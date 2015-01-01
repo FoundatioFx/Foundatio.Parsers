@@ -39,11 +39,18 @@
     <PegGrammar Include="lucene-query.grammar" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Nodes\FieldExpression.cs" />
-    <Compile Include="Nodes\QueryExpression.cs" />
-    <Compile Include="Nodes\QueryGroup.cs" />
-    <Compile Include="Nodes\QueryNode.cs" />
+    <Compile Include="lucene-query.grammar.cs">
+      <DependentUpon>lucene-query.grammar</DependentUpon>
+    </Compile>
+    <Compile Include="Nodes\FieldExpressionNode.cs" />
+    <Compile Include="Nodes\IQueryNode.cs" />
+    <Compile Include="Nodes\TermNode.cs" />
+    <Compile Include="Nodes\GroupNode.cs" />
+    <Compile Include="Nodes\QueryNodeBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Visitor\GenerateQueryVisitor.cs" />
+    <Compile Include="Visitor\IQueryNodeVisitor.cs" />
+    <Compile Include="Visitor\QueryNodeVisitorBase.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="LuceneQueryParser.nuspec" />

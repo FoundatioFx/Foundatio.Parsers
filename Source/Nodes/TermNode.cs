@@ -1,6 +1,8 @@
-﻿namespace Exceptionless.LuceneQueryParser.Nodes {
-    public class QueryExpression : QueryNode {
-        public FieldExpression Field { get; set; }
+﻿using System.Collections.Generic;
+
+namespace Exceptionless.LuceneQueryParser.Nodes {
+    public class TermNode : QueryNodeBase {
+        public FieldExpressionNode Field { get; set; }
         public string TermMin { get; set; }
         public string TermMax { get; set; }
         public bool? Inclusive { get; set; }
@@ -10,7 +12,7 @@
         public string Prefix { get; set; }
         public double? Proximity { get; set; }
 
-        public QueryExpression CopyTo(QueryExpression target) {
+        public TermNode CopyTo(TermNode target) {
             if (Field != null)
                 target.Field = Field;
 
@@ -39,6 +41,12 @@
                 target.Proximity = Proximity;
 
             return target;
+        }
+
+        public override IEnumerable<IQueryNode> Children {
+            get {
+                yield return Field;
+            }
         }
     }
 }

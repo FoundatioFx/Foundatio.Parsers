@@ -3,24 +3,24 @@
 @using System.Linq;
 @using Exceptionless.LuceneQueryParser.Nodes;
 
-start<QueryGroup>
+start<GroupNode>
   = _* node:node+
     {
         node[0]
     }
   / _*
     {
-        new QueryGroup()
+        new GroupNode()
     }
   / EOF
     {
-        new QueryGroup()
+        new GroupNode()
     }
 
-node<QueryGroup>
+node<GroupNode>
   = op:operator_exp EOF
     {
-        new QueryGroup {
+        new GroupNode {
             Operator = op
         }
     }
@@ -30,13 +30,13 @@ node<QueryGroup>
     }
   / left:group_exp op:(operator_exp* "") right:node*
     {{
-        var node= new QueryGroup {
+        var node= new GroupNode {
             Left = left
         };
 
         var rightExp =
                 right.Count == 0
-                ? (QueryExpression)null
+                ? (TermNode)null
                 : right[0].Right == null
                     ? right[0].Left
                     : right[0];
@@ -50,23 +50,23 @@ node<QueryGroup>
         return node;
     }}
 
-group_exp<QueryNode>
+group_exp<IQueryNode>
   = field_exp:field_exp _*
     {
         field_exp
     }
   / paren_exp
 
-paren_exp<QueryGroup>
+paren_exp<GroupNode>
   = "(" node:node+ ")" _*
     {
         node[0]
     }
 
-field_exp<QueryNode>
+field_exp<IQueryNode>
   = name:fieldname? range:range_operator_exp
     {{
-        range.Field = name.Count > 0 ? name[0] : new FieldExpression { 
+        range.Field = name.Count > 0 ? name[0] : new FieldExpressionNode { 
             Field = "<implicit>"
         };
 
@@ -79,8 +79,8 @@ field_exp<QueryNode>
     }}
   / name:fieldname? term:term
     {{
-        var query = new QueryExpression {
-            Field = name.Count > 0 ? name[0] : new FieldExpression {
+        var query = new TermNode {
+            Field = name.Count > 0 ? name[0] : new FieldExpressionNode {
                 Field = "<implicit>"
             }
         };
@@ -90,20 +90,20 @@ field_exp<QueryNode>
         return query;
     }}
 
-fieldname<FieldExpression>
+fieldname<FieldExpressionNode>
   = op:prefix_operator_exp? fieldname:unquoted_term [:]
       {{
-        var result = new FieldExpression { Field = fieldname };
+        var result = new FieldExpressionNode { Field = fieldname };
 
         result.Prefix = op.SingleOrDefault();
 
         return result;
     }}
 
-term<QueryExpression>
+term<TermNode>
   = op:prefix_operator_exp? term:quoted_term proximity:proximity_modifier? boost:boost_modifier? _*
       {{
-        var result = new QueryExpression { Term = term };
+        var result = new TermNode { Term = term };
 
         if (proximity.Count > 0)
             result.Proximity = proximity.SingleOrDefault();
@@ -117,7 +117,7 @@ term<QueryExpression>
     }}
   / op:prefix_operator_exp? term:unquoted_term similarity:fuzzy_modifier? boost:boost_modifier? _*
     {{
-        var result = new QueryExpression { Term = term };
+        var result = new TermNode { Term = term };
 
         if (similarity.Count > 0)
             result.Similarity = similarity.SingleOrDefault();
@@ -176,10 +176,10 @@ int_exp<double>
         Double.Parse(val)
     }
 
-range_operator_exp<QueryExpression>
+range_operator_exp<TermNode>
   = '[' term_min:unquoted_term _* 'TO' _+ term_max:unquoted_term ']'
     {
-        new QueryExpression {
+        new TermNode {
             TermMin = term_min,
             TermMax = term_max,
             Inclusive = true
@@ -187,7 +187,7 @@ range_operator_exp<QueryExpression>
     }
   / '{' term_min:unquoted_term _* 'TO' _+ term_max:unquoted_term '}'
     {
-        new QueryExpression {
+        new TermNode {
             TermMin = term_min,
             TermMax = term_max,
             Inclusive = false
