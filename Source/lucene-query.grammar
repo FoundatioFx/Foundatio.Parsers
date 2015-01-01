@@ -1,0 +1,228 @@
+﻿﻿@namespace Exceptionless.LuceneQueryParser
+@classname QueryParser
+@using System.Linq;
+@using Exceptionless.LuceneQueryParser.Nodes;
+
+start<QueryGroup>
+  = _* node:node+
+    {
+        node[0]
+    }
+  / _*
+    {
+        new QueryGroup()
+    }
+  / EOF
+    {
+        new QueryGroup()
+    }
+
+node<QueryGroup>
+  = op:operator_exp EOF
+    {
+        new QueryGroup {
+            Operator = op
+        }
+    }
+  / op:operator_exp right:node
+    {
+        right
+    }
+  / left:group_exp op:(operator_exp* "") right:node*
+    {{
+        var node= new QueryGroup {
+            Left = left
+        };
+
+        var rightExp =
+                right.Count == 0
+                ? (QueryExpression)null
+                : right[0].Right == null
+                    ? right[0].Left
+                    : right[0];
+
+        if (rightExp != null)
+        {
+            node.Operator = op == "" ? "OR" : op.Trim();
+            node.Right = rightExp;
+        }
+
+        return node;
+    }}
+
+group_exp<QueryNode>
+  = field_exp:field_exp _*
+    {
+        field_exp
+    }
+  / paren_exp
+
+paren_exp<QueryGroup>
+  = "(" node:node+ ")" _*
+    {
+        node[0]
+    }
+
+field_exp<QueryNode>
+  = name:fieldname? range:range_operator_exp
+    {{
+        range.Field = name.Count > 0 ? name[0] : new FieldExpression { 
+            Field = "<implicit>"
+        };
+
+        return range;
+    }}
+  / name:fieldname node:paren_exp
+    {{
+        node.Field = name;
+        return node;
+    }}
+  / name:fieldname? term:term
+    {{
+        var query = new QueryExpression {
+            Field = name.Count > 0 ? name[0] : new FieldExpression {
+                Field = "<implicit>"
+            }
+        };
+
+        term.CopyTo(query);
+
+        return query;
+    }}
+
+fieldname<FieldExpression>
+  = op:prefix_operator_exp? fieldname:unquoted_term [:]
+      {{
+        var result = new FieldExpression { Field = fieldname };
+
+        result.Prefix = op.SingleOrDefault();
+
+        return result;
+    }}
+
+term<QueryExpression>
+  = op:prefix_operator_exp? term:quoted_term proximity:proximity_modifier? boost:boost_modifier? _*
+      {{
+        var result = new QueryExpression { Term = term };
+
+        if (proximity.Count > 0)
+            result.Proximity = proximity.SingleOrDefault();
+
+        if (boost.Count > 0)
+            result.Boost = boost.SingleOrDefault();
+
+        result.Prefix = op.SingleOrDefault();
+
+        return result;
+    }}
+  / op:prefix_operator_exp? term:unquoted_term similarity:fuzzy_modifier? boost:boost_modifier? _*
+    {{
+        var result = new QueryExpression { Term = term };
+
+        if (similarity.Count > 0)
+            result.Similarity = similarity.SingleOrDefault();
+
+        if (boost.Count > 0)
+            result.Boost = boost.SingleOrDefault();
+
+        result.Prefix = op.SingleOrDefault();
+
+        return result;
+    }}
+
+unquoted_term
+  = term:([^: \t\r\n\f\{\}\(\)"\+\-/^~\[\]]+ "")
+    {
+        term
+    }
+
+quoted_term
+  = '"' term:"" [^"]+ '"'
+    {
+        term
+    }
+
+proximity_modifier<double>
+  = '~' proximity:int_exp
+    {
+        proximity
+    }
+
+boost_modifier<double>
+  = '^' boost:decimal_or_int_exp
+    {
+        boost
+    }
+
+fuzzy_modifier<double>
+  = '~' fuzziness:"" decimal_exp?
+    {
+        fuzziness == "" ? 0.5 : Double.Parse(fuzziness)
+    }
+
+decimal_or_int_exp<double>
+ = decimal_exp
+ / int_exp
+
+decimal_exp<double>
+ = '0.' val:"" [0-9]+
+    {
+        Double.Parse("0." + val)
+    }
+
+int_exp<double>
+  = val:"" [0-9]+
+    {
+        Double.Parse(val)
+    }
+
+range_operator_exp<QueryExpression>
+  = '[' term_min:unquoted_term _* 'TO' _+ term_max:unquoted_term ']'
+    {
+        new QueryExpression {
+            TermMin = term_min,
+            TermMax = term_max,
+            Inclusive = true
+        }
+    }
+  / '{' term_min:unquoted_term _* 'TO' _+ term_max:unquoted_term '}'
+    {
+        new QueryExpression {
+            TermMin = term_min,
+            TermMax = term_max,
+            Inclusive = false
+        }
+    }
+
+operator_exp
+  = _* op:operator _+
+    {
+        op
+    }
+  / _* op:operator EOF
+    {
+        op
+    }
+
+operator
+  = "OR"
+  / "AND"
+  / "NOT"
+  / "||" { "OR" }
+  / "&&" { "AND" }
+
+prefix_operator_exp
+  = _* op:prefix_operator
+    {
+        op
+    }
+
+prefix_operator
+  = '+'
+  / '-'
+
+_
+  = [ \t\r\n\f]+
+
+EOF
+  = !.

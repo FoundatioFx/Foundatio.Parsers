@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>Exceptionless.LuceneQueryParser</id>
+    <version>$version$</version>
+    <title>Exceptionless LuceneQueryParser</title>
+    <authors>Exceptionless</authors>
+    <licenseUrl>http://www.apache.org/licenses/LICENSE-2.0</licenseUrl>
+    <projectUrl>https://github.com/exceptionless/Exceptionless.LuceneQueryParser</projectUrl>
+    <iconUrl>http://app.exceptionless.com/images/exceptionless-32.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A lucene style query parser that is extensible and allows additional syntax features.</description>
+    <tags>Lucene Query Parser</tags>
+  </metadata>
+</package>
