@@ -5,6 +5,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public IQueryNode Left { get; set; }
         public IQueryNode Right { get; set; }
         public string Operator { get; set; }
+        public bool HasParens { get; set; }
         public FieldExpressionNode Field { get; set; }
 
         public override IEnumerable<IQueryNode> Children {

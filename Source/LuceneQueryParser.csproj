@@ -39,6 +39,7 @@
     <PegGrammar Include="lucene-query.grammar" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Extensions\TextWriterExtensions.cs" />
     <Compile Include="lucene-query.grammar.cs">
       <DependentUpon>lucene-query.grammar</DependentUpon>
     </Compile>
@@ -48,6 +49,7 @@
     <Compile Include="Nodes\GroupNode.cs" />
     <Compile Include="Nodes\QueryNodeBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Visitor\DebugQueryVisitor.cs" />
     <Compile Include="Visitor\GenerateQueryVisitor.cs" />
     <Compile Include="Visitor\IQueryNodeVisitor.cs" />
     <Compile Include="Visitor\QueryNodeVisitorBase.cs" />

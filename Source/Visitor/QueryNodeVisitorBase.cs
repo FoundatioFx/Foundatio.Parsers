@@ -5,6 +5,5 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
         public virtual void Visit(GroupNode node) {}
         public virtual void Visit(TermNode node) {}
         public virtual void Visit(FieldExpressionNode node) {}
-        public virtual void Visit(IQueryNode node) {}
     }
 }

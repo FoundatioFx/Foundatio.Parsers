@@ -5,9 +5,11 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public FieldExpressionNode Field { get; set; }
         public string TermMin { get; set; }
         public string TermMax { get; set; }
-        public bool? Inclusive { get; set; }
+        public string TermDelimiter { get; set; }
+        public bool? MinInclusive { get; set; }
+        public bool? MaxInclusive { get; set; }
         public string Term { get; set; }
-        public double? Similarity { get; set; }
+        public bool IsQuotedTerm { get; set; }
         public double? Boost { get; set; }
         public string Prefix { get; set; }
         public double? Proximity { get; set; }
@@ -22,14 +24,16 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             if (TermMax != null)
                 target.TermMax = TermMax;
 
-            if (Inclusive.HasValue)
-                target.Inclusive = Inclusive;
+            if (MinInclusive.HasValue)
+                target.MinInclusive = MinInclusive;
+
+            if (MaxInclusive.HasValue)
+                target.MaxInclusive = MaxInclusive;
 
             if (Term != null)
                 target.Term = Term;
 
-            if (Similarity.HasValue)
-                target.Similarity = Similarity;
+            target.IsQuotedTerm = IsQuotedTerm;
 
             if (Boost.HasValue)
                 target.Boost = Boost;

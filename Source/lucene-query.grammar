@@ -4,18 +4,15 @@
 @using Exceptionless.LuceneQueryParser.Nodes;
 
 start<GroupNode>
-  = _* node:node+
+  = _* node:node
     {
-        node[0]
+        node
     }
-  / _*
-    {
-        new GroupNode()
-    }
-  / EOF
+  / _* EOF
     {
         new GroupNode()
     }
+  / #ERROR{ "Unable to parse query." }
 
 node<GroupNode>
   = op:operator_exp EOF
@@ -43,7 +40,7 @@ node<GroupNode>
 
         if (rightExp != null)
         {
-            node.Operator = op == "" ? "OR" : op.Trim();
+            node.Operator = !String.IsNullOrEmpty(op) ? op.Trim() : null;
             node.Right = rightExp;
         }
 
@@ -58,17 +55,16 @@ group_exp<IQueryNode>
   / paren_exp
 
 paren_exp<GroupNode>
-  = "(" node:node+ ")" _*
-    {
-        node[0]
-    }
+  = "(" node:node ")" _*
+    {{
+        node.HasParens = true;
+        return node;
+    }}
 
 field_exp<IQueryNode>
   = name:fieldname? range:range_operator_exp
     {{
-        range.Field = name.Count > 0 ? name[0] : new FieldExpressionNode { 
-            Field = "<implicit>"
-        };
+        range.Field = name.Count > 0 ? name[0] : null;
 
         return range;
     }}
@@ -80,9 +76,7 @@ field_exp<IQueryNode>
   / name:fieldname? term:term
     {{
         var query = new TermNode {
-            Field = name.Count > 0 ? name[0] : new FieldExpressionNode {
-                Field = "<implicit>"
-            }
+            Field = name.Count > 0 ? name[0] : null
         };
 
         term.CopyTo(query);
@@ -91,7 +85,7 @@ field_exp<IQueryNode>
     }}
 
 fieldname<FieldExpressionNode>
-  = op:prefix_operator_exp? fieldname:unquoted_term [:]
+  = op:prefix_operator_exp? fieldname:unquoted_term ':'
       {{
         var result = new FieldExpressionNode { Field = fieldname };
 
@@ -103,7 +97,7 @@ fieldname<FieldExpressionNode>
 term<TermNode>
   = op:prefix_operator_exp? term:quoted_term proximity:proximity_modifier? boost:boost_modifier? _*
       {{
-        var result = new TermNode { Term = term };
+        var result = new TermNode { Term = term, IsQuotedTerm = true };
 
         if (proximity.Count > 0)
             result.Proximity = proximity.SingleOrDefault();
@@ -115,12 +109,12 @@ term<TermNode>
 
         return result;
     }}
-  / op:prefix_operator_exp? term:unquoted_term similarity:fuzzy_modifier? boost:boost_modifier? _*
+  / op:prefix_operator_exp? term:unquoted_term proximity:proximity_modifier? boost:boost_modifier? _*
     {{
         var result = new TermNode { Term = term };
 
-        if (similarity.Count > 0)
-            result.Similarity = similarity.SingleOrDefault();
+        if (proximity.Count > 0)
+            result.Proximity = proximity.SingleOrDefault();
 
         if (boost.Count > 0)
             result.Boost = boost.SingleOrDefault();
@@ -136,16 +130,16 @@ unquoted_term
         term
     }
 
-quoted_term
-  = '"' term:"" [^"]+ '"'
+range_unquoted_term
+  = term:([^: \.\t\r\n\f\{\}\(\)"^~\[\]]+ "")
     {
         term
     }
 
-proximity_modifier<double>
-  = '~' proximity:int_exp
+quoted_term
+  = '"' term:([^"]+ "") '"'
     {
-        proximity
+        term
     }
 
 boost_modifier<double>
@@ -154,10 +148,10 @@ boost_modifier<double>
         boost
     }
 
-fuzzy_modifier<double>
-  = '~' fuzziness:"" decimal_exp?
+proximity_modifier<double>
+  = '~' proximity:(decimal_or_int_exp? "")
     {
-        fuzziness == "" ? 0.5 : Double.Parse(fuzziness)
+        String.IsNullOrEmpty(proximity) ? Double.MinValue : Double.Parse(proximity)
     }
 
 decimal_or_int_exp<double>
@@ -165,34 +159,62 @@ decimal_or_int_exp<double>
  / int_exp
 
 decimal_exp<double>
- = '0.' val:"" [0-9]+
+ = '0.' val:([0-9]+ "")
     {
         Double.Parse("0." + val)
     }
 
 int_exp<double>
-  = val:"" [0-9]+
-    {
+  = val:([0-9]+ "")
+    {      
         Double.Parse(val)
     }
 
 range_operator_exp<TermNode>
-  = '[' term_min:unquoted_term _* 'TO' _+ term_max:unquoted_term ']'
+  = '[' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term ']'
     {
         new TermNode {
             TermMin = term_min,
             TermMax = term_max,
-            Inclusive = true
+            MinInclusive = true,
+            MaxInclusive = true,
+            TermDelimiter = delim
         }
     }
-  / '{' term_min:unquoted_term _* 'TO' _+ term_max:unquoted_term '}'
+  / '{' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term '}'
     {
         new TermNode {
             TermMin = term_min,
             TermMax = term_max,
-            Inclusive = false
+            MinInclusive = false,
+            MaxInclusive = false,
+            TermDelimiter = delim
         }
     }
+  / '{' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term ']'
+    {
+        new TermNode {
+            TermMin = term_min,
+            TermMax = term_max,
+            MinInclusive = false,
+            MaxInclusive = true,
+            TermDelimiter = delim
+        }
+    }
+  / '[' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term '}'
+    {
+        new TermNode {
+            TermMin = term_min,
+            TermMax = term_max,
+            MinInclusive = true,
+            MaxInclusive = false,
+            TermDelimiter = delim
+        }
+    }
+
+range_delimiter_exp
+  = _+ 'TO' _+
+  / _* '..' _*
 
 operator_exp
   = _* op:operator _+

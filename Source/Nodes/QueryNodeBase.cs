@@ -1,16 +1,23 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Exceptionless.LuceneQueryParser.Visitor;
 
 namespace Exceptionless.LuceneQueryParser.Nodes {
     public abstract class QueryNodeBase : IQueryNode, IEnumerable<IQueryNode> {
-        public virtual void Accept(IQueryNodeVisitor visitor) {
-            visitor.Visit(this);
+        public virtual void Accept(IQueryNodeVisitor visitor, bool visitChildren = true) {
+            if (this is GroupNode)
+                visitor.Visit((GroupNode)this);
+            else if (this is TermNode)
+                visitor.Visit((TermNode)this);
+            else if (this is FieldExpressionNode)
+                visitor.Visit((FieldExpressionNode)this);
 
-            foreach (var child in this) {
-                if (child != null)
-                    child.Accept(visitor);
-            }
+            if (!visitChildren)
+                return;
+
+            foreach (var child in this.Where(child => child != null))
+                child.Accept(visitor);
         }
 
         public abstract IEnumerable<IQueryNode> Children { get; }
