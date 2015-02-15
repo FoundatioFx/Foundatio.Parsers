@@ -85,7 +85,7 @@ field_exp<IQueryNode>
     }}
 
 fieldname<FieldExpressionNode>
-  = op:prefix_operator_exp? fieldname:unquoted_term ':'
+  = op:prefix_operator_exp? fieldname:name_term ':'
       {{
         var result = new FieldExpressionNode { Field = fieldname };
 
@@ -123,6 +123,13 @@ term<TermNode>
 
         return result;
     }}
+
+    
+name_term
+  = term:([^: \t\r\n\f\{\}\(\)"/^~\[\]]+ "")
+    {
+        term
+    }
 
 unquoted_term
   = term:([^: \t\r\n\f\{\}\(\)"\+\-/^~\[\]]+ "")

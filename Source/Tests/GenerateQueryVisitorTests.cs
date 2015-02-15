@@ -7,6 +7,7 @@ using Xunit.Extensions;
 namespace Tests {
     public class GenerateQueryVisitorTests {
         [Theory]
+        [InlineData("string\"")]
         [InlineData("\"quoted string\"")]
         [InlineData("criteria")]
         [InlineData("(criteria)")]
@@ -20,6 +21,7 @@ namespace Tests {
         [InlineData("field:[1 TO 2]")]
         [InlineData("field:{1 TO 2}")]
         [InlineData("field:[1 TO 2}")]
+        [InlineData("data.Windows-identity:ejsmith")]
         [InlineData("field:(criteria1 criteria2)")]
         [InlineData("field:(criteria1 OR criteria2)")]
         [InlineData("date:>now")]

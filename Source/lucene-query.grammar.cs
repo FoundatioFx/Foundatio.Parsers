@@ -679,7 +679,7 @@ namespace
             {
                 IParseResult<string> r3 = null;
                 var fieldnameStart = cursor;
-                r3 = this.unquoted_term(ref cursor);
+                r3 = this.name_term(ref cursor);
                 var fieldnameEnd = cursor;
                 var fieldname = ValueOrDefault(r3);
                 if (r3 != null)
@@ -1003,6 +1003,77 @@ namespace
             return r0;
         }
 
+        private IParseResult<string> name_term(ref Cursor cursor)
+        {
+            IParseResult<string> r0 = null;
+            var startCursor0 = cursor;
+            IParseResult<string> r1 = null;
+            var termStart = cursor;
+            var startCursor1 = cursor;
+            IParseResult<IList<string>> r2 = null;
+            var startCursor2 = cursor;
+            var l0 = new List<string>();
+            while (true)
+            {
+                IParseResult<string> r3 = null;
+                r3 = this.ParseClass(ref cursor, "::  \t\t\r\r\n\n\f\f{{}}(())\"\"//^^~~[[]]", negated: true);
+                if (r3 != null)
+                {
+                    l0.Add(r3.Value);
+                }
+                else
+                {
+                    break;
+                }
+            }
+            if (l0.Count >= 1)
+            {
+                r2 = this.ReturnHelper<IList<string>>(startCursor2, ref cursor, state => l0.AsReadOnly());
+            }
+            else
+            {
+                cursor = startCursor2;
+            }
+            if (r2 != null)
+            {
+                IParseResult<string> r4 = null;
+                r4 = this.ParseLiteral(ref cursor, "");
+                if (r4 != null)
+                {
+                    {
+                        var len = cursor.Location - startCursor1.Location;
+                        r1 = this.ReturnHelper<string>(startCursor1, ref cursor, state =>
+                            state.Subject.Substring(startCursor1.Location, len)
+                            );
+                    }
+                }
+                else
+                {
+                    cursor = startCursor1;
+                }
+            }
+            else
+            {
+                cursor = startCursor1;
+            }
+            var termEnd = cursor;
+            var term = ValueOrDefault(r1);
+            if (r1 != null)
+            {
+                r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
+                    #line 130 "lucene-query.grammar"
+     
+        term
+                    #line default
+                    );
+            }
+            else
+            {
+                cursor = startCursor0;
+            }
+            return r0;
+        }
+
         private IParseResult<string> unquoted_term(ref Cursor cursor)
         {
             IParseResult<string> r0 = null;
@@ -1061,7 +1132,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 129 "lucene-query.grammar"
+                    #line 136 "lucene-query.grammar"
      
         term
                     #line default
@@ -1132,7 +1203,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 135 "lucene-query.grammar"
+                    #line 142 "lucene-query.grammar"
      
         term
                     #line default
@@ -1211,7 +1282,7 @@ namespace
                     if (r6 != null)
                     {
                         r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                            #line 141 "lucene-query.grammar"
+                            #line 148 "lucene-query.grammar"
      
         term
                             #line default
@@ -1235,7 +1306,7 @@ namespace
         }
 
         private IParseResult<
-            #line 145 "lucene-query.grammar"
+            #line 152 "lucene-query.grammar"
                double
             #line default
             > boost_modifier(ref Cursor cursor)
@@ -1254,7 +1325,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                        #line 147 "lucene-query.grammar"
+                        #line 154 "lucene-query.grammar"
      
         boost
                         #line default
@@ -1273,7 +1344,7 @@ namespace
         }
 
         private IParseResult<
-            #line 151 "lucene-query.grammar"
+            #line 158 "lucene-query.grammar"
                    double
             #line default
             > proximity_modifier(ref Cursor cursor)
@@ -1331,7 +1402,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                        #line 153 "lucene-query.grammar"
+                        #line 160 "lucene-query.grammar"
      
         String.IsNullOrEmpty(proximity) ? Double.MinValue : Double.Parse(proximity)
                         #line default
@@ -1350,7 +1421,7 @@ namespace
         }
 
         private IParseResult<
-            #line 157 "lucene-query.grammar"
+            #line 164 "lucene-query.grammar"
                    double
             #line default
             > decimal_or_int_exp(ref Cursor cursor)
@@ -1368,7 +1439,7 @@ namespace
         }
 
         private IParseResult<
-            #line 161 "lucene-query.grammar"
+            #line 168 "lucene-query.grammar"
             double
             #line default
             > decimal_exp(ref Cursor cursor)
@@ -1433,7 +1504,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                        #line 163 "lucene-query.grammar"
+                        #line 170 "lucene-query.grammar"
      
         Double.Parse("0." + val)
                         #line default
@@ -1452,7 +1523,7 @@ namespace
         }
 
         private IParseResult<
-            #line 167 "lucene-query.grammar"
+            #line 174 "lucene-query.grammar"
         double
             #line default
             > int_exp(ref Cursor cursor)
@@ -1513,7 +1584,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                    #line 169 "lucene-query.grammar"
+                    #line 176 "lucene-query.grammar"
            
         Double.Parse(val)
                     #line default
@@ -1527,7 +1598,7 @@ namespace
         }
 
         private IParseResult<
-            #line 173 "lucene-query.grammar"
+            #line 180 "lucene-query.grammar"
                    TermNode
             #line default
             > range_operator_exp(ref Cursor cursor)
@@ -1566,7 +1637,7 @@ namespace
                                 if (r5 != null)
                                 {
                                     r0 = this.ReturnHelper<TermNode>(startCursor0, ref cursor, state =>
-                                        #line 175 "lucene-query.grammar"
+                                        #line 182 "lucene-query.grammar"
      
         new TermNode {
             TermMin = term_min,
@@ -1636,7 +1707,7 @@ namespace
                                 if (r10 != null)
                                 {
                                     r0 = this.ReturnHelper<TermNode>(startCursor1, ref cursor, state =>
-                                        #line 185 "lucene-query.grammar"
+                                        #line 192 "lucene-query.grammar"
      
         new TermNode {
             TermMin = term_min,
@@ -1706,7 +1777,7 @@ namespace
                                 if (r15 != null)
                                 {
                                     r0 = this.ReturnHelper<TermNode>(startCursor2, ref cursor, state =>
-                                        #line 195 "lucene-query.grammar"
+                                        #line 202 "lucene-query.grammar"
      
         new TermNode {
             TermMin = term_min,
@@ -1776,7 +1847,7 @@ namespace
                                 if (r20 != null)
                                 {
                                     r0 = this.ReturnHelper<TermNode>(startCursor3, ref cursor, state =>
-                                        #line 205 "lucene-query.grammar"
+                                        #line 212 "lucene-query.grammar"
      
         new TermNode {
             TermMin = term_min,
@@ -2029,7 +2100,7 @@ namespace
                         if (r4 != null)
                         {
                             r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                                #line 221 "lucene-query.grammar"
+                                #line 228 "lucene-query.grammar"
      
         op
                                 #line default
@@ -2084,7 +2155,7 @@ namespace
                         if (r9 != null)
                         {
                             r0 = this.ReturnHelper<string>(startCursor3, ref cursor, state =>
-                                #line 225 "lucene-query.grammar"
+                                #line 232 "lucene-query.grammar"
      
         op
                                 #line default
@@ -2131,7 +2202,7 @@ namespace
                 if (r1 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 233 "lucene-query.grammar"
+                        #line 240 "lucene-query.grammar"
            "OR"
                         #line default
                         );
@@ -2149,7 +2220,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor1, ref cursor, state =>
-                        #line 234 "lucene-query.grammar"
+                        #line 241 "lucene-query.grammar"
            "AND"
                         #line default
                         );
@@ -2193,7 +2264,7 @@ namespace
                 if (r3 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 238 "lucene-query.grammar"
+                        #line 245 "lucene-query.grammar"
      
         op
                         #line default
