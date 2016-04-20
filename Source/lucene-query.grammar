@@ -84,7 +84,7 @@ field_exp<IQueryNode>
         return query;
     }}
 
-fieldname<FieldExpressionNode>
+fieldname<FieldExpressionNode> -lexical
   = op:prefix_operator_exp? fieldname:name_term ':'
       {{
         var result = new FieldExpressionNode { Field = fieldname };
@@ -232,7 +232,7 @@ operator_exp
         op
     }
 
-operator
+operator -lexical
   = "OR"
   / "AND"
   / "NOT"
@@ -245,7 +245,7 @@ prefix_operator_exp
         op
     }
 
-prefix_operator
+prefix_operator -lexical
   = '+'
   / '-'
 

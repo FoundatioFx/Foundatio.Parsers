@@ -63,6 +63,7 @@ namespace Tests {
         [InlineData("data.age:[* TO 10]", "data.age:[* TO 10]", true)]
         [InlineData("hidden:true AND data.age:(>30 AND <=40)", "hidden:true AND data.age:(>30 AND <=40)", true)]
         [InlineData("hidden:true", "hidden:true", true)]
+        [InlineData("min:price count:(category count:subcategory avg:price min:price)", "min:price count:(category count:subcategory avg:price min:price)", true)]
         public void CanGenerateQuery(string query, string expected, bool isValid) {
             var parser = new QueryParser();
 

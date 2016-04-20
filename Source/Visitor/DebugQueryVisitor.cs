@@ -17,16 +17,13 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.WriteLine("Group:");
             _writer.Indent++;
 
-            if (node.Field != null)
-                node.Field.Accept(this, false);
+            node.Field?.Accept(this, false);
 
             _writer.WriteIf(node.Left != null, "Left - ");
-            if (node.Left != null)
-                node.Left.Accept(this, false);
+            node.Left?.Accept(this, false);
 
             _writer.WriteIf(node.Right != null, "Right - ");
-            if (node.Right != null)
-                node.Right.Accept(this, false);
+            node.Right?.Accept(this, false);
 
             _writer.WriteLineIf(node.Operator != null, "Operator: {0}", node.Operator);
             _writer.WriteLineIf(node.HasParens, "Parens: true");
@@ -60,7 +57,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.Indent--;
         }
 
-        public string Result { get { return _builder.ToString(); } }
+        public string Result => _builder.ToString();
 
         public static string Run(IQueryNode node) {
             var visitor = new DebugQueryVisitor();

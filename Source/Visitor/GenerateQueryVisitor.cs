@@ -7,22 +7,19 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
         private readonly StringBuilder _builder = new StringBuilder();
 
         public override void Visit(GroupNode node) {
-            if (node.Field != null)
-                node.Field.Accept(this, false);
+            node.Field?.Accept(this, false);
 
             if (node.HasParens)
                 _builder.Append("(");
 
-            if (node.Left != null)
-                node.Left.Accept(this, false);
+            node.Left?.Accept(this, false);
 
             if (!String.IsNullOrEmpty(node.Operator))
                 _builder.Append(" " + node.Operator + " ");
             else if (node.Right != null)
                 _builder.Append(" ");
 
-            if (node.Right != null)
-                node.Right.Accept(this, false);
+            node.Right?.Accept(this, false);
 
             if (node.HasParens)
                 _builder.Append(")");
@@ -31,8 +28,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
         public override void Visit(TermNode node) {
             _builder.Append(node.Prefix);
 
-            if (node.Field != null)
-                node.Field.Accept(this, false);
+            node.Field?.Accept(this, false);
 
             if (node.MinInclusive.HasValue)
                 _builder.Append(node.MinInclusive.Value ? "[" : "{");
@@ -65,7 +61,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _builder.Append(":");
         }
 
-        public string Query { get { return _builder.ToString(); } }
+        public string Query => _builder.ToString();
 
         public static string Run(IQueryNode node) {
             var visitor = new GenerateQueryVisitor();
