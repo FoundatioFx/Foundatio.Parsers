@@ -1,34 +1,23 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text;
 
 namespace Exceptionless.LuceneQueryParser.Nodes {
     public class TermNode : QueryNodeBase {
-        public FieldExpressionNode Field { get; set; }
-        public string TermMin { get; set; }
-        public string TermMax { get; set; }
-        public string TermDelimiter { get; set; }
-        public bool? MinInclusive { get; set; }
-        public bool? MaxInclusive { get; set; }
+        public string Prefix { get; set; }
+        public string Field { get; set; }
         public string Term { get; set; }
         public bool IsQuotedTerm { get; set; }
         public double? Boost { get; set; }
-        public string Prefix { get; set; }
         public double? Proximity { get; set; }
 
         public TermNode CopyTo(TermNode target) {
+            if (Prefix != null)
+                target.Prefix = Prefix;
+
             if (Field != null)
                 target.Field = Field;
-
-            if (TermMin != null)
-                target.TermMin = TermMin;
-
-            if (TermMax != null)
-                target.TermMax = TermMax;
-
-            if (MinInclusive.HasValue)
-                target.MinInclusive = MinInclusive;
-
-            if (MaxInclusive.HasValue)
-                target.MaxInclusive = MaxInclusive;
 
             if (Term != null)
                 target.Term = Term;
@@ -38,19 +27,34 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             if (Boost.HasValue)
                 target.Boost = Boost;
 
-            if (Prefix != null)
-                target.Prefix = Prefix;
-
             if (Proximity.HasValue)
                 target.Proximity = Proximity;
 
             return target;
         }
 
-        public override IEnumerable<IQueryNode> Children {
-            get {
-                yield return Field;
+        public override String ToString() {
+            var builder = new StringBuilder();
+
+            builder.Append(Prefix);
+
+            if (!String.IsNullOrEmpty(Field)) {
+                builder.Append(Prefix);
+                builder.Append(Field);
+                builder.Append(":");
             }
+
+            builder.Append(IsQuotedTerm ? "\"" + Term + "\"" : Term);
+
+            if (Boost.HasValue)
+                builder.Append("^" + Boost);
+
+            if (Proximity.HasValue)
+                builder.Append("~" + (Proximity.Value != Double.MinValue ? Proximity.ToString() : String.Empty));
+
+            return builder.ToString();
         }
+
+        public override IList<IQueryNode> Children => EmptyNodeList;
     }
 }

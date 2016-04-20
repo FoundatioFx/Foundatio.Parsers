@@ -23,6 +23,7 @@ namespace Tests {
         [InlineData("criteria", "criteria", true)]
         [InlineData("(criteria)", "(criteria)", true)]
         [InlineData("field:criteria", "field:criteria", true)]
+        [InlineData("field :criteria", "field:criteria", true)]
         [InlineData("-criteria", "-criteria", true)]
         [InlineData("criteria1   criteria2", "criteria1 criteria2", true)]
         [InlineData("criteria1 +criteria2", "criteria1 +criteria2", true)]
@@ -51,6 +52,8 @@ namespace Tests {
         [InlineData("criter~1", "criter~1", true)]
         [InlineData("criter^2", "criter^2", true)]
         [InlineData("\"blah criter\"~1", "\"blah criter\"~1", true)]
+        [InlineData("count:>1", "count:>1", true)]
+        [InlineData("count:>=1", "count:>=1", true)]
         [InlineData("count:[1..5}", "count:[1..5}", true)]
         [InlineData("data.count:[1..5}", "data.count:[1..5}", true)]
         [InlineData("age:(>=10 AND < 20)", "age:(>=10 AND < 20)", true)]
@@ -60,10 +63,11 @@ namespace Tests {
         [InlineData("data.age:(+>=10 +<20)", "data.age:(+>=10 +<20)", true)]
         [InlineData("data.age:(->=10 AND < 20)", "data.age:(->=10 AND < 20)", true)]
         [InlineData("data.age:[10 TO *]", "data.age:[10 TO *]", true)]
+        [InlineData("title:(full text search)^2", "title:(full text search)^2", true)]
         [InlineData("data.age:[* TO 10]", "data.age:[* TO 10]", true)]
         [InlineData("hidden:true AND data.age:(>30 AND <=40)", "hidden:true AND data.age:(>30 AND <=40)", true)]
         [InlineData("hidden:true", "hidden:true", true)]
-        [InlineData("min:price count:(category count:subcategory avg:price min:price)", "min:price count:(category count:subcategory avg:price min:price)", true)]
+        [InlineData("min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", "min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", true)]
         public void CanGenerateQuery(string query, string expected, bool isValid) {
             var parser = new QueryParser();
 

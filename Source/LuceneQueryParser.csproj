@@ -38,18 +38,18 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- A reference to the entire .NET Framework is automatically included -->
-    <PegGrammar Include="lucene-query.grammar" />
+    <PegGrammar Include="lucene-query.peg" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Extensions\TextWriterExtensions.cs" />
-    <Compile Include="lucene-query.grammar.cs">
-      <DependentUpon>lucene-query.grammar</DependentUpon>
+    <Compile Include="lucene-query.peg.cs">
+      <DependentUpon>lucene-query.peg</DependentUpon>
     </Compile>
-    <Compile Include="Nodes\FieldExpressionNode.cs" />
     <Compile Include="Nodes\IQueryNode.cs" />
     <Compile Include="Nodes\TermNode.cs" />
     <Compile Include="Nodes\GroupNode.cs" />
     <Compile Include="Nodes\QueryNodeBase.cs" />
+    <Compile Include="Nodes\TermRangeNode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Visitor\DebugQueryVisitor.cs" />
     <Compile Include="Visitor\GenerateQueryVisitor.cs" />

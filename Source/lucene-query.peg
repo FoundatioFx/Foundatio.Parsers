@@ -3,6 +3,14 @@
 @using System.Linq;
 @using Exceptionless.LuceneQueryParser.Nodes;
 
+@members
+{
+    public class FieldInfo {
+        public string Field { get; set; }
+        public string Prefix { get; set; }
+    }
+}
+
 start<GroupNode>
   = _* node:node
     {
@@ -55,39 +63,50 @@ group_exp<IQueryNode>
   / paren_exp
 
 paren_exp<GroupNode>
-  = "(" node:node ")" _*
+  = "(" node:node ")" boost:boost_modifier? _*
     {{
         node.HasParens = true;
+
+        if (boost.Count > 0)
+            node.Boost = boost.SingleOrDefault();
+
         return node;
     }}
 
 field_exp<IQueryNode>
   = name:fieldname? range:range_operator_exp
     {{
-        range.Field = name.Count > 0 ? name[0] : null;
+        if (name.Count == 1) {
+          range.Field = name[0].Field;
+          range.Prefix = name[0].Prefix;
+        }
 
         return range;
     }}
   / name:fieldname node:paren_exp
     {{
-        node.Field = name;
+        node.Field = name.Field;
+        node.Prefix = name.Prefix;
         return node;
     }}
   / name:fieldname? term:term
     {{
-        var query = new TermNode {
-            Field = name.Count > 0 ? name[0] : null
-        };
+        var query = new TermNode();
+
+        if (name.Count == 1) {
+          query.Field = name[0].Field;
+          query.Prefix = name[0].Prefix;
+        }
 
         term.CopyTo(query);
 
         return query;
     }}
 
-fieldname<FieldExpressionNode> -lexical
-  = op:prefix_operator_exp? fieldname:name_term ':'
+fieldname<FieldInfo> -lexical
+  = op:prefix_operator_exp? fieldname:name_term _* ':'
       {{
-        var result = new FieldExpressionNode { Field = fieldname };
+        var result = new FieldInfo { Field = fieldname };
 
         result.Prefix = op.SingleOrDefault();
 
@@ -176,45 +195,45 @@ int_exp<double>
         Double.Parse(val)
     }
 
-range_operator_exp<TermNode>
+range_operator_exp<TermRangeNode>
   = '[' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term ']'
     {
-        new TermNode {
-            TermMin = term_min,
-            TermMax = term_max,
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
             MinInclusive = true,
             MaxInclusive = true,
-            TermDelimiter = delim
+            Delimiter = delim
         }
     }
   / '{' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term '}'
     {
-        new TermNode {
-            TermMin = term_min,
-            TermMax = term_max,
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
             MinInclusive = false,
             MaxInclusive = false,
-            TermDelimiter = delim
+            Delimiter = delim
         }
     }
   / '{' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term ']'
     {
-        new TermNode {
-            TermMin = term_min,
-            TermMax = term_max,
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
             MinInclusive = false,
             MaxInclusive = true,
-            TermDelimiter = delim
+            Delimiter = delim
         }
     }
   / '[' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term '}'
     {
-        new TermNode {
-            TermMin = term_min,
-            TermMax = term_max,
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
             MinInclusive = true,
             MaxInclusive = false,
-            TermDelimiter = delim
+            Delimiter = delim
         }
     }
 

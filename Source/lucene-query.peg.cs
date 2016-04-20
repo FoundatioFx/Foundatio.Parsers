@@ -8,7 +8,7 @@
 // -----------------------------------------------------------------------
 
 namespace
-#line 1 "lucene-query.grammar"
+#line 1 "lucene-query.peg"
             Exceptionless.LuceneQueryParser
 #line default
 {
@@ -16,12 +16,12 @@ namespace
     using System.Collections.Generic;
     using Pegasus.Common;
     using
-        #line 3 "lucene-query.grammar"
+        #line 3 "lucene-query.peg"
        System.Linq
         #line default
         ;
     using
-        #line 4 "lucene-query.grammar"
+        #line 4 "lucene-query.peg"
        Exceptionless.LuceneQueryParser.Nodes
         #line default
         ;
@@ -32,10 +32,17 @@ namespace
     [System.CodeDom.Compiler.GeneratedCode("Pegasus", "3.1.2.0")]
     public
     partial class
-    #line 2 "lucene-query.grammar"
+    #line 2 "lucene-query.peg"
            QueryParser
     #line default
     {
+        #line 7 "lucene-query.peg"
+ 
+    public class FieldInfo {
+        public string Field { get; set; }
+        public string Prefix { get; set; }
+    }
+        #line default
 
         /// <summary>
         ///  Parses a string according to the rules of the <see cref="QueryParser" /> grammar.
@@ -77,7 +84,7 @@ namespace
         }
 
         private IParseResult<
-            #line 6 "lucene-query.grammar"
+            #line 14 "lucene-query.peg"
       GroupNode
             #line default
             > start(ref Cursor cursor)
@@ -113,7 +120,7 @@ namespace
                     if (r3 != null)
                     {
                         r0 = this.ReturnHelper<GroupNode>(startCursor0, ref cursor, state =>
-                            #line 8 "lucene-query.grammar"
+                            #line 16 "lucene-query.peg"
      
         node
                             #line default
@@ -156,7 +163,7 @@ namespace
                     if (r6 != null)
                     {
                         r0 = this.ReturnHelper<GroupNode>(startCursor2, ref cursor, state =>
-                            #line 12 "lucene-query.grammar"
+                            #line 20 "lucene-query.peg"
      
         new GroupNode()
                             #line default
@@ -176,7 +183,7 @@ namespace
             {
                 var startCursor4 = cursor;
                 throw this.ExceptionHelper(startCursor4, state =>
-                    #line 15 "lucene-query.grammar"
+                    #line 23 "lucene-query.peg"
             "Unable to parse query."
                     #line default
                     );
@@ -185,7 +192,7 @@ namespace
         }
 
         private IParseResult<
-            #line 17 "lucene-query.grammar"
+            #line 25 "lucene-query.peg"
      GroupNode
             #line default
             > node(ref Cursor cursor)
@@ -206,7 +213,7 @@ namespace
                     if (r2 != null)
                     {
                         r0 = this.ReturnHelper<GroupNode>(startCursor0, ref cursor, state =>
-                            #line 19 "lucene-query.grammar"
+                            #line 27 "lucene-query.peg"
      
         new GroupNode {
             Operator = op
@@ -242,7 +249,7 @@ namespace
                     if (r4 != null)
                     {
                         r0 = this.ReturnHelper<GroupNode>(startCursor1, ref cursor, state =>
-                            #line 25 "lucene-query.grammar"
+                            #line 33 "lucene-query.peg"
      
         right
                             #line default
@@ -337,7 +344,7 @@ namespace
                         if (r10 != null)
                         {
                             r0 = this.ReturnHelper<GroupNode>(startCursor2, ref cursor, state =>
-                                #line 29 "lucene-query.grammar"
+                                #line 37 "lucene-query.peg"
      {
         var node= new GroupNode {
             Left = left
@@ -380,7 +387,7 @@ namespace
         }
 
         private IParseResult<
-            #line 50 "lucene-query.grammar"
+            #line 58 "lucene-query.peg"
           IQueryNode
             #line default
             > group_exp(ref Cursor cursor)
@@ -416,7 +423,7 @@ namespace
                     if (r2 != null)
                     {
                         r0 = this.ReturnHelper<IQueryNode>(startCursor0, ref cursor, state =>
-                            #line 52 "lucene-query.grammar"
+                            #line 60 "lucene-query.peg"
      
         field_exp
                             #line default
@@ -440,7 +447,7 @@ namespace
         }
 
         private IParseResult<
-            #line 57 "lucene-query.grammar"
+            #line 65 "lucene-query.peg"
           GroupNode
             #line default
             > paren_exp(ref Cursor cursor)
@@ -462,13 +469,14 @@ namespace
                     r3 = this.ParseLiteral(ref cursor, ")");
                     if (r3 != null)
                     {
-                        IParseResult<IList<IList<string>>> r4 = null;
+                        IParseResult<IList<double>> r4 = null;
+                        var boostStart = cursor;
                         var startCursor1 = cursor;
-                        var l0 = new List<IList<string>>();
-                        while (true)
+                        var l0 = new List<double>();
+                        while (l0.Count < 1)
                         {
-                            IParseResult<IList<string>> r5 = null;
-                            r5 = this._(ref cursor);
+                            IParseResult<double> r5 = null;
+                            r5 = this.boost_modifier(ref cursor);
                             if (r5 != null)
                             {
                                 l0.Add(r5.Value);
@@ -478,17 +486,47 @@ namespace
                                 break;
                             }
                         }
-                        r4 = this.ReturnHelper<IList<IList<string>>>(startCursor1, ref cursor, state => l0.AsReadOnly());
+                        r4 = this.ReturnHelper<IList<double>>(startCursor1, ref cursor, state => l0.AsReadOnly());
+                        var boostEnd = cursor;
+                        var boost = ValueOrDefault(r4);
                         if (r4 != null)
                         {
-                            r0 = this.ReturnHelper<GroupNode>(startCursor0, ref cursor, state =>
-                                #line 59 "lucene-query.grammar"
+                            IParseResult<IList<IList<string>>> r6 = null;
+                            var startCursor2 = cursor;
+                            var l1 = new List<IList<string>>();
+                            while (true)
+                            {
+                                IParseResult<IList<string>> r7 = null;
+                                r7 = this._(ref cursor);
+                                if (r7 != null)
+                                {
+                                    l1.Add(r7.Value);
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            r6 = this.ReturnHelper<IList<IList<string>>>(startCursor2, ref cursor, state => l1.AsReadOnly());
+                            if (r6 != null)
+                            {
+                                r0 = this.ReturnHelper<GroupNode>(startCursor0, ref cursor, state =>
+                                    #line 67 "lucene-query.peg"
      {
         node.HasParens = true;
+
+        if (boost.Count > 0)
+            node.Boost = boost.SingleOrDefault();
+
         return node;
     }
-                                #line default
-                                );
+                                    #line default
+                                    );
+                            }
+                            else
+                            {
+                                cursor = startCursor0;
+                            }
                         }
                         else
                         {
@@ -513,7 +551,7 @@ namespace
         }
 
         private IParseResult<
-            #line 64 "lucene-query.grammar"
+            #line 76 "lucene-query.peg"
           IQueryNode
             #line default
             > field_exp(ref Cursor cursor)
@@ -522,13 +560,13 @@ namespace
             if (r0 == null)
             {
                 var startCursor0 = cursor;
-                IParseResult<IList<FieldExpressionNode>> r1 = null;
+                IParseResult<IList<FieldInfo>> r1 = null;
                 var nameStart = cursor;
                 var startCursor1 = cursor;
-                var l0 = new List<FieldExpressionNode>();
+                var l0 = new List<FieldInfo>();
                 while (l0.Count < 1)
                 {
-                    IParseResult<FieldExpressionNode> r2 = null;
+                    IParseResult<FieldInfo> r2 = null;
                     r2 = this.fieldname(ref cursor);
                     if (r2 != null)
                     {
@@ -539,12 +577,12 @@ namespace
                         break;
                     }
                 }
-                r1 = this.ReturnHelper<IList<FieldExpressionNode>>(startCursor1, ref cursor, state => l0.AsReadOnly());
+                r1 = this.ReturnHelper<IList<FieldInfo>>(startCursor1, ref cursor, state => l0.AsReadOnly());
                 var nameEnd = cursor;
                 var name = ValueOrDefault(r1);
                 if (r1 != null)
                 {
-                    IParseResult<TermNode> r3 = null;
+                    IParseResult<TermRangeNode> r3 = null;
                     var rangeStart = cursor;
                     r3 = this.range_operator_exp(ref cursor);
                     var rangeEnd = cursor;
@@ -552,9 +590,12 @@ namespace
                     if (r3 != null)
                     {
                         r0 = this.ReturnHelper<IQueryNode>(startCursor0, ref cursor, state =>
-                            #line 66 "lucene-query.grammar"
+                            #line 78 "lucene-query.peg"
      {
-        range.Field = name.Count > 0 ? name[0] : null;
+        if (name.Count == 1) {
+          range.Field = name[0].Field;
+          range.Prefix = name[0].Prefix;
+        }
 
         return range;
     }
@@ -574,7 +615,7 @@ namespace
             if (r0 == null)
             {
                 var startCursor2 = cursor;
-                IParseResult<FieldExpressionNode> r4 = null;
+                IParseResult<FieldInfo> r4 = null;
                 var nameStart = cursor;
                 r4 = this.fieldname(ref cursor);
                 var nameEnd = cursor;
@@ -589,9 +630,10 @@ namespace
                     if (r5 != null)
                     {
                         r0 = this.ReturnHelper<IQueryNode>(startCursor2, ref cursor, state =>
-                            #line 72 "lucene-query.grammar"
+                            #line 87 "lucene-query.peg"
      {
-        node.Field = name;
+        node.Field = name.Field;
+        node.Prefix = name.Prefix;
         return node;
     }
                             #line default
@@ -610,13 +652,13 @@ namespace
             if (r0 == null)
             {
                 var startCursor3 = cursor;
-                IParseResult<IList<FieldExpressionNode>> r6 = null;
+                IParseResult<IList<FieldInfo>> r6 = null;
                 var nameStart = cursor;
                 var startCursor4 = cursor;
-                var l1 = new List<FieldExpressionNode>();
+                var l1 = new List<FieldInfo>();
                 while (l1.Count < 1)
                 {
-                    IParseResult<FieldExpressionNode> r7 = null;
+                    IParseResult<FieldInfo> r7 = null;
                     r7 = this.fieldname(ref cursor);
                     if (r7 != null)
                     {
@@ -627,7 +669,7 @@ namespace
                         break;
                     }
                 }
-                r6 = this.ReturnHelper<IList<FieldExpressionNode>>(startCursor4, ref cursor, state => l1.AsReadOnly());
+                r6 = this.ReturnHelper<IList<FieldInfo>>(startCursor4, ref cursor, state => l1.AsReadOnly());
                 var nameEnd = cursor;
                 var name = ValueOrDefault(r6);
                 if (r6 != null)
@@ -640,11 +682,14 @@ namespace
                     if (r8 != null)
                     {
                         r0 = this.ReturnHelper<IQueryNode>(startCursor3, ref cursor, state =>
-                            #line 77 "lucene-query.grammar"
+                            #line 93 "lucene-query.peg"
      {
-        var query = new TermNode {
-            Field = name.Count > 0 ? name[0] : null
-        };
+        var query = new TermNode();
+
+        if (name.Count == 1) {
+          query.Field = name[0].Field;
+          query.Prefix = name[0].Prefix;
+        }
 
         term.CopyTo(query);
 
@@ -667,12 +712,12 @@ namespace
         }
 
         private IParseResult<
-            #line 87 "lucene-query.grammar"
-          FieldExpressionNode
+            #line 106 "lucene-query.peg"
+          FieldInfo
             #line default
             > fieldname(ref Cursor cursor)
         {
-            IParseResult<FieldExpressionNode> r0 = null;
+            IParseResult<FieldInfo> r0 = null;
             var startCursor0 = cursor;
             IParseResult<IList<string>> r1 = null;
             var opStart = cursor;
@@ -703,21 +748,45 @@ namespace
                 var fieldname = ValueOrDefault(r3);
                 if (r3 != null)
                 {
-                    IParseResult<string> r4 = null;
-                    r4 = this.ParseLiteral(ref cursor, ":");
+                    IParseResult<IList<IList<string>>> r4 = null;
+                    var startCursor2 = cursor;
+                    var l1 = new List<IList<string>>();
+                    while (true)
+                    {
+                        IParseResult<IList<string>> r5 = null;
+                        r5 = this._(ref cursor);
+                        if (r5 != null)
+                        {
+                            l1.Add(r5.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    r4 = this.ReturnHelper<IList<IList<string>>>(startCursor2, ref cursor, state => l1.AsReadOnly());
                     if (r4 != null)
                     {
-                        r0 = this.ReturnHelper<FieldExpressionNode>(startCursor0, ref cursor, state =>
-                            #line 89 "lucene-query.grammar"
+                        IParseResult<string> r6 = null;
+                        r6 = this.ParseLiteral(ref cursor, ":");
+                        if (r6 != null)
+                        {
+                            r0 = this.ReturnHelper<FieldInfo>(startCursor0, ref cursor, state =>
+                                #line 108 "lucene-query.peg"
        {
-        var result = new FieldExpressionNode { Field = fieldname };
+        var result = new FieldInfo { Field = fieldname };
 
         result.Prefix = op.SingleOrDefault();
 
         return result;
     }
-                            #line default
-                            , ruleName: "fieldname");
+                                #line default
+                                , ruleName: "fieldname");
+                        }
+                        else
+                        {
+                            cursor = startCursor0;
+                        }
                     }
                     else
                     {
@@ -737,7 +806,7 @@ namespace
         }
 
         private IParseResult<
-            #line 97 "lucene-query.grammar"
+            #line 116 "lucene-query.peg"
      TermNode
             #line default
             > term(ref Cursor cursor)
@@ -839,7 +908,7 @@ namespace
                                 if (r8 != null)
                                 {
                                     r0 = this.ReturnHelper<TermNode>(startCursor0, ref cursor, state =>
-                                        #line 99 "lucene-query.grammar"
+                                        #line 118 "lucene-query.peg"
        {
         var result = new TermNode { Term = term, IsQuotedTerm = true };
 
@@ -977,7 +1046,7 @@ namespace
                                 if (r17 != null)
                                 {
                                     r0 = this.ReturnHelper<TermNode>(startCursor5, ref cursor, state =>
-                                        #line 113 "lucene-query.grammar"
+                                        #line 132 "lucene-query.peg"
      {
         var result = new TermNode { Term = term };
 
@@ -1080,7 +1149,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 129 "lucene-query.grammar"
+                    #line 148 "lucene-query.peg"
      
         term
                     #line default
@@ -1151,7 +1220,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 135 "lucene-query.grammar"
+                    #line 154 "lucene-query.peg"
      
         term
                     #line default
@@ -1222,7 +1291,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 141 "lucene-query.grammar"
+                    #line 160 "lucene-query.peg"
      
         term
                     #line default
@@ -1301,7 +1370,7 @@ namespace
                     if (r6 != null)
                     {
                         r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                            #line 147 "lucene-query.grammar"
+                            #line 166 "lucene-query.peg"
      
         term
                             #line default
@@ -1325,7 +1394,7 @@ namespace
         }
 
         private IParseResult<
-            #line 151 "lucene-query.grammar"
+            #line 170 "lucene-query.peg"
                double
             #line default
             > boost_modifier(ref Cursor cursor)
@@ -1344,7 +1413,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                        #line 153 "lucene-query.grammar"
+                        #line 172 "lucene-query.peg"
      
         boost
                         #line default
@@ -1363,7 +1432,7 @@ namespace
         }
 
         private IParseResult<
-            #line 157 "lucene-query.grammar"
+            #line 176 "lucene-query.peg"
                    double
             #line default
             > proximity_modifier(ref Cursor cursor)
@@ -1421,7 +1490,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                        #line 159 "lucene-query.grammar"
+                        #line 178 "lucene-query.peg"
      
         String.IsNullOrEmpty(proximity) ? Double.MinValue : Double.Parse(proximity)
                         #line default
@@ -1440,7 +1509,7 @@ namespace
         }
 
         private IParseResult<
-            #line 163 "lucene-query.grammar"
+            #line 182 "lucene-query.peg"
                    double
             #line default
             > decimal_or_int_exp(ref Cursor cursor)
@@ -1458,7 +1527,7 @@ namespace
         }
 
         private IParseResult<
-            #line 167 "lucene-query.grammar"
+            #line 186 "lucene-query.peg"
             double
             #line default
             > decimal_exp(ref Cursor cursor)
@@ -1523,7 +1592,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                        #line 169 "lucene-query.grammar"
+                        #line 188 "lucene-query.peg"
      
         Double.Parse("0." + val)
                         #line default
@@ -1542,7 +1611,7 @@ namespace
         }
 
         private IParseResult<
-            #line 173 "lucene-query.grammar"
+            #line 192 "lucene-query.peg"
         double
             #line default
             > int_exp(ref Cursor cursor)
@@ -1603,7 +1672,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                    #line 175 "lucene-query.grammar"
+                    #line 194 "lucene-query.peg"
            
         Double.Parse(val)
                     #line default
@@ -1617,12 +1686,12 @@ namespace
         }
 
         private IParseResult<
-            #line 179 "lucene-query.grammar"
-                   TermNode
+            #line 198 "lucene-query.peg"
+                   TermRangeNode
             #line default
             > range_operator_exp(ref Cursor cursor)
         {
-            IParseResult<TermNode> r0 = null;
+            IParseResult<TermRangeNode> r0 = null;
             if (r0 == null)
             {
                 var startCursor0 = cursor;
@@ -1655,15 +1724,15 @@ namespace
                                 r5 = this.ParseLiteral(ref cursor, "]");
                                 if (r5 != null)
                                 {
-                                    r0 = this.ReturnHelper<TermNode>(startCursor0, ref cursor, state =>
-                                        #line 181 "lucene-query.grammar"
+                                    r0 = this.ReturnHelper<TermRangeNode>(startCursor0, ref cursor, state =>
+                                        #line 200 "lucene-query.peg"
      
-        new TermNode {
-            TermMin = term_min,
-            TermMax = term_max,
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
             MinInclusive = true,
             MaxInclusive = true,
-            TermDelimiter = delim
+            Delimiter = delim
         }
                                         #line default
                                         );
@@ -1725,15 +1794,15 @@ namespace
                                 r10 = this.ParseLiteral(ref cursor, "}");
                                 if (r10 != null)
                                 {
-                                    r0 = this.ReturnHelper<TermNode>(startCursor1, ref cursor, state =>
-                                        #line 191 "lucene-query.grammar"
+                                    r0 = this.ReturnHelper<TermRangeNode>(startCursor1, ref cursor, state =>
+                                        #line 210 "lucene-query.peg"
      
-        new TermNode {
-            TermMin = term_min,
-            TermMax = term_max,
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
             MinInclusive = false,
             MaxInclusive = false,
-            TermDelimiter = delim
+            Delimiter = delim
         }
                                         #line default
                                         );
@@ -1795,15 +1864,15 @@ namespace
                                 r15 = this.ParseLiteral(ref cursor, "]");
                                 if (r15 != null)
                                 {
-                                    r0 = this.ReturnHelper<TermNode>(startCursor2, ref cursor, state =>
-                                        #line 201 "lucene-query.grammar"
+                                    r0 = this.ReturnHelper<TermRangeNode>(startCursor2, ref cursor, state =>
+                                        #line 220 "lucene-query.peg"
      
-        new TermNode {
-            TermMin = term_min,
-            TermMax = term_max,
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
             MinInclusive = false,
             MaxInclusive = true,
-            TermDelimiter = delim
+            Delimiter = delim
         }
                                         #line default
                                         );
@@ -1865,15 +1934,15 @@ namespace
                                 r20 = this.ParseLiteral(ref cursor, "}");
                                 if (r20 != null)
                                 {
-                                    r0 = this.ReturnHelper<TermNode>(startCursor3, ref cursor, state =>
-                                        #line 211 "lucene-query.grammar"
+                                    r0 = this.ReturnHelper<TermRangeNode>(startCursor3, ref cursor, state =>
+                                        #line 230 "lucene-query.peg"
      
-        new TermNode {
-            TermMin = term_min,
-            TermMax = term_max,
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
             MinInclusive = true,
             MaxInclusive = false,
-            TermDelimiter = delim
+            Delimiter = delim
         }
                                         #line default
                                         );
@@ -2119,7 +2188,7 @@ namespace
                         if (r4 != null)
                         {
                             r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                                #line 227 "lucene-query.grammar"
+                                #line 246 "lucene-query.peg"
      
         op
                                 #line default
@@ -2174,7 +2243,7 @@ namespace
                         if (r9 != null)
                         {
                             r0 = this.ReturnHelper<string>(startCursor3, ref cursor, state =>
-                                #line 231 "lucene-query.grammar"
+                                #line 250 "lucene-query.peg"
      
         op
                                 #line default
@@ -2221,7 +2290,7 @@ namespace
                 if (r1 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 239 "lucene-query.grammar"
+                        #line 258 "lucene-query.peg"
            "OR"
                         #line default
                         , ruleName: "operator");
@@ -2239,7 +2308,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor1, ref cursor, state =>
-                        #line 240 "lucene-query.grammar"
+                        #line 259 "lucene-query.peg"
            "AND"
                         #line default
                         , ruleName: "operator");
@@ -2283,7 +2352,7 @@ namespace
                 if (r3 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 244 "lucene-query.grammar"
+                        #line 263 "lucene-query.peg"
      
         op
                         #line default
