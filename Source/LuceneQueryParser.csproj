@@ -45,6 +45,8 @@
     <Compile Include="lucene-query.peg.cs">
       <DependentUpon>lucene-query.peg</DependentUpon>
     </Compile>
+    <Compile Include="Nodes\MissingNode.cs" />
+    <Compile Include="Nodes\ExistsNode.cs" />
     <Compile Include="Nodes\IQueryNode.cs" />
     <Compile Include="Nodes\TermNode.cs" />
     <Compile Include="Nodes\GroupNode.cs" />

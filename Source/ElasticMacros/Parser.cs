@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace ElasticMacros {
-    public class Parser {
+    public class ElasticMacroProcessor {
         // parser query, generate filter, generate aggregations
     }
 }

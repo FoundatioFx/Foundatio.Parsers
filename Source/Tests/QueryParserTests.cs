@@ -1,4 +1,5 @@
 ﻿using System;
+using ElasticMacros.Visitor;
 using Xunit;
 using Exceptionless.LuceneQueryParser;
 using Exceptionless.LuceneQueryParser.Nodes;
@@ -9,9 +10,6 @@ namespace Tests {
         public void CanParseQuery() {
             var parser = new QueryParser();
             var result = parser.Parse("criteria");
-            var r = parser.Parse("geogrid:75044~25 avg:somefield~1");
-            r = parser.Parse("count:category (count:subcategory)");
-            r = parser.Parse("count:(category count:subcategory)");
             Assert.NotNull(result);
             Assert.NotNull(result.Left);
             Assert.IsType<TermNode>(result.Left);
@@ -20,6 +18,18 @@ namespace Tests {
 
         [Fact]
         public void ElasticMacros() {
+            var parser = new QueryParser();
+            var result = parser.Parse("field1:value1 (field2:value2 OR field3:value3)");
+            var filterContainer = FilterContainerVisitor.Run(result);
+            //var settings = new JsonSerializerSettings {
+            //    ContractResolver = new ElasticContractResolver(new ConnectionSettings(), new List<Func<Type, JsonConverter>>()),
+            //    Formatting = Formatting.Indented,
+            //    DefaultValueHandling = DefaultValueHandling.Ignore
+            //};
+
+            //var blah = +new TermQuery { Field = "field1", Value = "value1" } && (+new TermQuery { Field = "field2", Value = "value2" } || +new TermQuery { Field = "field3", Value = "field3" });
+            //string json = JsonConvert.SerializeObject(blah, settings);
+
             //var parser = new ElasticMacros.Parser();
             //var result = parser.Parse("criteria");
             //var r = parser.Parse("geogrid:75044~25 avg:somefield~1");

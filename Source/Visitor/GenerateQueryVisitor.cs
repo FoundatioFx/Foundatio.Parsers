@@ -18,6 +18,14 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _builder.Append(node);
         }
 
+        public override void Visit(ExistsNode node) {
+            _builder.Append(node);
+        }
+
+        public override void Visit(MissingNode node) {
+            _builder.Append(node);
+        }
+
         public string Query => _builder.ToString();
 
         public static string Run(IQueryNode node) {

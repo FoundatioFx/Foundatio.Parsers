@@ -74,13 +74,26 @@ paren_exp<GroupNode>
     }}
 
 field_exp<IQueryNode>
-  = name:fieldname? range:range_operator_exp
+  = op:prefix_operator_exp? '_exists_' _* ':' _* fieldname:name_term
+  {{
+        return new ExistsNode { Prefix = op.SingleOrDefault(), Field = fieldname };
+  }}
+  / op:prefix_operator_exp? '_missing_' _* ':' _* fieldname:name_term
+  {{
+        return new MissingNode { Prefix = op.SingleOrDefault(), Field = fieldname };
+  }}
+  / name:fieldname? range:range_operator_exp
     {{
         if (name.Count == 1) {
           range.Field = name[0].Field;
           range.Prefix = name[0].Prefix;
         }
 
+        return range;
+    }}
+  / op:prefix_operator_exp? range:range_operator_exp
+    {{
+        range.Prefix = op.SingleOrDefault();
         return range;
     }}
   / name:fieldname node:paren_exp
@@ -104,7 +117,7 @@ field_exp<IQueryNode>
     }}
 
 fieldname<FieldInfo> -lexical
-  = op:prefix_operator_exp? fieldname:name_term _* ':'
+  = op:prefix_operator_exp? fieldname:name_term _* ':' _*
       {{
         var result = new FieldInfo { Field = fieldname };
 
@@ -196,7 +209,7 @@ int_exp<double>
     }
 
 range_operator_exp<TermRangeNode>
-  = '[' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term ']'
+  = '[' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* ']'
     {
         new TermRangeNode {
             Min = term_min,
@@ -206,7 +219,7 @@ range_operator_exp<TermRangeNode>
             Delimiter = delim
         }
     }
-  / '{' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term '}'
+  / '{' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* '}'
     {
         new TermRangeNode {
             Min = term_min,
@@ -216,7 +229,7 @@ range_operator_exp<TermRangeNode>
             Delimiter = delim
         }
     }
-  / '{' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term ']'
+  / '{' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* ']'
     {
         new TermRangeNode {
             Min = term_min,
@@ -226,7 +239,7 @@ range_operator_exp<TermRangeNode>
             Delimiter = delim
         }
     }
-  / '[' term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term '}'
+  / '[' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* '}'
     {
         new TermRangeNode {
             Min = term_min,
@@ -234,6 +247,38 @@ range_operator_exp<TermRangeNode>
             MinInclusive = true,
             MaxInclusive = false,
             Delimiter = delim
+        }
+    }
+  / '>=' _* term_min:range_unquoted_term
+    {
+        new TermRangeNode {
+            Min = term_min,
+            MinInclusive = true,
+            Operator = ">="
+        }
+    }
+  / '>' _* term_min:range_unquoted_term
+    {
+        new TermRangeNode {
+            Min = term_min,
+            MinInclusive = false,
+            Operator = ">"
+        }
+    }
+  / '<=' _* term_max:range_unquoted_term
+    {
+        new TermRangeNode {
+            Max = term_max,
+            MaxInclusive = true,
+            Operator = "<="
+        }
+    }
+  / '<' _* term_max:range_unquoted_term
+    {
+        new TermRangeNode {
+            Max = term_max,
+            MaxInclusive = false,
+            Operator = "<"
         }
     }
 

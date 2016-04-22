@@ -560,14 +560,14 @@ namespace
             if (r0 == null)
             {
                 var startCursor0 = cursor;
-                IParseResult<IList<FieldInfo>> r1 = null;
-                var nameStart = cursor;
+                IParseResult<IList<string>> r1 = null;
+                var opStart = cursor;
                 var startCursor1 = cursor;
-                var l0 = new List<FieldInfo>();
+                var l0 = new List<string>();
                 while (l0.Count < 1)
                 {
-                    IParseResult<FieldInfo> r2 = null;
-                    r2 = this.fieldname(ref cursor);
+                    IParseResult<string> r2 = null;
+                    r2 = this.prefix_operator_exp(ref cursor);
                     if (r2 != null)
                     {
                         l0.Add(r2.Value);
@@ -577,30 +577,91 @@ namespace
                         break;
                     }
                 }
-                r1 = this.ReturnHelper<IList<FieldInfo>>(startCursor1, ref cursor, state => l0.AsReadOnly());
-                var nameEnd = cursor;
-                var name = ValueOrDefault(r1);
+                r1 = this.ReturnHelper<IList<string>>(startCursor1, ref cursor, state => l0.AsReadOnly());
+                var opEnd = cursor;
+                var op = ValueOrDefault(r1);
                 if (r1 != null)
                 {
-                    IParseResult<TermRangeNode> r3 = null;
-                    var rangeStart = cursor;
-                    r3 = this.range_operator_exp(ref cursor);
-                    var rangeEnd = cursor;
-                    var range = ValueOrDefault(r3);
+                    IParseResult<string> r3 = null;
+                    r3 = this.ParseLiteral(ref cursor, "_exists_");
                     if (r3 != null)
                     {
-                        r0 = this.ReturnHelper<IQueryNode>(startCursor0, ref cursor, state =>
-                            #line 78 "lucene-query.peg"
-     {
-        if (name.Count == 1) {
-          range.Field = name[0].Field;
-          range.Prefix = name[0].Prefix;
-        }
-
-        return range;
-    }
-                            #line default
-                            );
+                        IParseResult<IList<IList<string>>> r4 = null;
+                        var startCursor2 = cursor;
+                        var l1 = new List<IList<string>>();
+                        while (true)
+                        {
+                            IParseResult<IList<string>> r5 = null;
+                            r5 = this._(ref cursor);
+                            if (r5 != null)
+                            {
+                                l1.Add(r5.Value);
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        r4 = this.ReturnHelper<IList<IList<string>>>(startCursor2, ref cursor, state => l1.AsReadOnly());
+                        if (r4 != null)
+                        {
+                            IParseResult<string> r6 = null;
+                            r6 = this.ParseLiteral(ref cursor, ":");
+                            if (r6 != null)
+                            {
+                                IParseResult<IList<IList<string>>> r7 = null;
+                                var startCursor3 = cursor;
+                                var l2 = new List<IList<string>>();
+                                while (true)
+                                {
+                                    IParseResult<IList<string>> r8 = null;
+                                    r8 = this._(ref cursor);
+                                    if (r8 != null)
+                                    {
+                                        l2.Add(r8.Value);
+                                    }
+                                    else
+                                    {
+                                        break;
+                                    }
+                                }
+                                r7 = this.ReturnHelper<IList<IList<string>>>(startCursor3, ref cursor, state => l2.AsReadOnly());
+                                if (r7 != null)
+                                {
+                                    IParseResult<string> r9 = null;
+                                    var fieldnameStart = cursor;
+                                    r9 = this.name_term(ref cursor);
+                                    var fieldnameEnd = cursor;
+                                    var fieldname = ValueOrDefault(r9);
+                                    if (r9 != null)
+                                    {
+                                        r0 = this.ReturnHelper<IQueryNode>(startCursor0, ref cursor, state =>
+                                            #line 78 "lucene-query.peg"
+   {
+        return new ExistsNode { Prefix = op.SingleOrDefault(), Field = fieldname };
+  }
+                                            #line default
+                                            );
+                                    }
+                                    else
+                                    {
+                                        cursor = startCursor0;
+                                    }
+                                }
+                                else
+                                {
+                                    cursor = startCursor0;
+                                }
+                            }
+                            else
+                            {
+                                cursor = startCursor0;
+                            }
+                        }
+                        else
+                        {
+                            cursor = startCursor0;
+                        }
                     }
                     else
                     {
@@ -614,23 +675,245 @@ namespace
             }
             if (r0 == null)
             {
-                var startCursor2 = cursor;
-                IParseResult<FieldInfo> r4 = null;
-                var nameStart = cursor;
-                r4 = this.fieldname(ref cursor);
-                var nameEnd = cursor;
-                var name = ValueOrDefault(r4);
-                if (r4 != null)
+                var startCursor4 = cursor;
+                IParseResult<IList<string>> r10 = null;
+                var opStart = cursor;
+                var startCursor5 = cursor;
+                var l3 = new List<string>();
+                while (l3.Count < 1)
                 {
-                    IParseResult<GroupNode> r5 = null;
-                    var nodeStart = cursor;
-                    r5 = this.paren_exp(ref cursor);
-                    var nodeEnd = cursor;
-                    var node = ValueOrDefault(r5);
-                    if (r5 != null)
+                    IParseResult<string> r11 = null;
+                    r11 = this.prefix_operator_exp(ref cursor);
+                    if (r11 != null)
                     {
-                        r0 = this.ReturnHelper<IQueryNode>(startCursor2, ref cursor, state =>
-                            #line 87 "lucene-query.peg"
+                        l3.Add(r11.Value);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                r10 = this.ReturnHelper<IList<string>>(startCursor5, ref cursor, state => l3.AsReadOnly());
+                var opEnd = cursor;
+                var op = ValueOrDefault(r10);
+                if (r10 != null)
+                {
+                    IParseResult<string> r12 = null;
+                    r12 = this.ParseLiteral(ref cursor, "_missing_");
+                    if (r12 != null)
+                    {
+                        IParseResult<IList<IList<string>>> r13 = null;
+                        var startCursor6 = cursor;
+                        var l4 = new List<IList<string>>();
+                        while (true)
+                        {
+                            IParseResult<IList<string>> r14 = null;
+                            r14 = this._(ref cursor);
+                            if (r14 != null)
+                            {
+                                l4.Add(r14.Value);
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        r13 = this.ReturnHelper<IList<IList<string>>>(startCursor6, ref cursor, state => l4.AsReadOnly());
+                        if (r13 != null)
+                        {
+                            IParseResult<string> r15 = null;
+                            r15 = this.ParseLiteral(ref cursor, ":");
+                            if (r15 != null)
+                            {
+                                IParseResult<IList<IList<string>>> r16 = null;
+                                var startCursor7 = cursor;
+                                var l5 = new List<IList<string>>();
+                                while (true)
+                                {
+                                    IParseResult<IList<string>> r17 = null;
+                                    r17 = this._(ref cursor);
+                                    if (r17 != null)
+                                    {
+                                        l5.Add(r17.Value);
+                                    }
+                                    else
+                                    {
+                                        break;
+                                    }
+                                }
+                                r16 = this.ReturnHelper<IList<IList<string>>>(startCursor7, ref cursor, state => l5.AsReadOnly());
+                                if (r16 != null)
+                                {
+                                    IParseResult<string> r18 = null;
+                                    var fieldnameStart = cursor;
+                                    r18 = this.name_term(ref cursor);
+                                    var fieldnameEnd = cursor;
+                                    var fieldname = ValueOrDefault(r18);
+                                    if (r18 != null)
+                                    {
+                                        r0 = this.ReturnHelper<IQueryNode>(startCursor4, ref cursor, state =>
+                                            #line 82 "lucene-query.peg"
+   {
+        return new MissingNode { Prefix = op.SingleOrDefault(), Field = fieldname };
+  }
+                                            #line default
+                                            );
+                                    }
+                                    else
+                                    {
+                                        cursor = startCursor4;
+                                    }
+                                }
+                                else
+                                {
+                                    cursor = startCursor4;
+                                }
+                            }
+                            else
+                            {
+                                cursor = startCursor4;
+                            }
+                        }
+                        else
+                        {
+                            cursor = startCursor4;
+                        }
+                    }
+                    else
+                    {
+                        cursor = startCursor4;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor4;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor8 = cursor;
+                IParseResult<IList<FieldInfo>> r19 = null;
+                var nameStart = cursor;
+                var startCursor9 = cursor;
+                var l6 = new List<FieldInfo>();
+                while (l6.Count < 1)
+                {
+                    IParseResult<FieldInfo> r20 = null;
+                    r20 = this.fieldname(ref cursor);
+                    if (r20 != null)
+                    {
+                        l6.Add(r20.Value);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                r19 = this.ReturnHelper<IList<FieldInfo>>(startCursor9, ref cursor, state => l6.AsReadOnly());
+                var nameEnd = cursor;
+                var name = ValueOrDefault(r19);
+                if (r19 != null)
+                {
+                    IParseResult<TermRangeNode> r21 = null;
+                    var rangeStart = cursor;
+                    r21 = this.range_operator_exp(ref cursor);
+                    var rangeEnd = cursor;
+                    var range = ValueOrDefault(r21);
+                    if (r21 != null)
+                    {
+                        r0 = this.ReturnHelper<IQueryNode>(startCursor8, ref cursor, state =>
+                            #line 86 "lucene-query.peg"
+     {
+        if (name.Count == 1) {
+          range.Field = name[0].Field;
+          range.Prefix = name[0].Prefix;
+        }
+
+        return range;
+    }
+                            #line default
+                            );
+                    }
+                    else
+                    {
+                        cursor = startCursor8;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor8;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor10 = cursor;
+                IParseResult<IList<string>> r22 = null;
+                var opStart = cursor;
+                var startCursor11 = cursor;
+                var l7 = new List<string>();
+                while (l7.Count < 1)
+                {
+                    IParseResult<string> r23 = null;
+                    r23 = this.prefix_operator_exp(ref cursor);
+                    if (r23 != null)
+                    {
+                        l7.Add(r23.Value);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                r22 = this.ReturnHelper<IList<string>>(startCursor11, ref cursor, state => l7.AsReadOnly());
+                var opEnd = cursor;
+                var op = ValueOrDefault(r22);
+                if (r22 != null)
+                {
+                    IParseResult<TermRangeNode> r24 = null;
+                    var rangeStart = cursor;
+                    r24 = this.range_operator_exp(ref cursor);
+                    var rangeEnd = cursor;
+                    var range = ValueOrDefault(r24);
+                    if (r24 != null)
+                    {
+                        r0 = this.ReturnHelper<IQueryNode>(startCursor10, ref cursor, state =>
+                            #line 95 "lucene-query.peg"
+     {
+        range.Prefix = op.SingleOrDefault();
+        return range;
+    }
+                            #line default
+                            );
+                    }
+                    else
+                    {
+                        cursor = startCursor10;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor10;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor12 = cursor;
+                IParseResult<FieldInfo> r25 = null;
+                var nameStart = cursor;
+                r25 = this.fieldname(ref cursor);
+                var nameEnd = cursor;
+                var name = ValueOrDefault(r25);
+                if (r25 != null)
+                {
+                    IParseResult<GroupNode> r26 = null;
+                    var nodeStart = cursor;
+                    r26 = this.paren_exp(ref cursor);
+                    var nodeEnd = cursor;
+                    var node = ValueOrDefault(r26);
+                    if (r26 != null)
+                    {
+                        r0 = this.ReturnHelper<IQueryNode>(startCursor12, ref cursor, state =>
+                            #line 100 "lucene-query.peg"
      {
         node.Field = name.Field;
         node.Prefix = name.Prefix;
@@ -641,48 +924,48 @@ namespace
                     }
                     else
                     {
-                        cursor = startCursor2;
+                        cursor = startCursor12;
                     }
                 }
                 else
                 {
-                    cursor = startCursor2;
+                    cursor = startCursor12;
                 }
             }
             if (r0 == null)
             {
-                var startCursor3 = cursor;
-                IParseResult<IList<FieldInfo>> r6 = null;
+                var startCursor13 = cursor;
+                IParseResult<IList<FieldInfo>> r27 = null;
                 var nameStart = cursor;
-                var startCursor4 = cursor;
-                var l1 = new List<FieldInfo>();
-                while (l1.Count < 1)
+                var startCursor14 = cursor;
+                var l8 = new List<FieldInfo>();
+                while (l8.Count < 1)
                 {
-                    IParseResult<FieldInfo> r7 = null;
-                    r7 = this.fieldname(ref cursor);
-                    if (r7 != null)
+                    IParseResult<FieldInfo> r28 = null;
+                    r28 = this.fieldname(ref cursor);
+                    if (r28 != null)
                     {
-                        l1.Add(r7.Value);
+                        l8.Add(r28.Value);
                     }
                     else
                     {
                         break;
                     }
                 }
-                r6 = this.ReturnHelper<IList<FieldInfo>>(startCursor4, ref cursor, state => l1.AsReadOnly());
+                r27 = this.ReturnHelper<IList<FieldInfo>>(startCursor14, ref cursor, state => l8.AsReadOnly());
                 var nameEnd = cursor;
-                var name = ValueOrDefault(r6);
-                if (r6 != null)
+                var name = ValueOrDefault(r27);
+                if (r27 != null)
                 {
-                    IParseResult<TermNode> r8 = null;
+                    IParseResult<TermNode> r29 = null;
                     var termStart = cursor;
-                    r8 = this.term(ref cursor);
+                    r29 = this.term(ref cursor);
                     var termEnd = cursor;
-                    var term = ValueOrDefault(r8);
-                    if (r8 != null)
+                    var term = ValueOrDefault(r29);
+                    if (r29 != null)
                     {
-                        r0 = this.ReturnHelper<IQueryNode>(startCursor3, ref cursor, state =>
-                            #line 93 "lucene-query.peg"
+                        r0 = this.ReturnHelper<IQueryNode>(startCursor13, ref cursor, state =>
+                            #line 106 "lucene-query.peg"
      {
         var query = new TermNode();
 
@@ -700,19 +983,19 @@ namespace
                     }
                     else
                     {
-                        cursor = startCursor3;
+                        cursor = startCursor13;
                     }
                 }
                 else
                 {
-                    cursor = startCursor3;
+                    cursor = startCursor13;
                 }
             }
             return r0;
         }
 
         private IParseResult<
-            #line 106 "lucene-query.peg"
+            #line 119 "lucene-query.peg"
           FieldInfo
             #line default
             > fieldname(ref Cursor cursor)
@@ -771,8 +1054,27 @@ namespace
                         r6 = this.ParseLiteral(ref cursor, ":");
                         if (r6 != null)
                         {
-                            r0 = this.ReturnHelper<FieldInfo>(startCursor0, ref cursor, state =>
-                                #line 108 "lucene-query.peg"
+                            IParseResult<IList<IList<string>>> r7 = null;
+                            var startCursor3 = cursor;
+                            var l2 = new List<IList<string>>();
+                            while (true)
+                            {
+                                IParseResult<IList<string>> r8 = null;
+                                r8 = this._(ref cursor);
+                                if (r8 != null)
+                                {
+                                    l2.Add(r8.Value);
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            r7 = this.ReturnHelper<IList<IList<string>>>(startCursor3, ref cursor, state => l2.AsReadOnly());
+                            if (r7 != null)
+                            {
+                                r0 = this.ReturnHelper<FieldInfo>(startCursor0, ref cursor, state =>
+                                    #line 121 "lucene-query.peg"
        {
         var result = new FieldInfo { Field = fieldname };
 
@@ -780,8 +1082,13 @@ namespace
 
         return result;
     }
-                                #line default
-                                , ruleName: "fieldname");
+                                    #line default
+                                    , ruleName: "fieldname");
+                            }
+                            else
+                            {
+                                cursor = startCursor0;
+                            }
                         }
                         else
                         {
@@ -806,7 +1113,7 @@ namespace
         }
 
         private IParseResult<
-            #line 116 "lucene-query.peg"
+            #line 129 "lucene-query.peg"
      TermNode
             #line default
             > term(ref Cursor cursor)
@@ -908,7 +1215,7 @@ namespace
                                 if (r8 != null)
                                 {
                                     r0 = this.ReturnHelper<TermNode>(startCursor0, ref cursor, state =>
-                                        #line 118 "lucene-query.peg"
+                                        #line 131 "lucene-query.peg"
        {
         var result = new TermNode { Term = term, IsQuotedTerm = true };
 
@@ -1046,7 +1353,7 @@ namespace
                                 if (r17 != null)
                                 {
                                     r0 = this.ReturnHelper<TermNode>(startCursor5, ref cursor, state =>
-                                        #line 132 "lucene-query.peg"
+                                        #line 145 "lucene-query.peg"
      {
         var result = new TermNode { Term = term };
 
@@ -1149,7 +1456,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 148 "lucene-query.peg"
+                    #line 161 "lucene-query.peg"
      
         term
                     #line default
@@ -1220,7 +1527,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 154 "lucene-query.peg"
+                    #line 167 "lucene-query.peg"
      
         term
                     #line default
@@ -1291,7 +1598,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 160 "lucene-query.peg"
+                    #line 173 "lucene-query.peg"
      
         term
                     #line default
@@ -1370,7 +1677,7 @@ namespace
                     if (r6 != null)
                     {
                         r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                            #line 166 "lucene-query.peg"
+                            #line 179 "lucene-query.peg"
      
         term
                             #line default
@@ -1394,7 +1701,7 @@ namespace
         }
 
         private IParseResult<
-            #line 170 "lucene-query.peg"
+            #line 183 "lucene-query.peg"
                double
             #line default
             > boost_modifier(ref Cursor cursor)
@@ -1413,7 +1720,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                        #line 172 "lucene-query.peg"
+                        #line 185 "lucene-query.peg"
      
         boost
                         #line default
@@ -1432,7 +1739,7 @@ namespace
         }
 
         private IParseResult<
-            #line 176 "lucene-query.peg"
+            #line 189 "lucene-query.peg"
                    double
             #line default
             > proximity_modifier(ref Cursor cursor)
@@ -1490,7 +1797,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                        #line 178 "lucene-query.peg"
+                        #line 191 "lucene-query.peg"
      
         String.IsNullOrEmpty(proximity) ? Double.MinValue : Double.Parse(proximity)
                         #line default
@@ -1509,7 +1816,7 @@ namespace
         }
 
         private IParseResult<
-            #line 182 "lucene-query.peg"
+            #line 195 "lucene-query.peg"
                    double
             #line default
             > decimal_or_int_exp(ref Cursor cursor)
@@ -1527,7 +1834,7 @@ namespace
         }
 
         private IParseResult<
-            #line 186 "lucene-query.peg"
+            #line 199 "lucene-query.peg"
             double
             #line default
             > decimal_exp(ref Cursor cursor)
@@ -1592,7 +1899,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                        #line 188 "lucene-query.peg"
+                        #line 201 "lucene-query.peg"
      
         Double.Parse("0." + val)
                         #line default
@@ -1611,7 +1918,7 @@ namespace
         }
 
         private IParseResult<
-            #line 192 "lucene-query.peg"
+            #line 205 "lucene-query.peg"
         double
             #line default
             > int_exp(ref Cursor cursor)
@@ -1672,7 +1979,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<double>(startCursor0, ref cursor, state =>
-                    #line 194 "lucene-query.peg"
+                    #line 207 "lucene-query.peg"
            
         Double.Parse(val)
                     #line default
@@ -1686,7 +1993,7 @@ namespace
         }
 
         private IParseResult<
-            #line 198 "lucene-query.peg"
+            #line 211 "lucene-query.peg"
                    TermRangeNode
             #line default
             > range_operator_exp(ref Cursor cursor)
@@ -1699,33 +2006,71 @@ namespace
                 r1 = this.ParseLiteral(ref cursor, "[");
                 if (r1 != null)
                 {
-                    IParseResult<string> r2 = null;
-                    var term_minStart = cursor;
-                    r2 = this.range_unquoted_term(ref cursor);
-                    var term_minEnd = cursor;
-                    var term_min = ValueOrDefault(r2);
-                    if (r2 != null)
+                    IParseResult<IList<IList<string>>> r2 = null;
+                    var startCursor1 = cursor;
+                    var l0 = new List<IList<string>>();
+                    while (true)
                     {
-                        IParseResult<string> r3 = null;
-                        var delimStart = cursor;
-                        r3 = this.range_delimiter_exp(ref cursor);
-                        var delimEnd = cursor;
-                        var delim = ValueOrDefault(r3);
+                        IParseResult<IList<string>> r3 = null;
+                        r3 = this._(ref cursor);
                         if (r3 != null)
                         {
-                            IParseResult<string> r4 = null;
-                            var term_maxStart = cursor;
-                            r4 = this.range_unquoted_term(ref cursor);
-                            var term_maxEnd = cursor;
-                            var term_max = ValueOrDefault(r4);
-                            if (r4 != null)
+                            l0.Add(r3.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    r2 = this.ReturnHelper<IList<IList<string>>>(startCursor1, ref cursor, state => l0.AsReadOnly());
+                    if (r2 != null)
+                    {
+                        IParseResult<string> r4 = null;
+                        var term_minStart = cursor;
+                        r4 = this.range_unquoted_term(ref cursor);
+                        var term_minEnd = cursor;
+                        var term_min = ValueOrDefault(r4);
+                        if (r4 != null)
+                        {
+                            IParseResult<string> r5 = null;
+                            var delimStart = cursor;
+                            r5 = this.range_delimiter_exp(ref cursor);
+                            var delimEnd = cursor;
+                            var delim = ValueOrDefault(r5);
+                            if (r5 != null)
                             {
-                                IParseResult<string> r5 = null;
-                                r5 = this.ParseLiteral(ref cursor, "]");
-                                if (r5 != null)
+                                IParseResult<string> r6 = null;
+                                var term_maxStart = cursor;
+                                r6 = this.range_unquoted_term(ref cursor);
+                                var term_maxEnd = cursor;
+                                var term_max = ValueOrDefault(r6);
+                                if (r6 != null)
                                 {
-                                    r0 = this.ReturnHelper<TermRangeNode>(startCursor0, ref cursor, state =>
-                                        #line 200 "lucene-query.peg"
+                                    IParseResult<IList<IList<string>>> r7 = null;
+                                    var startCursor2 = cursor;
+                                    var l1 = new List<IList<string>>();
+                                    while (true)
+                                    {
+                                        IParseResult<IList<string>> r8 = null;
+                                        r8 = this._(ref cursor);
+                                        if (r8 != null)
+                                        {
+                                            l1.Add(r8.Value);
+                                        }
+                                        else
+                                        {
+                                            break;
+                                        }
+                                    }
+                                    r7 = this.ReturnHelper<IList<IList<string>>>(startCursor2, ref cursor, state => l1.AsReadOnly());
+                                    if (r7 != null)
+                                    {
+                                        IParseResult<string> r9 = null;
+                                        r9 = this.ParseLiteral(ref cursor, "]");
+                                        if (r9 != null)
+                                        {
+                                            r0 = this.ReturnHelper<TermRangeNode>(startCursor0, ref cursor, state =>
+                                                #line 213 "lucene-query.peg"
      
         new TermRangeNode {
             Min = term_min,
@@ -1734,8 +2079,18 @@ namespace
             MaxInclusive = true,
             Delimiter = delim
         }
-                                        #line default
-                                        );
+                                                #line default
+                                                );
+                                        }
+                                        else
+                                        {
+                                            cursor = startCursor0;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        cursor = startCursor0;
+                                    }
                                 }
                                 else
                                 {
@@ -1764,188 +2119,96 @@ namespace
             }
             if (r0 == null)
             {
-                var startCursor1 = cursor;
-                IParseResult<string> r6 = null;
-                r6 = this.ParseLiteral(ref cursor, "{");
-                if (r6 != null)
+                var startCursor3 = cursor;
+                IParseResult<string> r10 = null;
+                r10 = this.ParseLiteral(ref cursor, "{");
+                if (r10 != null)
                 {
-                    IParseResult<string> r7 = null;
-                    var term_minStart = cursor;
-                    r7 = this.range_unquoted_term(ref cursor);
-                    var term_minEnd = cursor;
-                    var term_min = ValueOrDefault(r7);
-                    if (r7 != null)
+                    IParseResult<IList<IList<string>>> r11 = null;
+                    var startCursor4 = cursor;
+                    var l2 = new List<IList<string>>();
+                    while (true)
                     {
-                        IParseResult<string> r8 = null;
-                        var delimStart = cursor;
-                        r8 = this.range_delimiter_exp(ref cursor);
-                        var delimEnd = cursor;
-                        var delim = ValueOrDefault(r8);
-                        if (r8 != null)
+                        IParseResult<IList<string>> r12 = null;
+                        r12 = this._(ref cursor);
+                        if (r12 != null)
                         {
-                            IParseResult<string> r9 = null;
-                            var term_maxStart = cursor;
-                            r9 = this.range_unquoted_term(ref cursor);
-                            var term_maxEnd = cursor;
-                            var term_max = ValueOrDefault(r9);
-                            if (r9 != null)
-                            {
-                                IParseResult<string> r10 = null;
-                                r10 = this.ParseLiteral(ref cursor, "}");
-                                if (r10 != null)
-                                {
-                                    r0 = this.ReturnHelper<TermRangeNode>(startCursor1, ref cursor, state =>
-                                        #line 210 "lucene-query.peg"
-     
-        new TermRangeNode {
-            Min = term_min,
-            Max = term_max,
-            MinInclusive = false,
-            MaxInclusive = false,
-            Delimiter = delim
-        }
-                                        #line default
-                                        );
-                                }
-                                else
-                                {
-                                    cursor = startCursor1;
-                                }
-                            }
-                            else
-                            {
-                                cursor = startCursor1;
-                            }
+                            l2.Add(r12.Value);
                         }
                         else
                         {
-                            cursor = startCursor1;
+                            break;
                         }
                     }
-                    else
-                    {
-                        cursor = startCursor1;
-                    }
-                }
-                else
-                {
-                    cursor = startCursor1;
-                }
-            }
-            if (r0 == null)
-            {
-                var startCursor2 = cursor;
-                IParseResult<string> r11 = null;
-                r11 = this.ParseLiteral(ref cursor, "{");
-                if (r11 != null)
-                {
-                    IParseResult<string> r12 = null;
-                    var term_minStart = cursor;
-                    r12 = this.range_unquoted_term(ref cursor);
-                    var term_minEnd = cursor;
-                    var term_min = ValueOrDefault(r12);
-                    if (r12 != null)
+                    r11 = this.ReturnHelper<IList<IList<string>>>(startCursor4, ref cursor, state => l2.AsReadOnly());
+                    if (r11 != null)
                     {
                         IParseResult<string> r13 = null;
-                        var delimStart = cursor;
-                        r13 = this.range_delimiter_exp(ref cursor);
-                        var delimEnd = cursor;
-                        var delim = ValueOrDefault(r13);
+                        var term_minStart = cursor;
+                        r13 = this.range_unquoted_term(ref cursor);
+                        var term_minEnd = cursor;
+                        var term_min = ValueOrDefault(r13);
                         if (r13 != null)
                         {
                             IParseResult<string> r14 = null;
-                            var term_maxStart = cursor;
-                            r14 = this.range_unquoted_term(ref cursor);
-                            var term_maxEnd = cursor;
-                            var term_max = ValueOrDefault(r14);
+                            var delimStart = cursor;
+                            r14 = this.range_delimiter_exp(ref cursor);
+                            var delimEnd = cursor;
+                            var delim = ValueOrDefault(r14);
                             if (r14 != null)
                             {
                                 IParseResult<string> r15 = null;
-                                r15 = this.ParseLiteral(ref cursor, "]");
+                                var term_maxStart = cursor;
+                                r15 = this.range_unquoted_term(ref cursor);
+                                var term_maxEnd = cursor;
+                                var term_max = ValueOrDefault(r15);
                                 if (r15 != null)
                                 {
-                                    r0 = this.ReturnHelper<TermRangeNode>(startCursor2, ref cursor, state =>
-                                        #line 220 "lucene-query.peg"
+                                    IParseResult<IList<IList<string>>> r16 = null;
+                                    var startCursor5 = cursor;
+                                    var l3 = new List<IList<string>>();
+                                    while (true)
+                                    {
+                                        IParseResult<IList<string>> r17 = null;
+                                        r17 = this._(ref cursor);
+                                        if (r17 != null)
+                                        {
+                                            l3.Add(r17.Value);
+                                        }
+                                        else
+                                        {
+                                            break;
+                                        }
+                                    }
+                                    r16 = this.ReturnHelper<IList<IList<string>>>(startCursor5, ref cursor, state => l3.AsReadOnly());
+                                    if (r16 != null)
+                                    {
+                                        IParseResult<string> r18 = null;
+                                        r18 = this.ParseLiteral(ref cursor, "}");
+                                        if (r18 != null)
+                                        {
+                                            r0 = this.ReturnHelper<TermRangeNode>(startCursor3, ref cursor, state =>
+                                                #line 223 "lucene-query.peg"
      
         new TermRangeNode {
             Min = term_min,
             Max = term_max,
             MinInclusive = false,
-            MaxInclusive = true,
-            Delimiter = delim
-        }
-                                        #line default
-                                        );
-                                }
-                                else
-                                {
-                                    cursor = startCursor2;
-                                }
-                            }
-                            else
-                            {
-                                cursor = startCursor2;
-                            }
-                        }
-                        else
-                        {
-                            cursor = startCursor2;
-                        }
-                    }
-                    else
-                    {
-                        cursor = startCursor2;
-                    }
-                }
-                else
-                {
-                    cursor = startCursor2;
-                }
-            }
-            if (r0 == null)
-            {
-                var startCursor3 = cursor;
-                IParseResult<string> r16 = null;
-                r16 = this.ParseLiteral(ref cursor, "[");
-                if (r16 != null)
-                {
-                    IParseResult<string> r17 = null;
-                    var term_minStart = cursor;
-                    r17 = this.range_unquoted_term(ref cursor);
-                    var term_minEnd = cursor;
-                    var term_min = ValueOrDefault(r17);
-                    if (r17 != null)
-                    {
-                        IParseResult<string> r18 = null;
-                        var delimStart = cursor;
-                        r18 = this.range_delimiter_exp(ref cursor);
-                        var delimEnd = cursor;
-                        var delim = ValueOrDefault(r18);
-                        if (r18 != null)
-                        {
-                            IParseResult<string> r19 = null;
-                            var term_maxStart = cursor;
-                            r19 = this.range_unquoted_term(ref cursor);
-                            var term_maxEnd = cursor;
-                            var term_max = ValueOrDefault(r19);
-                            if (r19 != null)
-                            {
-                                IParseResult<string> r20 = null;
-                                r20 = this.ParseLiteral(ref cursor, "}");
-                                if (r20 != null)
-                                {
-                                    r0 = this.ReturnHelper<TermRangeNode>(startCursor3, ref cursor, state =>
-                                        #line 230 "lucene-query.peg"
-     
-        new TermRangeNode {
-            Min = term_min,
-            Max = term_max,
-            MinInclusive = true,
             MaxInclusive = false,
             Delimiter = delim
         }
-                                        #line default
-                                        );
+                                                #line default
+                                                );
+                                        }
+                                        else
+                                        {
+                                            cursor = startCursor3;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        cursor = startCursor3;
+                                    }
                                 }
                                 else
                                 {
@@ -1970,6 +2233,478 @@ namespace
                 else
                 {
                     cursor = startCursor3;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor6 = cursor;
+                IParseResult<string> r19 = null;
+                r19 = this.ParseLiteral(ref cursor, "{");
+                if (r19 != null)
+                {
+                    IParseResult<IList<IList<string>>> r20 = null;
+                    var startCursor7 = cursor;
+                    var l4 = new List<IList<string>>();
+                    while (true)
+                    {
+                        IParseResult<IList<string>> r21 = null;
+                        r21 = this._(ref cursor);
+                        if (r21 != null)
+                        {
+                            l4.Add(r21.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    r20 = this.ReturnHelper<IList<IList<string>>>(startCursor7, ref cursor, state => l4.AsReadOnly());
+                    if (r20 != null)
+                    {
+                        IParseResult<string> r22 = null;
+                        var term_minStart = cursor;
+                        r22 = this.range_unquoted_term(ref cursor);
+                        var term_minEnd = cursor;
+                        var term_min = ValueOrDefault(r22);
+                        if (r22 != null)
+                        {
+                            IParseResult<string> r23 = null;
+                            var delimStart = cursor;
+                            r23 = this.range_delimiter_exp(ref cursor);
+                            var delimEnd = cursor;
+                            var delim = ValueOrDefault(r23);
+                            if (r23 != null)
+                            {
+                                IParseResult<string> r24 = null;
+                                var term_maxStart = cursor;
+                                r24 = this.range_unquoted_term(ref cursor);
+                                var term_maxEnd = cursor;
+                                var term_max = ValueOrDefault(r24);
+                                if (r24 != null)
+                                {
+                                    IParseResult<IList<IList<string>>> r25 = null;
+                                    var startCursor8 = cursor;
+                                    var l5 = new List<IList<string>>();
+                                    while (true)
+                                    {
+                                        IParseResult<IList<string>> r26 = null;
+                                        r26 = this._(ref cursor);
+                                        if (r26 != null)
+                                        {
+                                            l5.Add(r26.Value);
+                                        }
+                                        else
+                                        {
+                                            break;
+                                        }
+                                    }
+                                    r25 = this.ReturnHelper<IList<IList<string>>>(startCursor8, ref cursor, state => l5.AsReadOnly());
+                                    if (r25 != null)
+                                    {
+                                        IParseResult<string> r27 = null;
+                                        r27 = this.ParseLiteral(ref cursor, "]");
+                                        if (r27 != null)
+                                        {
+                                            r0 = this.ReturnHelper<TermRangeNode>(startCursor6, ref cursor, state =>
+                                                #line 233 "lucene-query.peg"
+     
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
+            MinInclusive = false,
+            MaxInclusive = true,
+            Delimiter = delim
+        }
+                                                #line default
+                                                );
+                                        }
+                                        else
+                                        {
+                                            cursor = startCursor6;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        cursor = startCursor6;
+                                    }
+                                }
+                                else
+                                {
+                                    cursor = startCursor6;
+                                }
+                            }
+                            else
+                            {
+                                cursor = startCursor6;
+                            }
+                        }
+                        else
+                        {
+                            cursor = startCursor6;
+                        }
+                    }
+                    else
+                    {
+                        cursor = startCursor6;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor6;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor9 = cursor;
+                IParseResult<string> r28 = null;
+                r28 = this.ParseLiteral(ref cursor, "[");
+                if (r28 != null)
+                {
+                    IParseResult<IList<IList<string>>> r29 = null;
+                    var startCursor10 = cursor;
+                    var l6 = new List<IList<string>>();
+                    while (true)
+                    {
+                        IParseResult<IList<string>> r30 = null;
+                        r30 = this._(ref cursor);
+                        if (r30 != null)
+                        {
+                            l6.Add(r30.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    r29 = this.ReturnHelper<IList<IList<string>>>(startCursor10, ref cursor, state => l6.AsReadOnly());
+                    if (r29 != null)
+                    {
+                        IParseResult<string> r31 = null;
+                        var term_minStart = cursor;
+                        r31 = this.range_unquoted_term(ref cursor);
+                        var term_minEnd = cursor;
+                        var term_min = ValueOrDefault(r31);
+                        if (r31 != null)
+                        {
+                            IParseResult<string> r32 = null;
+                            var delimStart = cursor;
+                            r32 = this.range_delimiter_exp(ref cursor);
+                            var delimEnd = cursor;
+                            var delim = ValueOrDefault(r32);
+                            if (r32 != null)
+                            {
+                                IParseResult<string> r33 = null;
+                                var term_maxStart = cursor;
+                                r33 = this.range_unquoted_term(ref cursor);
+                                var term_maxEnd = cursor;
+                                var term_max = ValueOrDefault(r33);
+                                if (r33 != null)
+                                {
+                                    IParseResult<IList<IList<string>>> r34 = null;
+                                    var startCursor11 = cursor;
+                                    var l7 = new List<IList<string>>();
+                                    while (true)
+                                    {
+                                        IParseResult<IList<string>> r35 = null;
+                                        r35 = this._(ref cursor);
+                                        if (r35 != null)
+                                        {
+                                            l7.Add(r35.Value);
+                                        }
+                                        else
+                                        {
+                                            break;
+                                        }
+                                    }
+                                    r34 = this.ReturnHelper<IList<IList<string>>>(startCursor11, ref cursor, state => l7.AsReadOnly());
+                                    if (r34 != null)
+                                    {
+                                        IParseResult<string> r36 = null;
+                                        r36 = this.ParseLiteral(ref cursor, "}");
+                                        if (r36 != null)
+                                        {
+                                            r0 = this.ReturnHelper<TermRangeNode>(startCursor9, ref cursor, state =>
+                                                #line 243 "lucene-query.peg"
+     
+        new TermRangeNode {
+            Min = term_min,
+            Max = term_max,
+            MinInclusive = true,
+            MaxInclusive = false,
+            Delimiter = delim
+        }
+                                                #line default
+                                                );
+                                        }
+                                        else
+                                        {
+                                            cursor = startCursor9;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        cursor = startCursor9;
+                                    }
+                                }
+                                else
+                                {
+                                    cursor = startCursor9;
+                                }
+                            }
+                            else
+                            {
+                                cursor = startCursor9;
+                            }
+                        }
+                        else
+                        {
+                            cursor = startCursor9;
+                        }
+                    }
+                    else
+                    {
+                        cursor = startCursor9;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor9;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor12 = cursor;
+                IParseResult<string> r37 = null;
+                r37 = this.ParseLiteral(ref cursor, ">=");
+                if (r37 != null)
+                {
+                    IParseResult<IList<IList<string>>> r38 = null;
+                    var startCursor13 = cursor;
+                    var l8 = new List<IList<string>>();
+                    while (true)
+                    {
+                        IParseResult<IList<string>> r39 = null;
+                        r39 = this._(ref cursor);
+                        if (r39 != null)
+                        {
+                            l8.Add(r39.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    r38 = this.ReturnHelper<IList<IList<string>>>(startCursor13, ref cursor, state => l8.AsReadOnly());
+                    if (r38 != null)
+                    {
+                        IParseResult<string> r40 = null;
+                        var term_minStart = cursor;
+                        r40 = this.range_unquoted_term(ref cursor);
+                        var term_minEnd = cursor;
+                        var term_min = ValueOrDefault(r40);
+                        if (r40 != null)
+                        {
+                            r0 = this.ReturnHelper<TermRangeNode>(startCursor12, ref cursor, state =>
+                                #line 253 "lucene-query.peg"
+     
+        new TermRangeNode {
+            Min = term_min,
+            MinInclusive = true,
+            Operator = ">="
+        }
+                                #line default
+                                );
+                        }
+                        else
+                        {
+                            cursor = startCursor12;
+                        }
+                    }
+                    else
+                    {
+                        cursor = startCursor12;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor12;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor14 = cursor;
+                IParseResult<string> r41 = null;
+                r41 = this.ParseLiteral(ref cursor, ">");
+                if (r41 != null)
+                {
+                    IParseResult<IList<IList<string>>> r42 = null;
+                    var startCursor15 = cursor;
+                    var l9 = new List<IList<string>>();
+                    while (true)
+                    {
+                        IParseResult<IList<string>> r43 = null;
+                        r43 = this._(ref cursor);
+                        if (r43 != null)
+                        {
+                            l9.Add(r43.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    r42 = this.ReturnHelper<IList<IList<string>>>(startCursor15, ref cursor, state => l9.AsReadOnly());
+                    if (r42 != null)
+                    {
+                        IParseResult<string> r44 = null;
+                        var term_minStart = cursor;
+                        r44 = this.range_unquoted_term(ref cursor);
+                        var term_minEnd = cursor;
+                        var term_min = ValueOrDefault(r44);
+                        if (r44 != null)
+                        {
+                            r0 = this.ReturnHelper<TermRangeNode>(startCursor14, ref cursor, state =>
+                                #line 261 "lucene-query.peg"
+     
+        new TermRangeNode {
+            Min = term_min,
+            MinInclusive = false,
+            Operator = ">"
+        }
+                                #line default
+                                );
+                        }
+                        else
+                        {
+                            cursor = startCursor14;
+                        }
+                    }
+                    else
+                    {
+                        cursor = startCursor14;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor14;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor16 = cursor;
+                IParseResult<string> r45 = null;
+                r45 = this.ParseLiteral(ref cursor, "<=");
+                if (r45 != null)
+                {
+                    IParseResult<IList<IList<string>>> r46 = null;
+                    var startCursor17 = cursor;
+                    var l10 = new List<IList<string>>();
+                    while (true)
+                    {
+                        IParseResult<IList<string>> r47 = null;
+                        r47 = this._(ref cursor);
+                        if (r47 != null)
+                        {
+                            l10.Add(r47.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    r46 = this.ReturnHelper<IList<IList<string>>>(startCursor17, ref cursor, state => l10.AsReadOnly());
+                    if (r46 != null)
+                    {
+                        IParseResult<string> r48 = null;
+                        var term_maxStart = cursor;
+                        r48 = this.range_unquoted_term(ref cursor);
+                        var term_maxEnd = cursor;
+                        var term_max = ValueOrDefault(r48);
+                        if (r48 != null)
+                        {
+                            r0 = this.ReturnHelper<TermRangeNode>(startCursor16, ref cursor, state =>
+                                #line 269 "lucene-query.peg"
+     
+        new TermRangeNode {
+            Max = term_max,
+            MaxInclusive = true,
+            Operator = "<="
+        }
+                                #line default
+                                );
+                        }
+                        else
+                        {
+                            cursor = startCursor16;
+                        }
+                    }
+                    else
+                    {
+                        cursor = startCursor16;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor16;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor18 = cursor;
+                IParseResult<string> r49 = null;
+                r49 = this.ParseLiteral(ref cursor, "<");
+                if (r49 != null)
+                {
+                    IParseResult<IList<IList<string>>> r50 = null;
+                    var startCursor19 = cursor;
+                    var l11 = new List<IList<string>>();
+                    while (true)
+                    {
+                        IParseResult<IList<string>> r51 = null;
+                        r51 = this._(ref cursor);
+                        if (r51 != null)
+                        {
+                            l11.Add(r51.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    r50 = this.ReturnHelper<IList<IList<string>>>(startCursor19, ref cursor, state => l11.AsReadOnly());
+                    if (r50 != null)
+                    {
+                        IParseResult<string> r52 = null;
+                        var term_maxStart = cursor;
+                        r52 = this.range_unquoted_term(ref cursor);
+                        var term_maxEnd = cursor;
+                        var term_max = ValueOrDefault(r52);
+                        if (r52 != null)
+                        {
+                            r0 = this.ReturnHelper<TermRangeNode>(startCursor18, ref cursor, state =>
+                                #line 277 "lucene-query.peg"
+     
+        new TermRangeNode {
+            Max = term_max,
+            MaxInclusive = false,
+            Operator = "<"
+        }
+                                #line default
+                                );
+                        }
+                        else
+                        {
+                            cursor = startCursor18;
+                        }
+                    }
+                    else
+                    {
+                        cursor = startCursor18;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor18;
                 }
             }
             return r0;
@@ -2188,7 +2923,7 @@ namespace
                         if (r4 != null)
                         {
                             r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                                #line 246 "lucene-query.peg"
+                                #line 291 "lucene-query.peg"
      
         op
                                 #line default
@@ -2243,7 +2978,7 @@ namespace
                         if (r9 != null)
                         {
                             r0 = this.ReturnHelper<string>(startCursor3, ref cursor, state =>
-                                #line 250 "lucene-query.peg"
+                                #line 295 "lucene-query.peg"
      
         op
                                 #line default
@@ -2290,7 +3025,7 @@ namespace
                 if (r1 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 258 "lucene-query.peg"
+                        #line 303 "lucene-query.peg"
            "OR"
                         #line default
                         , ruleName: "operator");
@@ -2308,7 +3043,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor1, ref cursor, state =>
-                        #line 259 "lucene-query.peg"
+                        #line 304 "lucene-query.peg"
            "AND"
                         #line default
                         , ruleName: "operator");
@@ -2352,7 +3087,7 @@ namespace
                 if (r3 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 263 "lucene-query.peg"
+                        #line 308 "lucene-query.peg"
      
         op
                         #line default

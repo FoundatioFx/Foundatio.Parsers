@@ -11,6 +11,10 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
                 visitor.Visit((TermNode)this);
             else if (this is TermRangeNode)
                 visitor.Visit((TermRangeNode)this);
+            else if (this is MissingNode)
+                visitor.Visit((MissingNode)this);
+            else if (this is ExistsNode)
+                visitor.Visit((ExistsNode)this);
 
             if (!visitChildren)
                 return;
