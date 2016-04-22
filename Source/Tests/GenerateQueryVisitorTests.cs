@@ -25,6 +25,8 @@ namespace Tests {
         [InlineData("field:criteria", "field:criteria", true)]
         [InlineData("field :criteria", "field:criteria", true)]
         [InlineData("-criteria", "-criteria", true)]
+        [InlineData("criteria1 AND NOT criteria2", "criteria1 AND NOT criteria2", true)]
+        [InlineData("criteria1 NOT criteria2", "criteria1 NOT criteria2", true)]
         [InlineData("criteria1   criteria2", "criteria1 criteria2", true)]
         [InlineData("criteria1 +criteria2", "criteria1 +criteria2", true)]
         [InlineData("criteria1 OR criteria2", "criteria1 OR criteria2", true)]
