@@ -9,12 +9,11 @@ namespace ElasticMacros.Visitor {
         private readonly Stack<Operator> _defaultOperatorStack = new Stack<Operator>();
         private readonly Stack<string> _defaultFieldStack = new Stack<string>();
         private readonly Operator _defaultOperator;
-        private string _defaultField;
         private FilterContainer _filter;
 
         public FilterContainerVisitor(Operator defaultOperator, string defaultField) {
             _defaultOperator = defaultOperator;
-            _defaultField = defaultField;
+            _defaultFieldStack.Push(defaultField);
         }
 
         public override void Visit(GroupNode node) {
