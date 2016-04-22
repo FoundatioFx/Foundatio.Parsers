@@ -76,14 +76,37 @@ namespace ElasticMacros.Visitor {
             }
         }
 
+        public override void Visit(ExistsNode node) {
+            var op = _defaultOperatorStack.Peek();
+
+            if (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-")
+                Filter &= !FilterContainer.From(new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() });
+            else if (op == Operator.And || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+"))
+                Filter &= new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
+            else
+                Filter |= new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
+        }
+
+        public override void Visit(MissingNode node) {
+            var op = _defaultOperatorStack.Peek();
+
+            if (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-")
+                Filter &= !FilterContainer.From(new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() });
+            else if (op == Operator.And || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+"))
+                Filter &= new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
+            else
+                Filter |= new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
+        }
+
         private Operator GetOperator(GroupNode node) {
-            string op = node.Operator ?? String.Empty;
-            op = op.Trim().ToLower();
-            if (op == "or" || op == "||")
-                return Operator.Or;
-            
-            if (op == "and" || op == "&&")
-                return Operator.And;
+            switch (node.Operator) {
+                case GroupOperator.And:
+                case GroupOperator.AndNot:
+                    return Operator.And;
+                case GroupOperator.Or:
+                case GroupOperator.OrNot:
+                    return Operator.Or;
+            }
 
             return DefaultOperator;
         }

@@ -33,7 +33,7 @@ node<GroupNode>
     {
         right
     }
-  / left:group_exp op:(operator_exp* "") right:node*
+  / left:group_exp op:operator_exp? right:node*
     {{
         var node= new GroupNode {
             Left = left
@@ -48,7 +48,7 @@ node<GroupNode>
 
         if (rightExp != null)
         {
-            node.Operator = !String.IsNullOrEmpty(op) ? op.Trim() : null;
+            node.Operator = op.SingleOrDefault();
             node.Right = rightExp;
         }
 
@@ -286,7 +286,7 @@ range_delimiter_exp
   = _+ 'TO' _+
   / _* '..' _*
 
-operator_exp
+operator_exp<GroupOperator>
   = _* op:operator _+
     {
         op
@@ -296,12 +296,14 @@ operator_exp
         op
     }
 
-operator -lexical
-  = "OR"
-  / "AND"
-  / "NOT"
-  / "||" { "OR" }
-  / "&&" { "AND" }
+operator<GroupOperator> -lexical
+  = "AND" _+ "NOT" { GroupOperator.AndNot }
+  / "OR" _+ "NOT"{ GroupOperator.OrNot }
+  / "OR" { GroupOperator.Or }
+  / "AND"{ GroupOperator.And }
+  / "NOT"{ GroupOperator.Not }
+  / "||" { GroupOperator.Or }
+  / "&&" { GroupOperator.And }
 
 prefix_operator_exp
   = _* op:prefix_operator

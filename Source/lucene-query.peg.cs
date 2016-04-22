@@ -201,7 +201,7 @@ namespace
             if (r0 == null)
             {
                 var startCursor0 = cursor;
-                IParseResult<string> r1 = null;
+                IParseResult<GroupOperator> r1 = null;
                 var opStart = cursor;
                 r1 = this.operator_exp(ref cursor);
                 var opEnd = cursor;
@@ -234,7 +234,7 @@ namespace
             if (r0 == null)
             {
                 var startCursor1 = cursor;
-                IParseResult<string> r3 = null;
+                IParseResult<GroupOperator> r3 = null;
                 var opStart = cursor;
                 r3 = this.operator_exp(ref cursor);
                 var opEnd = cursor;
@@ -275,73 +275,49 @@ namespace
                 var left = ValueOrDefault(r5);
                 if (r5 != null)
                 {
-                    IParseResult<string> r6 = null;
+                    IParseResult<IList<GroupOperator>> r6 = null;
                     var opStart = cursor;
                     var startCursor3 = cursor;
-                    IParseResult<IList<string>> r7 = null;
-                    var startCursor4 = cursor;
-                    var l0 = new List<string>();
-                    while (true)
+                    var l0 = new List<GroupOperator>();
+                    while (l0.Count < 1)
                     {
-                        IParseResult<string> r8 = null;
-                        r8 = this.operator_exp(ref cursor);
-                        if (r8 != null)
+                        IParseResult<GroupOperator> r7 = null;
+                        r7 = this.operator_exp(ref cursor);
+                        if (r7 != null)
                         {
-                            l0.Add(r8.Value);
+                            l0.Add(r7.Value);
                         }
                         else
                         {
                             break;
                         }
                     }
-                    r7 = this.ReturnHelper<IList<string>>(startCursor4, ref cursor, state => l0.AsReadOnly());
-                    if (r7 != null)
-                    {
-                        IParseResult<string> r9 = null;
-                        r9 = this.ParseLiteral(ref cursor, "");
-                        if (r9 != null)
-                        {
-                            {
-                                var len = cursor.Location - startCursor3.Location;
-                                r6 = this.ReturnHelper<string>(startCursor3, ref cursor, state =>
-                                    state.Subject.Substring(startCursor3.Location, len)
-                                    );
-                            }
-                        }
-                        else
-                        {
-                            cursor = startCursor3;
-                        }
-                    }
-                    else
-                    {
-                        cursor = startCursor3;
-                    }
+                    r6 = this.ReturnHelper<IList<GroupOperator>>(startCursor3, ref cursor, state => l0.AsReadOnly());
                     var opEnd = cursor;
                     var op = ValueOrDefault(r6);
                     if (r6 != null)
                     {
-                        IParseResult<IList<GroupNode>> r10 = null;
+                        IParseResult<IList<GroupNode>> r8 = null;
                         var rightStart = cursor;
-                        var startCursor5 = cursor;
+                        var startCursor4 = cursor;
                         var l1 = new List<GroupNode>();
                         while (true)
                         {
-                            IParseResult<GroupNode> r11 = null;
-                            r11 = this.node(ref cursor);
-                            if (r11 != null)
+                            IParseResult<GroupNode> r9 = null;
+                            r9 = this.node(ref cursor);
+                            if (r9 != null)
                             {
-                                l1.Add(r11.Value);
+                                l1.Add(r9.Value);
                             }
                             else
                             {
                                 break;
                             }
                         }
-                        r10 = this.ReturnHelper<IList<GroupNode>>(startCursor5, ref cursor, state => l1.AsReadOnly());
+                        r8 = this.ReturnHelper<IList<GroupNode>>(startCursor4, ref cursor, state => l1.AsReadOnly());
                         var rightEnd = cursor;
-                        var right = ValueOrDefault(r10);
-                        if (r10 != null)
+                        var right = ValueOrDefault(r8);
+                        if (r8 != null)
                         {
                             r0 = this.ReturnHelper<GroupNode>(startCursor2, ref cursor, state =>
                                 #line 37 "lucene-query.peg"
@@ -359,7 +335,7 @@ namespace
 
         if (rightExp != null)
         {
-            node.Operator = !String.IsNullOrEmpty(op) ? op.Trim() : null;
+            node.Operator = op.SingleOrDefault();
             node.Right = rightExp;
         }
 
@@ -2864,9 +2840,13 @@ namespace
             return r0;
         }
 
-        private IParseResult<string> operator_exp(ref Cursor cursor)
+        private IParseResult<
+            #line 289 "lucene-query.peg"
+             GroupOperator
+            #line default
+            > operator_exp(ref Cursor cursor)
         {
-            IParseResult<string> r0 = null;
+            IParseResult<GroupOperator> r0 = null;
             if (r0 == null)
             {
                 var startCursor0 = cursor;
@@ -2889,7 +2869,7 @@ namespace
                 r1 = this.ReturnHelper<IList<IList<string>>>(startCursor1, ref cursor, state => l0.AsReadOnly());
                 if (r1 != null)
                 {
-                    IParseResult<string> r3 = null;
+                    IParseResult<GroupOperator> r3 = null;
                     var opStart = cursor;
                     r3 = this.@operator(ref cursor);
                     var opEnd = cursor;
@@ -2922,7 +2902,7 @@ namespace
                         }
                         if (r4 != null)
                         {
-                            r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
+                            r0 = this.ReturnHelper<GroupOperator>(startCursor0, ref cursor, state =>
                                 #line 291 "lucene-query.peg"
      
         op
@@ -2966,7 +2946,7 @@ namespace
                 r6 = this.ReturnHelper<IList<IList<string>>>(startCursor4, ref cursor, state => l2.AsReadOnly());
                 if (r6 != null)
                 {
-                    IParseResult<string> r8 = null;
+                    IParseResult<GroupOperator> r8 = null;
                     var opStart = cursor;
                     r8 = this.@operator(ref cursor);
                     var opEnd = cursor;
@@ -2977,7 +2957,7 @@ namespace
                         r9 = this.EOF(ref cursor);
                         if (r9 != null)
                         {
-                            r0 = this.ReturnHelper<string>(startCursor3, ref cursor, state =>
+                            r0 = this.ReturnHelper<GroupOperator>(startCursor3, ref cursor, state =>
                                 #line 295 "lucene-query.peg"
      
         op
@@ -3002,33 +2982,65 @@ namespace
             return r0;
         }
 
-        private IParseResult<string> @operator(ref Cursor cursor)
+        private IParseResult<
+            #line 299 "lucene-query.peg"
+         GroupOperator
+            #line default
+            > @operator(ref Cursor cursor)
         {
-            IParseResult<string> r0 = null;
-            if (r0 == null)
-            {
-                r0 = this.ParseLiteral(ref cursor, "OR", ruleName: "operator");
-            }
-            if (r0 == null)
-            {
-                r0 = this.ParseLiteral(ref cursor, "AND", ruleName: "operator");
-            }
-            if (r0 == null)
-            {
-                r0 = this.ParseLiteral(ref cursor, "NOT", ruleName: "operator");
-            }
+            IParseResult<GroupOperator> r0 = null;
             if (r0 == null)
             {
                 var startCursor0 = cursor;
                 IParseResult<string> r1 = null;
-                r1 = this.ParseLiteral(ref cursor, "||");
+                r1 = this.ParseLiteral(ref cursor, "AND");
                 if (r1 != null)
                 {
-                    r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 303 "lucene-query.peg"
-           "OR"
-                        #line default
-                        , ruleName: "operator");
+                    IParseResult<IList<IList<string>>> r2 = null;
+                    var startCursor1 = cursor;
+                    var l0 = new List<IList<string>>();
+                    while (true)
+                    {
+                        IParseResult<IList<string>> r3 = null;
+                        r3 = this._(ref cursor);
+                        if (r3 != null)
+                        {
+                            l0.Add(r3.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    if (l0.Count >= 1)
+                    {
+                        r2 = this.ReturnHelper<IList<IList<string>>>(startCursor1, ref cursor, state => l0.AsReadOnly());
+                    }
+                    else
+                    {
+                        cursor = startCursor1;
+                    }
+                    if (r2 != null)
+                    {
+                        IParseResult<string> r4 = null;
+                        r4 = this.ParseLiteral(ref cursor, "NOT");
+                        if (r4 != null)
+                        {
+                            r0 = this.ReturnHelper<GroupOperator>(startCursor0, ref cursor, state =>
+                                #line 300 "lucene-query.peg"
+                     GroupOperator.AndNot
+                                #line default
+                                , ruleName: "operator");
+                        }
+                        else
+                        {
+                            cursor = startCursor0;
+                        }
+                    }
+                    else
+                    {
+                        cursor = startCursor0;
+                    }
                 }
                 else
                 {
@@ -3037,20 +3049,150 @@ namespace
             }
             if (r0 == null)
             {
-                var startCursor1 = cursor;
-                IParseResult<string> r2 = null;
-                r2 = this.ParseLiteral(ref cursor, "&&");
-                if (r2 != null)
+                var startCursor2 = cursor;
+                IParseResult<string> r5 = null;
+                r5 = this.ParseLiteral(ref cursor, "OR");
+                if (r5 != null)
                 {
-                    r0 = this.ReturnHelper<string>(startCursor1, ref cursor, state =>
-                        #line 304 "lucene-query.peg"
-           "AND"
+                    IParseResult<IList<IList<string>>> r6 = null;
+                    var startCursor3 = cursor;
+                    var l1 = new List<IList<string>>();
+                    while (true)
+                    {
+                        IParseResult<IList<string>> r7 = null;
+                        r7 = this._(ref cursor);
+                        if (r7 != null)
+                        {
+                            l1.Add(r7.Value);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    if (l1.Count >= 1)
+                    {
+                        r6 = this.ReturnHelper<IList<IList<string>>>(startCursor3, ref cursor, state => l1.AsReadOnly());
+                    }
+                    else
+                    {
+                        cursor = startCursor3;
+                    }
+                    if (r6 != null)
+                    {
+                        IParseResult<string> r8 = null;
+                        r8 = this.ParseLiteral(ref cursor, "NOT");
+                        if (r8 != null)
+                        {
+                            r0 = this.ReturnHelper<GroupOperator>(startCursor2, ref cursor, state =>
+                                #line 301 "lucene-query.peg"
+                   GroupOperator.OrNot
+                                #line default
+                                , ruleName: "operator");
+                        }
+                        else
+                        {
+                            cursor = startCursor2;
+                        }
+                    }
+                    else
+                    {
+                        cursor = startCursor2;
+                    }
+                }
+                else
+                {
+                    cursor = startCursor2;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor4 = cursor;
+                IParseResult<string> r9 = null;
+                r9 = this.ParseLiteral(ref cursor, "OR");
+                if (r9 != null)
+                {
+                    r0 = this.ReturnHelper<GroupOperator>(startCursor4, ref cursor, state =>
+                        #line 302 "lucene-query.peg"
+           GroupOperator.Or
                         #line default
                         , ruleName: "operator");
                 }
                 else
                 {
-                    cursor = startCursor1;
+                    cursor = startCursor4;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor5 = cursor;
+                IParseResult<string> r10 = null;
+                r10 = this.ParseLiteral(ref cursor, "AND");
+                if (r10 != null)
+                {
+                    r0 = this.ReturnHelper<GroupOperator>(startCursor5, ref cursor, state =>
+                        #line 303 "lucene-query.peg"
+           GroupOperator.And
+                        #line default
+                        , ruleName: "operator");
+                }
+                else
+                {
+                    cursor = startCursor5;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor6 = cursor;
+                IParseResult<string> r11 = null;
+                r11 = this.ParseLiteral(ref cursor, "NOT");
+                if (r11 != null)
+                {
+                    r0 = this.ReturnHelper<GroupOperator>(startCursor6, ref cursor, state =>
+                        #line 304 "lucene-query.peg"
+           GroupOperator.Not
+                        #line default
+                        , ruleName: "operator");
+                }
+                else
+                {
+                    cursor = startCursor6;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor7 = cursor;
+                IParseResult<string> r12 = null;
+                r12 = this.ParseLiteral(ref cursor, "||");
+                if (r12 != null)
+                {
+                    r0 = this.ReturnHelper<GroupOperator>(startCursor7, ref cursor, state =>
+                        #line 305 "lucene-query.peg"
+           GroupOperator.Or
+                        #line default
+                        , ruleName: "operator");
+                }
+                else
+                {
+                    cursor = startCursor7;
+                }
+            }
+            if (r0 == null)
+            {
+                var startCursor8 = cursor;
+                IParseResult<string> r13 = null;
+                r13 = this.ParseLiteral(ref cursor, "&&");
+                if (r13 != null)
+                {
+                    r0 = this.ReturnHelper<GroupOperator>(startCursor8, ref cursor, state =>
+                        #line 306 "lucene-query.peg"
+           GroupOperator.And
+                        #line default
+                        , ruleName: "operator");
+                }
+                else
+                {
+                    cursor = startCursor8;
                 }
             }
             return r0;
@@ -3087,7 +3229,7 @@ namespace
                 if (r3 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 308 "lucene-query.peg"
+                        #line 310 "lucene-query.peg"
      
         op
                         #line default

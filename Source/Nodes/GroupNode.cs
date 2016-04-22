@@ -6,7 +6,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
     public class GroupNode : QueryNodeBase {
         public IQueryNode Left { get; set; }
         public IQueryNode Right { get; set; }
-        public string Operator { get; set; }
+        public GroupOperator Operator { get; set; } = GroupOperator.Default;
         public bool HasParens { get; set; }
         public string Field { get; set; }
         public string Prefix { get; set; }
@@ -27,8 +27,16 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             if (Left != null)
                 builder.Append(Left);
 
-            if (!String.IsNullOrEmpty(Operator))
-                builder.Append(" " + Operator + " ");
+            if (Operator == GroupOperator.And)
+                builder.Append(" AND ");
+            else if (Operator == GroupOperator.Or)
+                builder.Append(" OR ");
+            else if (Operator == GroupOperator.AndNot)
+                builder.Append(" AND NOT ");
+            else if (Operator == GroupOperator.AndNot)
+                builder.Append(" OR NOT ");
+            else if (Operator == GroupOperator.Not)
+                builder.Append(" NOT ");
             else if (Right != null)
                 builder.Append(" ");
 
@@ -55,5 +63,14 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
                 return children;
             }
         }
+    }
+
+    public enum GroupOperator {
+        Default,
+        And,
+        AndNot,
+        Or,
+        OrNot,
+        Not
     }
 }
