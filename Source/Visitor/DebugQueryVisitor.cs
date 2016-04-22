@@ -1,11 +1,12 @@
-﻿using System.CodeDom.Compiler;
+﻿using System;
+using System.CodeDom.Compiler;
 using System.IO;
 using System.Text;
 using Exceptionless.LuceneQueryParser.Extensions;
 using Exceptionless.LuceneQueryParser.Nodes;
 
 namespace Exceptionless.LuceneQueryParser.Visitor {
-    public class DebugQueryVisitor : QueryNodeVisitorBase {
+    public class DebugQueryVisitor : QueryNodeVisitorBase<string> {
         private readonly StringBuilder _builder = new StringBuilder();
         private readonly IndentedTextWriter _writer;
 
@@ -76,12 +77,13 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.Indent--;
         }
 
-        public string Result => _builder.ToString();
+        public override string Accept(IQueryNode node) {
+            node.Accept(this, false);
+            return _builder.ToString();
+        }
 
         public static string Run(IQueryNode node) {
-            var visitor = new DebugQueryVisitor();
-            node.Accept(visitor, false);
-            return visitor.Result;
+            return new DebugQueryVisitor().Accept(node);
         }
     }
 }
