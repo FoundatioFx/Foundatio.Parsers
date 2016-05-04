@@ -47,7 +47,6 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             builder.Append(Prefix);
 
             if (!String.IsNullOrEmpty(Field)) {
-                builder.Append(Prefix);
                 builder.Append(Field);
                 builder.Append(":");
             }

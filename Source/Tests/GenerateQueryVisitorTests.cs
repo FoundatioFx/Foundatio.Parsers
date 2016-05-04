@@ -75,6 +75,7 @@ namespace Tests {
         [InlineData("hidden:true AND data.age:(>30 AND <=40)", "hidden:true AND data.age:(>30 AND <=40)", true)]
         [InlineData("hidden:true", "hidden:true", true)]
         [InlineData("min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", "min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", true)]
+        [InlineData("-type:404", "-type:404", true)]
         public void CanGenerateQuery(string query, string expected, bool isValid) {
             var parser = new QueryParser();
 

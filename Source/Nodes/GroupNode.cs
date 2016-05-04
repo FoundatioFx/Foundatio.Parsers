@@ -15,8 +15,9 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public override String ToString() {
             var builder = new StringBuilder();
 
+            builder.Append(Prefix);
+
             if (!String.IsNullOrEmpty(Field)) {
-                builder.Append(Prefix);
                 builder.Append(Field);
                 builder.Append(":");
             }
