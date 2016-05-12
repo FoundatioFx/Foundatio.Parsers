@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Exceptionless.LuceneQueryParser.Nodes;
 
 namespace Exceptionless.LuceneQueryParser.Visitor {
-    public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorBase<ISet<String>> {
+    public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorWithResultBase<ISet<String>> {
         private readonly HashSet<string> _fields = new HashSet<String>(StringComparer.OrdinalIgnoreCase);
 
         public override void Visit(GroupNode node) {

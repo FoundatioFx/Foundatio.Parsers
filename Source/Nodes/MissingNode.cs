@@ -17,7 +17,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             return target;
         }
 
-        public override String ToString() {
+        public override string ToString() {
             var builder = new StringBuilder();
 
             builder.Append(Prefix);

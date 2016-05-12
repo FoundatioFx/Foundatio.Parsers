@@ -12,13 +12,9 @@
 }
 
 start<GroupNode>
-  = _* node:node
+  = _* node:node? _* EOF
     {
-        node
-    }
-  / _* EOF
-    {
-        new GroupNode()
+        node.SingleOrDefault() ?? new GroupNode()
     }
   / #ERROR{ "Unable to parse query." }
 
@@ -163,13 +159,13 @@ name_term
     }
 
 unquoted_term
-  = term:([^: \t\r\n\f\{\}\(\)/^~\[\]]+ "")
+  = term:(([^: \\\t\r\n\f\{\}\(\)/^~\[\]\*] / '\\' [:-\\\(\)^~\*])+ "")
     {
         term
     }
 
 range_unquoted_term
-  = term:([^: \.\t\r\n\f\{\}\(\)"^~\[\]]+ "")
+  = term:((([^: \\\.\t\r\n\f\{\}\(\)"^~\[\]\*] / '\\' [:-\\\(\)^~\*])+ "") / '*')
     {
         term
     }
@@ -282,7 +278,7 @@ range_operator_exp<TermRangeNode>
         }
     }
 
-range_delimiter_exp
+range_delimiter_exp -lexical
   = _+ 'TO' _+
   / _* '..' _*
 

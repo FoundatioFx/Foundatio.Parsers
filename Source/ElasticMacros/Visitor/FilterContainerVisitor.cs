@@ -5,7 +5,7 @@ using Exceptionless.LuceneQueryParser.Visitor;
 using Nest;
 
 namespace ElasticMacros.Visitor {
-    public class FilterContainerVisitor : QueryNodeVisitorBase<FilterContainer> {
+    public class FilterContainerVisitor : QueryNodeVisitorWithResultBase<FilterContainer> {
         private readonly Stack<Operator> _defaultOperatorStack = new Stack<Operator>();
         private readonly Stack<string> _defaultFieldStack = new Stack<string>();
         private readonly Operator _defaultOperator;

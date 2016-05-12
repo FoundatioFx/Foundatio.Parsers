@@ -3,7 +3,7 @@ using System.Text;
 using Exceptionless.LuceneQueryParser.Nodes;
 
 namespace Exceptionless.LuceneQueryParser.Visitor {
-    public class GenerateQueryVisitor : QueryNodeVisitorBase<string> {
+    public class GenerateQueryVisitor : QueryNodeVisitorWithResultBase<string> {
         private readonly StringBuilder _builder = new StringBuilder();
 
         public override void Visit(GroupNode node) {

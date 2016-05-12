@@ -6,7 +6,7 @@ using Exceptionless.LuceneQueryParser.Extensions;
 using Exceptionless.LuceneQueryParser.Nodes;
 
 namespace Exceptionless.LuceneQueryParser.Visitor {
-    public class DebugQueryVisitor : QueryNodeVisitorBase<string> {
+    public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string> {
         private readonly StringBuilder _builder = new StringBuilder();
         private readonly IndentedTextWriter _writer;
 

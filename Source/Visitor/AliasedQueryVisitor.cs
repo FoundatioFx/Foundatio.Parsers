@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Exceptionless.LuceneQueryParser.Nodes;
 
 namespace Exceptionless.LuceneQueryParser.Visitor {
-    public class AliasedQueryVisitor : QueryNodeVisitorBase<IQueryNode> {
+    public class AliasedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode> {
         private readonly Func<string, string> _aliasFunc;
 
         public AliasedQueryVisitor(Func<string, string> aliasFunc) {
