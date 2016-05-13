@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using ElasticMacros.Visitor;
 using Xunit;
 using Exceptionless.LuceneQueryParser;
 using Exceptionless.LuceneQueryParser.Nodes;
+using Exceptionless.LuceneQueryParser.Visitor;
 
 namespace Tests {
     public class QueryParserTests {
@@ -39,6 +41,16 @@ namespace Tests {
             //Assert.NotNull(result.Left);
             //Assert.IsType<TermNode>(result.Left);
             //Assert.Equal("criteria", ((TermNode)result.Left).Term);
+        }
+
+        [Fact]
+        public void CanUseAliases() {
+            var parser = new QueryParser();
+            var result = parser.Parse("field1:value");
+            var aliasMap = new Dictionary<string, string>();
+            aliasMap.Add("field1", "field2");
+            var aliased = AliasedQueryVisitor.Run(result, aliasMap);
+            Assert.Equal("field2:value", aliased.ToString());
         }
     }
 }
