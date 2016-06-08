@@ -67,6 +67,7 @@
     <Compile Include="FilterContainerVisitor.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="ElasticMacros.nuspec" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

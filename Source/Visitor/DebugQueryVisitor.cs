@@ -27,7 +27,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.WriteIf(node.Right != null, "Right - ");
             node.Right?.Accept(this, false);
 
-            _writer.WriteLineIf(node.Operator != null, "Operator: {0}", node.Operator);
+            _writer.WriteLineIf(node.Operator != GroupOperator.Default, "Operator: {0}", node.Operator);
             _writer.WriteLineIf(node.HasParens, "Parens: true");
 
             _writer.Indent--;
