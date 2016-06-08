@@ -32,6 +32,7 @@ namespace Tests {
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
 
             var processor = new ElasticMacroProcessor();
             var filterContainer = processor.Process("field1:value1");
@@ -43,7 +44,61 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
-    
+
+        [Fact]
+        public void NegativeQueryProcessor() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value3" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticMacroProcessor(c => c.SetDefaultOperator(Operator.Or));
+            var filterContainer = processor.Process("field1:value1 AND -field2:value2");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(filterContainer));
+            string actualRequest = GetRequest(actualResponse);
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") && !f.Term(m => m.Field2, "value2")));
+            string expectedRequest = GetRequest(expectedResponse);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+
+            processor = new ElasticMacroProcessor(c => c.SetDefaultOperator(Operator.Or));
+            filterContainer = processor.Process("field1:value1 AND NOT field2:value2");
+            actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(filterContainer));
+            actualRequest = GetRequest(actualResponse);
+            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") && !f.Term(m => m.Field2, "value2")));
+            expectedRequest = GetRequest(expectedResponse);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+
+            processor = new ElasticMacroProcessor(c => c.SetDefaultOperator(Operator.Or));
+            filterContainer = processor.Process("field1:value1 OR NOT field2:value2");
+            actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(filterContainer));
+            actualRequest = GetRequest(actualResponse);
+            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") || !f.Term(m => m.Field2, "value2")));
+            expectedRequest = GetRequest(expectedResponse);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+
+            processor = new ElasticMacroProcessor(c => c.SetDefaultOperator(Operator.Or));
+            filterContainer = processor.Process("field1:value1 OR -field2:value2");
+            actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(filterContainer));
+            actualRequest = GetRequest(actualResponse);
+            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") || !f.Term(m => m.Field2, "value2")));
+            expectedRequest = GetRequest(expectedResponse);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
         [Fact]
         public void NestedQueryProcessor() {
             var client = new ElasticClient();
@@ -55,6 +110,7 @@ namespace Tests {
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
 
             var processor = new ElasticMacroProcessor();
             var filterContainer = processor.Process("field1:value1 (field2:value2 OR field3:value3)");
@@ -79,6 +135,7 @@ namespace Tests {
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1 }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
+            client.Refresh();
 
             var processor = new ElasticMacroProcessor();
             var filterContainer = processor.Process("field4:[1 TO 2} OR field1:value1");
@@ -103,15 +160,20 @@ namespace Tests {
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1 }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
+            client.Refresh();
 
             var processor = new ElasticMacroProcessor(c => c
-                .UseGeoRanges("field4")
+                .UseGeo(l => "d", "field4")
                 .UseAliases(name => name == "geo" ? "field4" : name));
-            var filterContainer = processor.Process("geo:[9 TO d] OR field1:value1");
+            var filterContainer = processor.Process("geo:[9 TO d] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(filterContainer));
             string actualRequest = GetRequest(actualResponse);
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.GeoBoundingBox(m => m.Field4, "9", "d") || f.Term(m => m.Field1, "value1")));
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f =>
+                f.GeoBoundingBox(m => m.Field4, "9", "d")
+                || f.Term(m => m.Field1, "value1")
+                || f.Range(m => m.OnField(g => g.Field2).GreaterOrEquals(1).LowerOrEquals(4))
+                || !f.GeoDistance(m => m.Field4, e => e.Location("d").Distance("75mi"))));
             string expectedRequest = GetRequest(expectedResponse);
 
             Assert.Equal(expectedRequest, actualRequest);

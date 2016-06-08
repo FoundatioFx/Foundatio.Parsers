@@ -17,6 +17,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
         public override void Visit(GroupNode node) {
             _writer.WriteLine("Group:");
             _writer.Indent++;
+            _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
 
@@ -36,6 +37,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.WriteLine("Term: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
+            _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
             _writer.WriteLine("IsQuoted: {0}", node.IsQuotedTerm);
             _writer.WriteLineIf(node.Term != null, "Term: {0}", node.Term);
@@ -49,6 +51,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.WriteLine("Term Range: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
+            _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
             _writer.WriteLineIf(node.Operator != null, "Operator: {0}", node.Operator);
             _writer.WriteLineIf(node.Max != null, "Max: {0}", node.Max);
@@ -63,6 +66,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.WriteLine("Exists: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
+            _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
 
             _writer.Indent--;
@@ -72,6 +76,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.WriteLine("Missing: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
+            _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
 
             _writer.Indent--;

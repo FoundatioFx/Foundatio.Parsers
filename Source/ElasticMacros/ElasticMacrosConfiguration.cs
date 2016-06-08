@@ -43,21 +43,21 @@ namespace ElasticMacros.Visitor {
             return AddVisitor(new AliasedQueryVisitor(field => aliasMap.ContainsKey(field) ? aliasMap[field] : field), priority);
         }
 
-        public ElasticMacrosConfiguration UseGeoRanges(IEnumerable<string> geoFields, int priority = 0) {
+        public ElasticMacrosConfiguration UseGeo(IEnumerable<string> geoFields, Func<string, string> resolveGeoLocation, int priority = 0) {
             var fields = new HashSet<string>(geoFields, StringComparer.OrdinalIgnoreCase);
-            return AddMacro(new GeoRangeMacro(f => fields.Contains(f)), priority);
+            return AddMacro(new GeoMacro(f => fields.Contains(f), resolveGeoLocation), priority);
         }
 
-        public ElasticMacrosConfiguration UseGeoRanges(params string[] geoFields) {
-            return UseGeoRanges(geoFields.ToList());
+        public ElasticMacrosConfiguration UseGeo(Func<string, string> resolveGeoLocation, params string[] geoFields) {
+            return UseGeo(geoFields.ToList(), resolveGeoLocation);
         }
 
-        public ElasticMacrosConfiguration UseGeoRanges(int priority, params string[] geoFields) {
-            return UseGeoRanges(geoFields.ToList(), priority);
+        public ElasticMacrosConfiguration UseGeo(int priority, Func<string, string> resolveGeoLocation, params string[] geoFields) {
+            return UseGeo(geoFields.ToList(), resolveGeoLocation, priority);
         }
 
-        public ElasticMacrosConfiguration UseGeoRanges(Func<string, bool> isGeoField, int priority = 0) {
-            return AddMacro(new GeoRangeMacro(isGeoField), priority);
+        public ElasticMacrosConfiguration UseGeo(Func<string, bool> isGeoField, Func<string, string> resolveGeoLocation, int priority = 0) {
+            return AddMacro(new GeoMacro(isGeoField, resolveGeoLocation), priority);
         }
     }
 

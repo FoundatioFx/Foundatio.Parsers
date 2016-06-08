@@ -9,6 +9,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public GroupOperator Operator { get; set; } = GroupOperator.Default;
         public bool HasParens { get; set; }
         public string Field { get; set; }
+        public bool? IsNegated { get; set; }
         public string Prefix { get; set; }
         public string Boost { get; set; }
 
@@ -32,14 +33,11 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
                 builder.Append(" AND ");
             else if (Operator == GroupOperator.Or)
                 builder.Append(" OR ");
-            else if (Operator == GroupOperator.AndNot)
-                builder.Append(" AND NOT ");
-            else if (Operator == GroupOperator.AndNot)
-                builder.Append(" OR NOT ");
-            else if (Operator == GroupOperator.Not)
-                builder.Append(" NOT ");
             else if (Right != null)
                 builder.Append(" ");
+
+            if (IsNegated.HasValue && IsNegated.Value)
+                builder.Append("NOT ");
 
             if (Right != null)
                 builder.Append(Right);
@@ -69,9 +67,6 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
     public enum GroupOperator {
         Default,
         And,
-        AndNot,
-        Or,
-        OrNot,
-        Not
+        Or
     }
 }

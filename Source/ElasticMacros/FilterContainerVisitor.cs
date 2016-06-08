@@ -6,7 +6,7 @@ using Nest;
 
 namespace ElasticMacros.Visitor {
     public class FilterContainerVisitor : QueryNodeVisitorWithResultBase<FilterContainer> {
-        private readonly Stack<Operator> _defaultOperatorStack = new Stack<Operator>();
+        private readonly Stack<Operator> _operatorStack = new Stack<Operator>();
         private readonly Stack<string> _defaultFieldStack = new Stack<string>();
         private readonly Operator _defaultOperator;
         private FilterContainer _filter;
@@ -25,21 +25,21 @@ namespace ElasticMacros.Visitor {
                 _filter = null;
             }
 
-            _defaultOperatorStack.Push(GetOperator(node));
+            _operatorStack.Push(GetOperator(node));
             if (!String.IsNullOrEmpty(node.Field))
                 _defaultFieldStack.Push(node.Field);
 
             foreach (var child in node.Children)
                 child.Accept(this, false);
 
-            _defaultOperatorStack.Pop();
+            _operatorStack.Pop();
             if (!String.IsNullOrEmpty(node.Field))
                 _defaultFieldStack.Pop();
 
             if (parent == null)
                 return;
 
-            var op = _defaultOperatorStack.Peek();
+            var op = _operatorStack.Peek();
             if (op == Operator.And)
                 parent &= _filter;
             else
@@ -53,12 +53,24 @@ namespace ElasticMacros.Visitor {
             foreach (var macro in _macros)
                 filter = macro.Expand(node, filter, new ElasticMacroContext { DefaultField = _defaultFieldStack.Peek() });
 
-            if (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-")
-                _filter &= !filter.ToContainer();
-            else if (_defaultOperatorStack.Peek() == Operator.And || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+"))
-                _filter &= filter.ToContainer();
-            else
-                _filter |= filter.ToContainer();
+            AddFilter(filter, node.IsNegated, node.Prefix);
+        }
+
+        private void AddFilter(PlainFilter filter, bool? isNegated, string prefix) {
+            FilterContainer container = filter.ToContainer();
+            var op = _operatorStack.Peek();
+            if ((isNegated.HasValue && isNegated.Value)
+                || (!String.IsNullOrEmpty(prefix) && prefix == "-"))
+                container = !container;
+
+            if (op == Operator.Or && !String.IsNullOrEmpty(prefix) && prefix == "+")
+                op = Operator.And;
+
+            if (op == Operator.And) {
+                _filter &= container;
+            } else if (op == Operator.Or) {
+                _filter |= container;
+            }
         }
 
         public override void Visit(TermRangeNode node) {
@@ -81,12 +93,7 @@ namespace ElasticMacros.Visitor {
             foreach (var macro in _macros)
                 filter = macro.Expand(node, filter, new ElasticMacroContext { DefaultField = _defaultFieldStack.Peek() });
 
-            if (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-")
-                _filter &= !filter.ToContainer();
-            if (_defaultOperatorStack.Peek() == Operator.And || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+"))
-                _filter &= filter.ToContainer();
-            else
-                _filter |= filter.ToContainer();
+            AddFilter(filter, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(ExistsNode node) {
@@ -94,12 +101,7 @@ namespace ElasticMacros.Visitor {
             foreach (var macro in _macros)
                 filter = macro.Expand(node, filter, new ElasticMacroContext { DefaultField = _defaultFieldStack.Peek() });
 
-            if (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-")
-                _filter &= !filter.ToContainer();
-            else if (_defaultOperatorStack.Peek() == Operator.And || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+"))
-                _filter &= filter.ToContainer();
-            else
-                _filter |= filter.ToContainer();
+            AddFilter(filter, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(MissingNode node) {
@@ -107,12 +109,7 @@ namespace ElasticMacros.Visitor {
             foreach (var macro in _macros)
                 filter = macro.Expand(node, filter, new ElasticMacroContext { DefaultField = _defaultFieldStack.Peek() });
 
-            if (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-")
-                _filter &= !filter.ToContainer();
-            else if (_defaultOperatorStack.Peek() == Operator.And || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+"))
-                _filter &= filter.ToContainer();
-            else
-                _filter |= filter.ToContainer();
+            AddFilter(filter, node.IsNegated, node.Prefix);
         }
 
         public override FilterContainer Accept(IQueryNode node) {
@@ -126,14 +123,12 @@ namespace ElasticMacros.Visitor {
         private Operator GetOperator(GroupNode node) {
             switch (node.Operator) {
                 case GroupOperator.And:
-                case GroupOperator.AndNot:
                     return Operator.And;
                 case GroupOperator.Or:
-                case GroupOperator.OrNot:
                     return Operator.Or;
+                default:
+                    return _defaultOperator;
             }
-
-            return _defaultOperator;
         }
     }
 }

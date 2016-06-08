@@ -10,13 +10,13 @@ namespace ElasticMacros {
     public class ElasticMacroProcessor {
         private readonly List<IQueryNodeVisitorWithResult<IQueryNode>> _visitors = new List<IQueryNodeVisitorWithResult<IQueryNode>>();
         private readonly QueryParser _parser = new QueryParser();
-        private readonly FilterContainerVisitor _filterContainerVisitor;
+        private readonly ElasticMacrosConfiguration _config;
 
         public ElasticMacroProcessor(Action<ElasticMacrosConfiguration> configure = null) {
             var config = new ElasticMacrosConfiguration();
             configure?.Invoke(config);
             _visitors.AddRange(config.Visitors);
-            _filterContainerVisitor = new FilterContainerVisitor(config);
+            _config = config;
         }
 
         public FilterContainer Process(string query) {
@@ -25,7 +25,7 @@ namespace ElasticMacros {
             for (int i = 0; i < _visitors.Count; i++)
                 _visitors[i].Accept(result);
 
-            return _filterContainerVisitor.Accept(result);
+            return new FilterContainerVisitor(_config).Accept(result);
         }
 
         // parser query, generate filter, generate aggregations

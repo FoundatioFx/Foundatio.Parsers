@@ -4,6 +4,7 @@ using System.Text;
 
 namespace Exceptionless.LuceneQueryParser.Nodes {
     public class TermNode : QueryNodeBase {
+        public bool? IsNegated { get; set; }
         public string Prefix { get; set; }
         public string Field { get; set; }
         public string Term { get; set; }
@@ -12,6 +13,9 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public string Proximity { get; set; }
 
         public TermNode CopyTo(TermNode target) {
+            if (IsNegated.HasValue)
+                target.IsNegated = IsNegated;
+
             if (Prefix != null)
                 target.Prefix = Prefix;
 
@@ -34,6 +38,9 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
 
         public override String ToString() {
             var builder = new StringBuilder();
+
+            if (IsNegated.HasValue && IsNegated.Value)
+                builder.Append("NOT ");
 
             builder.Append(Prefix);
 

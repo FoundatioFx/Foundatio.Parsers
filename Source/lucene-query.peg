@@ -70,37 +70,43 @@ paren_exp<GroupNode>
     }}
 
 field_exp<IQueryNode>
-  = op:prefix_operator_exp? '_exists_' _* ':' _* fieldname:name_term
+  = not:not_exp? op:prefix_operator_exp? '_exists_' _* ':' _* fieldname:name_term
   {{
-        return new ExistsNode { Prefix = op.SingleOrDefault(), Field = fieldname };
+        return new ExistsNode { IsNegated = not.Any(), Prefix = op.SingleOrDefault(), Field = fieldname };
   }}
-  / op:prefix_operator_exp? '_missing_' _* ':' _* fieldname:name_term
+  / not:not_exp? op:prefix_operator_exp? '_missing_' _* ':' _* fieldname:name_term
   {{
-        return new MissingNode { Prefix = op.SingleOrDefault(), Field = fieldname };
+        return new MissingNode { IsNegated = not.Any(), Prefix = op.SingleOrDefault(), Field = fieldname };
   }}
-  / name:fieldname? range:range_operator_exp
+  / not:not_exp? name:fieldname? range:range_operator_exp
     {{
         if (name.Count == 1) {
+		  range.IsNegated = not.Any();
           range.Field = name[0].Field;
           range.Prefix = name[0].Prefix;
         }
 
         return range;
     }}
-  / op:prefix_operator_exp? range:range_operator_exp
+  / not:not_exp? op:prefix_operator_exp? range:range_operator_exp
     {{
+		range.IsNegated = not.Any();
         range.Prefix = op.SingleOrDefault();
         return range;
     }}
-  / name:fieldname node:paren_exp
+  / not:not_exp? name:fieldname node:paren_exp
     {{
+		node.IsNegated = not.Any();
         node.Field = name.Field;
         node.Prefix = name.Prefix;
         return node;
     }}
-  / name:fieldname? term:term
+  / not:not_exp? name:fieldname? term:term
     {{
         var query = new TermNode();
+
+		if (not.Any())
+			query.IsNegated = true;
 
         if (name.Count == 1) {
           query.Field = name[0].Field;
@@ -123,7 +129,7 @@ fieldname<FieldInfo> -lexical
     }}
 
 term<TermNode>
-  = op:prefix_operator_exp? term:quoted_term proximity:proximity_modifier? boost:boost_modifier? _*
+  = not:not_exp? op:prefix_operator_exp? term:quoted_term proximity:proximity_modifier? boost:boost_modifier? _*
       {{
         var result = new TermNode { Term = term, IsQuotedTerm = true };
 
@@ -133,11 +139,13 @@ term<TermNode>
         if (boost.Count > 0)
             result.Boost = boost.SingleOrDefault();
 
+		if (not.Any())
+			result.IsNegated = true;
         result.Prefix = op.SingleOrDefault();
 
         return result;
     }}
-  / op:prefix_operator_exp? term:unquoted_term proximity:proximity_modifier? boost:boost_modifier? _*
+  / not:not_exp? op:prefix_operator_exp? term:unquoted_term proximity:proximity_modifier? boost:boost_modifier? _*
     {{
         var result = new TermNode { Term = term };
 
@@ -147,6 +155,8 @@ term<TermNode>
         if (boost.Count > 0)
             result.Boost = boost.SingleOrDefault();
 
+		if (not.Any())
+			result.IsNegated = true;
         result.Prefix = op.SingleOrDefault();
 
         return result;
@@ -266,6 +276,9 @@ range_delimiter_exp -lexical
   = _+ 'TO' _+
   / _* '..' _*
 
+not_exp
+  = 'NOT' _+
+
 operator_exp<GroupOperator>
   = _* op:operator _+
     {
@@ -277,11 +290,8 @@ operator_exp<GroupOperator>
     }
 
 operator<GroupOperator> -lexical
-  = "AND" _+ "NOT" { GroupOperator.AndNot }
-  / "OR" _+ "NOT"{ GroupOperator.OrNot }
-  / "OR" { GroupOperator.Or }
+  = "OR" { GroupOperator.Or }
   / "AND"{ GroupOperator.And }
-  / "NOT"{ GroupOperator.Not }
   / "||" { GroupOperator.Or }
   / "&&" { GroupOperator.And }
 

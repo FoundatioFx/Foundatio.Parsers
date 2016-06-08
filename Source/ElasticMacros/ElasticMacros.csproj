@@ -59,8 +59,7 @@
   <ItemGroup>
     <Compile Include="ElasticMacroBase.cs" />
     <Compile Include="ElasticMacroContext.cs" />
-    <Compile Include="GeoRadiusMacro.cs" />
-    <Compile Include="GeoRangeMacro.cs" />
+    <Compile Include="GeoMacro.cs" />
     <Compile Include="IElasticMacro.cs" />
     <Compile Include="ElasticMacroProcessor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
