@@ -39,12 +39,7 @@ namespace ElasticMacros.Visitor {
             if (parent == null)
                 return;
 
-            var op = _operatorStack.Peek();
-            if (op == Operator.And)
-                parent &= _filter;
-            else
-                parent |= _filter;
-
+            AddFilter(ref parent, _filter, node.IsNegated, node.Prefix);
             _filter = parent;
         }
 
@@ -57,7 +52,10 @@ namespace ElasticMacros.Visitor {
         }
 
         private void AddFilter(PlainFilter filter, bool? isNegated, string prefix) {
-            FilterContainer container = filter.ToContainer();
+            AddFilter(ref _filter, filter.ToContainer(), isNegated, prefix);
+        }
+
+        private void AddFilter(ref FilterContainer target, FilterContainer container, bool? isNegated, string prefix) {
             var op = _operatorStack.Peek();
             if ((isNegated.HasValue && isNegated.Value)
                 || (!String.IsNullOrEmpty(prefix) && prefix == "-"))
@@ -67,9 +65,9 @@ namespace ElasticMacros.Visitor {
                 op = Operator.And;
 
             if (op == Operator.And) {
-                _filter &= container;
+                target &= container;
             } else if (op == Operator.Or) {
-                _filter |= container;
+                target |= container;
             }
         }
 
