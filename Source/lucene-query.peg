@@ -176,32 +176,16 @@ quoted_term
         term
     }
 
-boost_modifier<double>
-  = '^' boost:decimal_or_int_exp
+boost_modifier<string>
+  = '^' boost:unquoted_term
     {
         boost
     }
 
-proximity_modifier<double>
-  = '~' proximity:(decimal_or_int_exp? "")
+proximity_modifier<string>
+  = '~' proximity:(unquoted_term? "")
     {
-        String.IsNullOrEmpty(proximity) ? Double.MinValue : Double.Parse(proximity)
-    }
-
-decimal_or_int_exp<double>
- = decimal_exp
- / int_exp
-
-decimal_exp<double>
- = '0.' val:([0-9]+ "")
-    {
-        Double.Parse("0." + val)
-    }
-
-int_exp<double>
-  = val:([0-9]+ "")
-    {      
-        Double.Parse(val)
+        proximity
     }
 
 range_operator_exp<TermRangeNode>

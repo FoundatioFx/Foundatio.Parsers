@@ -9,7 +9,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
         public virtual void Visit(MissingNode node) { }
     }
 
-    public abstract class QueryNodeVisitorWithResultBase<T> : IQueryNodeVisitor, IQueryNodeVisitorWithResult<T> {
+    public abstract class QueryNodeVisitorWithResultBase<T> : IQueryNodeVisitorWithResult<T> {
         public virtual void Visit(GroupNode node) {}
         public virtual void Visit(TermNode node) {}
         public virtual void Visit(TermRangeNode node) {}
@@ -18,7 +18,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
         public abstract T Accept(IQueryNode node);
     }
 
-    public interface IQueryNodeVisitorWithResult<T> {
+    public interface IQueryNodeVisitorWithResult<T>: IQueryNodeVisitor {
         T Accept(IQueryNode node);
     }
 }

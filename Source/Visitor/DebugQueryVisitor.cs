@@ -39,8 +39,8 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
             _writer.WriteLine("IsQuoted: {0}", node.IsQuotedTerm);
             _writer.WriteLineIf(node.Term != null, "Term: {0}", node.Term);
-            _writer.WriteLineIf(node.Boost.HasValue, "Boost: {0}", node.Boost);
-            _writer.WriteLineIf(node.Proximity.HasValue, "Proximity: {0}", node.Proximity);
+            _writer.WriteLineIf(node.Boost != null, "Boost: {0}", node.Boost);
+            _writer.WriteLineIf(node.Proximity != null, "Proximity: {0}", node.Proximity);
 
             _writer.Indent--;
         }

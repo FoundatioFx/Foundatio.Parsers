@@ -57,9 +57,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Parser.cs" />
+    <Compile Include="ElasticMacroBase.cs" />
+    <Compile Include="ElasticMacroContext.cs" />
+    <Compile Include="GeoRadiusMacro.cs" />
+    <Compile Include="GeoRangeMacro.cs" />
+    <Compile Include="IElasticMacro.cs" />
+    <Compile Include="ElasticMacroProcessor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Visitor\FilterContainerVisitor.cs" />
+    <Compile Include="ElasticMacrosConfiguration.cs" />
+    <Compile Include="FilterContainerVisitor.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

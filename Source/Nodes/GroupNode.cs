@@ -10,7 +10,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public bool HasParens { get; set; }
         public string Field { get; set; }
         public string Prefix { get; set; }
-        public double? Boost { get; set; }
+        public string Boost { get; set; }
 
         public override String ToString() {
             var builder = new StringBuilder();
@@ -47,7 +47,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             if (HasParens)
                 builder.Append(")");
 
-            if (Boost.HasValue)
+            if (Boost != null)
                 builder.Append("^" + Boost);
 
             return builder.ToString();

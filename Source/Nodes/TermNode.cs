@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 
 namespace Exceptionless.LuceneQueryParser.Nodes {
@@ -9,8 +8,8 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public string Field { get; set; }
         public string Term { get; set; }
         public bool IsQuotedTerm { get; set; }
-        public double? Boost { get; set; }
-        public double? Proximity { get; set; }
+        public string Boost { get; set; }
+        public string Proximity { get; set; }
 
         public TermNode CopyTo(TermNode target) {
             if (Prefix != null)
@@ -24,10 +23,10 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
 
             target.IsQuotedTerm = IsQuotedTerm;
 
-            if (Boost.HasValue)
+            if (Boost != null)
                 target.Boost = Boost;
 
-            if (Proximity.HasValue)
+            if (Proximity != null)
                 target.Proximity = Proximity;
 
             return target;
@@ -45,11 +44,11 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
 
             builder.Append(IsQuotedTerm ? "\"" + Term + "\"" : Term);
 
-            if (Boost.HasValue)
+            if (Boost != null)
                 builder.Append("^" + Boost);
 
-            if (Proximity.HasValue)
-                builder.Append("~" + (Proximity.Value != Double.MinValue ? Proximity.ToString() : String.Empty));
+            if (Proximity != null)
+                builder.Append("~" + Proximity);
 
             return builder.ToString();
         }
