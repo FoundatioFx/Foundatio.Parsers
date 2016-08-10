@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using ElasticMacros.Visitor;
+using ElasticMacros.FilterMacros;
+using ElasticMacros.QueryMacros;
 using Exceptionless.LuceneQueryParser;
 using Exceptionless.LuceneQueryParser.Nodes;
 using Exceptionless.LuceneQueryParser.Visitor;
@@ -19,13 +20,22 @@ namespace ElasticMacros {
             _config = config;
         }
 
-        public FilterContainer Process(string query) {
+        public FilterContainer ProcessFilter(string query) {
             var result = _parser.Parse(query);
 
             for (int i = 0; i < _visitors.Count; i++)
                 _visitors[i].Accept(result);
 
             return new FilterContainerVisitor(_config).Accept(result);
+        }
+
+        public QueryContainer ProcessQuery(string query) {
+            var result = _parser.Parse(query);
+
+            for (int i = 0; i < _visitors.Count; i++)
+                _visitors[i].Accept(result);
+
+            return new QueryContainerVisitor(_config).Accept(result);
         }
 
         // parser query, generate filter, generate aggregations

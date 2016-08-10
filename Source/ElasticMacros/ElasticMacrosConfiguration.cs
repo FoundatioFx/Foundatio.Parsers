@@ -1,18 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ElasticMacros.FilterMacros;
+using ElasticMacros.QueryMacros;
 using Exceptionless.LuceneQueryParser.Nodes;
 using Exceptionless.LuceneQueryParser.Visitor;
 using Nest;
 
-namespace ElasticMacros.Visitor {
+namespace ElasticMacros {
     public class ElasticMacrosConfiguration {
-        private readonly SortedSet<ElasticMacroWithPriority> _macros = new SortedSet<ElasticMacroWithPriority>(new ElasticMacroWithPriority.PriorityComparer());
+        private readonly SortedSet<ElasticFilterMacroWithPriority> _filterMacros = new SortedSet<ElasticFilterMacroWithPriority>(new ElasticFilterMacroWithPriority.PriorityComparer());
+        private readonly SortedSet<ElasticQueryMacroWithPriority> _queryMacros = new SortedSet<ElasticQueryMacroWithPriority>(new ElasticQueryMacroWithPriority.PriorityComparer());
         private readonly SortedSet<ElasticVisitorWithPriority> _visitors = new SortedSet<ElasticVisitorWithPriority>(new ElasticVisitorWithPriority.PriorityComparer());
 
         public string DefaultField { get; private set; }
         public Operator DefaultOperator { get; private set; } = Operator.And;
-        public IList<IElasticMacro> Macros => _macros.Cast<IElasticMacro>().ToList();
+        public IList<IElasticFilterMacro> FilterMacros => _filterMacros.Cast<IElasticFilterMacro>().ToList();
+        public IList<IElasticQueryMacro> QueryMacros => _queryMacros.Cast<IElasticQueryMacro>().ToList();
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
 
         public ElasticMacrosConfiguration SetDefaultField(string field) {
@@ -25,8 +29,13 @@ namespace ElasticMacros.Visitor {
             return this;
         }
 
-        public ElasticMacrosConfiguration AddMacro(IElasticMacro macro, int priority = 0) {
-            _macros.Add(new ElasticMacroWithPriority { Macro = macro, Priority = priority });
+        public ElasticMacrosConfiguration AddFilterMacro(IElasticFilterMacro filterMacro, int priority = 0) {
+            _filterMacros.Add(new ElasticFilterMacroWithPriority { FilterMacro = filterMacro, Priority = priority });
+            return this;
+        }
+
+        public ElasticMacrosConfiguration AddQueryMacro(IElasticQueryMacro queryMacro, int priority = 0) {
+            _queryMacros.Add(new ElasticQueryMacroWithPriority { QueryMacro = queryMacro, Priority = priority });
             return this;
         }
 
@@ -45,7 +54,7 @@ namespace ElasticMacros.Visitor {
 
         public ElasticMacrosConfiguration UseGeo(IEnumerable<string> geoFields, Func<string, string> resolveGeoLocation, int priority = 0) {
             var fields = new HashSet<string>(geoFields, StringComparer.OrdinalIgnoreCase);
-            return AddMacro(new GeoMacro(f => fields.Contains(f), resolveGeoLocation), priority);
+            return UseGeo(f => fields.Contains(f), resolveGeoLocation, priority);
         }
 
         public ElasticMacrosConfiguration UseGeo(Func<string, string> resolveGeoLocation, params string[] geoFields) {
@@ -57,36 +66,68 @@ namespace ElasticMacros.Visitor {
         }
 
         public ElasticMacrosConfiguration UseGeo(Func<string, bool> isGeoField, Func<string, string> resolveGeoLocation, int priority = 0) {
-            return AddMacro(new GeoMacro(isGeoField, resolveGeoLocation), priority);
+            AddQueryMacro(new GeoQueryMacro(isGeoField, resolveGeoLocation), priority);
+            return AddFilterMacro(new GeoFilterMacro(isGeoField, resolveGeoLocation), priority);
         }
     }
 
-    internal class ElasticMacroWithPriority : IElasticMacro {
+    internal class ElasticFilterMacroWithPriority : IElasticFilterMacro {
         public int Priority { get; set; }
-        public IElasticMacro Macro { get; set; }
+        public IElasticFilterMacro FilterMacro { get; set; }
 
-        public PlainFilter Expand(GroupNode node, PlainFilter currentFilter, ElasticMacroContext context) {
-            return Macro.Expand(node, currentFilter, context);
+        public void Expand(GroupNode node, ElasticFilterMacroContext context) {
+            FilterMacro.Expand(node, context);
         }
 
-        public PlainFilter Expand(TermNode node, PlainFilter currentFilter, ElasticMacroContext context) {
-            return Macro.Expand(node, currentFilter, context);
+        public void Expand(TermNode node, ElasticFilterMacroContext context) {
+            FilterMacro.Expand(node, context);
         }
 
-        public PlainFilter Expand(TermRangeNode node, PlainFilter currentFilter, ElasticMacroContext context) {
-            return Macro.Expand(node, currentFilter, context);
+        public void Expand(TermRangeNode node, ElasticFilterMacroContext context) {
+            FilterMacro.Expand(node, context);
         }
 
-        public PlainFilter Expand(MissingNode node, PlainFilter currentFilter, ElasticMacroContext context) {
-            return Macro.Expand(node, currentFilter, context);
+        public void Expand(MissingNode node, ElasticFilterMacroContext context) {
+            FilterMacro.Expand(node, context);
         }
 
-        public PlainFilter Expand(ExistsNode node, PlainFilter currentFilter, ElasticMacroContext context) { 
-            return Macro.Expand(node, currentFilter, context);
+        public void Expand(ExistsNode node, ElasticFilterMacroContext context) { 
+            FilterMacro.Expand(node, context);
         }
 
-        internal class PriorityComparer : IComparer<ElasticMacroWithPriority> {
-            public int Compare(ElasticMacroWithPriority x, ElasticMacroWithPriority y) {
+        internal class PriorityComparer : IComparer<ElasticFilterMacroWithPriority> {
+            public int Compare(ElasticFilterMacroWithPriority x, ElasticFilterMacroWithPriority y) {
+                return x.Priority.CompareTo(y.Priority);
+            }
+        }
+    }
+
+    internal class ElasticQueryMacroWithPriority : IElasticQueryMacro {
+        public int Priority { get; set; }
+        public IElasticQueryMacro QueryMacro { get; set; }
+
+        public void Expand(GroupNode node, ElasticQueryMacroContext context) {
+            QueryMacro.Expand(node, context);
+        }
+
+        public void Expand(TermNode node, ElasticQueryMacroContext context) {
+            QueryMacro.Expand(node, context);
+        }
+
+        public void Expand(TermRangeNode node, ElasticQueryMacroContext context) {
+            QueryMacro.Expand(node, context);
+        }
+
+        public void Expand(MissingNode node, ElasticQueryMacroContext context) {
+            QueryMacro.Expand(node, context);
+        }
+
+        public void Expand(ExistsNode node, ElasticQueryMacroContext context) {
+            QueryMacro.Expand(node, context);
+        }
+
+        internal class PriorityComparer : IComparer<ElasticQueryMacroWithPriority> {
+            public int Compare(ElasticQueryMacroWithPriority x, ElasticQueryMacroWithPriority y) {
                 return x.Priority.CompareTo(y.Priority);
             }
         }

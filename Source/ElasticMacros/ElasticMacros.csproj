@@ -57,14 +57,19 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ElasticMacroBase.cs" />
-    <Compile Include="ElasticMacroContext.cs" />
-    <Compile Include="GeoMacro.cs" />
-    <Compile Include="IElasticMacro.cs" />
+    <Compile Include="QueryMacros\ElasticQueryMacroContext.cs" />
+    <Compile Include="QueryMacros\ElasticQueryMacroBase.cs" />
+    <Compile Include="QueryMacros\GeoQueryMacro.cs" />
+    <Compile Include="QueryMacros\IElasticQueryMacro.cs" />
+    <Compile Include="QueryMacros\QueryContainerVisitor.cs" />
+    <Compile Include="FilterMacros\FilterContainerVisitor.cs" />
+    <Compile Include="FilterMacros\ElasticFilterMacroBase.cs" />
+    <Compile Include="FilterMacros\ElasticFilterMacroContext.cs" />
+    <Compile Include="FilterMacros\GeoFilterMacro.cs" />
+    <Compile Include="FilterMacros\IElasticFilterMacro.cs" />
     <Compile Include="ElasticMacroProcessor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ElasticMacrosConfiguration.cs" />
-    <Compile Include="FilterContainerVisitor.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ElasticMacros.nuspec" />

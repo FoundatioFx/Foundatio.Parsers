@@ -4,25 +4,25 @@ using Exceptionless.LuceneQueryParser.Nodes;
 using Exceptionless.LuceneQueryParser.Visitor;
 using Nest;
 
-namespace ElasticMacros.Visitor {
-    public class FilterContainerVisitor : QueryNodeVisitorWithResultBase<FilterContainer> {
+namespace ElasticMacros.QueryMacros {
+    public class QueryContainerVisitor : QueryNodeVisitorWithResultBase<QueryContainer> {
         private readonly Stack<Operator> _operatorStack = new Stack<Operator>();
         private readonly Stack<string> _defaultFieldStack = new Stack<string>();
         private readonly Operator _defaultOperator;
-        private FilterContainer _filter;
-        private readonly List<IElasticMacro> _macros = new List<IElasticMacro>();
+        private QueryContainer _query;
+        private readonly List<IElasticQueryMacro> _macros = new List<IElasticQueryMacro>();
 
-        public FilterContainerVisitor(ElasticMacrosConfiguration config) {
+        public QueryContainerVisitor(ElasticMacrosConfiguration config) {
             _defaultOperator = config.DefaultOperator;
             _defaultFieldStack.Push(config.DefaultField);
-            _macros.AddRange(config.Macros);
+            _macros.AddRange(config.QueryMacros);
         }
 
         public override void Visit(GroupNode node) {
-            FilterContainer parent = null;
+            QueryContainer parent = null;
             if (node.HasParens) {
-                parent = _filter;
-                _filter = null;
+                parent = _query;
+                _query = null;
             }
 
             _operatorStack.Push(GetOperator(node));
@@ -39,23 +39,28 @@ namespace ElasticMacros.Visitor {
             if (parent == null)
                 return;
 
-            AddFilter(ref parent, _filter, node.IsNegated, node.Prefix);
-            _filter = parent;
+            AddQuery(ref parent, _query, node.IsNegated, node.Prefix);
+            _query = parent;
         }
 
         public override void Visit(TermNode node) {
-            PlainFilter filter = new TermFilter { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.Term };
+            PlainQuery query = new TermQuery { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.Term };
+            var ctx = new ElasticQueryMacroContext {
+                DefaultField = _defaultFieldStack.Peek(),
+                Query = query
+            };
+
             foreach (var macro in _macros)
-                filter = macro.Expand(node, filter, new ElasticMacroContext { DefaultField = _defaultFieldStack.Peek() });
+                macro.Expand(node, ctx);
 
-            AddFilter(filter, node.IsNegated, node.Prefix);
+            AddQuery(ctx.Query, node.IsNegated, node.Prefix);
         }
 
-        private void AddFilter(PlainFilter filter, bool? isNegated, string prefix) {
-            AddFilter(ref _filter, filter.ToContainer(), isNegated, prefix);
+        private void AddQuery(PlainQuery query, bool? isNegated, string prefix) {
+            AddQuery(ref _query, query.ToContainer(), isNegated, prefix);
         }
 
-        private void AddFilter(ref FilterContainer target, FilterContainer container, bool? isNegated, string prefix) {
+        private void AddQuery(ref QueryContainer target, QueryContainer container, bool? isNegated, string prefix) {
             var op = _operatorStack.Peek();
             if ((isNegated.HasValue && isNegated.Value)
                 || (!String.IsNullOrEmpty(prefix) && prefix == "-"))
@@ -72,7 +77,7 @@ namespace ElasticMacros.Visitor {
         }
 
         public override void Visit(TermRangeNode node) {
-            var range = new RangeFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
+            var range = new RangeQuery { Field = node.Field ?? _defaultFieldStack.Peek() };
             if (!String.IsNullOrWhiteSpace(node.Min)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                     range.GreaterThan = node.Min;
@@ -87,35 +92,54 @@ namespace ElasticMacros.Visitor {
                     range.LowerThanOrEqualTo = node.Max;
             }
 
-            PlainFilter filter = range;
-            foreach (var macro in _macros)
-                filter = macro.Expand(node, filter, new ElasticMacroContext { DefaultField = _defaultFieldStack.Peek() });
+            PlainQuery query = range;
+            var ctx = new ElasticQueryMacroContext {
+                DefaultField = _defaultFieldStack.Peek(),
+                Query = query
+            };
 
-            AddFilter(filter, node.IsNegated, node.Prefix);
+            foreach (var macro in _macros)
+                macro.Expand(node, ctx);
+
+            AddQuery(ctx.Query, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(ExistsNode node) {
-            PlainFilter filter = new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
-            foreach (var macro in _macros)
-                filter = macro.Expand(node, filter, new ElasticMacroContext { DefaultField = _defaultFieldStack.Peek() });
+            PlainQuery query = new FilteredQuery {
+                Filter = new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() }.ToContainer()
+            };
+            var ctx = new ElasticQueryMacroContext {
+                DefaultField = _defaultFieldStack.Peek(),
+                Query = query
+            };
 
-            AddFilter(filter, node.IsNegated, node.Prefix);
+            foreach (var macro in _macros)
+                macro.Expand(node, ctx);
+            
+            AddQuery(ctx.Query, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(MissingNode node) {
-            PlainFilter filter = new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
-            foreach (var macro in _macros)
-                filter = macro.Expand(node, filter, new ElasticMacroContext { DefaultField = _defaultFieldStack.Peek() });
+            PlainQuery filter = new FilteredQuery {
+                Filter = new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() }.ToContainer()
+            };
+            var ctx = new ElasticQueryMacroContext {
+                DefaultField = _defaultFieldStack.Peek(),
+                Query = filter
+            };
 
-            AddFilter(filter, node.IsNegated, node.Prefix);
+            foreach (var macro in _macros)
+                macro.Expand(node, ctx);
+
+            AddQuery(ctx.Query, node.IsNegated, node.Prefix);
         }
 
-        public override FilterContainer Accept(IQueryNode node) {
+        public override QueryContainer Accept(IQueryNode node) {
             node.Accept(this, false);
-            if (_filter != null)
-                return _filter;
+            if (_query != null)
+                return _query;
 
-            return new MatchAllFilter().ToContainer();
+            return new MatchAllQuery().ToContainer();
         }
 
         private Operator GetOperator(GroupNode node) {
