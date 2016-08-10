@@ -14,7 +14,8 @@ namespace ElasticMacros {
         private readonly SortedSet<ElasticVisitorWithPriority> _visitors = new SortedSet<ElasticVisitorWithPriority>(new ElasticVisitorWithPriority.PriorityComparer());
 
         public string DefaultField { get; private set; }
-        public Operator DefaultOperator { get; private set; } = Operator.And;
+        public Operator DefaultFilterOperator { get; private set; } = Operator.And;
+        public Operator DefaultQueryOperator { get; private set; } = Operator.Or;
         public IList<IElasticFilterMacro> FilterMacros => _filterMacros.Cast<IElasticFilterMacro>().ToList();
         public IList<IElasticQueryMacro> QueryMacros => _queryMacros.Cast<IElasticQueryMacro>().ToList();
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
@@ -24,8 +25,13 @@ namespace ElasticMacros {
             return this;
         }
 
-        public ElasticMacrosConfiguration SetDefaultOperator(Operator op) {
-            DefaultOperator = op;
+        public ElasticMacrosConfiguration SetDefaultFilterOperator(Operator op) {
+            DefaultFilterOperator = op;
+            return this;
+        }
+
+        public ElasticMacrosConfiguration SetDefaultQueryOperator(Operator op) {
+            DefaultQueryOperator = op;
             return this;
         }
 

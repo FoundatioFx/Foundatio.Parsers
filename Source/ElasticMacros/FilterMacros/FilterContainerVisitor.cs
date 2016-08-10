@@ -13,7 +13,7 @@ namespace ElasticMacros.FilterMacros {
         private readonly List<IElasticFilterMacro> _macros = new List<IElasticFilterMacro>();
 
         public FilterContainerVisitor(ElasticMacrosConfiguration config) {
-            _defaultOperator = config.DefaultOperator;
+            _defaultOperator = config.DefaultFilterOperator;
             _defaultFieldStack.Push(config.DefaultField);
             _macros.AddRange(config.FilterMacros);
         }

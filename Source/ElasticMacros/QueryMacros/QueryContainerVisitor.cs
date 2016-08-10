@@ -13,7 +13,7 @@ namespace ElasticMacros.QueryMacros {
         private readonly List<IElasticQueryMacro> _macros = new List<IElasticQueryMacro>();
 
         public QueryContainerVisitor(ElasticMacrosConfiguration config) {
-            _defaultOperator = config.DefaultOperator;
+            _defaultOperator = config.DefaultQueryOperator;
             _defaultFieldStack.Push(config.DefaultField);
             _macros.AddRange(config.QueryMacros);
         }

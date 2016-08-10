@@ -22,7 +22,7 @@ namespace Tests {
         }
 
         [Fact]
-        public void SimpleQueryProcessor() {
+        public void SimpleFilterProcessor() {
             var client = new ElasticClient();
             client.DeleteIndex(i => i.Index("stuff"));
             client.Refresh();
@@ -46,6 +46,30 @@ namespace Tests {
         }
 
         [Fact]
+        public void SimpleQueryProcessor() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticMacroProcessor();
+            var result = processor.ProcessQuery("field1:value1");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
+            string actualRequest = GetRequest(actualResponse);
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Term(m => m.Field1, "value1")));
+            string expectedRequest = GetRequest(expectedResponse);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void NegativeQueryProcessor() {
             var client = new ElasticClient();
             client.DeleteIndex(i => i.Index("stuff"));
@@ -58,7 +82,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor(c => c.SetDefaultOperator(Operator.Or));
+            var processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
             var result = processor.ProcessFilter("field1:value1 AND -field2:value2");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -68,7 +92,7 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new ElasticMacroProcessor(c => c.SetDefaultOperator(Operator.Or));
+            processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
             result = processor.ProcessFilter("field1:value1 AND NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
@@ -78,7 +102,7 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new ElasticMacroProcessor(c => c.SetDefaultOperator(Operator.Or));
+            processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
             result = processor.ProcessFilter("field1:value1 OR NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
@@ -88,7 +112,7 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new ElasticMacroProcessor(c => c.SetDefaultOperator(Operator.Or));
+            processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
             result = processor.ProcessFilter("field1:value1 OR -field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
@@ -101,6 +125,31 @@ namespace Tests {
 
         [Fact]
         public void NestedQueryProcessor() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticMacroProcessor();
+            var result = processor.ProcessQuery("field1:value1 (field2:value2 OR field3:value3)");
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
+            string actualRequest = GetRequest(actualResponse);
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => f.Term(m => m.Field1, "value1") || (f.Term(m => m.Field2, "value2") || f.Term(m => m.Field3, "value3"))));
+            string expectedRequest = GetRequest(expectedResponse);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void NestedFilterProcessor() {
             var client = new ElasticClient();
             client.DeleteIndex(i => i.Index("stuff"));
             client.Refresh();
