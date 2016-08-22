@@ -83,6 +83,9 @@ namespace Tests {
         [InlineData("geo:\"Dallas, TX\"~75 m", "geo:\"Dallas, TX\"~75 m", true)]
         [InlineData("min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", "min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", true)]
         [InlineData("-type:404", "-type:404", true)]
+        [InlineData("type:*", "type:*", true)]
+        [InlineData("type:*test*", "type:*test*", true)]
+
         public void CanGenerateQuery(string query, string expected, bool isValid) {
             var parser = new QueryParser();
 
