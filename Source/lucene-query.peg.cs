@@ -1691,7 +1691,7 @@ namespace
                 IParseResult<string> r3 = null;
                 if (r3 == null)
                 {
-                    r3 = this.ParseClass(ref cursor, "::  \\\\\t\t\r\r\n\n\f\f{{}}(())//^^~~[[]]", negated: true);
+                    r3 = this.ParseClass(ref cursor, "::  \\\\\t\t\r\r\n\n\f\f{{}}(())//^^~~[[]]**", negated: true);
                 }
                 if (r3 == null)
                 {
@@ -1795,7 +1795,7 @@ namespace
                     IParseResult<string> r3 = null;
                     if (r3 == null)
                     {
-                        r3 = this.ParseClass(ref cursor, "::  \\\\..\t\t\r\r\n\n\f\f{{}}(())\"\"^^~~[[]]", negated: true);
+                        r3 = this.ParseClass(ref cursor, "::  \\\\..\t\t\r\r\n\n\f\f{{}}(())\"\"^^~~[[]]**", negated: true);
                     }
                     if (r3 == null)
                     {

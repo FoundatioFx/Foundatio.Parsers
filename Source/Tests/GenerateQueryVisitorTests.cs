@@ -25,6 +25,7 @@ namespace Tests {
         [InlineData("field:criteria", "field:criteria", true)]
         [InlineData("field :criteria", "field:criteria", true)]
         [InlineData("-criteria", "-criteria", true)]
+        [InlineData("+criteria", "+criteria", true)]
         [InlineData("criteria1 AND NOT criteria2", "criteria1 AND NOT criteria2", true)]
         [InlineData("criteria1 NOT criteria2", "criteria1 NOT criteria2", true)]
         [InlineData("field:criteria1 NOT field:criteria2", "field:criteria1 NOT field:criteria2", true)]
@@ -53,6 +54,7 @@ namespace Tests {
         [InlineData("(data.date:[now/d-4d TO now/d+1d})", "(data.date:[now/d-4d TO now/d+1d})", true)]
         [InlineData("criter~", "criter~", true)]
         [InlineData("criter~1", "criter~1", true)]
+        [InlineData("roam~0.8", "roam~0.8", true)]
         [InlineData("criter^2", "criter^2", true)]
         [InlineData("\"blah criter\"~1", "\"blah criter\"~1", true)]
         [InlineData("count:>1", "count:>1", true)]
@@ -83,12 +85,19 @@ namespace Tests {
         [InlineData("geo:\"Dallas, TX\"~75 m", "geo:\"Dallas, TX\"~75 m", true)]
         [InlineData("min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", "min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", true)]
         [InlineData("-type:404", "-type:404", true)]
-        [InlineData("type:*", "type:*", true)]
-        [InlineData("type:*test*", "type:*test*", true)]
+        [InlineData("type:*test*", "type:*test*", false)]
+        [InlineData("type:test*", "type:test*", true)]
+        [InlineData("type:te*t", "type:te*t", true)]
         [InlineData("type:test?s", "type:test?s", true)]
-        [InlineData("type:*", "type:*", true)]
-        [InlineData("type:?", "type:?", true)]
-
+        [InlineData("NOT Test", "NOT Test", true)]
+        [InlineData("! Test", "! Test", true)] // The symbol ! can be used in place of the word NOT.
+        [InlineData("type:*", "type:*", false)]
+        [InlineData("type:?", "type:?", false)]
+        [InlineData(@"type:\(1\+1\)\:2", @"type:\(1\+1\)\:2", true)] // https://lucene.apache.org/core/2_9_4/queryparsersyntax.html#Escaping%20Special%20Characters
+        [InlineData("title:(+return +\"pink panther\")", "title:(+return +\"pink panther\")", true)]
+        [InlineData("\"jakarta apache\" -\"Apache Lucene\"", "\"jakarta apache\" -\"Apache Lucene\"", true)]
+        [InlineData("\"jakarta apache\"^4 \"Apache Lucene\"", "\"jakarta apache\"^4 \"Apache Lucene\"", true)]
+        [InlineData("NOT \"jakarta apache\"", "NOT \"jakarta apache\"", true)]
         public void CanGenerateQuery(string query, string expected, bool isValid) {
             var parser = new QueryParser();
 
