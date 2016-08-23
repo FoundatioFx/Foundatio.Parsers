@@ -1701,7 +1701,7 @@ namespace
                     if (r4 != null)
                     {
                         IParseResult<string> r5 = null;
-                        r5 = this.ParseClass(ref cursor, ":\\(())^^~~");
+                        r5 = this.ParseClass(ref cursor, ":\\(())^^~~**");
                         if (r5 != null)
                         {
                             {
@@ -1805,7 +1805,7 @@ namespace
                         if (r4 != null)
                         {
                             IParseResult<string> r5 = null;
-                            r5 = this.ParseClass(ref cursor, ":\\(())^^~~");
+                            r5 = this.ParseClass(ref cursor, ":\\(())^^~~**");
                             if (r5 != null)
                             {
                                 {
