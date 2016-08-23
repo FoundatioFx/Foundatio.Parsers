@@ -52,6 +52,10 @@
       <HintPath>..\..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Pegasus.Common, Version=3.1.2.0, Culture=neutral, PublicKeyToken=28c69b6c6d100f4a, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Pegasus.3.1.2\lib\net40\Pegasus.Common.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
       <HintPath>..\..\packages\xunit.abstractions.2.0.0\lib\net35\xunit.abstractions.dll</HintPath>
@@ -121,7 +125,9 @@
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\..\packages\xunit.runner.visualstudio.2.1.0\build\net20\xunit.runner.visualstudio.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\xunit.runner.visualstudio.2.1.0\build\net20\xunit.runner.visualstudio.props'))" />
+    <Error Condition="!Exists('..\..\packages\Pegasus.3.1.2\build\Pegasus.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Pegasus.3.1.2\build\Pegasus.targets'))" />
   </Target>
+  <Import Project="..\..\packages\Pegasus.3.1.2\build\Pegasus.targets" Condition="Exists('..\..\packages\Pegasus.3.1.2\build\Pegasus.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

@@ -1691,7 +1691,7 @@ namespace
                 IParseResult<string> r3 = null;
                 if (r3 == null)
                 {
-                    r3 = this.ParseClass(ref cursor, "::  \\\\\t\t\r\r\n\n\f\f{{}}(())//^^~~[[]]**", negated: true);
+                    r3 = this.ParseClass(ref cursor, "::  \\\\\t\t\r\r\n\n\f\f{{}}(())//^^~~[[]]", negated: true);
                 }
                 if (r3 == null)
                 {
@@ -1701,7 +1701,7 @@ namespace
                     if (r4 != null)
                     {
                         IParseResult<string> r5 = null;
-                        r5 = this.ParseClass(ref cursor, ":\\(())^^~~**");
+                        r5 = this.ParseClass(ref cursor, ":\\(())^^~~");
                         if (r5 != null)
                         {
                             {
@@ -1795,7 +1795,7 @@ namespace
                     IParseResult<string> r3 = null;
                     if (r3 == null)
                     {
-                        r3 = this.ParseClass(ref cursor, "::  \\\\..\t\t\r\r\n\n\f\f{{}}(())\"\"^^~~[[]]**", negated: true);
+                        r3 = this.ParseClass(ref cursor, "::  \\\\..\t\t\r\r\n\n\f\f{{}}(())\"\"^^~~[[]]", negated: true);
                     }
                     if (r3 == null)
                     {
@@ -1805,7 +1805,7 @@ namespace
                         if (r4 != null)
                         {
                             IParseResult<string> r5 = null;
-                            r5 = this.ParseClass(ref cursor, ":\\(())^^~~**");
+                            r5 = this.ParseClass(ref cursor, ":\\(())^^~~");
                             if (r5 != null)
                             {
                                 {

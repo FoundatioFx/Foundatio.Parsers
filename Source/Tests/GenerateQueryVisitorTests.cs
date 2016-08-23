@@ -85,6 +85,9 @@ namespace Tests {
         [InlineData("-type:404", "-type:404", true)]
         [InlineData("type:*", "type:*", true)]
         [InlineData("type:*test*", "type:*test*", true)]
+        [InlineData("type:test?s", "type:test?s", true)]
+        [InlineData("type:*", "type:*", true)]
+        [InlineData("type:?", "type:?", true)]
 
         public void CanGenerateQuery(string query, string expected, bool isValid) {
             var parser = new QueryParser();
