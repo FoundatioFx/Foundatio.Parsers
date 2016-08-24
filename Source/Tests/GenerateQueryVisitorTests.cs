@@ -40,6 +40,8 @@ namespace Tests {
         [InlineData("field:(criteria1 criteria2)", "field:(criteria1 criteria2)", true)]
         [InlineData("data.field:(now criteria2)", "data.field:(now criteria2)", true)]
         [InlineData("field:(criteria1 OR criteria2)", "field:(criteria1 OR criteria2)", true)]
+        [InlineData("field:*cr", "field:*cr", true)]
+        [InlineData("field:cr*", "field:cr*", true)]
         [InlineData("date:>now", "date:>now", true)]
         [InlineData("date:<now", "date:<now", true)]
         [InlineData("_exists_:title", "_exists_:title", true)]
