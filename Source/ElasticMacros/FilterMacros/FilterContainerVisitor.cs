@@ -56,26 +56,6 @@ namespace ElasticMacros.FilterMacros {
             AddFilter(ctx.Filter, node.IsNegated, node.Prefix);
         }
 
-        private void AddFilter(PlainFilter filter, bool? isNegated, string prefix) {
-            AddFilter(ref _filter, filter.ToContainer(), isNegated, prefix);
-        }
-
-        private void AddFilter(ref FilterContainer target, FilterContainer container, bool? isNegated, string prefix) {
-            var op = _operatorStack.Peek();
-            if ((isNegated.HasValue && isNegated.Value)
-                || (!String.IsNullOrEmpty(prefix) && prefix == "-"))
-                container = !container;
-
-            if (op == Operator.Or && !String.IsNullOrEmpty(prefix) && prefix == "+")
-                op = Operator.And;
-
-            if (op == Operator.And) {
-                target &= container;
-            } else if (op == Operator.Or) {
-                target |= container;
-            }
-        }
-
         public override void Visit(TermRangeNode node) {
             var range = new RangeFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
             if (!String.IsNullOrWhiteSpace(node.Min)) {
@@ -128,6 +108,26 @@ namespace ElasticMacros.FilterMacros {
                 macro.Expand(node, ctx);
 
             AddFilter(ctx.Filter, node.IsNegated, node.Prefix);
+        }
+
+        private void AddFilter(PlainFilter filter, bool? isNegated, string prefix) {
+            AddFilter(ref _filter, filter.ToContainer(), isNegated, prefix);
+        }
+
+        private void AddFilter(ref FilterContainer target, FilterContainer container, bool? isNegated, string prefix) {
+            var op = _operatorStack.Peek();
+            if ((isNegated.HasValue && isNegated.Value)
+                || (!String.IsNullOrEmpty(prefix) && prefix == "-"))
+                container = !container;
+
+            if (op == Operator.Or && !String.IsNullOrEmpty(prefix) && prefix == "+")
+                op = Operator.And;
+
+            if (op == Operator.And) {
+                target &= container;
+            } else if (op == Operator.Or) {
+                target |= container;
+            }
         }
 
         public override FilterContainer Accept(IQueryNode node) {

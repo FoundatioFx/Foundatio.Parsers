@@ -35,7 +35,7 @@ namespace Tests {
             client.Refresh();
 
             var processor = new ElasticMacroProcessor();
-            var result = processor.ProcessFilter("field1:value1");
+            var result = processor.BuildFilter("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1")));
@@ -59,7 +59,7 @@ namespace Tests {
             client.Refresh();
 
             var processor = new ElasticMacroProcessor();
-            var result = processor.ProcessQuery("field1:value1");
+            var result = processor.BuildQuery("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Term(m => m.Field1, "value1")));
@@ -83,7 +83,7 @@ namespace Tests {
             client.Refresh();
 
             var processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
-            var result = processor.ProcessFilter("field1:value1 AND -field2:value2");
+            var result = processor.BuildFilter("field1:value1 AND -field2:value2");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") && !f.Term(m => m.Field2, "value2")));
@@ -93,7 +93,7 @@ namespace Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
             processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
-            result = processor.ProcessFilter("field1:value1 AND NOT field2:value2");
+            result = processor.BuildFilter("field1:value1 AND NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
             expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") && !f.Term(m => m.Field2, "value2")));
@@ -103,7 +103,7 @@ namespace Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
             processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
-            result = processor.ProcessFilter("field1:value1 OR NOT field2:value2");
+            result = processor.BuildFilter("field1:value1 OR NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
             expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") || !f.Term(m => m.Field2, "value2")));
@@ -113,7 +113,7 @@ namespace Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
             processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
-            result = processor.ProcessFilter("field1:value1 OR -field2:value2");
+            result = processor.BuildFilter("field1:value1 OR -field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
             expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") || !f.Term(m => m.Field2, "value2")));
@@ -137,7 +137,7 @@ namespace Tests {
             client.Refresh();
 
             var processor = new ElasticMacroProcessor();
-            var result = processor.ProcessQuery("field1:value1 (field2:value2 OR field3:value3)");
+            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);
@@ -162,7 +162,7 @@ namespace Tests {
             client.Refresh();
 
             var processor = new ElasticMacroProcessor();
-            var result = processor.ProcessFilter("field1:value1 (field2:value2 OR field3:value3)");
+            var result = processor.BuildFilter("field1:value1 (field2:value2 OR field3:value3)");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -187,7 +187,7 @@ namespace Tests {
             client.Refresh();
 
             var processor = new ElasticMacroProcessor();
-            var result = processor.ProcessFilter("field4:[1 TO 2} OR field1:value1");
+            var result = processor.BuildFilter("field4:[1 TO 2} OR field1:value1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -211,10 +211,11 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
             client.Refresh();
 
+            var aliasMap = new AliasMap { { "geo", "field4" } };
             var processor = new ElasticMacroProcessor(c => c
                 .UseGeo(l => "d", "field4")
-                .UseAliases(name => name == "geo" ? "field4" : name));
-            var result = processor.ProcessFilter("geo:[9 TO d] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi");
+                .UseAliases(aliasMap));
+            var result = processor.BuildFilter("geo:[9 TO d] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -233,10 +234,40 @@ namespace Tests {
         public void CanUseAliases() {
             var parser = new QueryParser();
             var result = parser.Parse("field1:value");
-            var aliasMap = new Dictionary<string, string>();
-            aliasMap.Add("field1", "field2");
+            var aliasMap = new AliasMap { { "field1", "field2" } };
             var aliased = AliasedQueryVisitor.Run(result, aliasMap);
             Assert.Equal("field2:value", aliased.ToString());
+
+            result = parser.Parse("field1.nested:value");
+            aliasMap = new AliasMap {
+                { "field1", new AliasMapValue { Name = "field2", ChildMap = { { "nested", "other" } } } }
+            };
+            aliased = AliasedQueryVisitor.Run(result, aliasMap);
+            Assert.Equal("field2.other:value", aliased.ToString());
+
+            result = parser.Parse("field1.nested:value");
+            aliasMap = new AliasMap {
+                { "field1", new AliasMapValue { Name = "field2", ChildMap = { { "stuff", "other" } } } }
+            };
+            aliased = AliasedQueryVisitor.Run(result, aliasMap);
+            Assert.Equal("field2.nested:value", aliased.ToString());
+
+            result = parser.Parse("field1.nested.morenested:value");
+            aliasMap = new AliasMap {
+                { "field1", new AliasMapValue { Name = "field2", ChildMap = { { "stuff", "other" } } } }
+            };
+            aliased = AliasedQueryVisitor.Run(result, aliasMap);
+            Assert.Equal("field2.nested.morenested:value", aliased.ToString());
+
+            result = parser.Parse("field1:(nested:value OR thing:yep) another:works");
+            aliasMap = new AliasMap {
+                {
+                    "field1",
+                    new AliasMapValue { Name = "field2", ChildMap = { { "nested", "other" }, { "thing", "nice" } } }
+                }
+            };
+            aliased = AliasedQueryVisitor.Run(result, aliasMap);
+            Assert.Equal("field2:(other:value OR nice:yep) another:works", aliased.ToString());
         }
 
         public static string GetRequest(IResponseWithRequestInformation response) {

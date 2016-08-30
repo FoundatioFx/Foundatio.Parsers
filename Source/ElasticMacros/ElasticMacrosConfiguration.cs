@@ -50,12 +50,8 @@ namespace ElasticMacros {
             return this;
         }
 
-        public ElasticMacrosConfiguration UseAliases(Func<string, string> aliasFunc, int priority = 0) {
-            return AddVisitor(new AliasedQueryVisitor(aliasFunc), priority);
-        }
-
-        public ElasticMacrosConfiguration UseAliases(IDictionary<string, string> aliasMap, int priority = 0) {
-            return AddVisitor(new AliasedQueryVisitor(field => aliasMap.ContainsKey(field) ? aliasMap[field] : field), priority);
+        public ElasticMacrosConfiguration UseAliases(AliasMap aliasMap, int priority = 0) {
+            return AddVisitor(new AliasedQueryVisitor(aliasMap), priority);
         }
 
         public ElasticMacrosConfiguration UseGeo(IEnumerable<string> geoFields, Func<string, string> resolveGeoLocation, int priority = 0) {

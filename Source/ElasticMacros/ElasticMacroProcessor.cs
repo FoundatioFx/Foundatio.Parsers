@@ -20,7 +20,7 @@ namespace ElasticMacros {
             _config = config;
         }
 
-        public FilterContainer ProcessFilter(string query) {
+        public FilterContainer BuildFilter(string query) {
             var result = _parser.Parse(query);
 
             for (int i = 0; i < _visitors.Count; i++)
@@ -29,7 +29,7 @@ namespace ElasticMacros {
             return new FilterContainerVisitor(_config).Accept(result);
         }
 
-        public QueryContainer ProcessQuery(string query) {
+        public QueryContainer BuildQuery(string query) {
             var result = _parser.Parse(query);
 
             for (int i = 0; i < _visitors.Count; i++)

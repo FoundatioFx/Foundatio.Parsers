@@ -56,26 +56,6 @@ namespace ElasticMacros.QueryMacros {
             AddQuery(ctx.Query, node.IsNegated, node.Prefix);
         }
 
-        private void AddQuery(PlainQuery query, bool? isNegated, string prefix) {
-            AddQuery(ref _query, query.ToContainer(), isNegated, prefix);
-        }
-
-        private void AddQuery(ref QueryContainer target, QueryContainer container, bool? isNegated, string prefix) {
-            var op = _operatorStack.Peek();
-            if ((isNegated.HasValue && isNegated.Value)
-                || (!String.IsNullOrEmpty(prefix) && prefix == "-"))
-                container = !container;
-
-            if (op == Operator.Or && !String.IsNullOrEmpty(prefix) && prefix == "+")
-                op = Operator.And;
-
-            if (op == Operator.And) {
-                target &= container;
-            } else if (op == Operator.Or) {
-                target |= container;
-            }
-        }
-
         public override void Visit(TermRangeNode node) {
             var range = new RangeQuery { Field = node.Field ?? _defaultFieldStack.Peek() };
             if (!String.IsNullOrWhiteSpace(node.Min)) {
@@ -132,6 +112,26 @@ namespace ElasticMacros.QueryMacros {
                 macro.Expand(node, ctx);
 
             AddQuery(ctx.Query, node.IsNegated, node.Prefix);
+        }
+
+        private void AddQuery(PlainQuery query, bool? isNegated, string prefix) {
+            AddQuery(ref _query, query.ToContainer(), isNegated, prefix);
+        }
+
+        private void AddQuery(ref QueryContainer target, QueryContainer container, bool? isNegated, string prefix) {
+            var op = _operatorStack.Peek();
+            if ((isNegated.HasValue && isNegated.Value)
+                || (!String.IsNullOrEmpty(prefix) && prefix == "-"))
+                container = !container;
+
+            if (op == Operator.Or && !String.IsNullOrEmpty(prefix) && prefix == "+")
+                op = Operator.And;
+
+            if (op == Operator.And) {
+                target &= container;
+            } else if (op == Operator.Or) {
+                target |= container;
+            }
         }
 
         public override QueryContainer Accept(IQueryNode node) {
