@@ -19,6 +19,7 @@ namespace ElasticMacros {
         public IList<IElasticFilterMacro> FilterMacros => _filterMacros.Cast<IElasticFilterMacro>().ToList();
         public IList<IElasticQueryMacro> QueryMacros => _queryMacros.Cast<IElasticQueryMacro>().ToList();
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
+        public ISet<string> AnalyzedFields { get; } = new HashSet<string>();
 
         public ElasticMacrosConfiguration SetDefaultField(string field) {
             DefaultField = field;
@@ -32,6 +33,18 @@ namespace ElasticMacros {
 
         public ElasticMacrosConfiguration SetDefaultQueryOperator(Operator op) {
             DefaultQueryOperator = op;
+            return this;
+        }
+
+        public ElasticMacrosConfiguration AddAnalyzedField(string field) {
+            AnalyzedFields.Add(field);
+            return this;
+        }
+
+        public ElasticMacrosConfiguration AddAnalyzedFields(IEnumerable<string> fields) {
+            foreach (var field in fields)
+                AnalyzedFields.Add(field);
+
             return this;
         }
 

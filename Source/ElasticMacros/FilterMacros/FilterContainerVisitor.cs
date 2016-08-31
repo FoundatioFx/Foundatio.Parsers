@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using Exceptionless.LuceneQueryParser.Nodes;
 using Exceptionless.LuceneQueryParser.Visitor;
 using Nest;
@@ -11,11 +13,14 @@ namespace ElasticMacros.FilterMacros {
         private readonly Operator _defaultOperator;
         private FilterContainer _filter;
         private readonly List<IElasticFilterMacro> _macros = new List<IElasticFilterMacro>();
+        private readonly HashSet<string> _analyzedFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public FilterContainerVisitor(ElasticMacrosConfiguration config) {
             _defaultOperator = config.DefaultFilterOperator;
             _defaultFieldStack.Push(config.DefaultField);
             _macros.AddRange(config.FilterMacros);
+            foreach (var field in config.AnalyzedFields) 
+                _analyzedFields.Add(field);
         }
 
         public override void Visit(GroupNode node) {
@@ -44,7 +49,17 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(TermNode node) {
-            PlainFilter filter = new TermFilter { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.Term };
+            PlainFilter filter = null;
+            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field))) {
+                filter = new QueryFilter { Query = new QueryStringQuery {
+                    Query = node.Term,
+                    DefaultField = node.Field,
+                    DefaultOperator = _operatorStack.Peek()
+                }.ToContainer() };
+            } else {
+                filter = new TermFilter { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.Term };
+            }
+
             var ctx = new ElasticFilterMacroContext {
                 DefaultField = _defaultFieldStack.Peek(),
                 Filter = filter
@@ -57,6 +72,9 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(TermRangeNode node) {
+            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+                return;
+
             var range = new RangeFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
             if (!String.IsNullOrWhiteSpace(node.Min)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
@@ -85,6 +103,9 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(ExistsNode node) {
+            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+                return;
+
             PlainFilter filter = new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
             var ctx = new ElasticFilterMacroContext {
                 DefaultField = _defaultFieldStack.Peek(),
@@ -98,6 +119,9 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(MissingNode node) {
+            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+                return;
+
             PlainFilter filter = new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
             var ctx = new ElasticFilterMacroContext {
                 DefaultField = _defaultFieldStack.Peek(),
@@ -108,6 +132,22 @@ namespace ElasticMacros.FilterMacros {
                 macro.Expand(node, ctx);
 
             AddFilter(ctx.Filter, node.IsNegated, node.Prefix);
+        }
+
+        private string GetFullFieldName(string field) {
+            if (_defaultFieldStack.Count == 1)
+                return field;
+
+            var sb = new StringBuilder();
+            // skip 1st field in stack because that is the default field and not a group field
+            foreach (var f in _defaultFieldStack.Skip(1)) {
+                sb.Append(f);
+                sb.Append('.');
+            }
+
+            sb.Append(field);
+
+            return sb.ToString();
         }
 
         private void AddFilter(PlainFilter filter, bool? isNegated, string prefix) {

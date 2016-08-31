@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using Exceptionless.LuceneQueryParser.Nodes;
 using Exceptionless.LuceneQueryParser.Visitor;
 using Nest;
@@ -11,11 +13,14 @@ namespace ElasticMacros.QueryMacros {
         private readonly Operator _defaultOperator;
         private QueryContainer _query;
         private readonly List<IElasticQueryMacro> _macros = new List<IElasticQueryMacro>();
+        private readonly HashSet<string> _analyzedFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public QueryContainerVisitor(ElasticMacrosConfiguration config) {
             _defaultOperator = config.DefaultQueryOperator;
             _defaultFieldStack.Push(config.DefaultField);
             _macros.AddRange(config.QueryMacros);
+            foreach (var field in config.AnalyzedFields)
+                _analyzedFields.Add(field);
         }
 
         public override void Visit(GroupNode node) {
@@ -44,7 +49,17 @@ namespace ElasticMacros.QueryMacros {
         }
 
         public override void Visit(TermNode node) {
-            PlainQuery query = new TermQuery { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.Term };
+            PlainQuery query = null;
+            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field))) {
+                query = new QueryStringQuery {
+                    Query = node.Term,
+                    DefaultField = node.Field,
+                    DefaultOperator = _operatorStack.Peek()
+                };
+            } else {
+                query = new TermQuery { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.Term };
+            }
+
             var ctx = new ElasticQueryMacroContext {
                 DefaultField = _defaultFieldStack.Peek(),
                 Query = query
@@ -57,6 +72,9 @@ namespace ElasticMacros.QueryMacros {
         }
 
         public override void Visit(TermRangeNode node) {
+            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+                return;
+
             var range = new RangeQuery { Field = node.Field ?? _defaultFieldStack.Peek() };
             if (!String.IsNullOrWhiteSpace(node.Min)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
@@ -85,6 +103,9 @@ namespace ElasticMacros.QueryMacros {
         }
 
         public override void Visit(ExistsNode node) {
+            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+                return;
+
             PlainQuery query = new FilteredQuery {
                 Filter = new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() }.ToContainer()
             };
@@ -100,6 +121,9 @@ namespace ElasticMacros.QueryMacros {
         }
 
         public override void Visit(MissingNode node) {
+            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+                return;
+
             PlainQuery filter = new FilteredQuery {
                 Filter = new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() }.ToContainer()
             };
@@ -112,6 +136,22 @@ namespace ElasticMacros.QueryMacros {
                 macro.Expand(node, ctx);
 
             AddQuery(ctx.Query, node.IsNegated, node.Prefix);
+        }
+
+        private string GetFullFieldName(string field) {
+            if (_defaultFieldStack.Count == 1)
+                return field;
+
+            var sb = new StringBuilder();
+            // skip 1st field in stack because that is the default field and not a group field
+            foreach (var f in _defaultFieldStack.Skip(1)) {
+                sb.Append(f);
+                sb.Append('.');
+            }
+
+            sb.Append(field);
+
+            return sb.ToString();
         }
 
         private void AddQuery(PlainQuery query, bool? isNegated, string prefix) {

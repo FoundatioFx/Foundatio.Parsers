@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
 using ElasticMacros;
 using Elasticsearch.Net;
@@ -48,22 +47,31 @@ namespace Tests {
         [Fact]
         public void SimpleQueryProcessor() {
             var client = new ElasticClient();
-            client.DeleteIndex(i => i.Index("stuff"));
             client.Refresh();
 
-            client.CreateIndex(i => i.Index("stuff"));
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.CreateIndex(i => i.Index("stuff").AddMapping<MyType>(f => f
+                .Properties(p => p
+                    .String(e => e.Name(m => m.Field3).Index(FieldIndexOption.Analyzed)))));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
-            client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now"}, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor();
+            var processor = new ElasticMacroProcessor(c => c.AddAnalyzedField("field3"));
             var result = processor.BuildQuery("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Term(m => m.Field1, "value1")));
             string expectedRequest = GetRequest(expectedResponse);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+
+            result = processor.BuildQuery("field3:hey");
+            actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
+            actualRequest = GetRequest(actualResponse);
+            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.QueryString(m => m.DefaultField(f => f.Field3).Query("hey").DefaultOperator(Operator.Or))));
+            expectedRequest = GetRequest(expectedResponse);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);

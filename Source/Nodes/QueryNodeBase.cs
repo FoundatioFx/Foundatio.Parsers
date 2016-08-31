@@ -25,6 +25,6 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
 
         public abstract IList<IQueryNode> Children { get; }
 
-        public static readonly IList<IQueryNode> EmptyNodeList = new List<IQueryNode>();
+        public static readonly IList<IQueryNode> EmptyNodeList = new List<IQueryNode>().AsReadOnly();
     }
 }
