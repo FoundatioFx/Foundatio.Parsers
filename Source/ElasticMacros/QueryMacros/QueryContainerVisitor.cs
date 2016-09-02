@@ -10,17 +10,12 @@ namespace ElasticMacros.QueryMacros {
     public class QueryContainerVisitor : QueryNodeVisitorWithResultBase<QueryContainer> {
         private readonly Stack<Operator> _operatorStack = new Stack<Operator>();
         private readonly Stack<string> _defaultFieldStack = new Stack<string>();
-        private readonly Operator _defaultOperator;
         private QueryContainer _query;
-        private readonly List<IElasticQueryMacro> _macros = new List<IElasticQueryMacro>();
-        private readonly HashSet<string> _analyzedFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly ElasticMacrosConfiguration _config;
 
         public QueryContainerVisitor(ElasticMacrosConfiguration config) {
-            _defaultOperator = config.DefaultQueryOperator;
+            _config = config;
             _defaultFieldStack.Push(config.DefaultField);
-            _macros.AddRange(config.QueryMacros);
-            foreach (var field in config.AnalyzedFields)
-                _analyzedFields.Add(field);
         }
 
         public override void Visit(GroupNode node) {
@@ -50,7 +45,7 @@ namespace ElasticMacros.QueryMacros {
 
         public override void Visit(TermNode node) {
             PlainQuery query = null;
-            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field))) {
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field))) {
                 query = new QueryStringQuery {
                     Query = node.Term,
                     DefaultField = node.Field,
@@ -65,14 +60,14 @@ namespace ElasticMacros.QueryMacros {
                 Query = query
             };
 
-            foreach (var macro in _macros)
+            foreach (var macro in _config.QueryMacros)
                 macro.Expand(node, ctx);
 
             AddQuery(ctx.Query, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(TermRangeNode node) {
-            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
                 return;
 
             var range = new RangeQuery { Field = node.Field ?? _defaultFieldStack.Peek() };
@@ -96,14 +91,14 @@ namespace ElasticMacros.QueryMacros {
                 Query = query
             };
 
-            foreach (var macro in _macros)
+            foreach (var macro in _config.QueryMacros)
                 macro.Expand(node, ctx);
 
             AddQuery(ctx.Query, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(ExistsNode node) {
-            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
                 return;
 
             PlainQuery query = new FilteredQuery {
@@ -114,14 +109,14 @@ namespace ElasticMacros.QueryMacros {
                 Query = query
             };
 
-            foreach (var macro in _macros)
+            foreach (var macro in _config.QueryMacros)
                 macro.Expand(node, ctx);
             
             AddQuery(ctx.Query, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(MissingNode node) {
-            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
                 return;
 
             PlainQuery filter = new FilteredQuery {
@@ -132,7 +127,7 @@ namespace ElasticMacros.QueryMacros {
                 Query = filter
             };
 
-            foreach (var macro in _macros)
+            foreach (var macro in _config.QueryMacros)
                 macro.Expand(node, ctx);
 
             AddQuery(ctx.Query, node.IsNegated, node.Prefix);
@@ -189,7 +184,7 @@ namespace ElasticMacros.QueryMacros {
                 case GroupOperator.Or:
                     return Operator.Or;
                 default:
-                    return _defaultOperator;
+                    return _config.DefaultQueryOperator;
             }
         }
     }

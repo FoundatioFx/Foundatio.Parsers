@@ -19,7 +19,16 @@ namespace ElasticMacros {
         public IList<IElasticFilterMacro> FilterMacros => _filterMacros.Cast<IElasticFilterMacro>().ToList();
         public IList<IElasticQueryMacro> QueryMacros => _queryMacros.Cast<IElasticQueryMacro>().ToList();
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
-        public ISet<string> AnalyzedFields { get; } = new HashSet<string>();
+        private ISet<string> AnalyzedFields { get; } = new HashSet<string>();
+        private Func<string, bool> AnalyzedFieldFunc { get; set; }
+
+        public bool IsFieldAnalyzed(string field) {
+            if (string.IsNullOrEmpty(field) || AnalyzedFields.Contains(field))
+                return true;
+            if (AnalyzedFieldFunc == null)
+                return false;
+            return AnalyzedFieldFunc(field);
+        }
 
         public ElasticMacrosConfiguration SetDefaultField(string field) {
             DefaultField = field;
@@ -45,6 +54,11 @@ namespace ElasticMacros {
             foreach (var field in fields)
                 AnalyzedFields.Add(field);
 
+            return this;
+        }
+
+        public ElasticMacrosConfiguration SetAnalyzedFieldFunc(Func<string, bool> analyzedFieldFunc) {
+            AnalyzedFieldFunc = analyzedFieldFunc;
             return this;
         }
 

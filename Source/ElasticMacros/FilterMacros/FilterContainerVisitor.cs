@@ -10,17 +10,12 @@ namespace ElasticMacros.FilterMacros {
     public class FilterContainerVisitor : QueryNodeVisitorWithResultBase<FilterContainer> {
         private readonly Stack<Operator> _operatorStack = new Stack<Operator>();
         private readonly Stack<string> _defaultFieldStack = new Stack<string>();
-        private readonly Operator _defaultOperator;
         private FilterContainer _filter;
-        private readonly List<IElasticFilterMacro> _macros = new List<IElasticFilterMacro>();
-        private readonly HashSet<string> _analyzedFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly ElasticMacrosConfiguration _config;
 
         public FilterContainerVisitor(ElasticMacrosConfiguration config) {
-            _defaultOperator = config.DefaultFilterOperator;
+            _config = config;
             _defaultFieldStack.Push(config.DefaultField);
-            _macros.AddRange(config.FilterMacros);
-            foreach (var field in config.AnalyzedFields) 
-                _analyzedFields.Add(field);
         }
 
         public override void Visit(GroupNode node) {
@@ -50,7 +45,7 @@ namespace ElasticMacros.FilterMacros {
 
         public override void Visit(TermNode node) {
             PlainFilter filter = null;
-            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field))) {
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field))) {
                 filter = new QueryFilter { Query = new QueryStringQuery {
                     Query = node.Term,
                     DefaultField = node.Field,
@@ -65,14 +60,14 @@ namespace ElasticMacros.FilterMacros {
                 Filter = filter
             };
 
-            foreach (var macro in _macros)
+            foreach (var macro in _config.FilterMacros)
                 macro.Expand(node, ctx);
 
             AddFilter(ctx.Filter, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(TermRangeNode node) {
-            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
                 return;
 
             var range = new RangeFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
@@ -96,14 +91,14 @@ namespace ElasticMacros.FilterMacros {
                 Filter = filter
             };
 
-            foreach (var macro in _macros)
+            foreach (var macro in _config.FilterMacros)
                 macro.Expand(node, ctx);
 
             AddFilter(ctx.Filter, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(ExistsNode node) {
-            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
                 return;
 
             PlainFilter filter = new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
@@ -112,14 +107,14 @@ namespace ElasticMacros.FilterMacros {
                 Filter = filter
             };
 
-            foreach (var macro in _macros)
+            foreach (var macro in _config.FilterMacros)
                 macro.Expand(node, ctx);
 
             AddFilter(ctx.Filter, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(MissingNode node) {
-            if (!String.IsNullOrEmpty(node.Field) && _analyzedFields.Contains(GetFullFieldName(node.Field)))
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
                 return;
 
             PlainFilter filter = new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
@@ -128,7 +123,7 @@ namespace ElasticMacros.FilterMacros {
                 Filter = filter
             };
 
-            foreach (var macro in _macros)
+            foreach (var macro in _config.FilterMacros)
                 macro.Expand(node, ctx);
 
             AddFilter(ctx.Filter, node.IsNegated, node.Prefix);
@@ -185,7 +180,7 @@ namespace ElasticMacros.FilterMacros {
                 case GroupOperator.Or:
                     return Operator.Or;
                 default:
-                    return _defaultOperator;
+                    return _config.DefaultFilterOperator;
             }
         }
     }
