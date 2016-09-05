@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Exceptionless.LuceneQueryParser.Extensions;
 
 namespace Exceptionless.LuceneQueryParser.Nodes {
     public class TermRangeNode : QueryNodeBase {
@@ -45,7 +46,8 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             return target;
         }
 
-        public override string ToString() {
+        public override string ToString(bool escapeTerms)
+        {
             var builder = new StringBuilder();
 
             if (IsNegated.HasValue && IsNegated.Value)
@@ -53,7 +55,8 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
 
             builder.Append(Prefix);
 
-            if (!String.IsNullOrEmpty(Field)) {
+            if (!String.IsNullOrEmpty(Field))
+            {
                 builder.Append(Field);
                 builder.Append(":");
             }
@@ -64,12 +67,12 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             if (MinInclusive.HasValue && String.IsNullOrEmpty(Operator))
                 builder.Append(MinInclusive.Value ? "[" : "{");
 
-            builder.Append(Min);
+            builder.Append(escapeTerms ? Min.Escape() : Min);
 
             if (!String.IsNullOrEmpty(Min) && !String.IsNullOrEmpty(Max) && String.IsNullOrEmpty(Operator))
                 builder.Append(Delimiter ?? " TO ");
 
-            builder.Append(Max);
+            builder.Append(escapeTerms ? Max.Escape() : Max);
 
             if (MaxInclusive.HasValue && String.IsNullOrEmpty(Operator))
                 builder.Append(MaxInclusive.Value ? "]" : "}");

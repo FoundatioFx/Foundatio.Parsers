@@ -65,9 +65,9 @@ namespace Tests {
         [InlineData("book.\\*:test", "book.\\*:test", true)]
         [InlineData("count:>=1", "count:>=1", true)]
         [InlineData("count:[1..5}", "count:[1..5}", true)]
-        [InlineData("count:a\\:a", "count:a\\:a", true)]
+        [InlineData("count:a\\:a", "count:a:a", true)]
         [InlineData("count:a:a", null, false)]
-        [InlineData("count:a\\:a more:stuff", "count:a\\:a more:stuff", true)]
+        [InlineData("count:a\\:a more:stuff", "count:a:a more:stuff", true)]
         [InlineData("data.count:[1..5}", "data.count:[1..5}", true)]
         [InlineData("age:(>=10 AND < 20)", "age:(>=10 AND <20)", true)]
         [InlineData("age : >= 10", "age:>=10", true)]
@@ -99,6 +99,8 @@ namespace Tests {
         [InlineData("\"jakarta apache\" -\"Apache Lucene\"", "\"jakarta apache\" -\"Apache Lucene\"", true)]
         [InlineData("\"jakarta apache\"^4 \"Apache Lucene\"", "\"jakarta apache\"^4 \"Apache Lucene\"", true)]
         [InlineData("NOT \"jakarta apache\"", "NOT \"jakarta apache\"", true)]
+        [InlineData(@"updated:2016-09-02T15\:41\:43.3385286Z", "updated:2016-09-02T15:41:43.3385286Z", true)]
+        [InlineData(@"updated:>2016-09-02T15\:41\:43.3385286Z", "updated:>2016-09-02T15:41:43.3385286Z", true)]
         public void CanGenerateQuery(string query, string expected, bool isValid) {
             var parser = new QueryParser();
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Exceptionless.LuceneQueryParser.Extensions;
 
 namespace Exceptionless.LuceneQueryParser.Nodes {
     public class TermNode : QueryNodeBase {
@@ -36,7 +37,8 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             return target;
         }
 
-        public override String ToString() {
+        public override string ToString(bool escapeTerms)
+        {
             var builder = new StringBuilder();
 
             if (IsNegated.HasValue && IsNegated.Value)
@@ -44,12 +46,14 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
 
             builder.Append(Prefix);
 
-            if (!String.IsNullOrEmpty(Field)) {
+            if (!String.IsNullOrEmpty(Field))
+            {
                 builder.Append(Field);
                 builder.Append(":");
             }
 
-            builder.Append(IsQuotedTerm ? "\"" + Term + "\"" : Term);
+            var term = escapeTerms ? Term.Escape() : Term;
+            builder.Append(IsQuotedTerm ? "\"" + term + "\"" : term);
 
             if (Boost != null)
                 builder.Append("^" + Boost);

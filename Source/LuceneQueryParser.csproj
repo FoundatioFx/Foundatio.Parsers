@@ -41,6 +41,7 @@
     <PegGrammar Include="lucene-query.peg" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="Extensions\TextWriterExtensions.cs" />
     <Compile Include="lucene-query.peg.cs">
       <DependentUpon>lucene-query.peg</DependentUpon>
