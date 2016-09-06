@@ -19,8 +19,19 @@ namespace ElasticMacros {
         public IList<IElasticFilterMacro> FilterMacros => _filterMacros.Cast<IElasticFilterMacro>().ToList();
         public IList<IElasticQueryMacro> QueryMacros => _queryMacros.Cast<IElasticQueryMacro>().ToList();
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
+        private Func<string, bool> NestedFieldFunc { get; set; }
         private Func<string, bool> AnalyzedFieldFunc { get; set; }
-        private Func<string, string, string> TransformTermFunc { get; set; }
+        private Func<string, string, IEnumerable<string>> TransformTermFunc { get; set; }
+
+        public bool IsFieldNested(string field) {
+            if (String.IsNullOrEmpty(field))
+                return false;
+
+            if (NestedFieldFunc == null)
+                return false;
+
+            return NestedFieldFunc(field);
+        }
 
         public bool IsFieldAnalyzed(string field) {
             if (String.IsNullOrEmpty(field))
@@ -32,12 +43,9 @@ namespace ElasticMacros {
             return AnalyzedFieldFunc(field);
         }
 
-        public string TransformTerm(string field, string term) {
-            if (String.IsNullOrEmpty(field))
-                return term;
-
+        public IEnumerable<string> TransformTerm(string field, string term) {
             if (TransformTermFunc == null)
-                return term;
+                return term.Split(' ').Select(t => t.ToLower());
 
             return TransformTermFunc(field, term);
         }
@@ -57,12 +65,17 @@ namespace ElasticMacros {
             return this;
         }
 
+        public ElasticMacrosConfiguration SetNestedFieldFunc(Func<string, bool> nestedFieldFunc) {
+            NestedFieldFunc = nestedFieldFunc;
+            return this;
+        }
+
         public ElasticMacrosConfiguration SetAnalyzedFieldFunc(Func<string, bool> analyzedFieldFunc) {
             AnalyzedFieldFunc = analyzedFieldFunc;
             return this;
         }
 
-        public ElasticMacrosConfiguration SetTransformTermFunc(Func<string, string, string> transformTermFunc) {
+        public ElasticMacrosConfiguration SetTransformTermFunc(Func<string, string, IEnumerable<string>> transformTermFunc) {
             TransformTermFunc = transformTermFunc;
             return this;
         }

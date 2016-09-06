@@ -45,16 +45,16 @@ namespace ElasticMacros.QueryMacros {
 
         public override void Visit(TermNode node) {
             PlainQuery query = null;
-            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field))) {
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)) || node.UnescapedTerm.Contains('*') || node.UnescapedTerm.Contains('?') || node.IsQuotedTerm) {
                 query = new QueryStringQuery {
                     Query = node.IsQuotedTerm ? "\"" + node.UnescapedTerm + "\"" : node.UnescapedTerm,
                     DefaultField = node.Field,
                     DefaultOperator = _operatorStack.Peek()
                 };
             } else {
-                query = new TermQuery {
+                query = new TermsQuery {
                     Field = node.Field ?? _defaultFieldStack.Peek(),
-                    Value = _config.TransformTerm(node.Field, node.UnescapedTerm)
+                    Terms = _config.TransformTerm(node.Field, node.UnescapedTerm)
                 };
             }
 
