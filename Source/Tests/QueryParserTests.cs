@@ -57,7 +57,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now"}, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor(c => c.AddAnalyzedField("field3"));
+            var processor = new ElasticMacroProcessor(c => c.SetAnalyzedFieldFunc(f => f == "field3"));
             var result = processor.BuildQuery("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);

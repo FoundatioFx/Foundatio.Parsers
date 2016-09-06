@@ -52,7 +52,10 @@ namespace ElasticMacros.FilterMacros {
                     DefaultOperator = _operatorStack.Peek()
                 }.ToContainer() };
             } else {
-                filter = new TermFilter { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.UnescapedTerm };
+                filter = new TermFilter {
+                    Field = node.Field ?? _defaultFieldStack.Peek(),
+                    Value = _config.TransformTerm(node.Field, node.UnescapedTerm)
+                };
             }
 
             var ctx = new ElasticFilterMacroContext {

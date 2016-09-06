@@ -52,7 +52,10 @@ namespace ElasticMacros.QueryMacros {
                     DefaultOperator = _operatorStack.Peek()
                 };
             } else {
-                query = new TermQuery { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.UnescapedTerm };
+                query = new TermQuery {
+                    Field = node.Field ?? _defaultFieldStack.Peek(),
+                    Value = _config.TransformTerm(node.Field, node.UnescapedTerm)
+                };
             }
 
             var ctx = new ElasticQueryMacroContext {

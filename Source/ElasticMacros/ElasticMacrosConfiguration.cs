@@ -19,15 +19,27 @@ namespace ElasticMacros {
         public IList<IElasticFilterMacro> FilterMacros => _filterMacros.Cast<IElasticFilterMacro>().ToList();
         public IList<IElasticQueryMacro> QueryMacros => _queryMacros.Cast<IElasticQueryMacro>().ToList();
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
-        private ISet<string> AnalyzedFields { get; } = new HashSet<string>();
         private Func<string, bool> AnalyzedFieldFunc { get; set; }
+        private Func<string, string, string> TransformTermFunc { get; set; }
 
         public bool IsFieldAnalyzed(string field) {
-            if (string.IsNullOrEmpty(field) || AnalyzedFields.Contains(field))
+            if (String.IsNullOrEmpty(field))
                 return true;
+
             if (AnalyzedFieldFunc == null)
                 return false;
+
             return AnalyzedFieldFunc(field);
+        }
+
+        public string TransformTerm(string field, string term) {
+            if (String.IsNullOrEmpty(field))
+                return term;
+
+            if (TransformTermFunc == null)
+                return term;
+
+            return TransformTermFunc(field, term);
         }
 
         public ElasticMacrosConfiguration SetDefaultField(string field) {
@@ -45,20 +57,13 @@ namespace ElasticMacros {
             return this;
         }
 
-        public ElasticMacrosConfiguration AddAnalyzedField(string field) {
-            AnalyzedFields.Add(field);
-            return this;
-        }
-
-        public ElasticMacrosConfiguration AddAnalyzedFields(IEnumerable<string> fields) {
-            foreach (var field in fields)
-                AnalyzedFields.Add(field);
-
-            return this;
-        }
-
         public ElasticMacrosConfiguration SetAnalyzedFieldFunc(Func<string, bool> analyzedFieldFunc) {
             AnalyzedFieldFunc = analyzedFieldFunc;
+            return this;
+        }
+
+        public ElasticMacrosConfiguration SetTransformTermFunc(Func<string, string, string> transformTermFunc) {
+            TransformTermFunc = transformTermFunc;
             return this;
         }
 
