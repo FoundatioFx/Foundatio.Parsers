@@ -47,7 +47,7 @@ namespace ElasticMacros.FilterMacros {
             PlainFilter filter = null;
             if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field))) {
                 filter = new QueryFilter { Query = new QueryStringQuery {
-                    Query = node.UnescapedTerm,
+                    Query = node.IsQuotedTerm ? "\"" + node.UnescapedTerm + "\"" : node.UnescapedTerm,
                     DefaultField = node.Field,
                     DefaultOperator = _operatorStack.Peek()
                 }.ToContainer() };

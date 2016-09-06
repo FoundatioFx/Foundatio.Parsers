@@ -47,7 +47,7 @@ namespace ElasticMacros.QueryMacros {
             PlainQuery query = null;
             if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field))) {
                 query = new QueryStringQuery {
-                    Query = node.UnescapedTerm,
+                    Query = node.IsQuotedTerm ? "\"" + node.UnescapedTerm + "\"" : node.UnescapedTerm,
                     DefaultField = node.Field,
                     DefaultOperator = _operatorStack.Peek()
                 };
