@@ -78,9 +78,6 @@ namespace ElasticMacros.QueryMacros {
         }
 
         public override void Visit(TermRangeNode node) {
-            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
-                return;
-
             var range = new RangeQuery { Field = node.Field ?? _defaultFieldStack.Peek() };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
@@ -109,9 +106,6 @@ namespace ElasticMacros.QueryMacros {
         }
 
         public override void Visit(ExistsNode node) {
-            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
-                return;
-
             PlainQuery query = new FilteredQuery {
                 Filter = new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() }.ToContainer()
             };
@@ -127,9 +121,6 @@ namespace ElasticMacros.QueryMacros {
         }
 
         public override void Visit(MissingNode node) {
-            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
-                return;
-
             PlainQuery filter = new FilteredQuery {
                 Filter = new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() }.ToContainer()
             };

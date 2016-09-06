@@ -79,9 +79,6 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(TermRangeNode node) {
-            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
-                return;
-
             var range = new RangeFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
@@ -110,9 +107,6 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(ExistsNode node) {
-            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
-                return;
-
             PlainFilter filter = new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
             var ctx = new ElasticFilterMacroContext {
                 DefaultField = _defaultFieldStack.Peek(),
@@ -126,9 +120,6 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(MissingNode node) {
-            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)))
-                return;
-
             PlainFilter filter = new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
             var ctx = new ElasticFilterMacroContext {
                 DefaultField = _defaultFieldStack.Peek(),
