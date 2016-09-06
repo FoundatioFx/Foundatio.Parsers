@@ -23,12 +23,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
                 child.Accept(visitor);
         }
 
-        public abstract string ToString(bool escapeTerms);
-
-        public override string ToString()
-        {
-            return ToString(false);
-        }
+        public abstract override string ToString();
 
         public abstract IList<IQueryNode> Children { get; }
 

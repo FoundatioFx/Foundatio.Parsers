@@ -21,7 +21,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             return target;
         }
 
-        public override string ToString(bool escapeTerms) {
+        public override string ToString() {
             var builder = new StringBuilder();
 
             if (IsNegated.HasValue && IsNegated.Value)

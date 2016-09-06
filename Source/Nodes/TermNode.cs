@@ -9,6 +9,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public string Prefix { get; set; }
         public string Field { get; set; }
         public string Term { get; set; }
+        public string UnescapedTerm => IsQuotedTerm ? Term : Term.Unescape();
         public bool IsQuotedTerm { get; set; }
         public string Boost { get; set; }
         public string Proximity { get; set; }
@@ -37,7 +38,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             return target;
         }
 
-        public override string ToString(bool escapeTerms)
+        public override string ToString()
         {
             var builder = new StringBuilder();
 
@@ -52,8 +53,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
                 builder.Append(":");
             }
 
-            var term = escapeTerms ? Term.Escape() : Term;
-            builder.Append(IsQuotedTerm ? "\"" + term + "\"" : term);
+            builder.Append(IsQuotedTerm ? "\"" + Term + "\"" : Term);
 
             if (Boost != null)
                 builder.Append("^" + Boost);

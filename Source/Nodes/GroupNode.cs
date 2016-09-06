@@ -13,7 +13,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public string Prefix { get; set; }
         public string Boost { get; set; }
 
-        public override string ToString(bool escapeTerms)
+        public override string ToString()
         {
             var builder = new StringBuilder();
 
@@ -29,7 +29,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
                 builder.Append("(");
 
             if (Left != null)
-                builder.Append(Left.ToString(escapeTerms));
+                builder.Append(Left);
 
             if (Operator == GroupOperator.And)
                 builder.Append(" AND ");
@@ -42,7 +42,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
                 builder.Append("NOT ");
 
             if (Right != null)
-                builder.Append(Right.ToString(escapeTerms));
+                builder.Append(Right);
 
             if (HasParens)
                 builder.Append(")");

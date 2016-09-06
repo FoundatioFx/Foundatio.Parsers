@@ -148,7 +148,7 @@ term<TermNode>
     }}
   / not:not_exp? op:prefix_operator_exp? term:unquoted_term proximity:proximity_modifier? boost:boost_modifier? _*
     {{
-        var result = new TermNode { Term = term.Unescape() };
+        var result = new TermNode { Term = term };
 
         if (proximity.Count > 0)
             result.Proximity = proximity.SingleOrDefault();
@@ -203,8 +203,8 @@ range_operator_exp<TermRangeNode>
   = '[' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* ']'
     {
         new TermRangeNode {
-            Min = term_min.Unescape(),
-            Max = term_max.Unescape(),
+            Min = term_min,
+            Max = term_max,
             MinInclusive = true,
             MaxInclusive = true,
             Delimiter = delim
@@ -213,8 +213,8 @@ range_operator_exp<TermRangeNode>
   / '{' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* '}'
     {
         new TermRangeNode {
-            Min = term_min.Unescape(),
-            Max = term_max.Unescape(),
+            Min = term_min,
+            Max = term_max,
             MinInclusive = false,
             MaxInclusive = false,
             Delimiter = delim
@@ -223,8 +223,8 @@ range_operator_exp<TermRangeNode>
   / '{' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* ']'
     {
         new TermRangeNode {
-            Min = term_min.Unescape(),
-            Max = term_max.Unescape(),
+            Min = term_min,
+            Max = term_max,
             MinInclusive = false,
             MaxInclusive = true,
             Delimiter = delim
@@ -233,8 +233,8 @@ range_operator_exp<TermRangeNode>
   / '[' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* '}'
     {
         new TermRangeNode {
-            Min = term_min.Unescape(),
-            Max = term_max.Unescape(),
+            Min = term_min,
+            Max = term_max,
             MinInclusive = true,
             MaxInclusive = false,
             Delimiter = delim
@@ -243,7 +243,7 @@ range_operator_exp<TermRangeNode>
   / '>=' _* term_min:range_unquoted_term
     {
         new TermRangeNode {
-            Min = term_min.Unescape(),
+            Min = term_min,
             MinInclusive = true,
             Operator = ">="
         }
@@ -251,7 +251,7 @@ range_operator_exp<TermRangeNode>
   / '>' _* term_min:range_unquoted_term
     {
         new TermRangeNode {
-            Min = term_min.Unescape(),
+            Min = term_min,
             MinInclusive = false,
             Operator = ">"
         }
@@ -259,7 +259,7 @@ range_operator_exp<TermRangeNode>
   / '<=' _* term_max:range_unquoted_term
     {
         new TermRangeNode {
-            Max = term_max.Unescape(),
+            Max = term_max,
             MaxInclusive = true,
             Operator = "<="
         }
@@ -267,7 +267,7 @@ range_operator_exp<TermRangeNode>
   / '<' _* term_max:range_unquoted_term
     {
         new TermRangeNode {
-            Max = term_max.Unescape(),
+            Max = term_max,
             MaxInclusive = false,
             Operator = "<"
         }

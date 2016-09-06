@@ -9,7 +9,9 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public string Field { get; set; }
         public string Prefix { get; set; }
         public string Min { get; set; }
+        public string UnescapedMin => Min.Unescape();
         public string Max { get; set; }
+        public string UnescapedMax => Max.Unescape();
         public string Operator { get; set; }
         public string Delimiter { get; set; }
         public bool? MinInclusive { get; set; }
@@ -46,7 +48,7 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             return target;
         }
 
-        public override string ToString(bool escapeTerms)
+        public override string ToString()
         {
             var builder = new StringBuilder();
 
@@ -67,12 +69,12 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
             if (MinInclusive.HasValue && String.IsNullOrEmpty(Operator))
                 builder.Append(MinInclusive.Value ? "[" : "{");
 
-            builder.Append(escapeTerms ? Min.Escape() : Min);
+            builder.Append(Min);
 
             if (!String.IsNullOrEmpty(Min) && !String.IsNullOrEmpty(Max) && String.IsNullOrEmpty(Operator))
                 builder.Append(Delimiter ?? " TO ");
 
-            builder.Append(escapeTerms ? Max.Escape() : Max);
+            builder.Append(Max);
 
             if (MaxInclusive.HasValue && String.IsNullOrEmpty(Operator))
                 builder.Append(MaxInclusive.Value ? "]" : "}");

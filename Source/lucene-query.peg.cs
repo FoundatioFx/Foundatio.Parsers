@@ -1560,7 +1560,7 @@ namespace
                                         r0 = this.ReturnHelper<TermNode>(startCursor6, ref cursor, state =>
                                             #line 150 "lucene-query.peg"
      {
-        var result = new TermNode { Term = term.Unescape() };
+        var result = new TermNode { Term = term };
 
         if (proximity.Count > 0)
             result.Proximity = proximity.SingleOrDefault();
@@ -2236,8 +2236,8 @@ namespace
                                                 #line 204 "lucene-query.peg"
      
         new TermRangeNode {
-            Min = term_min.Unescape(),
-            Max = term_max.Unescape(),
+            Min = term_min,
+            Max = term_max,
             MinInclusive = true,
             MaxInclusive = true,
             Delimiter = delim
@@ -2354,8 +2354,8 @@ namespace
                                                 #line 214 "lucene-query.peg"
      
         new TermRangeNode {
-            Min = term_min.Unescape(),
-            Max = term_max.Unescape(),
+            Min = term_min,
+            Max = term_max,
             MinInclusive = false,
             MaxInclusive = false,
             Delimiter = delim
@@ -2472,8 +2472,8 @@ namespace
                                                 #line 224 "lucene-query.peg"
      
         new TermRangeNode {
-            Min = term_min.Unescape(),
-            Max = term_max.Unescape(),
+            Min = term_min,
+            Max = term_max,
             MinInclusive = false,
             MaxInclusive = true,
             Delimiter = delim
@@ -2590,8 +2590,8 @@ namespace
                                                 #line 234 "lucene-query.peg"
      
         new TermRangeNode {
-            Min = term_min.Unescape(),
-            Max = term_max.Unescape(),
+            Min = term_min,
+            Max = term_max,
             MinInclusive = true,
             MaxInclusive = false,
             Delimiter = delim
@@ -2671,7 +2671,7 @@ namespace
                                 #line 244 "lucene-query.peg"
      
         new TermRangeNode {
-            Min = term_min.Unescape(),
+            Min = term_min,
             MinInclusive = true,
             Operator = ">="
         }
@@ -2730,7 +2730,7 @@ namespace
                                 #line 252 "lucene-query.peg"
      
         new TermRangeNode {
-            Min = term_min.Unescape(),
+            Min = term_min,
             MinInclusive = false,
             Operator = ">"
         }
@@ -2789,7 +2789,7 @@ namespace
                                 #line 260 "lucene-query.peg"
      
         new TermRangeNode {
-            Max = term_max.Unescape(),
+            Max = term_max,
             MaxInclusive = true,
             Operator = "<="
         }
@@ -2848,7 +2848,7 @@ namespace
                                 #line 268 "lucene-query.peg"
      
         new TermRangeNode {
-            Max = term_max.Unescape(),
+            Max = term_max,
             MaxInclusive = false,
             Operator = "<"
         }

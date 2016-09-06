@@ -1,15 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Exceptionless.LuceneQueryParser.Extensions;
 using Xunit;
 
-namespace LuceneQueryParser.Tests
-{
-    public sealed class StringExtensionsTests
-    {
+namespace LuceneQueryParser.Tests {
+    public sealed class StringExtensionsTests {
         [Theory]
         [InlineData("", "")]
         [InlineData("none", "none")]
@@ -17,8 +11,7 @@ namespace LuceneQueryParser.Tests
         [InlineData(@"Escap\e", "Escape")]
         [InlineData(@"Double \\ backslash", @"Double \ backslash")]
         [InlineData(@"At end \", @"At end \")]
-        public void UnescapingWorks(string test, string expected)
-        {
+        public void UnescapingWorks(string test, string expected) {
             var result = test.Unescape();
             Assert.Equal(expected, result);
         }
@@ -26,9 +19,8 @@ namespace LuceneQueryParser.Tests
         [Theory]
         [InlineData("", "")]
         [InlineData("none", "none")]
-        [InlineData(@"Lots of characters: +-&|!(){}[]^""~*?\", @"Lots of characters\: \+\-\&\|\!\(\)\{\}\[\]\^\""\~\*\?\\")]
-        public void EscapingWorks(string test, string expected)
-        {
+        [InlineData(@"Lots of characters: +-&|!(){}[]^""~*?\", @"Lots of characters\: +-&|!(){}[]^""~*?\\")]
+        public void EscapingWorks(string test, string expected) {
             var result = test.Escape();
             Assert.Equal(expected, result);
         }
