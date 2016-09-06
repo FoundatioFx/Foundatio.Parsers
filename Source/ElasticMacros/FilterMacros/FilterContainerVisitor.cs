@@ -47,12 +47,12 @@ namespace ElasticMacros.FilterMacros {
             PlainFilter filter = null;
             if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field))) {
                 filter = new QueryFilter { Query = new QueryStringQuery {
-                    Query = node.Term,
+                    Query = node.UnescapedTerm,
                     DefaultField = node.Field,
                     DefaultOperator = _operatorStack.Peek()
                 }.ToContainer() };
             } else {
-                filter = new TermFilter { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.Term };
+                filter = new TermFilter { Field = node.Field ?? _defaultFieldStack.Peek(), Value = node.UnescapedTerm };
             }
 
             var ctx = new ElasticFilterMacroContext {
@@ -71,18 +71,18 @@ namespace ElasticMacros.FilterMacros {
                 return;
 
             var range = new RangeFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
-            if (!String.IsNullOrWhiteSpace(node.Min)) {
+            if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
-                    range.GreaterThan = node.Min;
+                    range.GreaterThan = node.UnescapedMin;
                 else
-                    range.GreaterThanOrEqualTo = node.Min;
+                    range.GreaterThanOrEqualTo = node.UnescapedMin;
             }
 
-            if (!String.IsNullOrWhiteSpace(node.Max)) {
+            if (!String.IsNullOrWhiteSpace(node.UnescapedMax)) {
                 if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
-                    range.LowerThan = node.Max;
+                    range.LowerThan = node.UnescapedMax;
                 else
-                    range.LowerThanOrEqualTo = node.Max;
+                    range.LowerThanOrEqualTo = node.UnescapedMax;
             }
 
             PlainFilter filter = range;
