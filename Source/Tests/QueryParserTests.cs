@@ -237,6 +237,55 @@ namespace Tests {
         }
 
         [Fact]
+        public void MixedCaseTermFilterQueryProcessor() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var response = client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index("stuff"));
+
+            var processor = new ElasticMacroProcessor();
+            var result = processor.BuildFilter("field1:Testing.Casing");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "Testing.Casing")));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void MultipleWordsTermFilterQueryProcessor() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var response = client.Index(new MyType { Field1 = "Blake Niemyjski" }, i => i.Index("stuff"));
+
+            var processor = new ElasticMacroProcessor();
+            var result = processor.BuildFilter("field1:\"Blake Niemyjski\"");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            // TODO: This should use a match phrase query.
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Query(q => q.QueryString(qs => qs.Query("\"Blake Niemyjski\"").DefaultField("field1").DefaultOperator(Operator.And)))));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void NestedFilterProcessor() {
             var client = new ElasticClient();
             client.DeleteIndex(i => i.Index("stuff"));
