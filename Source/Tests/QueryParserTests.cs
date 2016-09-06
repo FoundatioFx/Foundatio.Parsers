@@ -6,10 +6,15 @@ using Xunit;
 using Exceptionless.LuceneQueryParser;
 using Exceptionless.LuceneQueryParser.Nodes;
 using Exceptionless.LuceneQueryParser.Visitor;
+using Foundatio.Logging;
+using Foundatio.Logging.Xunit;
 using Nest;
+using Xunit.Abstractions;
 
 namespace Tests {
-    public class QueryParserTests {
+    public class QueryParserTests : TestWithLoggingBase {
+        public QueryParserTests(ITestOutputHelper output) : base(output) { }
+
         [Fact]
         public void CanParseQuery() {
             var parser = new QueryParser();
@@ -28,7 +33,7 @@ namespace Tests {
 
             client.CreateIndex(i => i.Index("stuff"));
             client.Map<MyType>(d => d.Dynamic().Index("stuff"));
-            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
+            var response = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
@@ -37,8 +42,65 @@ namespace Tests {
             var result = processor.BuildFilter("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1")));
             string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void ExistsFilterProcessor() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticMacroProcessor();
+            var result = processor.BuildFilter($"_exists_:{nameof(MyType.Field2)}");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Exists(nameof(MyType.Field2))));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void MissingFilterProcessor() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticMacroProcessor();
+            var result = processor.BuildFilter($"_missing_:{nameof(MyType.Field2)}");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Missing(nameof(MyType.Field2))));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -61,8 +123,11 @@ namespace Tests {
             var result = processor.BuildQuery("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Term(m => m.Field1, "value1")));
             string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -94,8 +159,11 @@ namespace Tests {
             var result = processor.BuildFilter("field1:value1 AND -field2:value2");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") && !f.Term(m => m.Field2, "value2")));
             string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -104,8 +172,11 @@ namespace Tests {
             result = processor.BuildFilter("field1:value1 AND NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") && !f.Term(m => m.Field2, "value2")));
             expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -114,8 +185,11 @@ namespace Tests {
             result = processor.BuildFilter("field1:value1 OR NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") || !f.Term(m => m.Field2, "value2")));
             expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -124,8 +198,11 @@ namespace Tests {
             result = processor.BuildFilter("field1:value1 OR -field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") || !f.Term(m => m.Field2, "value2")));
             expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -149,8 +226,11 @@ namespace Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => f.Term(m => m.Field1, "value1") || (f.Term(m => m.Field2, "value2") || f.Term(m => m.Field3, "value3"))));
             string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -174,8 +254,11 @@ namespace Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") && (f.Term(m => m.Field2, "value2") || f.Term(m => m.Field3, "value3"))));
             string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -199,8 +282,11 @@ namespace Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Range(m => m.OnField(f2 => f2.Field4).GreaterOrEquals(1).Lower(2)) || f.Term(m => m.Field1, "value1")));
             string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -227,12 +313,15 @@ namespace Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f =>
                 f.GeoBoundingBox(m => m.Field4, "9", "d")
                 || f.Term(m => m.Field1, "value1")
                 || f.Range(m => m.OnField(g => g.Field2).GreaterOrEquals(1).LowerOrEquals(4))
                 || !f.GeoDistance(m => m.Field4, e => e.Location("d").Distance("75mi"))));
             string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);

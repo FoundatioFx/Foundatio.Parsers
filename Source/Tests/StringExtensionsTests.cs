@@ -1,9 +1,13 @@
 ﻿using System;
 using Exceptionless.LuceneQueryParser.Extensions;
+using Foundatio.Logging.Xunit;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace LuceneQueryParser.Tests {
-    public sealed class StringExtensionsTests {
+    public sealed class StringExtensionsTests : TestWithLoggingBase {
+        public StringExtensionsTests(ITestOutputHelper output) : base(output) { }
+
         [Theory]
         [InlineData("", "")]
         [InlineData("none", "none")]

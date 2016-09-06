@@ -2,16 +2,14 @@
 using Exceptionless.LuceneQueryParser;
 using Exceptionless.LuceneQueryParser.Nodes;
 using Exceptionless.LuceneQueryParser.Visitor;
+using Foundatio.Logging;
+using Foundatio.Logging.Xunit;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Tests {
-    public class GenerateQueryVisitorTests {
-        private readonly ITestOutputHelper _output;
-
-        public GenerateQueryVisitorTests(ITestOutputHelper output) {
-            _output = output;
-        }
+    public class GenerateQueryVisitorTests : TestWithLoggingBase {
+        public GenerateQueryVisitorTests(ITestOutputHelper output) : base(output) {}
 
         [Theory]
         [InlineData(null, null, false)]
@@ -47,6 +45,7 @@ namespace Tests {
         [InlineData("date:>now", "date:>now", true)]
         [InlineData("date:<now", "date:<now", true)]
         [InlineData("_exists_:title", "_exists_:title", true)]
+        [InlineData("_missing_:title", "_missing_:title", true)]
         [InlineData("book.\\*:(quick brown)", "book.\\*:(quick brown)", true)]
         [InlineData("date:[now/d-4d TO now/d+1d}", @"date:[now/d-4d TO now/d+1d}", true)]
         [InlineData("(date:[now/d-4d TO now/d+1d})", @"(date:[now/d-4d TO now/d+1d})", true)]
@@ -112,7 +111,7 @@ namespace Tests {
                 return;
             }
 
-            _output.WriteLine(DebugQueryVisitor.Run(result));
+            _logger.Info(DebugQueryVisitor.Run(result));
             var generatedQuery = GenerateQueryVisitor.Run(result);
             Assert.Equal(expected, generatedQuery);
         }
