@@ -135,7 +135,12 @@ namespace Tests {
             result = processor.BuildQuery("field3:hey");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             actualRequest = GetRequest(actualResponse);
-            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.QueryString(m => m.DefaultField(f => f.Field3).Query("hey").DefaultOperator(Operator.Or))));
+            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.QueryString(m => m
+                .DefaultField(f => f.Field3)
+                .Query("hey")
+                .DefaultOperator(Operator.Or)
+                .AllowLeadingWildcard(false)
+                .AnalyzeWildcard())));
             expectedRequest = GetRequest(expectedResponse);
 
             Assert.Equal(expectedRequest, actualRequest);

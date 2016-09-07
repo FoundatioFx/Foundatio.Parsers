@@ -45,26 +45,19 @@ namespace ElasticMacros.FilterMacros {
 
         public override void Visit(TermNode node) {
             PlainFilter filter = null;
-            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field)) || node.UnescapedTerm.Contains('*') || node.UnescapedTerm.Contains('?') || node.IsQuotedTerm) {
+            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field))) {
                 filter = new QueryFilter { Query = new QueryStringQuery {
                     Query = node.IsQuotedTerm ? "\"" + node.UnescapedTerm + "\"" : node.UnescapedTerm,
                     DefaultField = node.Field,
+                    AllowLeadingWildcard = false,
+                    AnalyzeWildcard = true,
                     DefaultOperator = _operatorStack.Peek()
                 }.ToContainer() };
             } else {
-                var terms = _config.TransformTerm(node.Field, node.UnescapedTerm).ToArray();
-                if (terms.Length == 1) {
-                    filter = new TermFilter {
-                        Field = node.Field ?? _defaultFieldStack.Peek(),
-                        Value = terms[0]
-                    };
-                } else {
-                    filter = new TermsFilter {
-                        Field = node.Field ?? _defaultFieldStack.Peek(),
-                        Execution = TermsExecution.And,
-                        Terms = terms
-                    };
-                }
+                filter = new TermFilter {
+                    Field = node.Field ?? _defaultFieldStack.Peek(),
+                    Value = node.UnescapedTerm
+                };
             }
 
             var ctx = new ElasticFilterMacroContext {
