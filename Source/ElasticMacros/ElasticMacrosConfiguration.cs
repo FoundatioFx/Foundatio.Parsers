@@ -21,7 +21,6 @@ namespace ElasticMacros {
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
         private Func<string, bool> NestedFieldFunc { get; set; }
         private Func<string, bool> AnalyzedFieldFunc { get; set; }
-        private Func<string, string, IEnumerable<string>> TransformTermFunc { get; set; }
 
         public bool IsFieldNested(string field) {
             if (String.IsNullOrEmpty(field))
@@ -41,13 +40,6 @@ namespace ElasticMacros {
                 return false;
 
             return AnalyzedFieldFunc(field);
-        }
-
-        public IEnumerable<string> TransformTerm(string field, string term) {
-            if (TransformTermFunc == null)
-                return term.Split(' ').Select(t => t.ToLower());
-
-            return TransformTermFunc(field, term);
         }
 
         public ElasticMacrosConfiguration SetDefaultField(string field) {
@@ -72,11 +64,6 @@ namespace ElasticMacros {
 
         public ElasticMacrosConfiguration SetAnalyzedFieldFunc(Func<string, bool> analyzedFieldFunc) {
             AnalyzedFieldFunc = analyzedFieldFunc;
-            return this;
-        }
-
-        public ElasticMacrosConfiguration SetTransformTermFunc(Func<string, string, IEnumerable<string>> transformTermFunc) {
-            TransformTermFunc = transformTermFunc;
             return this;
         }
 
