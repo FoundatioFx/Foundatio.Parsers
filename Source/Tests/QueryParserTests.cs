@@ -281,8 +281,7 @@ namespace Tests {
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
 
-            // TODO: This should use a match phrase query.
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Query(q => q.QueryString(qs => qs.Query("\"Blake Niemyjski\"").DefaultField("field1").DefaultOperator(Operator.And)))));
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(p => p.Field1, "Blake Niemyjski")));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
