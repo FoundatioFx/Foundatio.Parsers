@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using ElasticMacros;
 using Elasticsearch.Net;
@@ -290,7 +292,7 @@ namespace Tests {
         }
 
         [Fact]
-        public void NestedFilterProcessor() {
+        public void GroupedOrFilterProcessor() {
             var client = new ElasticClient();
             client.DeleteIndex(i => i.Index("stuff"));
             client.Refresh();
@@ -311,6 +313,73 @@ namespace Tests {
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "value1") && (f.Term(m => m.Field2, "value2") || f.Term(m => m.Field3, "value3"))));
             string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void NestedFilterProcessor() {
+            var client = new ElasticClient(new ConnectionSettings()
+                .MapDefaultTypeNames(t => t
+                    .Add(typeof(MyNestedType), "things"))
+                .MapDefaultTypeIndices(d => d
+                    .Add(typeof(MyNestedType), "stuff")));
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff").AddMapping<MyNestedType>(d => d.Index("stuff").Properties(p => p
+                .String(e => e.Name(n => n.Field1).Index(FieldIndexOption.Analyzed))
+                .String(e => e.Name(n => n.Field2).Index(FieldIndexOption.Analyzed))
+                .String(e => e.Name(n => n.Field3).Index(FieldIndexOption.Analyzed))
+                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+                .NestedObject<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
+                    .String(e => e.Name(n => n.Field1).Index(FieldIndexOption.Analyzed))
+                    .String(e => e.Name(n => n.Field2).Index(FieldIndexOption.Analyzed))
+                    .String(e => e.Name(n => n.Field3).Index(FieldIndexOption.Analyzed))
+                    .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+                ))
+            )));
+
+            var res = client.IndexManyAsync(new[] {
+                new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = { new MyType { Field1 = "value1", Field4 = 4 } }},
+                new MyNestedType { Field1 = "value2", Field2 = "value2" },
+                new MyNestedType { Field1 = "value1", Field2 = "value4" }
+            });
+            client.Refresh();
+
+            var processor = new ElasticMacroProcessor(c => c.UseNested(n => n == "nested"));
+            var result = processor.BuildFilter("field1:value1 nested.field1:value1");
+
+            var actualResponse = client.Search<MyNestedType>(d => d.Filter(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyNestedType>(d => d.Filter(f => f
+                .Term(m => m.Field1, "value1")
+                && f.Nested(n => n.Path(p => p.Nested).Filter(f1 => f1
+                    .Term(m => m.Field1, "value1")))));
+
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+
+            result = processor.BuildFilter("field1:value1 nested:(field1:value1 field4:4)");
+
+            actualResponse = client.Search<MyNestedType>(d => d.Filter(result));
+            actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            expectedResponse = client.Search<MyNestedType>(d => d.Filter(f => f
+                .Term(m => m.Field1, "value1")
+                && f.Nested(n => n.Path(p => p.Nested).Filter(f1 => f1
+                    .Term(m => m.Field1, "value1")
+                    && f1.Term(m => m.Field4, 4)))));
+
+            expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
@@ -431,5 +500,13 @@ namespace Tests {
         public string Field2 { get; set; }
         public string Field3 { get; set; }
         public int Field4 { get; set; }
+    }
+
+    public class MyNestedType {
+        public string Field1 { get; set; }
+        public string Field2 { get; set; }
+        public string Field3 { get; set; }
+        public int Field4 { get; set; }
+        public IList<MyType> Nested { get; set; } = new List<MyType>();
     }
 }

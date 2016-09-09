@@ -57,6 +57,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FilterMacros\NestedFilterMacro.cs" />
     <Compile Include="QueryMacros\ElasticQueryMacroContext.cs" />
     <Compile Include="QueryMacros\ElasticQueryMacroBase.cs" />
     <Compile Include="QueryMacros\GeoQueryMacro.cs" />

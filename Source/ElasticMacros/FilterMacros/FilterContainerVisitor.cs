@@ -8,61 +8,69 @@ using Nest;
 
 namespace ElasticMacros.FilterMacros {
     public class FilterContainerVisitor : QueryNodeVisitorWithResultBase<FilterContainer> {
-        private readonly Stack<Operator> _operatorStack = new Stack<Operator>();
-        private readonly Stack<string> _defaultFieldStack = new Stack<string>();
-        private FilterContainer _filter;
         private readonly ElasticMacrosConfiguration _config;
+        private ElasticFilterMacroContext _context;
 
         public FilterContainerVisitor(ElasticMacrosConfiguration config) {
             _config = config;
-            _defaultFieldStack.Push(config.DefaultField);
         }
 
         public override void Visit(GroupNode node) {
-            FilterContainer parent = null;
-            if (node.HasParens) {
-                parent = _filter;
-                _filter = null;
-            }
+            ElasticFilterMacroContext parent = null;
+            if (node.HasParens || _context == null) {
+                if (_context != null)
+                    parent = _context;
 
-            _operatorStack.Push(GetOperator(node));
-            if (!String.IsNullOrEmpty(node.Field))
-                _defaultFieldStack.Push(node.Field);
+                _context = new ElasticFilterMacroContext {
+                    Config = _config,
+                    DefaultField = !String.IsNullOrEmpty(node.Field) ? node.Field : parent?.DefaultField ?? _config.DefaultField,
+                    Group = node,
+                    Operator = GetOperator(node),
+                    FieldPrefixParts = parent?.FieldPrefixParts ?? new string[] {}
+                };
+
+                if (!String.IsNullOrEmpty(node.Field)) {
+                    var prefixParts = parent?.FieldPrefixParts?.ToList() ?? new List<string>();
+                    prefixParts.Add(node.Field);
+                    _context.FieldPrefixParts = prefixParts.ToArray();
+                }
+            }
 
             foreach (var child in node.Children)
                 child.Accept(this, false);
 
-            _operatorStack.Pop();
-            if (!String.IsNullOrEmpty(node.Field))
-                _defaultFieldStack.Pop();
-
             if (parent == null)
                 return;
 
-            AddFilter(ref parent, _filter, node.IsNegated, node.Prefix);
-            _filter = parent;
+            var current = _context;
+            _context = parent;
+            AddFilter(current.Filter, node.IsNegated, node.Prefix);
         }
 
         public override void Visit(TermNode node) {
-            PlainFilter filter = null;
-            if (_config.IsFieldAnalyzed(GetFullFieldName(node.Field))) {
+            FilterContainer filter = null;
+            if (_config.IsFieldAnalyzed(_context.GetFullFieldName(node.Field))) {
                 filter = new QueryFilter { Query = new QueryStringQuery {
                     Query = node.IsQuotedTerm ? "\"" + node.UnescapedTerm + "\"" : node.UnescapedTerm,
                     DefaultField = node.Field,
                     AllowLeadingWildcard = false,
                     AnalyzeWildcard = true,
-                    DefaultOperator = _operatorStack.Peek()
+                    DefaultOperator = _context.Operator
                 }.ToContainer() };
             } else {
                 filter = new TermFilter {
-                    Field = node.Field ?? _defaultFieldStack.Peek(),
+                    Field = node.Field ?? _context.DefaultField,
                     Value = node.UnescapedTerm
                 };
             }
 
             var ctx = new ElasticFilterMacroContext {
-                DefaultField = _defaultFieldStack.Peek(),
-                Filter = filter
+                DefaultField = _context.DefaultField,
+                Filter = filter,
+                FieldPrefixParts = _context.FieldPrefixParts,
+                Operator = _context.Operator,
+                Config = _context.Config,
+                Group = _context.Group
             };
 
             foreach (var macro in _config.FilterMacros)
@@ -72,7 +80,7 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(TermRangeNode node) {
-            var range = new RangeFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
+            var range = new RangeFilter { Field = node.Field ?? _context.DefaultField };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                     range.GreaterThan = node.UnescapedMin;
@@ -87,10 +95,14 @@ namespace ElasticMacros.FilterMacros {
                     range.LowerThanOrEqualTo = node.UnescapedMax;
             }
 
-            PlainFilter filter = range;
+            FilterContainer filter = range;
             var ctx = new ElasticFilterMacroContext {
-                DefaultField = _defaultFieldStack.Peek(),
-                Filter = filter
+                DefaultField = _context.DefaultField,
+                Filter = filter,
+                FieldPrefixParts = _context.FieldPrefixParts,
+                Operator = _context.Operator,
+                Config = _context.Config,
+                Group = _context.Group
             };
 
             foreach (var macro in _config.FilterMacros)
@@ -100,10 +112,14 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(ExistsNode node) {
-            PlainFilter filter = new ExistsFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
+            FilterContainer filter = new ExistsFilter { Field = node.Field ?? _context.DefaultField };
             var ctx = new ElasticFilterMacroContext {
-                DefaultField = _defaultFieldStack.Peek(),
-                Filter = filter
+                DefaultField = _context.DefaultField,
+                Filter = filter,
+                FieldPrefixParts = _context.FieldPrefixParts,
+                Operator = _context.Operator,
+                Config = _context.Config,
+                Group = _context.Group
             };
 
             foreach (var macro in _config.FilterMacros)
@@ -113,10 +129,14 @@ namespace ElasticMacros.FilterMacros {
         }
 
         public override void Visit(MissingNode node) {
-            PlainFilter filter = new MissingFilter { Field = node.Field ?? _defaultFieldStack.Peek() };
+            FilterContainer filter = new MissingFilter { Field = node.Field ?? _context.DefaultField };
             var ctx = new ElasticFilterMacroContext {
-                DefaultField = _defaultFieldStack.Peek(),
-                Filter = filter
+                DefaultField = _context.DefaultField,
+                Filter = filter,
+                FieldPrefixParts = _context.FieldPrefixParts,
+                Operator = _context.Operator,
+                Config = _context.Config,
+                Group = _context.Group
             };
 
             foreach (var macro in _config.FilterMacros)
@@ -125,28 +145,8 @@ namespace ElasticMacros.FilterMacros {
             AddFilter(ctx.Filter, node.IsNegated, node.Prefix);
         }
 
-        private string GetFullFieldName(string field) {
-            if (_defaultFieldStack.Count == 1)
-                return field;
-
-            var sb = new StringBuilder();
-            // skip 1st field in stack because that is the default field and not a group field
-            foreach (var f in _defaultFieldStack.Skip(1)) {
-                sb.Append(f);
-                sb.Append('.');
-            }
-
-            sb.Append(field);
-
-            return sb.ToString();
-        }
-
-        private void AddFilter(PlainFilter filter, bool? isNegated, string prefix) {
-            AddFilter(ref _filter, filter.ToContainer(), isNegated, prefix);
-        }
-
-        private void AddFilter(ref FilterContainer target, FilterContainer container, bool? isNegated, string prefix) {
-            var op = _operatorStack.Peek();
+        private void AddFilter(FilterContainer container, bool? isNegated, string prefix) {
+            var op = _context.Operator;
             if ((isNegated.HasValue && isNegated.Value)
                 || (!String.IsNullOrEmpty(prefix) && prefix == "-"))
                 container = !container;
@@ -155,16 +155,16 @@ namespace ElasticMacros.FilterMacros {
                 op = Operator.And;
 
             if (op == Operator.And) {
-                target &= container;
+                _context.Filter &= container;
             } else if (op == Operator.Or) {
-                target |= container;
+                _context.Filter |= container;
             }
         }
 
         public override FilterContainer Accept(IQueryNode node) {
             node.Accept(this, false);
-            if (_filter != null)
-                return _filter;
+            if (_context.Filter != null)
+                return _context.Filter;
 
             return new MatchAllFilter().ToContainer();
         }

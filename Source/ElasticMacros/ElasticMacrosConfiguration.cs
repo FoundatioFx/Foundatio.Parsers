@@ -19,18 +19,7 @@ namespace ElasticMacros {
         public IList<IElasticFilterMacro> FilterMacros => _filterMacros.Cast<IElasticFilterMacro>().ToList();
         public IList<IElasticQueryMacro> QueryMacros => _queryMacros.Cast<IElasticQueryMacro>().ToList();
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
-        private Func<string, bool> NestedFieldFunc { get; set; }
         private Func<string, bool> AnalyzedFieldFunc { get; set; }
-
-        public bool IsFieldNested(string field) {
-            if (String.IsNullOrEmpty(field))
-                return false;
-
-            if (NestedFieldFunc == null)
-                return false;
-
-            return NestedFieldFunc(field);
-        }
 
         public bool IsFieldAnalyzed(string field) {
             if (String.IsNullOrEmpty(field))
@@ -54,11 +43,6 @@ namespace ElasticMacros {
 
         public ElasticMacrosConfiguration SetDefaultQueryOperator(Operator op) {
             DefaultQueryOperator = op;
-            return this;
-        }
-
-        public ElasticMacrosConfiguration SetNestedFieldFunc(Func<string, bool> nestedFieldFunc) {
-            NestedFieldFunc = nestedFieldFunc;
             return this;
         }
 
@@ -102,6 +86,11 @@ namespace ElasticMacros {
         public ElasticMacrosConfiguration UseGeo(Func<string, bool> isGeoField, Func<string, string> resolveGeoLocation, int priority = 0) {
             AddQueryMacro(new GeoQueryMacro(isGeoField, resolveGeoLocation), priority);
             return AddFilterMacro(new GeoFilterMacro(isGeoField, resolveGeoLocation), priority);
+        }
+
+        public ElasticMacrosConfiguration UseNested(Func<string, bool> isNestedField, int priority = 0) {
+            //AddQueryMacro(new NestedFilterMacro(isNestedField), priority);
+            return AddFilterMacro(new NestedFilterMacro(isNestedField), priority);
         }
     }
 
