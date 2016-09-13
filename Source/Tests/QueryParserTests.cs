@@ -3,23 +3,23 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Elasticsearch.Net;
-using Exceptionless.ElasticQueryParser;
-using Xunit;
-using Exceptionless.LuceneQueryParser;
-using Exceptionless.LuceneQueryParser.Nodes;
-using Exceptionless.LuceneQueryParser.Visitor;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
+using Foundatio.Parsers.ElasticQueries;
+using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using Xunit;
 using Xunit.Abstractions;
 
-namespace Tests {
+namespace Foundatio.Parsers.Tests {
     public class QueryParserTests : TestWithLoggingBase {
         public QueryParserTests(ITestOutputHelper output) : base(output) { }
 
         [Fact]
         public void CanParseQuery() {
-            var parser = new QueryParser();
+            var parser = new LuceneQueryParser();
             var result = parser.Parse("criteria");
             Assert.NotNull(result);
             Assert.NotNull(result.Left);
@@ -40,7 +40,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new Parser();
+            var processor = new ElasticQueryParser();
             var result = processor.BuildFilter("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -67,7 +67,7 @@ namespace Tests {
             client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new Parser();
+            var processor = new ElasticQueryParser();
             var result = processor.BuildFilter($"_exists_:{nameof(MyType.Field2)}");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -94,7 +94,7 @@ namespace Tests {
             client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new Parser();
+            var processor = new ElasticQueryParser();
             var result = processor.BuildFilter($"_missing_:{nameof(MyType.Field2)}");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -121,7 +121,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now"}, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new Parser(c => c.SetAnalyzedFieldFunc(f => f == "field3"));
+            var processor = new ElasticQueryParser(c => c.SetAnalyzedFieldFunc(f => f == "field3"));
             var result = processor.BuildQuery("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);
@@ -162,7 +162,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new Parser(c => c.SetDefaultFilterOperator(Operator.Or));
+            var processor = new ElasticQueryParser(c => c.SetDefaultFilterOperator(Operator.Or));
             var result = processor.BuildFilter("field1:value1 AND -field2:value2");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -175,7 +175,7 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new Parser(c => c.SetDefaultFilterOperator(Operator.Or));
+            processor = new ElasticQueryParser(c => c.SetDefaultFilterOperator(Operator.Or));
             result = processor.BuildFilter("field1:value1 AND NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
@@ -188,7 +188,7 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new Parser(c => c.SetDefaultFilterOperator(Operator.Or));
+            processor = new ElasticQueryParser(c => c.SetDefaultFilterOperator(Operator.Or));
             result = processor.BuildFilter("field1:value1 OR NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
@@ -201,7 +201,7 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new Parser(c => c.SetDefaultFilterOperator(Operator.Or));
+            processor = new ElasticQueryParser(c => c.SetDefaultFilterOperator(Operator.Or));
             result = processor.BuildFilter("field1:value1 OR -field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
@@ -228,7 +228,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new Parser();
+            var processor = new ElasticQueryParser();
             var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
@@ -253,7 +253,7 @@ namespace Tests {
             client.Map<MyType>(d => d.Dynamic().Index("stuff"));
             var response = client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index("stuff"));
 
-            var processor = new Parser();
+            var processor = new ElasticQueryParser();
             var result = processor.BuildFilter("field1:Testing.Casing");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -277,7 +277,7 @@ namespace Tests {
             client.Map<MyType>(d => d.Dynamic().Index("stuff"));
             var response = client.Index(new MyType { Field1 = "Blake Niemyjski" }, i => i.Index("stuff"));
 
-            var processor = new Parser();
+            var processor = new ElasticQueryParser();
             var result = processor.BuildFilter("field1:\"Blake Niemyjski\"");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -304,7 +304,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new Parser();
+            var processor = new ElasticQueryParser();
             var result = processor.BuildFilter("field1:value1 (field2:value2 OR field3:value3)");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
@@ -349,7 +349,7 @@ namespace Tests {
             });
             client.Refresh();
 
-            var processor = new Parser(c => c.UseNested(n => n == "nested"));
+            var processor = new ElasticQueryParser(c => c.UseNested(n => n == "nested"));
             var result = processor.BuildFilter("field1:value1 nested.field1:value1");
 
             var actualResponse = client.Search<MyNestedType>(d => d.Filter(result));
@@ -399,7 +399,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new Parser();
+            var processor = new ElasticQueryParser();
             var result = processor.BuildFilter("field4:[1 TO 2} OR field1:value1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
@@ -428,7 +428,7 @@ namespace Tests {
             client.Refresh();
 
             var aliasMap = new AliasMap { { "geo", "field4" } };
-            var processor = new Parser(c => c
+            var processor = new ElasticQueryParser(c => c
                 .UseGeo(l => "d", "field4")
                 .UseAliases(aliasMap));
             var result = processor.BuildFilter("geo:[9 TO d] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi");
@@ -451,7 +451,7 @@ namespace Tests {
 
         [Fact]
         public void CanUseAliases() {
-            var parser = new QueryParser();
+            var parser = new LuceneQueryParser();
             var result = parser.Parse("field1:value");
             var aliasMap = new AliasMap { { "field1", "field2" } };
             var aliased = AliasedQueryVisitor.Run(result, aliasMap);

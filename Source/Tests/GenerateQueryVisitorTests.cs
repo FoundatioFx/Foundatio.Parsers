@@ -1,13 +1,13 @@
 ﻿using System;
-using Exceptionless.LuceneQueryParser;
-using Exceptionless.LuceneQueryParser.Nodes;
-using Exceptionless.LuceneQueryParser.Visitor;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
+using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Tests {
+namespace Foundatio.Parsers.Tests {
     public class GenerateQueryVisitorTests : TestWithLoggingBase {
         public GenerateQueryVisitorTests(ITestOutputHelper output) : base(output) {}
 
@@ -101,7 +101,7 @@ namespace Tests {
         [InlineData(@"updated:2016-09-02T15\:41\:43.3385286Z", @"updated:2016-09-02T15\:41\:43.3385286Z", true)]
         [InlineData(@"updated:>2016-09-02T15\:41\:43.3385286Z", @"updated:>2016-09-02T15\:41\:43.3385286Z", true)]
         public void CanGenerateQuery(string query, string expected, bool isValid) {
-            var parser = new QueryParser();
+            var parser = new LuceneQueryParser();
 
             IQueryNode result;
             try {

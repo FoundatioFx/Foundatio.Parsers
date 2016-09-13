@@ -31,7 +31,7 @@ before_build:
   - ps: .\Build\Replace-FileString -Pattern '\$version\$' -Replacement "$($env:appveyor_build_version)$($env:VERSION_SUFFIX)" -Path src\**\*.nuspec -Overwrite
 
 build:
-  project: Exceptionless.LuceneQueryParser.sln
+  project: Foundatio.Parsers.sln
   verbosity: minimal
   publish_nuget: true
 

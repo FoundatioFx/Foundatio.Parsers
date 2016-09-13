@@ -1,10 +1,10 @@
 ﻿using System;
-using Exceptionless.LuceneQueryParser.Extensions;
 using Foundatio.Logging.Xunit;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace LuceneQueryParser.Tests {
+namespace Foundatio.Parsers.Tests {
     public sealed class StringExtensionsTests : TestWithLoggingBase {
         public StringExtensionsTests(ITestOutputHelper output) : base(output) { }
 
