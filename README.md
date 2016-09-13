@@ -1,5 +1,5 @@
 # Foundatio.Parsers
-[![Build status](https://ci.appveyor.com/api/projects/status/c92r9f5jhf6pl4hs/branch/master?svg=true)](https://ci.appveyor.com/project/Exceptionless/exceptionless-lucenequeryparser)
+[![Build status](https://ci.appveyor.com/api/projects/status/c92r9f5jhf6pl4hs/branch/master?svg=true)](https://ci.appveyor.com/project/Exceptionless/foundatio-parsers)
 [![NuGet Version](http://img.shields.io/nuget/v/Foundatio.Parsers.LuceneQueries.svg?style=flat)](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) 
 [![Slack Status](https://slack.exceptionless.com/badge.svg)](https://slack.exceptionless.com)
 [![Donate](https://img.shields.io/badge/donorbox-donate-blue.svg)](https://donorbox.org/exceptionless) 
@@ -8,7 +8,7 @@ A lucene style query parser that is extensible and allows additional syntax feat
 
 ## Getting Started (Development)
 
-[This package](https://www.nuget.org/packages/Exceptionless.LuceneQueryParser/) can be installed via the [NuGet package manager](https://docs.nuget.org/consume/Package-Manager-Dialog). If you need help, please contact us via in-app support or [open an issue](https://github.com/exceptionless/Exceptionless.LuceneQueryParser/issues/new). We’re always here to help if you have any questions!
+[This package](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) can be installed via the [NuGet package manager](https://docs.nuget.org/consume/Package-Manager-Dialog). If you need help, please contact us via in-app support or [open an issue](https://github.com/exceptionless/Foundatio.Parsers/issues/new). We’re always here to help if you have any questions!
 
 1. You will need to have [Visual Studio 2013](http://www.visualstudio.com/products/visual-studio-community-vs) installed.
 2. Open the `Exceptionless.LuceneQueryParser.sln` Visual Studio solution file.
