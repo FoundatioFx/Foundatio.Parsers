@@ -53,7 +53,7 @@ namespace Exceptionless.ElasticQueryParser.Filter {
                 }.ToContainer() };
             } else {
                 filter = new TermFilter {
-                    Field = node.GetDefaultField(_config.DefaultField),
+                    Field = node.GetFullName() ?? _config.DefaultField,
                     Value = node.UnescapedTerm
                 };
             }

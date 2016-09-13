@@ -377,7 +377,7 @@ namespace Tests {
                 .Term(m => m.Field1, "value1")
                 && f.Nested(n => n.Path(p => p.Nested).Filter(f1 => f1
                     .Term("nested.field1", "value1")
-                    && f1.Term("nested.field4", 4)))));
+                    && f1.Term("nested.field4", "4")))));
 
             expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
