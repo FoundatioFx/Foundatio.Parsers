@@ -4,7 +4,7 @@ using Exceptionless.LuceneQueryParser.Nodes;
 
 namespace Exceptionless.LuceneQueryParser.Visitor {
     public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorWithResultBase<ISet<String>> {
-        private readonly HashSet<string> _fields = new HashSet<String>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public override void Visit(GroupNode node) {
             if (!String.IsNullOrEmpty(node.Field))
@@ -32,7 +32,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
         }
 
         public override ISet<string> Accept(IQueryNode node) {
-            node.Accept(this, false);
+            node.Accept(this);
             return _fields;
         }
 

@@ -113,9 +113,9 @@
     <Compile Include="StringExtensionsTests.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ElasticMacros\ElasticMacros.csproj">
+    <ProjectReference Include="..\ElasticMacros\ElasticQueryParser.csproj">
       <Project>{9f6f9cc3-2544-44eb-8829-209187271a4e}</Project>
-      <Name>ElasticMacros</Name>
+      <Name>ElasticQueryParser</Name>
     </ProjectReference>
     <ProjectReference Include="..\LuceneQueryParser.csproj">
       <Project>{f759e45d-c914-4546-947d-b9f0854d22e9}</Project>

@@ -41,6 +41,7 @@
     <PegGrammar Include="lucene-query.peg" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="Extensions\TextWriterExtensions.cs" />
     <Compile Include="lucene-query.peg.cs">
@@ -54,12 +55,17 @@
     <Compile Include="Nodes\QueryNodeBase.cs" />
     <Compile Include="Nodes\TermRangeNode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Visitor\ChainedQueryVisitor.cs" />
     <Compile Include="Visitor\GetReferencedFieldsQueryVisitor.cs" />
     <Compile Include="Visitor\AliasedQueryVisitor.cs" />
     <Compile Include="Visitor\DebugQueryVisitor.cs" />
     <Compile Include="Visitor\GenerateQueryVisitor.cs" />
+    <Compile Include="Visitor\IChainableQueryVisitor.cs" />
     <Compile Include="Visitor\IQueryNodeVisitor.cs" />
+    <Compile Include="Visitor\IQueryNodeVisitorWithResult.cs" />
     <Compile Include="Visitor\QueryNodeVisitorBase.cs" />
+    <Compile Include="Visitor\QueryNodeVisitorWithResultBase.cs" />
+    <Compile Include="Visitor\VisitorWithPriority.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="LuceneQueryParser.nuspec" />

@@ -335,6 +335,7 @@ namespace
         var node= new GroupNode {
             Left = left
         };
+		left.Parent = node;
 
         var rightExp =
                 right.Count == 0
@@ -347,6 +348,7 @@ namespace
         {
             node.Operator = op.SingleOrDefault();
             node.Right = rightExp;
+			rightExp.Parent = node;
         }
 
         return node;
@@ -373,7 +375,7 @@ namespace
         }
 
         private IParseResult<
-            #line 55 "lucene-query.peg"
+            #line 57 "lucene-query.peg"
           IQueryNode
             #line default
             > group_exp(ref Cursor cursor)
@@ -409,7 +411,7 @@ namespace
                     if (r2 != null)
                     {
                         r0 = this.ReturnHelper<IQueryNode>(startCursor0, ref cursor, state =>
-                            #line 57 "lucene-query.peg"
+                            #line 59 "lucene-query.peg"
      
         field_exp
                             #line default
@@ -433,7 +435,7 @@ namespace
         }
 
         private IParseResult<
-            #line 62 "lucene-query.peg"
+            #line 64 "lucene-query.peg"
           GroupNode
             #line default
             > paren_exp(ref Cursor cursor)
@@ -497,7 +499,7 @@ namespace
                             if (r6 != null)
                             {
                                 r0 = this.ReturnHelper<GroupNode>(startCursor0, ref cursor, state =>
-                                    #line 64 "lucene-query.peg"
+                                    #line 66 "lucene-query.peg"
      {
         node.HasParens = true;
 
@@ -537,7 +539,7 @@ namespace
         }
 
         private IParseResult<
-            #line 73 "lucene-query.peg"
+            #line 75 "lucene-query.peg"
           IQueryNode
             #line default
             > field_exp(ref Cursor cursor)
@@ -644,7 +646,7 @@ namespace
                                         if (r11 != null)
                                         {
                                             r0 = this.ReturnHelper<IQueryNode>(startCursor0, ref cursor, state =>
-                                                #line 75 "lucene-query.peg"
+                                                #line 77 "lucene-query.peg"
    {
         return new ExistsNode { IsNegated = not.Any(), Prefix = op.SingleOrDefault(), Field = fieldname };
   }
@@ -787,7 +789,7 @@ namespace
                                         if (r22 != null)
                                         {
                                             r0 = this.ReturnHelper<IQueryNode>(startCursor5, ref cursor, state =>
-                                                #line 79 "lucene-query.peg"
+                                                #line 81 "lucene-query.peg"
    {
         return new MissingNode { IsNegated = not.Any(), Prefix = op.SingleOrDefault(), Field = fieldname };
   }
@@ -884,7 +886,7 @@ namespace
                         if (r27 != null)
                         {
                             r0 = this.ReturnHelper<IQueryNode>(startCursor10, ref cursor, state =>
-                                #line 83 "lucene-query.peg"
+                                #line 85 "lucene-query.peg"
      {
         if (name.Count == 1) {
 		  range.IsNegated = not.Any();
@@ -967,7 +969,7 @@ namespace
                         if (r32 != null)
                         {
                             r0 = this.ReturnHelper<IQueryNode>(startCursor13, ref cursor, state =>
-                                #line 93 "lucene-query.peg"
+                                #line 95 "lucene-query.peg"
      {
 		range.IsNegated = not.Any();
         range.Prefix = op.SingleOrDefault();
@@ -1031,7 +1033,7 @@ namespace
                         if (r36 != null)
                         {
                             r0 = this.ReturnHelper<IQueryNode>(startCursor16, ref cursor, state =>
-                                #line 99 "lucene-query.peg"
+                                #line 101 "lucene-query.peg"
      {
 		node.IsNegated = not.Any();
         node.Field = name.Field;
@@ -1111,7 +1113,7 @@ namespace
                         if (r41 != null)
                         {
                             r0 = this.ReturnHelper<IQueryNode>(startCursor18, ref cursor, state =>
-                                #line 106 "lucene-query.peg"
+                                #line 108 "lucene-query.peg"
      {
         var query = new TermNode();
 
@@ -1149,7 +1151,7 @@ namespace
         }
 
         private IParseResult<
-            #line 122 "lucene-query.peg"
+            #line 124 "lucene-query.peg"
           FieldInfo
             #line default
             > fieldname(ref Cursor cursor)
@@ -1228,7 +1230,7 @@ namespace
                             if (r7 != null)
                             {
                                 r0 = this.ReturnHelper<FieldInfo>(startCursor0, ref cursor, state =>
-                                    #line 124 "lucene-query.peg"
+                                    #line 126 "lucene-query.peg"
        {
         var result = new FieldInfo { Field = fieldname };
 
@@ -1267,7 +1269,7 @@ namespace
         }
 
         private IParseResult<
-            #line 132 "lucene-query.peg"
+            #line 134 "lucene-query.peg"
      TermNode
             #line default
             > term(ref Cursor cursor)
@@ -1391,7 +1393,7 @@ namespace
                                     if (r10 != null)
                                     {
                                         r0 = this.ReturnHelper<TermNode>(startCursor0, ref cursor, state =>
-                                            #line 134 "lucene-query.peg"
+                                            #line 136 "lucene-query.peg"
        {
         var result = new TermNode { Term = term, IsQuotedTerm = true };
 
@@ -1558,7 +1560,7 @@ namespace
                                     if (r21 != null)
                                     {
                                         r0 = this.ReturnHelper<TermNode>(startCursor6, ref cursor, state =>
-                                            #line 150 "lucene-query.peg"
+                                            #line 152 "lucene-query.peg"
      {
         var result = new TermNode { Term = term };
 
@@ -1699,7 +1701,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 168 "lucene-query.peg"
+                    #line 170 "lucene-query.peg"
      
         term
                     #line default
@@ -1801,7 +1803,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 174 "lucene-query.peg"
+                    #line 176 "lucene-query.peg"
      
         term
                     #line default
@@ -1938,7 +1940,7 @@ namespace
             if (r1 != null)
             {
                 r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                    #line 180 "lucene-query.peg"
+                    #line 182 "lucene-query.peg"
      
         term
                     #line default
@@ -2017,7 +2019,7 @@ namespace
                     if (r6 != null)
                     {
                         r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                            #line 186 "lucene-query.peg"
+                            #line 188 "lucene-query.peg"
      
         term
                             #line default
@@ -2041,7 +2043,7 @@ namespace
         }
 
         private IParseResult<
-            #line 190 "lucene-query.peg"
+            #line 192 "lucene-query.peg"
                string
             #line default
             > boost_modifier(ref Cursor cursor)
@@ -2060,7 +2062,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 192 "lucene-query.peg"
+                        #line 194 "lucene-query.peg"
      
         boost
                         #line default
@@ -2079,7 +2081,7 @@ namespace
         }
 
         private IParseResult<
-            #line 196 "lucene-query.peg"
+            #line 198 "lucene-query.peg"
                    string
             #line default
             > proximity_modifier(ref Cursor cursor)
@@ -2137,7 +2139,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 198 "lucene-query.peg"
+                        #line 200 "lucene-query.peg"
      
         proximity
                         #line default
@@ -2156,7 +2158,7 @@ namespace
         }
 
         private IParseResult<
-            #line 202 "lucene-query.peg"
+            #line 204 "lucene-query.peg"
                    TermRangeNode
             #line default
             > range_operator_exp(ref Cursor cursor)
@@ -2233,7 +2235,7 @@ namespace
                                         if (r9 != null)
                                         {
                                             r0 = this.ReturnHelper<TermRangeNode>(startCursor0, ref cursor, state =>
-                                                #line 204 "lucene-query.peg"
+                                                #line 206 "lucene-query.peg"
      
         new TermRangeNode {
             Min = term_min,
@@ -2351,7 +2353,7 @@ namespace
                                         if (r18 != null)
                                         {
                                             r0 = this.ReturnHelper<TermRangeNode>(startCursor3, ref cursor, state =>
-                                                #line 214 "lucene-query.peg"
+                                                #line 216 "lucene-query.peg"
      
         new TermRangeNode {
             Min = term_min,
@@ -2469,7 +2471,7 @@ namespace
                                         if (r27 != null)
                                         {
                                             r0 = this.ReturnHelper<TermRangeNode>(startCursor6, ref cursor, state =>
-                                                #line 224 "lucene-query.peg"
+                                                #line 226 "lucene-query.peg"
      
         new TermRangeNode {
             Min = term_min,
@@ -2587,7 +2589,7 @@ namespace
                                         if (r36 != null)
                                         {
                                             r0 = this.ReturnHelper<TermRangeNode>(startCursor9, ref cursor, state =>
-                                                #line 234 "lucene-query.peg"
+                                                #line 236 "lucene-query.peg"
      
         new TermRangeNode {
             Min = term_min,
@@ -2668,7 +2670,7 @@ namespace
                         if (r40 != null)
                         {
                             r0 = this.ReturnHelper<TermRangeNode>(startCursor12, ref cursor, state =>
-                                #line 244 "lucene-query.peg"
+                                #line 246 "lucene-query.peg"
      
         new TermRangeNode {
             Min = term_min,
@@ -2727,7 +2729,7 @@ namespace
                         if (r44 != null)
                         {
                             r0 = this.ReturnHelper<TermRangeNode>(startCursor14, ref cursor, state =>
-                                #line 252 "lucene-query.peg"
+                                #line 254 "lucene-query.peg"
      
         new TermRangeNode {
             Min = term_min,
@@ -2786,7 +2788,7 @@ namespace
                         if (r48 != null)
                         {
                             r0 = this.ReturnHelper<TermRangeNode>(startCursor16, ref cursor, state =>
-                                #line 260 "lucene-query.peg"
+                                #line 262 "lucene-query.peg"
      
         new TermRangeNode {
             Max = term_max,
@@ -2845,7 +2847,7 @@ namespace
                         if (r52 != null)
                         {
                             r0 = this.ReturnHelper<TermRangeNode>(startCursor18, ref cursor, state =>
-                                #line 268 "lucene-query.peg"
+                                #line 270 "lucene-query.peg"
      
         new TermRangeNode {
             Max = term_max,
@@ -3081,7 +3083,7 @@ namespace
         }
 
         private IParseResult<
-            #line 283 "lucene-query.peg"
+            #line 285 "lucene-query.peg"
              GroupOperator
             #line default
             > operator_exp(ref Cursor cursor)
@@ -3143,7 +3145,7 @@ namespace
                         if (r4 != null)
                         {
                             r0 = this.ReturnHelper<GroupOperator>(startCursor0, ref cursor, state =>
-                                #line 285 "lucene-query.peg"
+                                #line 287 "lucene-query.peg"
      
         op
                                 #line default
@@ -3198,7 +3200,7 @@ namespace
                         if (r9 != null)
                         {
                             r0 = this.ReturnHelper<GroupOperator>(startCursor3, ref cursor, state =>
-                                #line 289 "lucene-query.peg"
+                                #line 291 "lucene-query.peg"
      
         op
                                 #line default
@@ -3223,7 +3225,7 @@ namespace
         }
 
         private IParseResult<
-            #line 293 "lucene-query.peg"
+            #line 295 "lucene-query.peg"
          GroupOperator
             #line default
             > @operator(ref Cursor cursor)
@@ -3237,7 +3239,7 @@ namespace
                 if (r1 != null)
                 {
                     r0 = this.ReturnHelper<GroupOperator>(startCursor0, ref cursor, state =>
-                        #line 294 "lucene-query.peg"
+                        #line 296 "lucene-query.peg"
            GroupOperator.Or
                         #line default
                         , ruleName: "operator");
@@ -3255,7 +3257,7 @@ namespace
                 if (r2 != null)
                 {
                     r0 = this.ReturnHelper<GroupOperator>(startCursor1, ref cursor, state =>
-                        #line 295 "lucene-query.peg"
+                        #line 297 "lucene-query.peg"
            GroupOperator.And
                         #line default
                         , ruleName: "operator");
@@ -3273,7 +3275,7 @@ namespace
                 if (r3 != null)
                 {
                     r0 = this.ReturnHelper<GroupOperator>(startCursor2, ref cursor, state =>
-                        #line 296 "lucene-query.peg"
+                        #line 298 "lucene-query.peg"
            GroupOperator.Or
                         #line default
                         , ruleName: "operator");
@@ -3291,7 +3293,7 @@ namespace
                 if (r4 != null)
                 {
                     r0 = this.ReturnHelper<GroupOperator>(startCursor3, ref cursor, state =>
-                        #line 297 "lucene-query.peg"
+                        #line 299 "lucene-query.peg"
            GroupOperator.And
                         #line default
                         , ruleName: "operator");
@@ -3335,7 +3337,7 @@ namespace
                 if (r3 != null)
                 {
                     r0 = this.ReturnHelper<string>(startCursor0, ref cursor, state =>
-                        #line 301 "lucene-query.peg"
+                        #line 303 "lucene-query.peg"
      
         op
                         #line default

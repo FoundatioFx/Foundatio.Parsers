@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <package >
   <metadata>
-    <id>Exceptionless.ElasticMacros</id>
+    <id>Exceptionless.ElasticQueryParser</id>
     <version>$version$</version>
-    <title>Exceptionless ElasticMacros</title>
+    <title>Exceptionless ElasticQueryParser</title>
     <authors>Exceptionless</authors>
     <licenseUrl>http://www.apache.org/licenses/LICENSE-2.0</licenseUrl>
     <projectUrl>https://github.com/exceptionless/Exceptionless.LuceneQueryParser</projectUrl>

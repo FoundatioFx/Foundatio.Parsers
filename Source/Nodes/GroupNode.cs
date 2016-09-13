@@ -13,6 +13,28 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
         public string Prefix { get; set; }
         public string Boost { get; set; }
 
+        public GroupNode CopyTo(GroupNode target) {
+            if (Left != null)
+                target.Left = Left;
+
+            if (Right != null)
+                target.Right = Right;
+
+            target.Operator = Operator;
+            target.HasParens = HasParens;
+
+            if (Field != null)
+                target.Field = Field;
+
+            if (IsNegated.HasValue)
+                target.IsNegated = IsNegated;
+
+            if (Boost != null)
+                target.Boost = Boost;
+
+            return target;
+        }
+
         public override string ToString()
         {
             var builder = new StringBuilder();

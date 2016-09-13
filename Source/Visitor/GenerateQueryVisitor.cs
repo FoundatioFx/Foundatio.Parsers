@@ -27,7 +27,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
         }
 
         public override string Accept(IQueryNode node) {
-            node.Accept(this, false);
+            node.Accept(this);
             return _builder.ToString();
         }
 

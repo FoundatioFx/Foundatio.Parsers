@@ -22,10 +22,10 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
 
             _writer.WriteIf(node.Left != null, "Left - ");
-            node.Left?.Accept(this, false);
+            node.Left?.Accept(this);
 
             _writer.WriteIf(node.Right != null, "Right - ");
-            node.Right?.Accept(this, false);
+            node.Right?.Accept(this);
 
             _writer.WriteLineIf(node.Operator != GroupOperator.Default, "Operator: {0}", node.Operator);
             _writer.WriteLineIf(node.HasParens, "Parens: true");
@@ -83,7 +83,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
         }
 
         public override string Accept(IQueryNode node) {
-            node.Accept(this, false);
+            node.Accept(this);
             return _builder.ToString();
         }
 

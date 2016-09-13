@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Exceptionless.LuceneQueryParser.Nodes;
 
 namespace Exceptionless.LuceneQueryParser.Visitor {
-    public class AliasedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode> {
+    public class AliasedQueryVisitor : ChainableQueryVisitor {
         private readonly Stack<AliasMap> _aliasMapStack = new Stack<AliasMap>();
 
         public AliasedQueryVisitor(AliasMap aliasMap) {
@@ -17,7 +17,7 @@ namespace Exceptionless.LuceneQueryParser.Visitor {
             _aliasMapStack.Push(alias.Item2 ?? _aliasMapStack.Peek());
 
             foreach (var child in node.Children)
-                child.Accept(this, false);
+                child.Accept(this);
 
             _aliasMapStack.Pop();
         }

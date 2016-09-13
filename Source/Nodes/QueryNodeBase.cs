@@ -1,10 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System;
+using System.Collections.Generic;
 using Exceptionless.LuceneQueryParser.Visitor;
 
 namespace Exceptionless.LuceneQueryParser.Nodes {
     public abstract class QueryNodeBase : IQueryNode {
-        public virtual void Accept(IQueryNodeVisitor visitor, bool visitChildren = true) {
+        public virtual void Accept(IQueryNodeVisitor visitor) {
             if (this is GroupNode)
                 visitor.Visit((GroupNode)this);
             else if (this is TermNode)
@@ -15,17 +15,13 @@ namespace Exceptionless.LuceneQueryParser.Nodes {
                 visitor.Visit((MissingNode)this);
             else if (this is ExistsNode)
                 visitor.Visit((ExistsNode)this);
-
-            if (!visitChildren)
-                return;
-
-            foreach (var child in Children.Where(child => child != null))
-                child.Accept(visitor);
         }
 
         public abstract override string ToString();
 
         public abstract IList<IQueryNode> Children { get; }
+
+        public GroupNode Parent { get; set; }
 
         public static readonly IList<IQueryNode> EmptyNodeList = new List<IQueryNode>().AsReadOnly();
     }

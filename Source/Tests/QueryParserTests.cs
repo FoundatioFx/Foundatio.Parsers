@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using ElasticMacros;
 using Elasticsearch.Net;
+using Exceptionless.ElasticQueryParser;
 using Xunit;
 using Exceptionless.LuceneQueryParser;
 using Exceptionless.LuceneQueryParser.Nodes;
@@ -40,7 +40,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor();
+            var processor = new Parser();
             var result = processor.BuildFilter("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -67,7 +67,7 @@ namespace Tests {
             client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor();
+            var processor = new Parser();
             var result = processor.BuildFilter($"_exists_:{nameof(MyType.Field2)}");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -94,7 +94,7 @@ namespace Tests {
             client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor();
+            var processor = new Parser();
             var result = processor.BuildFilter($"_missing_:{nameof(MyType.Field2)}");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -121,7 +121,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now"}, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor(c => c.SetAnalyzedFieldFunc(f => f == "field3"));
+            var processor = new Parser(c => c.SetAnalyzedFieldFunc(f => f == "field3"));
             var result = processor.BuildQuery("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);
@@ -162,7 +162,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
+            var processor = new Parser(c => c.SetDefaultFilterOperator(Operator.Or));
             var result = processor.BuildFilter("field1:value1 AND -field2:value2");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -175,7 +175,7 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
+            processor = new Parser(c => c.SetDefaultFilterOperator(Operator.Or));
             result = processor.BuildFilter("field1:value1 AND NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
@@ -188,7 +188,7 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
+            processor = new Parser(c => c.SetDefaultFilterOperator(Operator.Or));
             result = processor.BuildFilter("field1:value1 OR NOT field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
@@ -201,7 +201,7 @@ namespace Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new ElasticMacroProcessor(c => c.SetDefaultFilterOperator(Operator.Or));
+            processor = new Parser(c => c.SetDefaultFilterOperator(Operator.Or));
             result = processor.BuildFilter("field1:value1 OR -field2:value2");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
@@ -228,7 +228,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor();
+            var processor = new Parser();
             var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
@@ -253,7 +253,7 @@ namespace Tests {
             client.Map<MyType>(d => d.Dynamic().Index("stuff"));
             var response = client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index("stuff"));
 
-            var processor = new ElasticMacroProcessor();
+            var processor = new Parser();
             var result = processor.BuildFilter("field1:Testing.Casing");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -277,7 +277,7 @@ namespace Tests {
             client.Map<MyType>(d => d.Dynamic().Index("stuff"));
             var response = client.Index(new MyType { Field1 = "Blake Niemyjski" }, i => i.Index("stuff"));
 
-            var processor = new ElasticMacroProcessor();
+            var processor = new Parser();
             var result = processor.BuildFilter("field1:\"Blake Niemyjski\"");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -304,7 +304,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor();
+            var processor = new Parser();
             var result = processor.BuildFilter("field1:value1 (field2:value2 OR field3:value3)");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
@@ -349,7 +349,7 @@ namespace Tests {
             });
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor(c => c.UseNested(n => n == "nested"));
+            var processor = new Parser(c => c.UseNested(n => n == "nested"));
             var result = processor.BuildFilter("field1:value1 nested.field1:value1");
 
             var actualResponse = client.Search<MyNestedType>(d => d.Filter(result));
@@ -359,7 +359,7 @@ namespace Tests {
             var expectedResponse = client.Search<MyNestedType>(d => d.Filter(f => f
                 .Term(m => m.Field1, "value1")
                 && f.Nested(n => n.Path(p => p.Nested).Filter(f1 => f1
-                    .Term(m => m.Field1, "value1")))));
+                    .Term("nested.field1", "value1")))));
 
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
@@ -376,8 +376,8 @@ namespace Tests {
             expectedResponse = client.Search<MyNestedType>(d => d.Filter(f => f
                 .Term(m => m.Field1, "value1")
                 && f.Nested(n => n.Path(p => p.Nested).Filter(f1 => f1
-                    .Term(m => m.Field1, "value1")
-                    && f1.Term(m => m.Field4, 4)))));
+                    .Term("nested.field1", "value1")
+                    && f1.Term("nested.field4", 4)))));
 
             expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
@@ -399,7 +399,7 @@ namespace Tests {
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticMacroProcessor();
+            var processor = new Parser();
             var result = processor.BuildFilter("field4:[1 TO 2} OR field1:value1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
@@ -428,7 +428,7 @@ namespace Tests {
             client.Refresh();
 
             var aliasMap = new AliasMap { { "geo", "field4" } };
-            var processor = new ElasticMacroProcessor(c => c
+            var processor = new Parser(c => c
                 .UseGeo(l => "d", "field4")
                 .UseAliases(aliasMap));
             var result = processor.BuildFilter("geo:[9 TO d] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi");
