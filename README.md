@@ -1,6 +1,6 @@
-# Exceptionless.LuceneQueryParser
+# Foundatio.Parsers
 [![Build status](https://ci.appveyor.com/api/projects/status/c92r9f5jhf6pl4hs/branch/master?svg=true)](https://ci.appveyor.com/project/Exceptionless/exceptionless-lucenequeryparser)
-[![NuGet Version](http://img.shields.io/nuget/v/Exceptionless.LuceneQueryParser.svg?style=flat)](https://www.nuget.org/packages/Exceptionless.LuceneQueryParser/) 
+[![NuGet Version](http://img.shields.io/nuget/v/Foundatio.Parsers.LuceneQueries.svg?style=flat)](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) 
 [![Slack Status](https://slack.exceptionless.com/badge.svg)](https://slack.exceptionless.com)
 [![Donate](https://img.shields.io/badge/donorbox-donate-blue.svg)](https://donorbox.org/exceptionless) 
 
@@ -20,10 +20,10 @@ Below is a small sampling of the things you can accomplish with LuceneQueryParse
 In the sample below we will parse a query and output it's structure using the `DebugQueryVisitor` and then generate the same exact query using the parse result.
 
 ```csharp
-using Exceptionless.LuceneQueryParser;
-using Exceptionless.LuceneQueryParser.Visitor;
+using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 
-var parser = new QueryParser();
+var parser = new LuceneQueryParser();
 var result = parser.Parse("field:[1 TO 2]");
 Debug.WriteLine(DebugQueryVisitor.Run(result));
 ```
