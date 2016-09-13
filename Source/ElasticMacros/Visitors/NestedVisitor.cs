@@ -19,7 +19,7 @@ namespace Exceptionless.ElasticQueryParser.Visitors {
                 return;
             }
 
-            node.Filter = new NestedFilter { Path = node.GetParentFullName(), Filter = node.Filter };
+            node.Filter = new NestedFilter { Path = node.GetFullName(), Filter = node.Filter };
             node.Parent.InvalidateFilter();
 
             base.Visit(node);
@@ -29,14 +29,14 @@ namespace Exceptionless.ElasticQueryParser.Visitors {
             if (!IsFieldNested(node.GetNameParts()))
                 return;
 
-            node.Query = new NestedQuery { Path = node.GetParentFullName(), Query = node.Query };
+            node.Query = new NestedQuery { Path = node.GetFullName(), Query = node.Query };
             node.Parent.InvalidateQuery();
 
             base.Visit(node);
         }
 
         public override void Visit(FilterTermNode node) {
-            if (!IsFieldNested(node.GetNameParts()))
+            if (!IsFieldNested(node.Field?.Split('.')))
                 return;
 
             node.Filter = new NestedFilter { Path = node.GetParentFullName(), Filter = node.Filter };
@@ -44,7 +44,7 @@ namespace Exceptionless.ElasticQueryParser.Visitors {
         }
 
         public override void Visit(QueryTermNode node) {
-            if (!IsFieldNested(node.GetNameParts()))
+            if (!IsFieldNested(node.Field?.Split('.')))
                 return;
 
             node.Query = new NestedQuery { Path = node.GetParentFullName(), Query = node.Query };
@@ -52,7 +52,7 @@ namespace Exceptionless.ElasticQueryParser.Visitors {
         }
 
         private bool IsFieldNested(string[] nameParts) {
-            if (_isNestedField == null || nameParts.Length == 0)
+            if (nameParts == null || _isNestedField == null || nameParts.Length == 0)
                 return false;
 
             string fieldName = String.Empty;
