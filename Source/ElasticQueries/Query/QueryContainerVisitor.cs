@@ -41,14 +41,14 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
             if (_config.IsFieldAnalyzed(node.GetFullName())) {
                 query = new QueryStringQuery {
                     Query = node.IsQuotedTerm ? "\"" + node.UnescapedTerm + "\"" : node.UnescapedTerm,
-                    DefaultField = node.GetDefaultField(_config.DefaultField),
+                    DefaultField = node.GetFullName() ?? _config.DefaultField,
                     AllowLeadingWildcard = false,
                     AnalyzeWildcard = true,
                     DefaultOperator = node.GetOperator(_config.DefaultQueryOperator)
                 };
             } else {
                 query = new TermQuery {
-                    Field = node.GetDefaultField(_config.DefaultField),
+                    Field = node.GetFullName(),
                     Value = node.UnescapedTerm
                 };
             }
@@ -56,7 +56,7 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
         }
 
         public override void Visit(QueryTermRangeNode node) {
-            var range = new RangeQuery { Field = node.Field };
+            var range = new RangeQuery { Field = node.GetFullName() };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                     range.GreaterThan = node.UnescapedMin;
@@ -76,13 +76,13 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
 
         public override void Visit(QueryExistsNode node) {
             node.Query = new FilteredQuery {
-                Filter = new ExistsFilter { Field = node.Field }.ToContainer()
+                Filter = new ExistsFilter { Field = node.GetFullName() }.ToContainer()
             };
         }
 
         public override void Visit(QueryMissingNode node) {
             node.Query = new FilteredQuery {
-                Filter = new MissingFilter { Field = node.Field }.ToContainer()
+                Filter = new MissingFilter { Field = node.GetFullName() }.ToContainer()
             };
         }
     }

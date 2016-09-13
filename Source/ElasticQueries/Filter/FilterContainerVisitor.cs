@@ -44,14 +44,14 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
             if (_config.IsFieldAnalyzed(node.GetFullName())) {
                 filter = new QueryFilter { Query = new QueryStringQuery {
                     Query = node.IsQuotedTerm ? "\"" + node.UnescapedTerm + "\"" : node.UnescapedTerm,
-                    DefaultField = node.GetDefaultField(_config.DefaultField),
+                    DefaultField = node.GetFullName() ?? _config.DefaultField,
                     AllowLeadingWildcard = false,
                     AnalyzeWildcard = true,
                     DefaultOperator = node.GetOperator(_config.DefaultFilterOperator)
                 }.ToContainer() };
             } else {
                 filter = new TermFilter {
-                    Field = node.GetFullName() ?? _config.DefaultField,
+                    Field = node.GetFullName(),
                     Value = node.UnescapedTerm
                 };
             }
@@ -63,7 +63,7 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
             if (node.Filter != null)
                 return;
 
-            var range = new RangeFilter { Field = node.Field };
+            var range = new RangeFilter { Field = node.GetFullName() };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                     range.GreaterThan = node.UnescapedMin;
@@ -85,14 +85,14 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
             if (node.Filter != null)
                 return;
 
-            node.Filter = new ExistsFilter { Field = node.Field };
+            node.Filter = new ExistsFilter { Field = node.GetFullName() };
         }
 
         public override void Visit(FilterMissingNode node) {
             if (node.Filter != null)
                 return;
 
-            node.Filter = new MissingFilter { Field = node.Field };
+            node.Filter = new MissingFilter { Field = node.GetFullName() };
         }
     }
 }
