@@ -42,13 +42,16 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
 
             FilterContainer filter = null;
             if (_config.IsFieldAnalyzed(node.GetFullName())) {
-                filter = new QueryFilter { Query = new QueryStringQuery {
-                    Query = node.IsQuotedTerm ? "\"" + node.UnescapedTerm + "\"" : node.UnescapedTerm,
-                    DefaultField = node.GetFullName() ?? _config.DefaultField,
-                    AllowLeadingWildcard = false,
-                    AnalyzeWildcard = true,
-                    DefaultOperator = node.GetOperator(_config.DefaultFilterOperator)
-                }.ToContainer() };
+                var q = new MatchQuery {
+                    Field = node.GetFullName() ?? _config.DefaultField,
+                    Query = node.UnescapedTerm
+                };
+                if (node.IsQuotedTerm)
+                    q.Type = "phrase";
+
+                filter = new QueryFilter {
+                    Query = q.ToContainer()
+                };
             } else {
                 filter = new TermFilter {
                     Field = node.GetFullName(),

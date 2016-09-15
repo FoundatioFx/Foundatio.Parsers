@@ -40,7 +40,11 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
 
         public static string GetFullName(this IQueryNode node) {
-            return String.Join(".", node.GetNameParts());
+            var parts = node.GetNameParts();
+            if (parts.Length == 0)
+                return null;
+
+            return String.Join(".", parts);
         }
         
         public static string GetParentFullName(this IQueryNode node) {

@@ -121,7 +121,7 @@ namespace Foundatio.Parsers.Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now"}, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticQueryParser(c => c.SetAnalyzedFieldFunc(f => f == "field3"));
+            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping));
             var result = processor.BuildQuery("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);
@@ -137,13 +137,14 @@ namespace Foundatio.Parsers.Tests {
             result = processor.BuildQuery("field3:hey");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             actualRequest = GetRequest(actualResponse);
-            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.QueryString(m => m
-                .DefaultField(f => f.Field3)
+            _logger.Info($"Actual: {actualRequest}");
+            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Match(m => m
+                .OnField(f => f.Field3)
                 .Query("hey")
-                .DefaultOperator(Operator.Or)
-                .AllowLeadingWildcard(false)
-                .AnalyzeWildcard())));
+                .Operator(Operator.Or)
+            )));
             expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -349,7 +350,7 @@ namespace Foundatio.Parsers.Tests {
             });
             client.Refresh();
 
-            var processor = new ElasticQueryParser(c => c.UseNested(n => n == "nested"));
+            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyNestedType))).Mapping).UseNested());
             var result = processor.BuildFilter("field1:value1 nested.field1:value1");
 
             var actualResponse = client.Search<MyNestedType>(d => d.Filter(result));
@@ -357,9 +358,9 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<MyNestedType>(d => d.Filter(f => f
-                .Term(m => m.Field1, "value1")
+                .Query(q => q.Match(m => m.OnField(e => e.Field1).Query("value1")))
                 && f.Nested(n => n.Path(p => p.Nested).Filter(f1 => f1
-                    .Term("nested.field1", "value1")))));
+                    .Query(q => q.Match(m => m.OnField("nested.field1").Query("value1")))))));
 
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
@@ -421,15 +422,16 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh();
 
             client.CreateIndex(i => i.Index("stuff"));
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
-            var res = client.Index(new MyType { Field1 = "value1", Field4 = 1 }, i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff").Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+            var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
             client.Refresh();
 
-            var aliasMap = new AliasMap { { "geo", "field4" } };
+            var aliasMap = new AliasMap { { "geo", "field3" } };
             var processor = new ElasticQueryParser(c => c
-                .UseGeo(l => "d", "field4")
+                .UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping)
+                .UseGeo(l => "d")
                 .UseAliases(aliasMap));
             var result = processor.BuildFilter("geo:[9 TO d] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi");
 
@@ -438,10 +440,10 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f =>
-                f.GeoBoundingBox(m => m.Field4, "9", "d")
-                || f.Term(m => m.Field1, "value1")
+                f.GeoBoundingBox(m => m.Field3, "9", "d")
+                || f.Query(m => m.Match(y => y.OnField(e => e.Field1).Query("value1")))
                 || f.Range(m => m.OnField(g => g.Field2).GreaterOrEquals(1).LowerOrEquals(4))
-                || !f.GeoDistance(m => m.Field4, e => e.Location("d").Distance("75mi"))));
+                || !f.GeoDistance(m => m.Field3, e => e.Location("d").Distance("75mi"))));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
