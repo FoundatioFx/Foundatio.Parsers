@@ -127,7 +127,7 @@ namespace Foundatio.Parsers.Tests {
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
 
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Term(m => m.Field1, "value1")));
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Match(e => e.OnField(m => m.Field1).Query("value1"))));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -141,7 +141,6 @@ namespace Foundatio.Parsers.Tests {
             expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Match(m => m
                 .OnField(f => f.Field3)
                 .Query("hey")
-                .Operator(Operator.Or)
             )));
             expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
@@ -375,9 +374,9 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
 
             expectedResponse = client.Search<MyNestedType>(d => d.Filter(f => f
-                .Term(m => m.Field1, "value1")
+                .Query(q => q.Match(m => m.OnField(e => e.Field1).Query("value1")))
                 && f.Nested(n => n.Path(p => p.Nested).Filter(f1 => f1
-                    .Term("nested.field1", "value1")
+                    .Query(q => q.Match(m => m.OnField("nested.field1").Query("value1")))
                     && f1.Term("nested.field4", "4")))));
 
             expectedRequest = GetRequest(expectedResponse);

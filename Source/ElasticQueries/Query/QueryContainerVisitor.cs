@@ -39,21 +39,30 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
         public override void Visit(QueryTermNode node) {
             PlainQuery query = null;
             if (_config.IsFieldAnalyzed(node.GetFullName())) {
-                var q = new MatchQuery {
-                    Field = node.GetFullName() ?? _config.DefaultField,
-                    Query = node.UnescapedTerm
-                };
+                if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
+                    query = new QueryStringQuery {
+                        DefaultField = node.GetFullName() ?? _config.DefaultField,
+                        AllowLeadingWildcard = false,
+                        AnalyzeWildcard = true,
+                        Query = node.UnescapedTerm
+                    };
+                } else {
+                    var q = new MatchQuery {
+                        Field = node.GetFullName() ?? _config.DefaultField,
+                        Query = node.UnescapedTerm
+                    };
+                    if (node.IsQuotedTerm)
+                        q.Type = "phrase";
 
-                if (node.IsQuotedTerm)
-                    q.Type = "phrase";
-
-                query = q;
+                    query = q;
+                }
             } else {
                 query = new TermQuery {
                     Field = node.GetFullName(),
                     Value = node.UnescapedTerm
                 };
             }
+
             node.Query = query;
         }
 
