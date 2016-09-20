@@ -59,25 +59,8 @@
   <ItemGroup>
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Filter\CombineFiltersVisitor.cs" />
-    <Compile Include="Filter\IElasticFilterNodeVisitor.cs" />
     <Compile Include="Query\CombineQueriesVisitor.cs" />
-    <Compile Include="Visitors\ElasticCombinedNodeVisitorBase.cs" />
     <Compile Include="Visitors\NestedVisitor.cs" />
-    <Compile Include="Filter\Nodes\ExistsNode.cs" />
-    <Compile Include="Filter\Nodes\GroupNode.cs" />
-    <Compile Include="Filter\Nodes\IElasticFilterNode.cs" />
-    <Compile Include="Filter\Nodes\MissingNode.cs" />
-    <Compile Include="Filter\Nodes\TermNode.cs" />
-    <Compile Include="Filter\Nodes\TermRangeNode.cs" />
-    <Compile Include="Filter\ElasticFilterNodeVisitorBase.cs" />
-    <Compile Include="Query\ElasticQueryNodeVisitorBase.cs" />
-    <Compile Include="Query\IElasticQueryNodeVisitor.cs" />
-    <Compile Include="Query\Nodes\ExistsNode.cs" />
-    <Compile Include="Query\Nodes\GroupNode.cs" />
-    <Compile Include="Query\Nodes\IElasticQueryNode.cs" />
-    <Compile Include="Query\Nodes\MissingNode.cs" />
-    <Compile Include="Query\Nodes\TermNode.cs" />
-    <Compile Include="Query\Nodes\TermRangeNode.cs" />
     <Compile Include="Query\QueryContainerVisitor.cs" />
     <Compile Include="Filter\FilterContainerVisitor.cs" />
     <Compile Include="Visitors\GeoVisitor.cs" />

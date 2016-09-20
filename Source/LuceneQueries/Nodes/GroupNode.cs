@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
-    public class GroupNode : QueryNodeBase {
+    public class GroupNode : QueryNodeBase, IFieldQueryNode {
         public IQueryNode Left { get; set; }
         public IQueryNode Right { get; set; }
         public GroupOperator Operator { get; set; } = GroupOperator.Default;

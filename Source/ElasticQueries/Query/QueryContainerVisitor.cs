@@ -1,26 +1,27 @@
 ﻿using System;
 using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.ElasticQueries.Query.Nodes;
 using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Query {
-    public class QueryContainerVisitor : ElasticQueryNodeVisitorBase {
+    public class QueryContainerVisitor : ChainableQueryVisitor {
         private readonly ElasticQueryParserConfiguration _config;
 
         public QueryContainerVisitor(ElasticQueryParserConfiguration config) {
             _config = config;
         }
 
-        public override void Visit(QueryGroupNode node) {
+        public override void Visit(GroupNode node) {
             QueryContainer query = null;
-            foreach (var child in node.Children.OfType<IElasticQueryNode>()) {
+            foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 child.Accept(this);
 
-                var childQuery = child.Query;
+                var childQuery = child.GetQuery();
                 var op = node.GetOperator(_config.DefaultQueryOperator);
-                if (child.IsNegated())
+                if (child.IsNodeNegated())
                     childQuery = !childQuery;
 
                 if (op == Operator.Or && !String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+")
@@ -33,10 +34,10 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
                 }
             }
 
-            node.Query = query;
+            node.SetQuery(query);
         }
 
-        public override void Visit(QueryTermNode node) {
+        public override void Visit(TermNode node) {
             PlainQuery query = null;
             if (_config.IsFieldAnalyzed(node.GetFullName())) {
                 if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
@@ -63,10 +64,10 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
                 };
             }
 
-            node.Query = query;
+            node.SetQuery(query);
         }
 
-        public override void Visit(QueryTermRangeNode node) {
+        public override void Visit(TermRangeNode node) {
             var range = new RangeQuery { Field = node.GetFullName() };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
@@ -82,19 +83,19 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
                     range.LowerThanOrEqualTo = node.UnescapedMax;
             }
 
-            node.Query = range;
+            node.SetQuery(range);
         }
 
-        public override void Visit(QueryExistsNode node) {
-            node.Query = new FilteredQuery {
+        public override void Visit(ExistsNode node) {
+            node.SetQuery(new FilteredQuery {
                 Filter = new ExistsFilter { Field = node.GetFullName() }.ToContainer()
-            };
+            });
         }
 
-        public override void Visit(QueryMissingNode node) {
-            node.Query = new FilteredQuery {
+        public override void Visit(MissingNode node) {
+            node.SetQuery(new FilteredQuery {
                 Filter = new MissingFilter { Field = node.GetFullName() }.ToContainer()
-            };
+            });
         }
     }
 }

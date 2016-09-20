@@ -2,9 +2,7 @@
 using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Filter;
-using Foundatio.Parsers.ElasticQueries.Filter.Nodes;
 using Foundatio.Parsers.ElasticQueries.Query;
-using Foundatio.Parsers.ElasticQueries.Query.Nodes;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
@@ -33,19 +31,17 @@ namespace Foundatio.Parsers.ElasticQueries {
         public FilterContainer BuildFilter(string query) {
             var result = _parser.Parse(query);
 
-            result = result.ToFilter() as FilterGroupNode;
-            var filterNode = _filterVisitor.Accept(result) as IElasticFilterNode;
+            var filterNode = _filterVisitor.Accept(result);
 
-            return filterNode?.Filter ?? new MatchAllFilter();
+            return filterNode?.GetFilter() ?? new MatchAllFilter();
         }
 
         public QueryContainer BuildQuery(string query) {
             var result = _parser.Parse(query);
 
-            result = result.ToQuery() as QueryGroupNode;
-            var queryNode = _queryVisitor.Accept(result) as IElasticQueryNode;
+            var queryNode = _queryVisitor.Accept(result);
 
-            return queryNode?.Query ?? new MatchAllQuery();
+            return queryNode?.GetQuery() ?? new MatchAllQuery();
         }
 
         // parser query, generate filter, generate aggregations

@@ -4,7 +4,7 @@ using System.Text;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
-    public class TermNode : QueryNodeBase {
+    public class TermNode : QueryNodeBase, IFieldQueryNode {
         public bool? IsNegated { get; set; }
         public string Prefix { get; set; }
         public string Field { get; set; }

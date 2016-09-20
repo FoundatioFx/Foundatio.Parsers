@@ -1,26 +1,27 @@
 ﻿using System;
 using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.ElasticQueries.Filter.Nodes;
 using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Filter {
-    public class FilterContainerVisitor : ElasticFilterNodeVisitorBase {
+    public class FilterContainerVisitor : ChainableQueryVisitor {
         private readonly ElasticQueryParserConfiguration _config;
 
         public FilterContainerVisitor(ElasticQueryParserConfiguration config) {
             _config = config;
         }
 
-        public override void Visit(FilterGroupNode node) {
+        public override void Visit(GroupNode node) {
             FilterContainer filter = null;
-            foreach (var child in node.Children.OfType<IElasticFilterNode>()) {
+            foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 child.Accept(this);
 
-                var childFilter = child.Filter;
+                var childFilter = child.GetFilter();
                 var op = node.GetOperator(_config.DefaultFilterOperator);
-                if (child.IsNegated())
+                if (child.IsNodeNegated())
                     childFilter = !childFilter;
                 
                 if (op == Operator.Or && !String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+")
@@ -33,11 +34,11 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
                 }
             }
 
-            node.Filter = filter;
+            node.SetFilter(filter);
         }
 
-        public override void Visit(FilterTermNode node) {
-            if (node.Filter != null)
+        public override void Visit(TermNode node) {
+            if (node.GetFilter() != null)
                 return;
 
             FilterContainer filter = null;
@@ -71,11 +72,11 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
                 };
             }
 
-            node.Filter = filter;
+            node.SetFilter(filter);
         }
 
-        public override void Visit(FilterTermRangeNode node) {
-            if (node.Filter != null)
+        public override void Visit(TermRangeNode node) {
+            if (node.GetFilter() != null)
                 return;
 
             var range = new RangeFilter { Field = node.GetFullName() };
@@ -93,21 +94,21 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
                     range.LowerThanOrEqualTo = node.UnescapedMax;
             }
 
-            node.Filter = range;
+            node.SetFilter(range);
         }
 
-        public override void Visit(FilterExistsNode node) {
-            if (node.Filter != null)
+        public override void Visit(ExistsNode node) {
+            if (node.GetFilter() != null)
                 return;
 
-            node.Filter = new ExistsFilter { Field = node.GetFullName() };
+            node.SetFilter(new ExistsFilter { Field = node.GetFullName() });
         }
 
-        public override void Visit(FilterMissingNode node) {
-            if (node.Filter != null)
+        public override void Visit(MissingNode node) {
+            if (node.GetFilter() != null)
                 return;
 
-            node.Filter = new MissingFilter { Field = node.GetFullName() };
+            node.SetFilter(new MissingFilter { Field = node.GetFullName() });
         }
     }
 }

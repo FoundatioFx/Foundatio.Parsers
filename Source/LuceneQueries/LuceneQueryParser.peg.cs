@@ -25,11 +25,6 @@ namespace
        Foundatio.Parsers.LuceneQueries.Nodes
         #line default
         ;
-    using
-        #line 5 "LuceneQueryParser.peg"
-       Foundatio.Parsers.LuceneQueries.Extensions
-        #line default
-        ;
 
     /// <summary>
     ///  Parses a string according to the rules of the <see cref="LuceneQueryParser" /> grammar.

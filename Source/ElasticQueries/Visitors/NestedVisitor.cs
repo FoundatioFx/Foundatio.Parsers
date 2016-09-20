@@ -1,53 +1,41 @@
 ﻿using System;
 using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.ElasticQueries.Filter.Nodes;
-using Foundatio.Parsers.ElasticQueries.Query.Nodes;
 using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class NestedVisitor: ElasticCombinedNodeVisitorBase {
+    public class NestedVisitor: ChainableQueryVisitor {
         private readonly Func<string, bool> _isNestedField;
 
         public NestedVisitor(Func<string, bool> isNestedField) {
             _isNestedField = isNestedField;
         }
 
-        public override void Visit(FilterGroupNode node) {
+        public override void Visit(GroupNode node) {
             if (!IsFieldNested(node.GetNameParts())) {
                 base.Visit(node);
                 return;
             }
 
-            node.Filter = new NestedFilter { Path = node.GetFullName(), Filter = node.Filter };
+            node.SetFilter(new NestedFilter { Path = node.GetFullName(), Filter = node.GetFilter() });
             node.Parent.InvalidateFilter();
 
-            base.Visit(node);
-        }
-
-        public override void Visit(QueryGroupNode node) {
-            if (!IsFieldNested(node.GetNameParts()))
-                return;
-
-            node.Query = new NestedQuery { Path = node.GetFullName(), Query = node.Query };
+            node.SetQuery(new NestedQuery { Path = node.GetFullName(), Query = node.GetQuery() });
             node.Parent.InvalidateQuery();
 
             base.Visit(node);
         }
 
-        public override void Visit(FilterTermNode node) {
+        public override void Visit(TermNode node) {
             if (!IsFieldNested(node.Field?.Split('.')))
                 return;
 
-            node.Filter = new NestedFilter { Path = node.GetParentFullName(), Filter = node.Filter };
+            node.SetFilter(new NestedFilter { Path = node.GetParentFullName(), Filter = node.GetFilter() });
             node.InvalidateFilter();
-        }
 
-        public override void Visit(QueryTermNode node) {
-            if (!IsFieldNested(node.Field?.Split('.')))
-                return;
-
-            node.Query = new NestedQuery { Path = node.GetParentFullName(), Query = node.Query };
+            node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQuery() });
             node.InvalidateQuery();
         }
 

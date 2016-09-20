@@ -1,7 +1,6 @@
 ﻿using System;
-using Foundatio.Parsers.ElasticQueries.Filter.Nodes;
-using Foundatio.Parsers.ElasticQueries.Query.Nodes;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
@@ -9,9 +8,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         public static void InvalidateFilter(this IQueryNode node) {
             IQueryNode current = node;
             while (current != null) {
-                var filterNode = current as FilterGroupNode;
-                if (filterNode != null)
-                    filterNode.Filter = null;
+                if (current is GroupNode)
+                    current.RemoveFilter();
 
                 current = current.Parent;
             }
@@ -20,9 +18,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         public static void InvalidateQuery(this IQueryNode node) {
             IQueryNode current = node;
             while (current != null) {
-                var filterNode = current as QueryGroupNode;
-                if (filterNode != null)
-                    filterNode.Query = null;
+                if (current is GroupNode)
+                    current.RemoveQuery();
 
                 current = current.Parent;
             }
@@ -43,104 +40,40 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             }
         }
 
-        public static IQueryNode ToFilter(this IQueryNode node) {
-            var groupNode = node as GroupNode;
-            if (groupNode != null) {
-                var filterNode = new FilterGroupNode();
-                groupNode.CopyTo(filterNode);
+        private const string FILTER_KEY = "@filter";
+        public static FilterContainer GetFilter(this IQueryNode node) {
+            object value = null;
+            if (!node.Meta.TryGetValue(FILTER_KEY, out value))
+                return null;
 
-                if (filterNode.Left != null) {
-                    filterNode.Left = filterNode.Left.ToFilter();
-                    filterNode.Left.Parent = filterNode;
-                }
-
-                if (filterNode.Right != null) {
-                    filterNode.Right = filterNode.Right.ToFilter();
-                    filterNode.Right.Parent = filterNode;
-                }
-
-                return filterNode;
-            }
-
-            var termNode = node as TermNode;
-            if (termNode != null) {
-                var filterNode = new FilterTermNode();
-                termNode.CopyTo(filterNode);
-                return filterNode;
-            }
-
-            var termRangeNode = node as TermRangeNode;
-            if (termRangeNode != null) {
-                var filterNode = new FilterTermRangeNode();
-                termRangeNode.CopyTo(filterNode);
-                return filterNode;
-            }
-
-            var missingNode = node as MissingNode;
-            if (missingNode != null) {
-                var filterNode = new FilterMissingNode();
-                missingNode.CopyTo(filterNode);
-                return filterNode;
-            }
-
-            var existsNode = node as ExistsNode;
-            if (existsNode != null) {
-                var filterNode = new FilterExistsNode();
-                existsNode.CopyTo(filterNode);
-                return filterNode;
-            }
-
-            return null;
+            return value as FilterContainer;
         }
 
-        public static IQueryNode ToQuery(this IQueryNode node) {
-            var groupNode = node as GroupNode;
-            if (groupNode != null) {
-                var queryNode = new QueryGroupNode();
-                groupNode.CopyTo(queryNode);
+        public static void SetFilter(this IQueryNode node, FilterContainer container) {
+            node.Meta[FILTER_KEY] = container;
+        }
 
-                if (queryNode.Left != null) {
-                    queryNode.Left = queryNode.Left.ToQuery();
-                    queryNode.Left.Parent = queryNode;
-                }
+        public static void RemoveFilter(this IQueryNode node) {
+            if (node.Meta.ContainsKey(FILTER_KEY))
+                node.Meta.Remove(FILTER_KEY);
+        }
 
-                if (queryNode.Right != null) {
-                    queryNode.Right = queryNode.Right.ToQuery();
-                    queryNode.Right.Parent = queryNode;
-                }
+        private const string QUERY_KEY = "@query";
+        public static QueryContainer GetQuery(this IQueryNode node) {
+            object value = null;
+            if (!node.Meta.TryGetValue(QUERY_KEY, out value))
+                return null;
 
-                return queryNode;
-            }
+            return value as QueryContainer;
+        }
 
-            var termNode = node as TermNode;
-            if (termNode != null) {
-                var queryNode = new QueryTermNode();
-                termNode.CopyTo(queryNode);
-                return queryNode;
-            }
+        public static void SetQuery(this IQueryNode node, QueryContainer container) {
+            node.Meta[QUERY_KEY] = container;
+        }
 
-            var termRangeNode = node as TermRangeNode;
-            if (termRangeNode != null) {
-                var queryNode = new QueryTermRangeNode();
-                termRangeNode.CopyTo(queryNode);
-                return queryNode;
-            }
-
-            var missingNode = node as MissingNode;
-            if (missingNode != null) {
-                var queryNode = new QueryMissingNode();
-                missingNode.CopyTo(queryNode);
-                return queryNode;
-            }
-
-            var existsNode = node as ExistsNode;
-            if (existsNode != null) {
-                var queryNode = new QueryExistsNode();
-                existsNode.CopyTo(queryNode);
-                return queryNode;
-            }
-
-            return null;
+        public static void RemoveQuery(this IQueryNode node) {
+            if (node.Meta.ContainsKey(QUERY_KEY))
+                node.Meta.Remove(QUERY_KEY);
         }
     }
 }

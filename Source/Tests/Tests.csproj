@@ -107,6 +107,7 @@
     <Otherwise />
   </Choose>
   <ItemGroup>
+    <Compile Include="AliasedQueryVisitorTests.cs" />
     <Compile Include="GenerateQueryVisitorTests.cs" />
     <Compile Include="QueryParserTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

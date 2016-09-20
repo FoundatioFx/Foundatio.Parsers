@@ -2,16 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class QueryNodeExtensions {
-        public static string GetDefaultField(this IQueryNode node, string defaultField) {
-            var field = node.GetField();
+        public static string GetDefaultField(this IFieldQueryNode node, string defaultField) {
+            var field = node.Field;
 
             if (!String.IsNullOrEmpty(field))
                 return field;
 
-            var current = node;
+            IQueryNode current = node;
             while (current != null) {
                 var groupNode = node as GroupNode;
                 if (groupNode != null && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field))
@@ -23,15 +24,15 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return defaultField;
         }
 
-        public static string[] GetNameParts(this IQueryNode node) {
+        public static string[] GetNameParts(this IFieldQueryNode node) {
             var nameParts = new List<string>();
             var current = node;
             while (current != null) {
-                var field = current.GetField();
+                var field = current.Field;
                 if (field != null)
                     nameParts.AddRange(field.Split('.').Reverse());
 
-                current = current.Parent;
+                current = current.Parent as IFieldQueryNode;
             }
 
             nameParts.Reverse();
@@ -39,7 +40,20 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return nameParts.ToArray();
         }
 
-        public static string GetFullName(this IQueryNode node) {
+        public static IFieldQueryNode[] GetFieldNodes(this IFieldQueryNode node) {
+            var nodes = new List<IFieldQueryNode>();
+            var current = node;
+            while (current != null) {
+                nodes.Add(current);
+                current = current.Parent as IFieldQueryNode;
+            }
+
+            nodes.Reverse();
+
+            return nodes.ToArray();
+        }
+
+        public static string GetFullName(this IFieldQueryNode node) {
             var parts = node.GetNameParts();
             if (parts.Length == 0)
                 return null;
@@ -47,57 +61,26 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return String.Join(".", parts);
         }
         
-        public static string GetParentFullName(this IQueryNode node) {
+        public static string GetParentFullName(this IFieldQueryNode node) {
             var nameParts = node.GetNameParts();
             return String.Join(".", nameParts.Take(nameParts.Length - 1));
         }
 
-        public static string GetField(this IQueryNode node) {
-            var groupNode = node as GroupNode;
-            if (groupNode != null)
-                return groupNode.Field;
-
-            var termNode = node as TermNode;
-            if (termNode != null)
-                return termNode.Field;
-
-            var termRangeNode = node as TermRangeNode;
-            if (termRangeNode != null)
-                return termRangeNode.Field;
-
-            var missingNode = node as MissingNode;
-            if (missingNode != null)
-                return missingNode.Field;
-
-            var existsNode = node as ExistsNode;
-            if (existsNode != null)
-                return existsNode.Field;
-
-            return null;
+        public static bool IsNodeNegated(this IFieldQueryNode node) {
+            return (node.IsNegated.HasValue && node.IsNegated.Value == true) || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-");
         }
 
-        public static bool IsNegated(this IQueryNode node) {
-            var groupNode = node as GroupNode;
-            if (groupNode != null)
-                return (groupNode.IsNegated.HasValue && groupNode.IsNegated.Value == true) || (!String.IsNullOrEmpty(groupNode.Prefix) && groupNode.Prefix == "-");
+        private const string ALIASRESOLVER_KEY = "@aliasresolver";
+        public static AliasResolver GetAliasResolver(this IQueryNode node) {
+            object value = null;
+            if (!node.Meta.TryGetValue(ALIASRESOLVER_KEY, out value))
+                return null;
 
-            var termNode = node as TermNode;
-            if (termNode != null)
-                return (termNode.IsNegated.HasValue && termNode.IsNegated.Value == true) || (!String.IsNullOrEmpty(termNode.Prefix) && termNode.Prefix == "-");
+            return value as AliasResolver;
+        }
 
-            var termRangeNode = node as TermRangeNode;
-            if (termRangeNode != null)
-                return (termRangeNode.IsNegated.HasValue && termRangeNode.IsNegated.Value == true) || (!String.IsNullOrEmpty(termRangeNode.Prefix) && termRangeNode.Prefix == "-");
-
-            var missingNode = node as MissingNode;
-            if (missingNode != null)
-                return (missingNode.IsNegated.HasValue && missingNode.IsNegated.Value == true) || (!String.IsNullOrEmpty(missingNode.Prefix) && missingNode.Prefix == "-");
-
-            var existsNode = node as ExistsNode;
-            if (existsNode != null)
-                return (existsNode.IsNegated.HasValue && existsNode.IsNegated.Value == true) || (!String.IsNullOrEmpty(existsNode.Prefix) && existsNode.Prefix == "-");
-
-            return false;
+        public static void SetAliasResolver(this IQueryNode node, AliasResolver resolver) {
+            node.Meta[ALIASRESOLVER_KEY] = resolver;
         }
     }
 }

@@ -450,46 +450,6 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-        [Fact]
-        public void CanUseAliases() {
-            var parser = new LuceneQueryParser();
-            var result = parser.Parse("field1:value");
-            var aliasMap = new AliasMap { { "field1", "field2" } };
-            var aliased = AliasedQueryVisitor.Run(result, aliasMap);
-            Assert.Equal("field2:value", aliased.ToString());
-
-            result = parser.Parse("field1.nested:value");
-            aliasMap = new AliasMap {
-                { "field1", new AliasMapValue { Name = "field2", ChildMap = { { "nested", "other" } } } }
-            };
-            aliased = AliasedQueryVisitor.Run(result, aliasMap);
-            Assert.Equal("field2.other:value", aliased.ToString());
-
-            result = parser.Parse("field1.nested:value");
-            aliasMap = new AliasMap {
-                { "field1", new AliasMapValue { Name = "field2", ChildMap = { { "stuff", "other" } } } }
-            };
-            aliased = AliasedQueryVisitor.Run(result, aliasMap);
-            Assert.Equal("field2.nested:value", aliased.ToString());
-
-            result = parser.Parse("field1.nested.morenested:value");
-            aliasMap = new AliasMap {
-                { "field1", new AliasMapValue { Name = "field2", ChildMap = { { "stuff", "other" } } } }
-            };
-            aliased = AliasedQueryVisitor.Run(result, aliasMap);
-            Assert.Equal("field2.nested.morenested:value", aliased.ToString());
-
-            result = parser.Parse("field1:(nested:value OR thing:yep) another:works");
-            aliasMap = new AliasMap {
-                {
-                    "field1",
-                    new AliasMapValue { Name = "field2", ChildMap = { { "nested", "other" }, { "thing", "nice" } } }
-                }
-            };
-            aliased = AliasedQueryVisitor.Run(result, aliasMap);
-            Assert.Equal("field2:(other:value OR nice:yep) another:works", aliased.ToString());
-        }
-
         public static string GetRequest(IResponseWithRequestInformation response) {
             var requestUrl = new Uri(response.RequestInformation.RequestUrl);
             return $"{response.RequestInformation.RequestMethod.ToUpper()} {requestUrl.PathAndQuery}\r\n{Encoding.UTF8.GetString(response.RequestInformation.Request)}\r\n";

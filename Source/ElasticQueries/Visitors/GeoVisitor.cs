@@ -1,10 +1,11 @@
 ﻿using System;
-using Foundatio.Parsers.ElasticQueries.Filter.Nodes;
-using Foundatio.Parsers.ElasticQueries.Query.Nodes;
+using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class GeoVisitor: ElasticCombinedNodeVisitorBase {
+    public class GeoVisitor: ChainableQueryVisitor {
         private readonly Func<string, bool> _isGeoField;
         private readonly Func<string, string> _resolveGeoLocation;
 
@@ -13,38 +14,23 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             _resolveGeoLocation = resolveGeoLocation;
         }
 
-        public override void Visit(FilterTermNode node) {
+        public override void Visit(TermNode node) {
             if (!_isGeoField(node.Field))
                 return;
 
             string location = _resolveGeoLocation != null ? _resolveGeoLocation(node.Term) ?? node.Term : node.Term;
-            node.Filter = new GeoDistanceFilter { Field = node.Field, Location = location, Distance = node.Proximity };
+            var filter = new GeoDistanceFilter { Field = node.Field, Location = location, Distance = node.Proximity };
+            node.SetFilter(filter);
+            node.SetQuery(new FilteredQuery { Filter = filter.ToContainer() });
         }
 
-        public override void Visit(FilterTermRangeNode node) {
+        public override void Visit(TermRangeNode node) {
             if (!_isGeoField(node.Field))
                 return;
 
-            node.Filter = new GeoBoundingBoxFilter { TopLeft = node.Min, BottomRight = node.Max, Field = node.Field };
-        }
-
-        public override void Visit(QueryTermNode node) {
-            if (!_isGeoField(node.Field))
-                return;
-
-            string location = _resolveGeoLocation != null ? _resolveGeoLocation(node.Term) ?? node.Term : node.Term;
-            node.Query = new FilteredQuery {
-                Filter = new GeoDistanceFilter { Field = node.Field, Location = location, Distance = node.Proximity }.ToContainer()
-            };
-        }
-
-        public override void Visit(QueryTermRangeNode node) {
-            if (!_isGeoField(node.Field))
-                return;
-
-            node.Query = new FilteredQuery {
-                Filter = new GeoBoundingBoxFilter { TopLeft = node.Min, BottomRight = node.Max, Field = node.Field }.ToContainer()
-            };
+            var filter = new GeoBoundingBoxFilter { TopLeft = node.Min, BottomRight = node.Max, Field = node.Field };
+            node.SetFilter(filter);
+            node.SetQuery(new FilteredQuery { Filter = filter.ToContainer() });
         }
     }
 }

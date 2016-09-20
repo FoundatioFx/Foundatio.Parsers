@@ -17,12 +17,11 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
                 visitor.Visit((ExistsNode)this);
         }
 
-        public abstract override string ToString();
-
+        public IDictionary<string, object> Meta { get; } = new Dictionary<string, object>();
         public abstract IList<IQueryNode> Children { get; }
-
-        public GroupNode Parent { get; set; }
-
+        public IQueryNode Parent { get; set; }
         public static readonly IList<IQueryNode> EmptyNodeList = new List<IQueryNode>().AsReadOnly();
+
+        public abstract override string ToString();
     }
 }

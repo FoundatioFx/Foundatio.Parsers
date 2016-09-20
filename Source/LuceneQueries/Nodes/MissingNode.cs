@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
-    public class MissingNode : QueryNodeBase {
+    public class MissingNode : QueryNodeBase, IFieldQueryNode {
         public bool? IsNegated { get; set; }
         public string Prefix { get; set; }
         public string Field { get; set; }

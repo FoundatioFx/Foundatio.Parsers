@@ -1,29 +1,30 @@
 ﻿using System;
 using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.ElasticQueries.Query.Nodes;
 using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Query {
-    public class CombineQueriesVisitor : ElasticQueryNodeVisitorBase {
+    public class CombineQueriesVisitor : ChainableQueryVisitor {
         private readonly ElasticQueryParserConfiguration _config;
 
         public CombineQueriesVisitor(ElasticQueryParserConfiguration config) {
             _config = config;
         }
 
-        public override void Visit(QueryGroupNode node) {
-            if (node.Query != null) {
+        public override void Visit(GroupNode node) {
+            if (node.GetQuery() != null) {
                 base.Visit(node);
                 return;
             }
 
             QueryContainer query = null;
-            foreach (var child in node.Children.OfType<IElasticQueryNode>()) {
-                var childQuery = child.Query;
+            foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
+                var childQuery = child.GetQuery();
                 var op = node.GetOperator(_config.DefaultQueryOperator);
-                if (child.IsNegated())
+                if (child.IsNodeNegated())
                     childQuery = !childQuery;
 
                 if (op == Operator.Or && !String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+")
@@ -36,7 +37,7 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
                 }
             }
 
-            node.Query = query;
+            node.SetQuery(query);
             base.Visit(node);
         }
     }
