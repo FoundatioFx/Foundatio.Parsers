@@ -4,20 +4,20 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
-    public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorWithResultBase<ISet<String>> {
+    public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorWithResultBase<ISet<string>> {
         private readonly HashSet<string> _fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        public override void Visit(GroupNode node) {
+        public override void Visit(GroupNode node, IQueryVisitorContext context) {
             if (!String.IsNullOrEmpty(node.Field))
                 _fields.Add(node.GetFullName());
         }
 
-        public override void Visit(TermNode node) {
+        public override void Visit(TermNode node, IQueryVisitorContext context) {
             if (!String.IsNullOrEmpty(node.Field))
                 _fields.Add(node.GetFullName());
         }
 
-        public override void Visit(TermRangeNode node) {
+        public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
             if (!String.IsNullOrEmpty(node.Field)) {
                 _fields.Add(node.GetFullName());
             } else {
@@ -27,23 +27,23 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             }
         }
 
-        public override void Visit(ExistsNode node) {
+        public override void Visit(ExistsNode node, IQueryVisitorContext context) {
             if (!String.IsNullOrEmpty(node.Field))
                 _fields.Add(node.GetFullName());
         }
 
-        public override void Visit(MissingNode node) {
+        public override void Visit(MissingNode node, IQueryVisitorContext context) {
             if (!String.IsNullOrEmpty(node.Field))
                 _fields.Add(node.GetFullName());
         }
 
-        public override ISet<string> Accept(IQueryNode node) {
-            node.Accept(this);
+        public override ISet<string> Accept(IQueryNode node, IQueryVisitorContext context) {
+            node.Accept(this, context);
             return _fields;
         }
 
         public static ISet<string> Run(IQueryNode node) {
-            return new GetReferencedFieldsQueryVisitor().Accept(node);
+            return new GetReferencedFieldsQueryVisitor().Accept(node, null);
         }
     }
 }

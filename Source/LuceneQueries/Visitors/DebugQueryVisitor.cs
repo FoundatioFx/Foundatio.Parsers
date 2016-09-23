@@ -14,7 +14,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer = new IndentedTextWriter(new StringWriter(_builder));
         }
 
-        public override void Visit(GroupNode node) {
+        public override void Visit(GroupNode node, IQueryVisitorContext context) {
             _writer.WriteLine("Group:");
             _writer.Indent++;
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
@@ -22,10 +22,10 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
 
             _writer.WriteIf(node.Left != null, "Left - ");
-            node.Left?.Accept(this);
+            node.Left?.Accept(this, context);
 
             _writer.WriteIf(node.Right != null, "Right - ");
-            node.Right?.Accept(this);
+            node.Right?.Accept(this, context);
 
             _writer.WriteLineIf(node.Operator != GroupOperator.Default, "Operator: {0}", node.Operator);
             _writer.WriteLineIf(node.HasParens, "Parens: true");
@@ -33,7 +33,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.Indent--;
         }
 
-        public override void Visit(TermNode node) {
+        public override void Visit(TermNode node, IQueryVisitorContext context) {
             _writer.WriteLine("Term: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
@@ -47,7 +47,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.Indent--;
         }
 
-        public override void Visit(TermRangeNode node) {
+        public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
             _writer.WriteLine("Term Range: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
@@ -62,7 +62,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.Indent--;
         }
 
-        public override void Visit(ExistsNode node) {
+        public override void Visit(ExistsNode node, IQueryVisitorContext context) {
             _writer.WriteLine("Exists: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
@@ -72,7 +72,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.Indent--;
         }
 
-        public override void Visit(MissingNode node) {
+        public override void Visit(MissingNode node, IQueryVisitorContext context) {
             _writer.WriteLine("Missing: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
@@ -82,13 +82,13 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.Indent--;
         }
 
-        public override string Accept(IQueryNode node) {
-            node.Accept(this);
+        public override string Accept(IQueryNode node, IQueryVisitorContext context) {
+            node.Accept(this, context);
             return _builder.ToString();
         }
 
         public static string Run(IQueryNode node) {
-            return new DebugQueryVisitor().Accept(node);
+            return new DebugQueryVisitor().Accept(node, null);
         }
     }
 }

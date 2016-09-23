@@ -5,8 +5,8 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public interface IQueryNode {
         IQueryNode Parent { get; set; }
         IList<IQueryNode> Children { get; }
-        IDictionary<string, object> Meta { get; }
-        void Accept(IQueryNodeVisitor visitor);
+        IDictionary<string, object> Data { get; }
+        void Accept(IQueryNodeVisitor visitor, IQueryVisitorContext context);
         string ToString();
     }
 

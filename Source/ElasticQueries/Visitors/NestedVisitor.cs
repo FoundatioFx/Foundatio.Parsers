@@ -13,19 +13,19 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             _isNestedField = isNestedField;
         }
 
-        public override void Visit(GroupNode node) {
+        public override void Visit(GroupNode node, IQueryVisitorContext context) {
             if (!IsFieldNested(node.GetNameParts())) {
-                base.Visit(node);
+                base.Visit(node, context);
                 return;
             }
 
             node.SetQuery(new NestedQuery { Path = node.GetFullName(), Query = node.GetQuery() });
             node.Parent.InvalidateQuery();
 
-            base.Visit(node);
+            base.Visit(node, context);
         }
 
-        public override void Visit(TermNode node) {
+        public override void Visit(TermNode node, IQueryVisitorContext context) {
             if (!IsFieldNested(node.Field?.Split('.')))
                 return;
 

@@ -19,12 +19,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _isSorted = false;
         }
 
-        public override IQueryNode Accept(IQueryNode node) {
+        public override IQueryNode Accept(IQueryNode node, IQueryVisitorContext context) {
             if (!_isSorted)
                 _visitors.Sort(QueryVisitorWithPriority.PriorityComparer.Instance);
 
             foreach (var visitor in _visitors)
-                visitor.Accept(node);
+                visitor.Accept(node, context);
 
             return node;
         }

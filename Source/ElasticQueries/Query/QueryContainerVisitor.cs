@@ -14,13 +14,13 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
             _config = config;
         }
 
-        public override void Visit(GroupNode node) {
+        public override void Visit(GroupNode node, IQueryVisitorContext context) {
             QueryBase query = null;
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
-                child.Accept(this);
+                child.Accept(this, context);
 
                 var childQuery = child.GetQuery();
-                var op = node.GetOperator(_config.DefaultQueryOperator);
+                var op = node.GetOperator(context.GetDefaultOperator());
                 if (child.IsNodeNegated())
                     childQuery = !childQuery;
 
@@ -37,9 +37,9 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
             node.SetQuery(query);
         }
 
-        public override void Visit(TermNode node) {
+        public override void Visit(TermNode node, IQueryVisitorContext context) {
             QueryBase query = null;
-            if (_config.IsFieldAnalyzed(node.GetFullName())) {
+            if (_config.IsPropertyAnalyzed(node.GetFullName())) {
                 if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
                     query = new QueryStringQuery {
                         DefaultField = node.GetFullName() ?? _config.DefaultField,
@@ -73,7 +73,7 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
             node.SetQuery(query);
         }
 
-        public override void Visit(TermRangeNode node) {
+        public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
             var range = new TermRangeQuery { Field = node.GetFullName() };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
@@ -92,13 +92,13 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
             node.SetQuery(range);
         }
 
-        public override void Visit(ExistsNode node) {
+        public override void Visit(ExistsNode node, IQueryVisitorContext context) {
             node.SetQuery(new ExistsQuery {
                 Field = node.GetFullName()
             });
         }
 
-        public override void Visit(MissingNode node) {
+        public override void Visit(MissingNode node, IQueryVisitorContext context) {
             node.SetQuery(new MissingQuery {
                 Field = node.GetFullName()
             });

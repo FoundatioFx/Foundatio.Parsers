@@ -12,14 +12,12 @@ namespace Foundatio.Parsers.ElasticQueries {
         private readonly SortedSet<QueryVisitorWithPriority> _visitors = new SortedSet<QueryVisitorWithPriority>(new QueryVisitorWithPriority.PriorityComparer());
 
         public string DefaultField { get; private set; } = "_all";
-        public Operator DefaultFilterOperator { get; private set; } = Operator.And;
-        public Operator DefaultQueryOperator { get; private set; } = Operator.Or;
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
         public ITypeMapping Mapping { get; set; }
         private Func<ITypeMapping> UpdateMappingFunc { get; set; }
         private DateTime? _lastMappingUpdate = null;
 
-        public IProperty GetFieldProperty(string field) {
+        public IProperty GetMappingProperty(string field) {
             if (String.IsNullOrEmpty(field) || Mapping == null)
                 return null;
 
@@ -70,45 +68,35 @@ namespace Foundatio.Parsers.ElasticQueries {
             return true;
         }
 
-        public bool IsFieldAnalyzed(string field) {
+        public bool IsPropertyAnalyzed(string field) {
             if (String.IsNullOrEmpty(field))
                 return true;
 
-            var mapping = GetFieldProperty(field) as TextProperty;
+            var mapping = GetMappingProperty(field) as TextProperty;
             if (mapping == null)
                 return false;
 
             return !mapping.Index.HasValue || mapping.Index.Value;
         }
 
-        private bool IsNestedFieldType(string field) {
+        private bool IsNestedPropertyType(string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = GetFieldProperty(field) as ObjectProperty;
+            var mapping = GetMappingProperty(field) as NestedProperty;
             return mapping != null;
         }
 
-        private bool IsGeoFieldType(string field) {
+        private bool IsGeoPropertyType(string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = GetFieldProperty(field) as GeoPointProperty;
+            var mapping = GetMappingProperty(field) as GeoPointProperty;
             return mapping != null;
         }
 
         public ElasticQueryParserConfiguration SetDefaultField(string field) {
             DefaultField = field;
-            return this;
-        }
-
-        public ElasticQueryParserConfiguration SetDefaultFilterOperator(Operator op) {
-            DefaultFilterOperator = op;
-            return this;
-        }
-
-        public ElasticQueryParserConfiguration SetDefaultQueryOperator(Operator op) {
-            DefaultQueryOperator = op;
             return this;
         }
 
@@ -138,11 +126,11 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 10) {
-            return AddVisitor(new GeoVisitor(IsGeoFieldType, resolveGeoLocation), priority);
+            return AddVisitor(new GeoVisitor(IsGeoPropertyType, resolveGeoLocation), priority);
         }
 
         public ElasticQueryParserConfiguration UseNested(int priority = 1000) {
-            return AddVisitor(new NestedVisitor(IsNestedFieldType), priority);
+            return AddVisitor(new NestedVisitor(IsNestedPropertyType), priority);
         }
     }
 }

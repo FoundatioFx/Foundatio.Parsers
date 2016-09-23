@@ -14,16 +14,16 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
             _config = config;
         }
 
-        public override void Visit(GroupNode node) {
+        public override void Visit(GroupNode node, IQueryVisitorContext context) {
             if (node.GetQuery() != null) {
-                base.Visit(node);
+                base.Visit(node, context);
                 return;
             }
 
             QueryBase query = null;
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 var childQuery = child.GetQuery();
-                var op = node.GetOperator(_config.DefaultQueryOperator);
+                var op = node.GetOperator(context.GetDefaultOperator());
                 if (child.IsNodeNegated())
                     childQuery = !childQuery;
 
@@ -38,7 +38,7 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
             }
 
             node.SetQuery(query);
-            base.Visit(node);
+            base.Visit(node, context);
         }
     }
 }

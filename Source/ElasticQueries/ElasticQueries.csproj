@@ -59,6 +59,7 @@
   <ItemGroup>
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Query\CombineQueriesVisitor.cs" />
+    <Compile Include="Visitors\ElasticQueryVisitorContext.cs" />
     <Compile Include="Visitors\NestedVisitor.cs" />
     <Compile Include="Query\QueryContainerVisitor.cs" />
     <Compile Include="Visitors\GeoVisitor.cs" />
