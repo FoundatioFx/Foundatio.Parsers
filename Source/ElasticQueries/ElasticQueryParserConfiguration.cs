@@ -15,31 +15,31 @@ namespace Foundatio.Parsers.ElasticQueries {
         public Operator DefaultFilterOperator { get; private set; } = Operator.And;
         public Operator DefaultQueryOperator { get; private set; } = Operator.Or;
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
-        public RootObjectMapping Mapping { get; set; }
-        private Func<RootObjectMapping> UpdateMappingFunc { get; set; }
+        public ITypeMapping Mapping { get; set; }
+        private Func<ITypeMapping> UpdateMappingFunc { get; set; }
         private DateTime? _lastMappingUpdate = null;
 
-        public IElasticType GetFieldMapping(string field) {
+        public IProperty GetFieldProperty(string field) {
             if (String.IsNullOrEmpty(field) || Mapping == null)
                 return null;
 
             string[] fieldParts = field.Split('.');
-            ObjectMapping currentObject = Mapping;
+            IProperties currentProperties = Mapping.Properties;
 
             for (int depth = 0; depth < fieldParts.Length; depth++) {
                 string fieldPart = fieldParts[depth];
-                IElasticType fieldMapping = null;
-                if (currentObject.Properties == null || !currentObject.Properties.TryGetValue(fieldPart, out fieldMapping)) {
+                IProperty fieldMapping = null;
+                if (currentProperties == null || !currentProperties.TryGetValue(fieldPart, out fieldMapping)) {
                     // check to see if there is an index_name match
-                    if (currentObject.Properties != null)
-                        fieldMapping = currentObject.Properties.Values
-                            .OfType<IElasticCoreType>()
+                    if (currentProperties != null)
+                        fieldMapping = currentProperties
+                            .Select(m => m.Value)
                             .FirstOrDefault(m => m.IndexName == fieldPart);
 
                     if (fieldMapping == null && UpdateMapping()) {
                         // we have updated mapping, start over from the top
                         depth = -1;
-                        currentObject = Mapping;
+                        currentProperties = Mapping.Properties;
                         continue;
                     }
 
@@ -50,8 +50,9 @@ namespace Foundatio.Parsers.ElasticQueries {
                 if (depth == fieldParts.Length - 1)
                     return fieldMapping;
 
-                if (fieldMapping is ObjectMapping)
-                    currentObject = fieldMapping as ObjectMapping;
+                var objectProperty = fieldMapping as ObjectProperty;
+                if (objectProperty != null)
+                    currentProperties = objectProperty.Properties;
                 else
                     return null;
             }
@@ -73,18 +74,18 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (String.IsNullOrEmpty(field))
                 return true;
 
-            var mapping = GetFieldMapping(field) as StringMapping;
+            var mapping = GetFieldProperty(field) as TextProperty;
             if (mapping == null)
                 return false;
 
-            return mapping.Index == FieldIndexOption.Analyzed || mapping.Index == null;
+            return !mapping.Index.HasValue || mapping.Index.Value;
         }
 
         private bool IsNestedFieldType(string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = GetFieldMapping(field) as NestedObjectMapping;
+            var mapping = GetFieldProperty(field) as ObjectProperty;
             return mapping != null;
         }
 
@@ -92,7 +93,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = GetFieldMapping(field) as GeoPointMapping;
+            var mapping = GetFieldProperty(field) as GeoPointProperty;
             return mapping != null;
         }
 
@@ -111,16 +112,16 @@ namespace Foundatio.Parsers.ElasticQueries {
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseMappings<T>(Func<PutMappingDescriptor<T>, PutMappingDescriptor<T>> mappingBuilder, Func<RootObjectMapping> getMapping) where T : class {
-            var descriptor = new PutMappingDescriptor<T>(new ConnectionSettings());
+        public ElasticQueryParserConfiguration UseMappings<T>(Func<PutMappingDescriptor<T>, PutMappingDescriptor<T>> mappingBuilder, Func<ITypeMapping> getMapping) where T : class {
+            var descriptor = new PutMappingDescriptor<T>();
             descriptor = mappingBuilder(descriptor);
-            Mapping = ((IPutMappingRequest<T>)descriptor).Mapping;
+            Mapping = descriptor;
             UpdateMappingFunc = getMapping;
 
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseMappings(Func<RootObjectMapping> getMapping) {
+        public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping) {
             Mapping = getMapping();
             UpdateMappingFunc = getMapping;
 

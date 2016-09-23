@@ -15,7 +15,7 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
         }
 
         public override void Visit(GroupNode node) {
-            QueryContainer query = null;
+            QueryBase query = null;
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 child.Accept(this);
 
@@ -38,7 +38,7 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
         }
 
         public override void Visit(TermNode node) {
-            PlainQuery query = null;
+            QueryBase query = null;
             if (_config.IsFieldAnalyzed(node.GetFullName())) {
                 if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
                     query = new QueryStringQuery {
@@ -48,12 +48,18 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
                         Query = node.UnescapedTerm
                     };
                 } else {
-                    var q = new MatchQuery {
-                        Field = node.GetFullName() ?? _config.DefaultField,
-                        Query = node.UnescapedTerm
-                    };
-                    if (node.IsQuotedTerm)
-                        q.Type = "phrase";
+                    QueryBase q;
+                    if (node.IsQuotedTerm) {
+                        q = new MatchPhraseQuery {
+                            Field = node.GetFullName() ?? _config.DefaultField,
+                            Query = node.UnescapedTerm
+                        };
+                    } else {
+                        q = new MatchQuery {
+                            Field = node.GetFullName() ?? _config.DefaultField,
+                            Query = node.UnescapedTerm
+                        };
+                    }
 
                     query = q;
                 }
@@ -68,7 +74,7 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
         }
 
         public override void Visit(TermRangeNode node) {
-            var range = new RangeQuery { Field = node.GetFullName() };
+            var range = new TermRangeQuery { Field = node.GetFullName() };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                     range.GreaterThan = node.UnescapedMin;
@@ -78,23 +84,23 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
 
             if (!String.IsNullOrWhiteSpace(node.UnescapedMax)) {
                 if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
-                    range.LowerThan = node.UnescapedMax;
+                    range.LessThan = node.UnescapedMax;
                 else
-                    range.LowerThanOrEqualTo = node.UnescapedMax;
+                    range.LessThanOrEqualTo = node.UnescapedMax;
             }
 
             node.SetQuery(range);
         }
 
         public override void Visit(ExistsNode node) {
-            node.SetQuery(new FilteredQuery {
-                Filter = new ExistsFilter { Field = node.GetFullName() }.ToContainer()
+            node.SetQuery(new ExistsQuery {
+                Field = node.GetFullName()
             });
         }
 
         public override void Visit(MissingNode node) {
-            node.SetQuery(new FilteredQuery {
-                Filter = new MissingFilter { Field = node.GetFullName() }.ToContainer()
+            node.SetQuery(new MissingQuery {
+                Field = node.GetFullName()
             });
         }
     }

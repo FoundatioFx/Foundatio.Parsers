@@ -20,7 +20,7 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
                 return;
             }
 
-            QueryContainer query = null;
+            QueryBase query = null;
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 var childQuery = child.GetQuery();
                 var op = node.GetOperator(_config.DefaultQueryOperator);

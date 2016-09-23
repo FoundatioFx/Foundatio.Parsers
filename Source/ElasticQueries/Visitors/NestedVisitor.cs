@@ -19,9 +19,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return;
             }
 
-            node.SetFilter(new NestedFilter { Path = node.GetFullName(), Filter = node.GetFilter() });
-            node.Parent.InvalidateFilter();
-
             node.SetQuery(new NestedQuery { Path = node.GetFullName(), Query = node.GetQuery() });
             node.Parent.InvalidateQuery();
 
@@ -31,9 +28,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override void Visit(TermNode node) {
             if (!IsFieldNested(node.Field?.Split('.')))
                 return;
-
-            node.SetFilter(new NestedFilter { Path = node.GetParentFullName(), Filter = node.GetFilter() });
-            node.InvalidateFilter();
 
             node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQuery() });
             node.InvalidateQuery();

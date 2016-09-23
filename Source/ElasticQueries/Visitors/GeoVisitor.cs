@@ -19,18 +19,16 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return;
 
             string location = _resolveGeoLocation != null ? _resolveGeoLocation(node.Term) ?? node.Term : node.Term;
-            var filter = new GeoDistanceFilter { Field = node.Field, Location = location, Distance = node.Proximity };
-            node.SetFilter(filter);
-            node.SetQuery(new FilteredQuery { Filter = filter.ToContainer() });
+            var query = new GeoDistanceQuery { Field = node.Field, Location = location, Distance = node.Proximity };
+            node.SetQuery(query);
         }
 
         public override void Visit(TermRangeNode node) {
             if (!_isGeoField(node.Field))
                 return;
 
-            var filter = new GeoBoundingBoxFilter { TopLeft = node.Min, BottomRight = node.Max, Field = node.Field };
-            node.SetFilter(filter);
-            node.SetQuery(new FilteredQuery { Filter = filter.ToContainer() });
+            var query = new GeoBoundingBoxQuery { BoundingBox = { TopLeft = node.Min, BottomRight = node.Max }, Field = node.Field };
+            node.SetQuery(query);
         }
     }
 }
