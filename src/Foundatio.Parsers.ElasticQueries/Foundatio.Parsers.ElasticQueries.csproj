@@ -68,13 +68,13 @@
     <Compile Include="ElasticQueryParserConfiguration.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="ElasticQueries.nuspec" />
+    <None Include="Foundatio.Parsers.ElasticQueries.nuspec" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\LuceneQueries\LuceneQueries.csproj">
+    <ProjectReference Include="..\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj">
       <Project>{f759e45d-c914-4546-947d-b9f0854d22e9}</Project>
-      <Name>LuceneQueries</Name>
+      <Name>Foundatio.Parsers.LuceneQueries</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
