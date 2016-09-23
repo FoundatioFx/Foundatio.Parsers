@@ -6,7 +6,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
-namespace Foundatio.Parsers.ElasticQueries.Query {
+namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class QueryContainerVisitor : ChainableQueryVisitor {
         private readonly ElasticQueryParserConfiguration _config;
 
@@ -39,7 +39,7 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
             QueryBase query = null;
-            if (_config.IsPropertyAnalyzed(node.GetFullName())) {
+            if (_config.IsAnalyzedPropertyType(node.GetFullName())) {
                 if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
                     query = new QueryStringQuery {
                         DefaultField = node.GetFullName() ?? _config.DefaultField,

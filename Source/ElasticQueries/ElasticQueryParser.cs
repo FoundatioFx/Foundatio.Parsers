@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.ElasticQueries.Query;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;

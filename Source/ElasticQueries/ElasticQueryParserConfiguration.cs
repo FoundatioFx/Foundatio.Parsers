@@ -68,7 +68,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             return true;
         }
 
-        public bool IsPropertyAnalyzed(string field) {
+        public bool IsAnalyzedPropertyType(string field) {
             if (String.IsNullOrEmpty(field))
                 return true;
 
@@ -92,6 +92,14 @@ namespace Foundatio.Parsers.ElasticQueries {
                 return false;
 
             var mapping = GetMappingProperty(field) as GeoPointProperty;
+            return mapping != null;
+        }
+
+        private bool IsNumericPropertyType(string field) {
+            if (String.IsNullOrEmpty(field))
+                return false;
+
+            var mapping = GetMappingProperty(field) as NumberProperty;
             return mapping != null;
         }
 
@@ -125,7 +133,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             return AddVisitor(new AliasedQueryVisitor(aliasMap), priority);
         }
 
-        public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 10) {
+        public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
             return AddVisitor(new GeoVisitor(IsGeoPropertyType, resolveGeoLocation), priority);
         }
 

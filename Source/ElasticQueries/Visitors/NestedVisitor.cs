@@ -7,14 +7,14 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class NestedVisitor: ChainableQueryVisitor {
-        private readonly Func<string, bool> _isNestedField;
+        private readonly Func<string, bool> _isNestedPropertyType;
 
-        public NestedVisitor(Func<string, bool> isNestedField) {
-            _isNestedField = isNestedField;
+        public NestedVisitor(Func<string, bool> isNestedPropertyType) {
+            _isNestedPropertyType = isNestedPropertyType;
         }
 
         public override void Visit(GroupNode node, IQueryVisitorContext context) {
-            if (!IsFieldNested(node.GetNameParts())) {
+            if (!IsNestedPropertyType(node.GetNameParts())) {
                 base.Visit(node, context);
                 return;
             }
@@ -26,15 +26,15 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
-            if (!IsFieldNested(node.Field?.Split('.')))
+            if (!IsNestedPropertyType(node.Field?.Split('.')))
                 return;
 
             node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQuery() });
             node.InvalidateQuery();
         }
 
-        private bool IsFieldNested(string[] nameParts) {
-            if (nameParts == null || _isNestedField == null || nameParts.Length == 0)
+        private bool IsNestedPropertyType(string[] nameParts) {
+            if (nameParts == null || _isNestedPropertyType == null || nameParts.Length == 0)
                 return false;
 
             string fieldName = String.Empty;
@@ -44,7 +44,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
                 fieldName += nameParts[i];
 
-                if (_isNestedField(fieldName))
+                if (_isNestedPropertyType(fieldName))
                     return true;
             }
 

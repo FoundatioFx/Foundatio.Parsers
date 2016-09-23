@@ -6,7 +6,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
-namespace Foundatio.Parsers.ElasticQueries.Query {
+namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class CombineQueriesVisitor : ChainableQueryVisitor {
         private readonly ElasticQueryParserConfiguration _config;
 
