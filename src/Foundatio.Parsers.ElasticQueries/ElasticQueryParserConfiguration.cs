@@ -108,8 +108,8 @@ namespace Foundatio.Parsers.ElasticQueries {
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseMappings<T>(Func<PutMappingDescriptor<T>, PutMappingDescriptor<T>> mappingBuilder, Func<ITypeMapping> getMapping) where T : class {
-            var descriptor = new PutMappingDescriptor<T>();
+        public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Func<ITypeMapping> getMapping) where T : class {
+            var descriptor = new TypeMappingDescriptor<T>();
             descriptor = mappingBuilder(descriptor);
             Mapping = descriptor;
             UpdateMappingFunc = getMapping;
