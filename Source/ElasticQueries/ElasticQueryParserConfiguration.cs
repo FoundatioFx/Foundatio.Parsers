@@ -80,7 +80,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             return mapping.Index == FieldIndexOption.Analyzed || mapping.Index == null;
         }
 
-        private bool IsNestedFieldType(string field) {
+        public bool IsNestedFieldType(string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
@@ -88,7 +88,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             return mapping != null;
         }
 
-        private bool IsGeoFieldType(string field) {
+        public bool IsGeoFieldType(string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
