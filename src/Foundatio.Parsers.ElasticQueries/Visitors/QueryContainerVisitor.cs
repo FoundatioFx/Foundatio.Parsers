@@ -99,8 +99,12 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override void Visit(MissingNode node, IQueryVisitorContext context) {
-            node.SetQuery(new MissingQuery {
-                Field = node.GetFullName()
+            node.SetQuery(new BoolQuery {
+                MustNot = new QueryContainer[] {
+                    new ExistsQuery {
+                        Field =  node.GetFullName()
+                    }
+                }
             });
         }
     }
