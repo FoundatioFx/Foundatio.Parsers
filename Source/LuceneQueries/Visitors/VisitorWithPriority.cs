@@ -7,28 +7,28 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         public int Priority { get; set; }
         public IQueryNodeVisitorWithResult<IQueryNode> Visitor { get; set; }
 
-        public IQueryNode Accept(IQueryNode node) {
-            return Visitor.Accept(node);
+        public IQueryNode Accept(IQueryNode node, IQueryVisitorContext context) {
+            return Visitor.Accept(node, context);
         }
 
-        public void Visit(GroupNode node) {
-            Visitor.Visit(node);
+        public void Visit(GroupNode node, IQueryVisitorContext context) {
+            Visitor.Visit(node, context);
         }
 
-        public void Visit(TermNode node) {
-            Visitor.Visit(node);
+        public void Visit(TermNode node, IQueryVisitorContext context) {
+            Visitor.Visit(node, context);
         }
 
-        public void Visit(TermRangeNode node) {
-            Visitor.Visit(node);
+        public void Visit(TermRangeNode node, IQueryVisitorContext context) {
+            Visitor.Visit(node, context);
         }
 
-        public void Visit(ExistsNode node) {
-            Visitor.Visit(node);
+        public void Visit(ExistsNode node, IQueryVisitorContext context) {
+            Visitor.Visit(node, context);
         }
 
-        public void Visit(MissingNode node) {
-            Visitor.Visit(node);
+        public void Visit(MissingNode node, IQueryVisitorContext context) {
+            Visitor.Visit(node, context);
         }
 
         public class PriorityComparer : IComparer<QueryVisitorWithPriority> {

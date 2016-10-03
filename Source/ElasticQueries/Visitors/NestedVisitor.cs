@@ -13,30 +13,24 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             _isNestedField = isNestedField;
         }
 
-        public override void Visit(GroupNode node) {
-            if (!IsFieldNested(node.GetNameParts())) {
-                base.Visit(node);
+        public override void Visit(GroupNode node, IQueryVisitorContext context) {
+            if (String.IsNullOrEmpty(node.Field) || !IsFieldNested(node.GetNameParts())) {
+                base.Visit(node, context);
                 return;
             }
 
-            node.SetFilter(new NestedFilter { Path = node.GetFullName(), Filter = node.GetFilter() });
-            node.Parent.InvalidateFilter();
+            node.SetFilter(new NestedFilter { Path = node.GetFullName() });
+            node.SetQuery(new NestedQuery { Path = node.GetFullName() });
 
-            node.SetQuery(new NestedQuery { Path = node.GetFullName(), Query = node.GetQuery() });
-            node.Parent.InvalidateQuery();
-
-            base.Visit(node);
+            base.Visit(node, context);
         }
 
-        public override void Visit(TermNode node) {
+        public override void Visit(TermNode node, IQueryVisitorContext context) {
             if (!IsFieldNested(node.Field?.Split('.')))
                 return;
 
-            node.SetFilter(new NestedFilter { Path = node.GetParentFullName(), Filter = node.GetFilter() });
-            node.InvalidateFilter();
-
-            node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQuery() });
-            node.InvalidateQuery();
+            node.SetFilter(new NestedFilter { Path = node.GetParentFullName(), Filter = node.GetFilterOrDefault()?.ToContainer() });
+            node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQueryOrDefault()?.ToContainer() });
         }
 
         private bool IsFieldNested(string[] nameParts) {

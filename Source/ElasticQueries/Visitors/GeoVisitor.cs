@@ -14,7 +14,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             _resolveGeoLocation = resolveGeoLocation;
         }
 
-        public override void Visit(TermNode node) {
+        public override void Visit(TermNode node, IQueryVisitorContext context) {
             if (!_isGeoField(node.Field))
                 return;
 
@@ -24,7 +24,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             node.SetQuery(new FilteredQuery { Filter = filter.ToContainer() });
         }
 
-        public override void Visit(TermRangeNode node) {
+        public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
             if (!_isGeoField(node.Field))
                 return;
 

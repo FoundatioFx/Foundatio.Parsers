@@ -63,8 +63,10 @@
     <Compile Include="Visitors\IChainableQueryVisitor.cs" />
     <Compile Include="Visitors\IQueryNodeVisitor.cs" />
     <Compile Include="Visitors\IQueryNodeVisitorWithResult.cs" />
+    <Compile Include="Visitors\IQueryVisitorContext.cs" />
     <Compile Include="Visitors\QueryNodeVisitorBase.cs" />
     <Compile Include="Visitors\QueryNodeVisitorWithResultBase.cs" />
+    <Compile Include="Visitors\QueryVisitorContext.cs" />
     <Compile Include="Visitors\VisitorWithPriority.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -3,6 +3,7 @@ using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Filter;
 using Foundatio.Parsers.ElasticQueries.Query;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
@@ -12,6 +13,10 @@ namespace Foundatio.Parsers.ElasticQueries {
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
         private readonly ChainedQueryVisitor _filterVisitor = new ChainedQueryVisitor();
         private readonly ChainedQueryVisitor _queryVisitor = new ChainedQueryVisitor();
+        private readonly DefaultFilterVisitor _defaultFilterVisitor;
+        private readonly DefaultQueryVisitor _defaultQueryVisitor;
+        private readonly CombineFiltersVisitor _combineFiltersVisitor;
+        private readonly CombineQueriesVisitor _combineQueriesVisitor;
 
         public ElasticQueryParser(Action<ElasticQueryParserConfiguration> configure = null) {
             var config = new ElasticQueryParserConfiguration();
@@ -19,29 +24,37 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             foreach (var visitor in config.Visitors.OfType<QueryVisitorWithPriority>())
                 _filterVisitor.AddVisitor(visitor);
-            _filterVisitor.AddVisitor(new FilterContainerVisitor(config), 100);
-            _filterVisitor.AddVisitor(new CombineFiltersVisitor(config), 100000);
+
+            _defaultFilterVisitor = new DefaultFilterVisitor(config);
+            _combineFiltersVisitor = new CombineFiltersVisitor(config);
 
             foreach (var visitor in config.Visitors.OfType<QueryVisitorWithPriority>())
                 _queryVisitor.AddVisitor(visitor);
-            _queryVisitor.AddVisitor(new QueryContainerVisitor(config), 100);
-            _queryVisitor.AddVisitor(new CombineQueriesVisitor(config), 100000);
+
+            _defaultQueryVisitor = new DefaultQueryVisitor(config);
+            _combineQueriesVisitor = new CombineQueriesVisitor(config);
         }
 
         public FilterContainer BuildFilter(string query) {
             var result = _parser.Parse(query);
 
-            var filterNode = _filterVisitor.Accept(result);
+            var context = new ElasticQueryVisitorContext();
+            var filterNode = _defaultFilterVisitor.Accept(result, context);
+            filterNode = _filterVisitor.Accept(filterNode, context);
+            filterNode = _combineFiltersVisitor.Accept(filterNode, context);
 
-            return filterNode?.GetFilter() ?? new MatchAllFilter();
+            return filterNode?.GetFilterContainer() ?? new MatchAllFilter();
         }
 
         public QueryContainer BuildQuery(string query) {
             var result = _parser.Parse(query);
 
-            var queryNode = _queryVisitor.Accept(result);
+            var context = new ElasticQueryVisitorContext();
+            var queryNode = _defaultQueryVisitor.Accept(result, context);
+            queryNode = _queryVisitor.Accept(queryNode, context);
+            queryNode = _combineQueriesVisitor.Accept(queryNode, context);
 
-            return queryNode?.GetQuery() ?? new MatchAllQuery();
+            return queryNode?.GetQueryContainer() ?? new MatchAllQuery();
         }
 
         // parser query, generate filter, generate aggregations

@@ -342,7 +342,7 @@ namespace Foundatio.Parsers.Tests {
                 ))
             )));
 
-            var res = client.IndexManyAsync(new[] {
+            var res = client.IndexMany(new[] {
                 new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = { new MyType { Field1 = "value1", Field4 = 4 } }},
                 new MyNestedType { Field1 = "value2", Field2 = "value2" },
                 new MyNestedType { Field1 = "value1", Field2 = "value4" }
@@ -380,6 +380,57 @@ namespace Foundatio.Parsers.Tests {
                     && f1.Term("nested.field4", "4")))));
 
             expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void NestedFilterProcessor2() {
+            var client = new ElasticClient(new ConnectionSettings()
+                .MapDefaultTypeNames(t => t
+                    .Add(typeof(MyNestedType), "things"))
+                .MapDefaultTypeIndices(d => d
+                    .Add(typeof(MyNestedType), "stuff")));
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff").AddMapping<MyNestedType>(d => d.Index("stuff").Properties(p => p
+                .String(e => e.Name(n => n.Field1).Index(FieldIndexOption.Analyzed))
+                .String(e => e.Name(n => n.Field2).Index(FieldIndexOption.Analyzed))
+                .String(e => e.Name(n => n.Field3).Index(FieldIndexOption.Analyzed))
+                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+                .NestedObject<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
+                    .String(e => e.Name(n => n.Field1).Index(FieldIndexOption.Analyzed))
+                    .String(e => e.Name(n => n.Field2).Index(FieldIndexOption.Analyzed))
+                    .String(e => e.Name(n => n.Field3).Index(FieldIndexOption.Analyzed))
+                    .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+                ))
+            )));
+
+            var res = client.IndexMany(new[] {
+                new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = { new MyType { Field1 = "value1", Field4 = 4 } }},
+                new MyNestedType { Field1 = "value2", Field2 = "value2" },
+                new MyNestedType { Field1 = "value1", Field2 = "value4", Field3 = "value3" }
+            });
+            client.Refresh();
+
+            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyNestedType))).Mapping).UseNested());
+            var result = processor.BuildFilter("field1:value1 nested:(field1:value1 field4:4 field3:value3)");
+
+            var actualResponse = client.Search<MyNestedType>(d => d.Filter(result));
+            var actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyNestedType>(d => d.Filter(f => f
+                .Query(q => q.Match(m => m.OnField(e => e.Field1).Query("value1")))
+                && f.Nested(n => n.Path(p => p.Nested).Filter(f1 => f1
+                    .Query(q => q.Match(m => m.OnField("nested.field1").Query("value1")))
+                    && f1.Term("nested.field4", "4")
+                    && f1.Query(q => q.Match(m => m.OnField("nested.field3").Query("value3")))))));
+
+            var expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);

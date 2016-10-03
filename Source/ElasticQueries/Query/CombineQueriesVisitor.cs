@@ -14,15 +14,23 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
             _config = config;
         }
 
-        public override void Visit(GroupNode node) {
-            if (node.GetQuery() != null) {
-                base.Visit(node);
-                return;
-            }
+        public override void Visit(GroupNode node, IQueryVisitorContext context) {
+            base.Visit(node, context);
 
-            QueryContainer query = null;
+            QueryContainer query = node.GetQuery()?.ToContainer();
+            QueryContainer container = query;
+            
+            var nested = ((IQueryContainer)query)?.Nested as NestedQuery;
+            if (nested != null)
+                container = nested.Query as QueryContainer;
+
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
-                var childQuery = child.GetQuery();
+                QueryContainer childQuery;
+                if (child is GroupNode)
+                    childQuery = child.GetQueryContainer() ?? child.GetQueryOrDefault()?.ToContainer();
+                else
+                    childQuery = child.GetQueryOrDefault()?.ToContainer();
+
                 var op = node.GetOperator(_config.DefaultQueryOperator);
                 if (child.IsNodeNegated())
                     childQuery = !childQuery;
@@ -31,14 +39,18 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
                     op = Operator.And;
 
                 if (op == Operator.And) {
-                    query &= childQuery;
+                    container &= childQuery;
                 } else if (op == Operator.Or) {
-                    query |= childQuery;
+                    container |= childQuery;
                 }
             }
 
-            node.SetQuery(query);
-            base.Visit(node);
+            if (nested != null) {
+                nested.Query = container;
+                node.SetQueryContainer(nested);
+            } else {
+                node.SetQueryContainer(container);
+            }
         }
     }
 }

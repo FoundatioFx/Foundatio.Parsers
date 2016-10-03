@@ -14,15 +14,23 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
             _config = config;
         }
 
-        public override void Visit(GroupNode node) {
-            if (node.GetFilter() != null) {
-                base.Visit(node);
-                return;
-            }
+        public override void Visit(GroupNode node, IQueryVisitorContext context) {
+            base.Visit(node, context);
 
-            FilterContainer filter = null;
+            FilterContainer query = node.GetFilter()?.ToContainer();
+            FilterContainer container = query;
+
+            var nested = ((IFilterContainer)query)?.Nested as NestedFilter;
+            if (nested != null)
+                container = nested.Filter as FilterContainer;
+
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
-                var childFilter = child.GetFilter();
+                FilterContainer childFilter;
+                if (child is GroupNode)
+                    childFilter = child.GetFilterContainer() ?? child.GetFilterOrDefault()?.ToContainer();
+                else
+                    childFilter = child.GetFilterOrDefault()?.ToContainer();
+
                 var op = node.GetOperator(_config.DefaultFilterOperator);
                 if (child.IsNodeNegated())
                     childFilter = !childFilter;
@@ -31,14 +39,18 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
                     op = Operator.And;
 
                 if (op == Operator.And) {
-                    filter &= childFilter;
+                    container &= childFilter;
                 } else if (op == Operator.Or) {
-                    filter |= childFilter;
+                    container |= childFilter;
                 }
             }
 
-            node.SetFilter(filter);
-            base.Visit(node);
+            if (nested != null) {
+                nested.Filter = container;
+                node.SetFilterContainer(nested);
+            } else {
+                node.SetFilterContainer(container);
+            }
         }
     }
 }

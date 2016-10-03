@@ -22,30 +22,30 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _rootResolver = aliasMap.Resolve;
         }
 
-        public override void Visit(GroupNode node) {
-            ApplyAlias(node);
+        public override void Visit(GroupNode node, IQueryVisitorContext context) {
+            ApplyAlias(node, context);
 
             foreach (var child in node.Children)
-                child.Accept(this);
+                child.Accept(this, context);
         }
 
-        public override void Visit(TermNode node) {
-            ApplyAlias(node);
+        public override void Visit(TermNode node, IQueryVisitorContext context) {
+            ApplyAlias(node, context);
         }
 
-        public override void Visit(TermRangeNode node) {
-            ApplyAlias(node);
+        public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
+            ApplyAlias(node, context);
         }
 
-        public override void Visit(ExistsNode node) {
-            ApplyAlias(node);
+        public override void Visit(ExistsNode node, IQueryVisitorContext context) {
+            ApplyAlias(node, context);
         }
 
-        public override void Visit(MissingNode node) {
-            ApplyAlias(node);
+        public override void Visit(MissingNode node, IQueryVisitorContext context) {
+            ApplyAlias(node, context);
         }
 
-        private void ApplyAlias(IFieldQueryNode node) {
+        private void ApplyAlias(IFieldQueryNode node, IQueryVisitorContext context) {
             if (node.Parent == null)
                 return;
 
@@ -68,20 +68,20 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return f => resolver(!String.IsNullOrEmpty(scope) ? scope + "." + f : f);
         }
 
-        public override IQueryNode Accept(IQueryNode node) {
+        public override IQueryNode Accept(IQueryNode node, IQueryVisitorContext context) {
             if (node is GroupNode)
                 node.SetAliasResolver(_rootResolver);
 
-            node.Accept(this);
+            node.Accept(this, context);
             return node;
         }
 
         public static IQueryNode Run(GroupNode node, AliasResolver resolver) {
-            return new AliasedQueryVisitor(resolver).Accept(node);
+            return new AliasedQueryVisitor(resolver).Accept(node, null);
         }
 
         public static IQueryNode Run(GroupNode node, AliasMap aliasMap) {
-            return new AliasedQueryVisitor(aliasMap.Resolve).Accept(node);
+            return new AliasedQueryVisitor(aliasMap.Resolve).Accept(node, null);
         }
     }
 

@@ -60,9 +60,10 @@
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Filter\CombineFiltersVisitor.cs" />
     <Compile Include="Query\CombineQueriesVisitor.cs" />
+    <Compile Include="Visitors\ElasticQueryVisitorContext.cs" />
     <Compile Include="Visitors\NestedVisitor.cs" />
-    <Compile Include="Query\QueryContainerVisitor.cs" />
-    <Compile Include="Filter\FilterContainerVisitor.cs" />
+    <Compile Include="Query\DefaultQueryVisitor.cs" />
+    <Compile Include="Filter\DefaultFilterVisitor.cs" />
     <Compile Include="Visitors\GeoVisitor.cs" />
     <Compile Include="ElasticQueryParser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
