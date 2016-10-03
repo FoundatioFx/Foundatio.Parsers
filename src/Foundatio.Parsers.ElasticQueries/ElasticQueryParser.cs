@@ -10,6 +10,8 @@ namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParser {
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
         private readonly ChainedQueryVisitor _queryVisitor = new ChainedQueryVisitor();
+        private readonly DefaultQueryVisitor _defaultQueryVisitor;
+        private readonly CombineQueriesVisitor _combineQueriesVisitor;
 
         public ElasticQueryParser(Action<ElasticQueryParserConfiguration> configure = null) {
             var config = new ElasticQueryParserConfiguration();
@@ -17,8 +19,9 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             foreach (var visitor in config.Visitors.OfType<QueryVisitorWithPriority>())
                 _queryVisitor.AddVisitor(visitor);
-            _queryVisitor.AddVisitor(new QueryContainerVisitor(config), 100);
-            _queryVisitor.AddVisitor(new CombineQueriesVisitor(config), 100000);
+
+            _defaultQueryVisitor = new DefaultQueryVisitor(config);
+            _combineQueriesVisitor = new CombineQueriesVisitor(config);
         }
 
         public QueryContainer BuildQuery(string query, Operator defaultOperator = Operator.And, bool scoreResults = false) {
@@ -26,7 +29,11 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             var context = new ElasticQueryVisitorContext();
             context.SetDefaultOperator(defaultOperator);
-            var queryNode = _queryVisitor.Accept(result, context);
+
+            var queryNode = _defaultQueryVisitor.Accept(result, context);
+            queryNode = _queryVisitor.Accept(queryNode, context);
+            queryNode = _combineQueriesVisitor.Accept(queryNode, context);
+
             var q = queryNode?.GetQuery() ?? new MatchAllQuery();
             if (!scoreResults) {
                 q = new BoolQuery {

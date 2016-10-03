@@ -61,7 +61,7 @@
     <Compile Include="Visitors\CombineQueriesVisitor.cs" />
     <Compile Include="Visitors\ElasticQueryVisitorContext.cs" />
     <Compile Include="Visitors\NestedVisitor.cs" />
-    <Compile Include="Visitors\QueryContainerVisitor.cs" />
+    <Compile Include="Visitors\DefaultQueryVisitor.cs" />
     <Compile Include="Visitors\GeoVisitor.cs" />
     <Compile Include="ElasticQueryParser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

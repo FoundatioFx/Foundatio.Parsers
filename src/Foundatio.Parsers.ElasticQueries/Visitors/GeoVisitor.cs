@@ -21,7 +21,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             string location = _resolveGeoLocation != null ? _resolveGeoLocation(node.Term) ?? node.Term : node.Term;
             var query = new GeoDistanceQuery { Field = node.Field, Location = location, Distance = node.Proximity };
             node.SetQuery(query);
-            node.Parent.InvalidateQuery();
         }
 
         public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
@@ -31,7 +30,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             var box = new BoundingBox { TopLeft = node.Min, BottomRight = node.Max };
             var query = new GeoBoundingBoxQuery { BoundingBox = box, Field = node.Field };
             node.SetQuery(query);
-            node.Parent.InvalidateQuery();
         }
     }
 }

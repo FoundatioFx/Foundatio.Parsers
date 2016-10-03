@@ -5,16 +5,6 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class QueryNodeExtensions {
-        public static void InvalidateQuery(this IQueryNode node) {
-            IQueryNode current = node;
-            while (current != null) {
-                if (current is GroupNode)
-                    current.RemoveQuery();
-
-                current = current.Parent;
-            }
-        }
-
         public static Operator GetOperator(this IQueryNode node, Operator defaultOperator) {
             var groupNode = node as GroupNode;
             if (groupNode == null)
@@ -30,22 +20,48 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             }
         }
 
-        private const string QUERY_KEY = "@query";
+        public static QueryBase GetQueryOrDefault(this IQueryNode node) {
+            var q = node.GetQuery();
+            if (q != null)
+                return q;
+
+            return node.GetDefaultQuery();
+        }
+
+        private const string QueryKey = "@query";
         public static QueryBase GetQuery(this IQueryNode node) {
             object value = null;
-            if (!node.Data.TryGetValue(QUERY_KEY, out value))
+            if (!node.Data.TryGetValue(QueryKey, out value))
                 return null;
 
             return value as QueryBase;
         }
 
         public static void SetQuery(this IQueryNode node, QueryBase container) {
-            node.Data[QUERY_KEY] = container;
+            node.Data[QueryKey] = container;
         }
 
         public static void RemoveQuery(this IQueryNode node) {
-            if (node.Data.ContainsKey(QUERY_KEY))
-                node.Data.Remove(QUERY_KEY);
+            if (node.Data.ContainsKey(QueryKey))
+                node.Data.Remove(QueryKey);
+        }
+
+        private const string DefaultQueryKey = "@default_query";
+        public static QueryBase GetDefaultQuery(this IQueryNode node) {
+            object value = null;
+            if (!node.Data.TryGetValue(DefaultQueryKey, out value))
+                return null;
+
+            return value as QueryBase;
+        }
+
+        public static void SetDefaultQuery(this IQueryNode node, QueryBase container) {
+            node.Data[DefaultQueryKey] = container;
+        }
+
+        public static void RemoveDefaultQuery(this IQueryNode node) {
+            if (node.Data.ContainsKey(DefaultQueryKey))
+                node.Data.Remove(DefaultQueryKey);
         }
 
         private const string DEFAULT_OPERATOR_KEY = "@default_operator";

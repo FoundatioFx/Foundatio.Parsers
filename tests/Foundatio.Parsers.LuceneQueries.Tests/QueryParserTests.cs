@@ -417,6 +417,57 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void NestedFilterProcessor2() {
+            var client = GetClient(new ConnectionSettings()
+                .MapDefaultTypeNames(t => t
+                    .Add(typeof(MyNestedType), "things"))
+                .MapDefaultTypeIndices(d => d
+                    .Add(typeof(MyNestedType), "stuff")));
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff", i => i.Mappings(m => m.Map<MyNestedType>(d => d.Properties(p => p
+                .Text(e => e.Name(n => n.Field1).Index())
+                .Text(e => e.Name(n => n.Field2).Index())
+                .Text(e => e.Name(n => n.Field3).Index())
+                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+                .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
+                    .Text(e => e.Name(n => n.Field1).Index())
+                    .Text(e => e.Name(n => n.Field2).Index())
+                    .Text(e => e.Name(n => n.Field3).Index())
+                    .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+                ))
+            ))));
+
+            var res = client.IndexMany(new[] {
+                new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = { new MyType { Field1 = "value1", Field4 = 4 } }},
+                new MyNestedType { Field1 = "value2", Field2 = "value2" },
+                new MyNestedType { Field1 = "value1", Field2 = "value4", Field3 = "value3" }
+            });
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyNestedType))).Mapping).UseNested());
+            var result = processor.BuildQuery("field1:value1 nested:(field1:value1 field4:4 field3:value3)", scoreResults: true);
+
+            var actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));
+            var actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyNestedType>(d => d.Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
+                && q.Nested(n => n.Path(p => p.Nested).Query(q2 =>
+                    q2.Match(m => m.Field("nested.field1").Query("value1"))
+                    && q2.Term("nested.field4", "4")
+                    && q2.Match(m => m.Field("nested.field3").Query("value3"))))));
+
+            var expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+
+        [Fact]
         public void RangeQueryProcessor() {
             var client = GetClient();
             client.DeleteIndex("stuff");

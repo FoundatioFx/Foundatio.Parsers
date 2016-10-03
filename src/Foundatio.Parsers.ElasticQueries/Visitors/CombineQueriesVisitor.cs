@@ -15,14 +15,16 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override void Visit(GroupNode node, IQueryVisitorContext context) {
-            if (node.GetQuery() != null) {
-                base.Visit(node, context);
-                return;
-            }
+            base.Visit(node, context);
 
-            QueryBase query = null;
+            QueryBase query = node.GetQueryOrDefault();
+            QueryBase container = query;
+            var nested = query as NestedQuery;
+            if (nested != null)
+                container = null;
+
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
-                var childQuery = child.GetQuery();
+                var childQuery = child.GetQueryOrDefault();
                 var op = node.GetOperator(context.GetDefaultOperator());
                 if (child.IsNodeNegated())
                     childQuery = !childQuery;
@@ -31,14 +33,18 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     op = Operator.And;
 
                 if (op == Operator.And) {
-                    query &= childQuery;
+                    container &= childQuery;
                 } else if (op == Operator.Or) {
-                    query |= childQuery;
+                    container |= childQuery;
                 }
             }
 
-            node.SetQuery(query);
-            base.Visit(node, context);
+            if (nested != null) {
+                nested.Query = container;
+                node.SetQuery(nested);
+            } else {
+                node.SetQuery(container);
+            }
         }
     }
 }

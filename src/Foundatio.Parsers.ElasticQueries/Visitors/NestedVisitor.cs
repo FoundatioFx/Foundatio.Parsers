@@ -14,14 +14,12 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override void Visit(GroupNode node, IQueryVisitorContext context) {
-            if (!IsNestedPropertyType(node.GetNameParts())) {
+            if (String.IsNullOrEmpty(node.Field) || !IsNestedPropertyType(node.GetNameParts())) {
                 base.Visit(node, context);
                 return;
             }
 
-            node.SetQuery(new NestedQuery { Path = node.GetFullName(), Query = node.GetQuery() });
-            node.Parent.InvalidateQuery();
-
+            node.SetQuery(new NestedQuery { Path = node.GetFullName() });
             base.Visit(node, context);
         }
 
@@ -30,7 +28,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return;
 
             node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQuery() });
-            node.InvalidateQuery();
         }
 
         private bool IsNestedPropertyType(string[] nameParts) {
