@@ -1,4 +1,4 @@
-﻿$es_version = "5.0.0"
+﻿$es_version = "5.0.0-beta1"
 If ($env:ES_VERSION) {
     $es_version = $env:ES_VERSION
 }
@@ -11,12 +11,12 @@ If ($env:JAVA_HOME -eq $null -or !(Test-Path -Path $env:JAVA_HOME)) {
 Push-Location $PSScriptRoot
 
 If (!(Test-Path -Path "elasticsearch-$es_version") -And !(Test-Path -Path "elasticsearch.zip")) {
-    Invoke-WebRequest "http://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-$es_version.zip" -OutFile "elasticsearch.zip"
+    Invoke-WebRequest "https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-$es_version.zip" -OutFile "elasticsearch-$es_version.zip"
 }
 
 If ((Test-Path -Path "elasticsearch.zip") -And !(Test-Path -Path "elasticsearch-$es_version")) {
     Add-Type -assembly "system.io.compression.filesystem"
-    [io.compression.zipfile]::ExtractToDirectory("$PSScriptRoot\elasticsearch.zip", $PSScriptRoot)
+    [io.compression.zipfile]::ExtractToDirectory("$PSScriptRoot\elasticsearch-$es_version.zip", $PSScriptRoot)
     cp .\elasticsearch.yml .\elasticsearch-$es_version\config -Force
     rm elasticsearch.zip
 }
