@@ -136,11 +136,11 @@ namespace Foundatio.Parsers.ElasticQueries {
             return AddVisitor(new AliasedQueryVisitor(aliasMap), priority);
         }
 
-        public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 10) {
+        public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
             return AddVisitor(new GeoVisitor(IsGeoFieldType, resolveGeoLocation), priority);
         }
 
-        public ElasticQueryParserConfiguration UseNested(int priority = 1000) {
+        public ElasticQueryParserConfiguration UseNested(int priority = 300) {
             return AddVisitor(new NestedVisitor(IsNestedFieldType), priority);
         }
     }

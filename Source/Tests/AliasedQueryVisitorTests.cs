@@ -1,6 +1,8 @@
 ﻿using System;
+using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Nest;
 using Xunit;
 
 namespace Foundatio.Parsers.Tests {
@@ -12,6 +14,19 @@ namespace Foundatio.Parsers.Tests {
             var aliasMap = new AliasMap { { "field1", "field2" } };
             var aliased = AliasedQueryVisitor.Run(result, aliasMap);
             Assert.Equal("field2:value", aliased.ToString());
+        }
+
+        [Fact]
+        public void CanUseAliasMapForTopLevelAlias2() {
+            var filter = "program:postgrad";
+            var aliasMap = new AliasMap {
+               { "program", "programName" }
+            };
+
+            var p = new ElasticQueryParser(c => c.UseAliases(aliasMap));
+            var parsed = p.BuildFilter(filter) as IFilterContainer;
+            Assert.NotNull(parsed.Term);
+            Assert.Equal("programName", parsed.Term.Field.Name);
         }
 
         [Fact]
