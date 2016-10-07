@@ -6,7 +6,7 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class NestedVisitor: ChainableQueryVisitor {
+    public class NestedVisitor : ChainableQueryVisitor {
         private readonly Func<string, bool> _isNestedPropertyType;
 
         public NestedVisitor(Func<string, bool> isNestedPropertyType) {

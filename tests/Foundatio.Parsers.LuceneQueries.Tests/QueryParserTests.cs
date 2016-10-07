@@ -101,12 +101,12 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery($"_missing_:{nameof(MyType.Field2)}");
+            var result = processor.BuildQuery($"_missing_:{nameof(MyType.Field2)}", scoreResults: true);
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
 
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Bool(b => b.Filter(f => f.Missing(e => e.Field(nameof(MyType.Field2)))))));
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Bool(b => b.MustNot(f => f.Exists(e => e.Field(nameof(MyType.Field2)))))));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -118,7 +118,7 @@ namespace Foundatio.Parsers.Tests {
         public void SimpleQueryProcessor() {
             var client = GetClient();
             client.DeleteIndex("stuff");
- 
+
             client.CreateIndex("stuff", i => i.Mappings(m => m.Map<MyType>(t => t
                 .Properties(p => p
                     .Text(e => e.Name(n => n.Field3).Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))));

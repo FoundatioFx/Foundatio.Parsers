@@ -5,7 +5,7 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class GeoVisitor: ChainableQueryVisitor {
+    public class GeoVisitor : ChainableQueryVisitor {
         private readonly Func<string, bool> _isGeoField;
         private readonly Func<string, string> _resolveGeoLocation;
 

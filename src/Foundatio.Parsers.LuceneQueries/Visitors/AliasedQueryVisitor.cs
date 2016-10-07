@@ -121,7 +121,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
             if (fieldParts.Length > 0)
                 result.Name = result.Name + "." + String.Join(".", fieldParts);
-            
+
             return result;
         }
 
