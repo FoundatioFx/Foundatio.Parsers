@@ -25,6 +25,11 @@ namespace
        Foundatio.Parsers.LuceneQueries.Nodes
         #line default
         ;
+    using
+        #line 5 "LuceneQueryParser.peg"
+       Foundatio.Parsers.LuceneQueries.Extensions
+        #line default
+        ;
 
     /// <summary>
     ///  Parses a string according to the rules of the <see cref="LuceneQueryParser" /> grammar.
@@ -1965,7 +1970,14 @@ namespace
                 while (true)
                 {
                     IParseResult<string> r4 = null;
-                    r4 = this.ParseClass(ref cursor, "\"\"", negated: true);
+                    if (r4 == null)
+                    {
+                        r4 = this.ParseLiteral(ref cursor, "\\\"");
+                    }
+                    if (r4 == null)
+                    {
+                        r4 = this.ParseClass(ref cursor, "\"\"", negated: true);
+                    }
                     if (r4 != null)
                     {
                         l0.Add(r4.Value);

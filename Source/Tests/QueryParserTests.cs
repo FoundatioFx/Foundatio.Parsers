@@ -62,23 +62,24 @@ namespace Foundatio.Parsers.Tests {
 
             client.CreateIndex(i => i.Index("stuff"));
             client.Map<MyType>(d => d.Dynamic().Index("stuff"));
-            var response = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
+            var response = client.Index(new MyType { Field1 = "hey \"you there\"", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticQueryParser();
-            var result = processor.BuildFilter("field1:\"value1\"");
+            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping));
+            var result = processor.BuildFilter("field1:\"hey \\\"you there\\\"\"");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
 
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Term(m => m.Field1, "\"value1\"")));
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Query(q => q.MatchPhrase(m => m.OnField(w => w.Field1).Query("hey \"you there\"")))));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
+            Assert.Equal(1, actualResponse.Total);
         }
 
         [Fact]
