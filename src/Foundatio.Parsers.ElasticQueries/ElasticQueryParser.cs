@@ -12,8 +12,8 @@ namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParser {
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
         private readonly ChainedQueryVisitor _filterVisitors = new ChainedQueryVisitor();
-        private readonly ChainedQueryVisitor _queryVisitors = new ChainedQueryVisitor();
         private readonly CombineFiltersVisitor _combineFiltersVisitor;
+        private readonly ChainedQueryVisitor _queryVisitors = new ChainedQueryVisitor();
         private readonly CombineQueriesVisitor _combineQueriesVisitor;
 
         public ElasticQueryParser(Action<ElasticQueryParserConfiguration> configure = null) {

@@ -4,7 +4,7 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
-    public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorWithResultBase<ISet<String>> {
+    public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorWithResultBase<ISet<string>> {
         private readonly HashSet<string> _fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public override void Visit(GroupNode node, IQueryVisitorContext context) {

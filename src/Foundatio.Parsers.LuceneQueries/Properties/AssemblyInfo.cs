@@ -2,12 +2,12 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-[assembly: AssemblyTitle("Exceptionless.LuceneQueryParser")]
+[assembly: AssemblyTitle("Foundatio.Parsers.LuceneQueries")]
 [assembly: AssemblyDescription("A lucene style query parser that is extensible and allows additional syntax features.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Exceptionless")]
 [assembly: AssemblyProduct("Exceptionless")]
-[assembly: AssemblyCopyright("Copyright (c) 2015 Exceptionless.  All rights reserved.")]
+[assembly: AssemblyCopyright("Copyright (c) 2016 Exceptionless.  All rights reserved.")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: NeutralResourcesLanguage("en")]

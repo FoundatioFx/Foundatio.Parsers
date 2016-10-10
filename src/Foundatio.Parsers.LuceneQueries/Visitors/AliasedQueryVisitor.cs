@@ -121,48 +121,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
             if (fieldParts.Length > 0)
                 result.Name = result.Name + "." + String.Join(".", fieldParts);
-            
+
             return result;
-
-            // field could be multi-part "level1.level2.level3:value"
-            // break it into parts and try to resolve each level "level1", "level1.level2"
-            // if we get a result from breaking out the parts, then the returned resolver needs to be wrapped with a prefix
-            // "level1" is mapped to "blah", the returned resolver would be for level1, but any child aliases should be for "level1.level2.level3".
-            // so we would need to use the resolver for "level1" since that is all we have and any requested resolvers would get prefixed with "level2.level3."
-            // if we get a result from breaking out the parts, then we need to try and resolve the rest of the parts so that we can get the deepest match and resolver
-
-            //var fieldParts = field.Split('.');
-            //if (fieldParts.Length == 1)
-            //    return null;
-
-            //call current resolver with 1st part
-
-
-            //var partsToCheck = new List<Tuple<string, int>>();
-            //for (int i = 0; i < fieldParts.Length - 1; i++)
-            //    partsToCheck.Add(Tuple.Create(String.Join(".", fieldParts.Take(i + 1)), i));
-
-            //Func<string, GetAliasResult> currentResolver = Resolve;
-            //GetAliasResult currentResult = null;
-            //for (int i = 0; i < partsToCheck.Count; i++) {
-            //    var part = partsToCheck[i];
-            //    currentResult = currentResolver(part.Item1);
-            //    if (currentResult == null)
-            //        break;
-
-            //    string suffix = String.Join(".", fieldParts.Skip(i + 1));
-            //    if (suffix.Length > 0)
-            //        currentResult.Name = currentResult.Name + "." + suffix;
-
-            //    var resolver = currentResult.Resolver;
-            //    var result = resolver(String.Join(".", fieldParts.Skip(i + 1)));
-            //    if (result == null)
-            //        string prefix = String.Join(".", fieldParts.Take(i));
-            //    if (prefix.Length > 0)
-            //        currentResult.Resolver = AliasedQueryVisitor.GetScopedResolver(resolver, prefix);
-            //}
-
-            //return currentResult;
         }
 
         private AliasResolver InternalResolve(AliasMap aliasMap) {
@@ -190,8 +150,6 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
             return null;
         }
-
-        private static readonly AliasResolver EmptyResolve = f => (GetAliasResult)null;
     }
 
     public class AliasMapValue {
