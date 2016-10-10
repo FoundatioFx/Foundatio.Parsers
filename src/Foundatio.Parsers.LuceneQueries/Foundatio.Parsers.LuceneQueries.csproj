@@ -67,6 +67,7 @@
     <Compile Include="Visitors\QueryNodeVisitorBase.cs" />
     <Compile Include="Visitors\QueryNodeVisitorWithResultBase.cs" />
     <Compile Include="Visitors\QueryVisitorContext.cs" />
+    <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
     <Compile Include="Visitors\VisitorWithPriority.cs" />
   </ItemGroup>
   <ItemGroup>

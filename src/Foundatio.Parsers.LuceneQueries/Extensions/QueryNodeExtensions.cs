@@ -70,17 +70,17 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return (node.IsNegated.HasValue && node.IsNegated.Value == true) || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-");
         }
 
-        private const string ALIASRESOLVER_KEY = "@aliasresolver";
+        private const string AliasResolverKey = "@AliasResolver";
         public static AliasResolver GetAliasResolver(this IQueryNode node) {
             object value = null;
-            if (!node.Data.TryGetValue(ALIASRESOLVER_KEY, out value))
+            if (!node.Data.TryGetValue(AliasResolverKey, out value))
                 return null;
 
             return value as AliasResolver;
         }
 
         public static void SetAliasResolver(this IQueryNode node, AliasResolver resolver) {
-            node.Data[ALIASRESOLVER_KEY] = resolver;
+            node.Data[AliasResolverKey] = resolver;
         }
     }
 }

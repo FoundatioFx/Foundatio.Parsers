@@ -14,6 +14,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public string DefaultField { get; private set; } = "_all";
         public Operator DefaultFilterOperator { get; private set; } = Operator.And;
         public Operator DefaultQueryOperator { get; private set; } = Operator.Or;
+        public AliasResolver DefaultAliasResolver { get; private set; }
         public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
         public RootObjectMapping Mapping { get; set; }
         private Func<RootObjectMapping> UpdateMappingFunc { get; set; }
@@ -132,8 +133,14 @@ namespace Foundatio.Parsers.ElasticQueries {
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseAliases(AliasMap aliasMap, int priority = 0) {
-            return AddVisitor(new AliasedQueryVisitor(aliasMap), priority);
+        public ElasticQueryParserConfiguration UseAliases(AliasResolver defaultAliasResolver, int priority = 0) {
+            DefaultAliasResolver = defaultAliasResolver;
+            return AddVisitor(new AliasedQueryVisitor(), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseAliases(AliasMap defaultAliasMap, int priority = 0) {
+            DefaultAliasResolver = defaultAliasMap.Resolve;
+            return AddVisitor(new AliasedQueryVisitor(), priority);
         }
 
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
