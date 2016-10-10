@@ -9,7 +9,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public string Prefix { get; set; }
         public string Field { get; set; }
         public string Term { get; set; }
-        public string UnescapedTerm => IsQuotedTerm ? Term : Term.Unescape();
+        public string UnescapedTerm => Term.Unescape();
         public bool IsQuotedTerm { get; set; }
         public string Boost { get; set; }
         public string Proximity { get; set; }

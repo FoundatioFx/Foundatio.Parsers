@@ -184,7 +184,7 @@ range_unquoted_term
     }
 
 quoted_term
-  = '"' term:([^"]+ "") '"'
+  = '"' term:(('\\"' / [^"])+ "") '"'
     {
         term
     }

@@ -23,29 +23,29 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public override void Visit(GroupNode node, IQueryVisitorContext context) {
-            ApplyAlias(node);
+            ApplyAlias(node, context);
 
             foreach (var child in node.Children)
                 child.Accept(this, context);
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
-            ApplyAlias(node);
+            ApplyAlias(node, context);
         }
 
         public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
-            ApplyAlias(node);
+            ApplyAlias(node, context);
         }
 
         public override void Visit(ExistsNode node, IQueryVisitorContext context) {
-            ApplyAlias(node);
+            ApplyAlias(node, context);
         }
 
         public override void Visit(MissingNode node, IQueryVisitorContext context) {
-            ApplyAlias(node);
+            ApplyAlias(node, context);
         }
 
-        private void ApplyAlias(IFieldQueryNode node) {
+        private void ApplyAlias(IFieldQueryNode node, IQueryVisitorContext context) {
             if (node.Parent == null)
                 return;
 

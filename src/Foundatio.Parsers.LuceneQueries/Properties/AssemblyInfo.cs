@@ -16,3 +16,4 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyFileVersion("2.0.0.0")]
 
 [assembly: InternalsVisibleTo("Foundatio.Parsers.Tests")]
+

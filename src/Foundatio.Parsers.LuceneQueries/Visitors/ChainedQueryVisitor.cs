@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode>, IChainableQueryVisitor {
         private readonly List<QueryVisitorWithPriority> _visitors = new List<QueryVisitorWithPriority>();
-        private bool _isSorted = false;
+        private QueryVisitorWithPriority[] _frozenVisitors;
+        private bool _isDirty = true;
 
         public void AddVisitor(IQueryNodeVisitorWithResult<IQueryNode> visitor, int priority = 0) {
             AddVisitor(new QueryVisitorWithPriority {
@@ -16,14 +18,14 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
         public void AddVisitor(QueryVisitorWithPriority visitor) {
             _visitors.Add(visitor);
-            _isSorted = false;
+            _isDirty = true;
         }
 
         public override IQueryNode Accept(IQueryNode node, IQueryVisitorContext context) {
-            if (!_isSorted)
-                _visitors.Sort(QueryVisitorWithPriority.PriorityComparer.Instance);
+            if (_isDirty)
+                _frozenVisitors = _visitors.OrderBy(v => v.Priority).ToArray();
 
-            foreach (var visitor in _visitors)
+            foreach (var visitor in _frozenVisitors)
                 visitor.Accept(node, context);
 
             return node;

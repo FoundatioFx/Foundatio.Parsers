@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public class ExistsNode : QueryNodeBase, IFieldQueryNode {

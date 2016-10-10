@@ -9,18 +9,17 @@ using Nest;
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParser {
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
-        private readonly ChainedQueryVisitor _queryVisitor = new ChainedQueryVisitor();
-        private readonly DefaultQueryVisitor _defaultQueryVisitor;
+        private readonly ChainedQueryVisitor _queryVisitors = new ChainedQueryVisitor();
         private readonly CombineQueriesVisitor _combineQueriesVisitor;
 
         public ElasticQueryParser(Action<ElasticQueryParserConfiguration> configure = null) {
             var config = new ElasticQueryParserConfiguration();
             configure?.Invoke(config);
 
+            _queryVisitors.AddVisitor(new DefaultQueryVisitor(config), 100);
             foreach (var visitor in config.Visitors.OfType<QueryVisitorWithPriority>())
-                _queryVisitor.AddVisitor(visitor);
+                _queryVisitors.AddVisitor(visitor);
 
-            _defaultQueryVisitor = new DefaultQueryVisitor(config);
             _combineQueriesVisitor = new CombineQueriesVisitor(config);
         }
 
@@ -30,8 +29,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             var context = new ElasticQueryVisitorContext();
             context.SetDefaultOperator(defaultOperator);
 
-            var queryNode = _defaultQueryVisitor.Accept(result, context);
-            queryNode = _queryVisitor.Accept(queryNode, context);
+            var queryNode = _queryVisitors.Accept(result, context);
             queryNode = _combineQueriesVisitor.Accept(queryNode, context);
 
             var q = queryNode?.GetQuery() ?? new MatchAllQuery();
