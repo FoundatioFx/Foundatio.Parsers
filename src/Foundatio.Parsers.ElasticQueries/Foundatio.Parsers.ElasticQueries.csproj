@@ -74,7 +74,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\LuceneQueries\LuceneQueries.csproj">
+    <ProjectReference Include="..\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj">
       <Project>{f759e45d-c914-4546-947d-b9f0854d22e9}</Project>
       <Name>LuceneQueries</Name>
     </ProjectReference>

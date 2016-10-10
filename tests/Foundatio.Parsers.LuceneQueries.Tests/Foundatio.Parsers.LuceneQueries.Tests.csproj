@@ -114,11 +114,11 @@
     <Compile Include="StringExtensionsTests.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ElasticQueries\ElasticQueries.csproj">
+    <ProjectReference Include="..\..\src\Foundatio.Parsers.ElasticQueries\Foundatio.Parsers.ElasticQueries.csproj">
       <Project>{9f6f9cc3-2544-44eb-8829-209187271a4e}</Project>
       <Name>ElasticQueries</Name>
     </ProjectReference>
-    <ProjectReference Include="..\LuceneQueries\LuceneQueries.csproj">
+    <ProjectReference Include="..\..\src\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj">
       <Project>{f759e45d-c914-4546-947d-b9f0854d22e9}</Project>
       <Name>LuceneQueries</Name>
     </ProjectReference>
