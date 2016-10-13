@@ -6,18 +6,16 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
-namespace Foundatio.Parsers.ElasticQueries.Filter {
+namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class CombineFiltersVisitor : ChainableQueryVisitor {
-        private readonly ElasticQueryParserConfiguration _config;
-
-        public CombineFiltersVisitor(ElasticQueryParserConfiguration config) {
-            _config = config;
-        }
-
         public override void Visit(GroupNode node, IQueryVisitorContext context) {
             base.Visit(node, context);
 
-            FilterContainer query = node.GetFilter()?.ToContainer();
+            var elasticContext = context as IElasticQueryVisitorContext;
+            if (elasticContext == null)
+                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+            FilterContainer query = node.GetFilter(() => node.GetDefaultFilter(context))?.ToContainer();
             FilterContainer container = query;
 
             var nested = ((IFilterContainer)query)?.Nested as NestedFilter;
@@ -27,11 +25,11 @@ namespace Foundatio.Parsers.ElasticQueries.Filter {
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 FilterContainer childFilter;
                 if (child is GroupNode)
-                    childFilter = child.GetFilterContainer() ?? child.GetFilterOrDefault()?.ToContainer();
+                    childFilter = child.GetFilterContainer() ?? child.GetFilter(() => child.GetDefaultFilter(context))?.ToContainer();
                 else
-                    childFilter = child.GetFilterOrDefault()?.ToContainer();
+                    childFilter = child.GetFilter(() => child.GetDefaultFilter(context))?.ToContainer();
 
-                var op = node.GetOperator(_config.DefaultFilterOperator);
+                var op = node.GetOperator(elasticContext.DefaultOperator);
                 if (child.IsNodeNegated())
                     childFilter = !childFilter;
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -87,6 +88,7 @@ namespace Foundatio.Parsers.Tests {
         [InlineData("geo:\"Dallas, TX\"~75m", "geo:\"Dallas, TX\"~75m", true)]
         [InlineData("geo:\"Dallas, TX\"~75 m", "geo:\"Dallas, TX\"~75 m", true)]
         [InlineData("min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", "min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", true)]
+        [InlineData("datehistogram:(date~2^-5\\:30 min:date)", "datehistogram:(date~2^-5\\:30 min:date)", true)]
         [InlineData("-type:404", "-type:404", true)]
         [InlineData("type:test?s", "type:test?s", true)]
         [InlineData("NOT Test", "NOT Test", true)]
@@ -115,6 +117,21 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info(DebugQueryVisitor.Run(result));
             var generatedQuery = GenerateQueryVisitor.Run(result);
             Assert.Equal(expected, generatedQuery);
+        }
+
+        [Fact]
+        public void CanGenerateSingleQuery() {
+            string query = "datehistogram:(date~2^-5\\:30 min:date)";
+            var parser = new LuceneQueryParser();
+
+            IQueryNode result = parser.Parse(query);
+
+            _logger.Info(DebugQueryVisitor.Run(result));
+            var generatedQuery = GenerateQueryVisitor.Run(result);
+            Assert.Equal(query, generatedQuery);
+
+            new SwapFieldAndTermVisitor().Accept(result, null);
+            _logger.Info(DebugQueryVisitor.Run(result));
         }
     }
 }

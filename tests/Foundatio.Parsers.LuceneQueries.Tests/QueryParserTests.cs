@@ -6,6 +6,8 @@ using Elasticsearch.Net;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
+using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -137,6 +139,36 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void SimpleAggregation() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticQueryParser();
+            var result = processor.BuildAggregations("min:Field2 min:Field1");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(f => f
+                .Min("min_Field2", m => m.Field(nameof(MyType.Field2)))
+                //.Min("min_Field1", m => m.Field(nameof(MyType.Field1)))
+            ));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void SimpleQueryProcessor() {
             var client = new ElasticClient();
             client.Refresh();
@@ -190,8 +222,8 @@ namespace Foundatio.Parsers.Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticQueryParser(c => c.SetDefaultFilterOperator(Operator.Or));
-            var result = processor.BuildFilter("field1:value1 AND -field2:value2");
+            var processor = new ElasticQueryParser();
+            var result = processor.BuildFilter("field1:value1 AND -field2:value2", new ElasticQueryVisitorContext().SetDefaultOperator(Operator.Or));
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -203,8 +235,8 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new ElasticQueryParser(c => c.SetDefaultFilterOperator(Operator.Or));
-            result = processor.BuildFilter("field1:value1 AND NOT field2:value2");
+            processor = new ElasticQueryParser();
+            result = processor.BuildFilter("field1:value1 AND NOT field2:value2", new ElasticQueryVisitorContext().SetDefaultOperator(Operator.Or));
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -216,8 +248,8 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new ElasticQueryParser(c => c.SetDefaultFilterOperator(Operator.Or));
-            result = processor.BuildFilter("field1:value1 OR NOT field2:value2");
+            processor = new ElasticQueryParser();
+            result = processor.BuildFilter("field1:value1 OR NOT field2:value2", new ElasticQueryVisitorContext().SetDefaultOperator(Operator.Or));
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -229,8 +261,8 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            processor = new ElasticQueryParser(c => c.SetDefaultFilterOperator(Operator.Or));
-            result = processor.BuildFilter("field1:value1 OR -field2:value2");
+            processor = new ElasticQueryParser();
+            result = processor.BuildFilter("field1:value1 OR -field2:value2", new ElasticQueryVisitorContext().SetDefaultOperator(Operator.Or));
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");

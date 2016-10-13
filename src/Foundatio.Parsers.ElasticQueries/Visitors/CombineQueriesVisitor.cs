@@ -6,18 +6,16 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
-namespace Foundatio.Parsers.ElasticQueries.Query {
+namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class CombineQueriesVisitor : ChainableQueryVisitor {
-        private readonly ElasticQueryParserConfiguration _config;
-
-        public CombineQueriesVisitor(ElasticQueryParserConfiguration config) {
-            _config = config;
-        }
-
         public override void Visit(GroupNode node, IQueryVisitorContext context) {
             base.Visit(node, context);
 
-            QueryContainer query = node.GetQuery()?.ToContainer();
+            var elasticContext = context as IElasticQueryVisitorContext;
+            if (elasticContext == null)
+                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+            QueryContainer query = node.GetQuery(() => node.GetDefaultQuery(context))?.ToContainer();
             QueryContainer container = query;
             
             var nested = ((IQueryContainer)query)?.Nested as NestedQuery;
@@ -27,11 +25,11 @@ namespace Foundatio.Parsers.ElasticQueries.Query {
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 QueryContainer childQuery;
                 if (child is GroupNode)
-                    childQuery = child.GetQueryContainer() ?? child.GetQueryOrDefault()?.ToContainer();
+                    childQuery = child.GetQueryContainer() ?? child.GetQuery(() => child.GetDefaultQuery(context))?.ToContainer();
                 else
-                    childQuery = child.GetQueryOrDefault()?.ToContainer();
+                    childQuery = child.GetQuery(() => child.GetDefaultQuery(context))?.ToContainer();
 
-                var op = node.GetOperator(_config.DefaultQueryOperator);
+                var op = node.GetOperator(elasticContext.DefaultOperator);
                 if (child.IsNodeNegated())
                     childQuery = !childQuery;
 

@@ -19,14 +19,6 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             }
         }
 
-        public static PlainFilter GetFilterOrDefault(this IQueryNode node) {
-            var f = node.GetFilter();
-            if (f != null)
-                return f;
-
-            return node.GetDefaultFilter();
-        }
-
         private const string FilterContainerKey = "@FilterContainer";
         public static FilterContainer GetFilterContainer(this IQueryNode node) {
             object value = null;
@@ -46,10 +38,10 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private const string FilterKey = "@Filter";
-        public static PlainFilter GetFilter(this IQueryNode node) {
+        public static PlainFilter GetFilter(this IQueryNode node, Func<PlainFilter> getDefaultValue = null) {
             object value = null;
             if (!node.Data.TryGetValue(FilterKey, out value))
-                return null;
+                return getDefaultValue?.Invoke();
 
             return value as PlainFilter;
         }
@@ -63,37 +55,11 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 node.Data.Remove(FilterKey);
         }
 
-        private const string DefaultFilterKey = "@DefaultFilter";
-        public static PlainFilter GetDefaultFilter(this IQueryNode node) {
-            object value = null;
-            if (!node.Data.TryGetValue(DefaultFilterKey, out value))
-                return null;
-
-            return value as PlainFilter;
-        }
-
-        public static void SetDefaultFilter(this IQueryNode node, PlainFilter filter) {
-            node.Data[DefaultFilterKey] = filter;
-        }
-
-        public static void RemoveDefaultFilter(this IQueryNode node) {
-            if (node.Data.ContainsKey(DefaultFilterKey))
-                node.Data.Remove(DefaultFilterKey);
-        }
-
-        public static PlainQuery GetQueryOrDefault(this IQueryNode node) {
-            var q = node.GetQuery();
-            if (q != null)
-                return q;
-
-            return node.GetDefaultQuery();
-        }
-
         private const string QueryKey = "@Query";
-        public static PlainQuery GetQuery(this IQueryNode node) {
+        public static PlainQuery GetQuery(this IQueryNode node, Func<PlainQuery> getDefaultValue = null) {
             object value = null;
             if (!node.Data.TryGetValue(QueryKey, out value))
-                return null;
+                return getDefaultValue?.Invoke();
 
             return value as PlainQuery;
         }
@@ -125,22 +91,22 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 node.Data.Remove(QueryContainerKey);
         }
 
-        private const string DefaultQueryKey = "@DefaultQuery";
-        public static PlainQuery GetDefaultQuery(this IQueryNode node) {
+        private const string AggregationContainerKey = "@AggregationContainer";
+        public static AggregationContainer GetAggregationContainer(this IQueryNode node) {
             object value = null;
-            if (!node.Data.TryGetValue(DefaultQueryKey, out value))
+            if (!node.Data.TryGetValue(AggregationContainerKey, out value))
                 return null;
 
-            return value as PlainQuery;
+            return value as AggregationContainer;
         }
 
-        public static void SetDefaultQuery(this IQueryNode node, PlainQuery query) {
-            node.Data[DefaultQueryKey] = query;
+        public static void SetAggregationContainer(this IQueryNode node, AggregationContainer container) {
+            node.Data[AggregationContainerKey] = container;
         }
 
-        public static void RemoveDefaultQuery(this IQueryNode node) {
-            if (node.Data.ContainsKey(DefaultQueryKey))
-                node.Data.Remove(DefaultQueryKey);
+        public static void RemoveAggregationContainer(this IQueryNode node) {
+            if (node.Data.ContainsKey(AggregationContainerKey))
+                node.Data.Remove(AggregationContainerKey);
         }
     }
 }

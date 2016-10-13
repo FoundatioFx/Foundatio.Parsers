@@ -53,7 +53,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public override IQueryNode Accept(IQueryNode node, IQueryVisitorContext context) {
-            var rootResolver = context.GetRootAliasResolver();
+            var aliasResolverContext = context as IQueryVisitorContextWithAliasResolver;
+            var rootResolver = aliasResolverContext?.RootAliasResolver;
             if (rootResolver == null)
                 throw new ArgumentNullException(nameof(context), "Context must have a root alias resolver set.");
 
@@ -68,11 +69,11 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public static IQueryNode Run(GroupNode node, AliasResolver resolver) {
-            return new AliasedQueryVisitor().Accept(node, new QueryVisitorContext().SetRootAliasResolver(resolver));
+            return new AliasedQueryVisitor().Accept(node, new QueryVisitorContextWithAliasResolver { RootAliasResolver = resolver });
         }
 
         public static IQueryNode Run(GroupNode node, AliasMap aliasMap) {
-            return new AliasedQueryVisitor().Accept(node, new QueryVisitorContext().SetRootAliasMap(aliasMap));
+            return new AliasedQueryVisitor().Accept(node, new QueryVisitorContextWithAliasResolver { RootAliasResolver = aliasMap.Resolve });
         }
     }
 

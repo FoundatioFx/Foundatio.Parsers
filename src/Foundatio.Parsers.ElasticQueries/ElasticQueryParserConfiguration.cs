@@ -1,31 +1,215 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
-using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParserConfiguration {
-        private readonly SortedSet<QueryVisitorWithPriority> _visitors = new SortedSet<QueryVisitorWithPriority>(new QueryVisitorWithPriority.PriorityComparer());
+        private RootObjectMapping _mapping;
+
+        public ElasticQueryParserConfiguration() {
+            AddFilterVisitor(new CombineFiltersVisitor(), 10000);
+            AddQueryVisitor(new CombineQueriesVisitor(), 10000);
+            AddAggregationVisitor(new SwapFieldAndTermVisitor(), 100);
+            AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
+        }
 
         public string DefaultField { get; private set; } = "_all";
-        public Operator DefaultFilterOperator { get; private set; } = Operator.And;
-        public Operator DefaultQueryOperator { get; private set; } = Operator.Or;
         public AliasResolver DefaultAliasResolver { get; private set; }
-        public IList<IQueryNodeVisitorWithResult<IQueryNode>> Visitors => _visitors.Cast<IQueryNodeVisitorWithResult<IQueryNode>>().ToList();
-        public RootObjectMapping Mapping { get; set; }
-        private Func<RootObjectMapping> UpdateMappingFunc { get; set; }
-        private DateTime? _lastMappingUpdate = null;
+        public ChainedQueryVisitor FilterVisitor { get; } = new ChainedQueryVisitor();
+        public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
+        public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
+
+        public ElasticQueryParserConfiguration UseMappings<T>(Func<PutMappingDescriptor<T>, PutMappingDescriptor<T>> mappingBuilder, Func<RootObjectMapping> getMapping) where T : class {
+            var descriptor = new PutMappingDescriptor<T>(new ConnectionSettings());
+            descriptor = mappingBuilder(descriptor);
+            _mapping = ((IPutMappingRequest<T>)descriptor).Mapping;
+            UpdateMappingFunc = getMapping;
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration UseMappings(Func<RootObjectMapping> getMapping) {
+            _mapping = getMapping();
+            UpdateMappingFunc = getMapping;
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration UseAliases(AliasResolver defaultAliasResolver, int priority = 0) {
+            DefaultAliasResolver = defaultAliasResolver;
+
+            return AddVisitor(new AliasedQueryVisitor(), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseAliases(AliasMap defaultAliasMap, int priority = 0) {
+            DefaultAliasResolver = defaultAliasMap.Resolve;
+
+            return AddVisitor(new AliasedQueryVisitor(), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
+            return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseNested(int priority = 300) {
+            return AddVisitor(new NestedVisitor(), priority);
+        }
+
+        #region Combined Visitor Management
+
+        public ElasticQueryParserConfiguration AddVisitor(IChainableQueryVisitor visitor, int priority = 0) {
+            FilterVisitor.AddVisitor(visitor, priority);
+            QueryVisitor.AddVisitor(visitor, priority);
+            AggregationVisitor.AddVisitor(visitor, priority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration RemoveVisitor<T>() where T : IChainableQueryVisitor {
+            FilterVisitor.RemoveVisitor<T>();
+            QueryVisitor.RemoveVisitor<T>();
+            AggregationVisitor.RemoveVisitor<T>();
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration ReplaceVisitor<T>(IChainableQueryVisitor visitor, int? newPriority = null) where T : IChainableQueryVisitor {
+            FilterVisitor.ReplaceVisitor<T>(visitor, newPriority);
+            QueryVisitor.ReplaceVisitor<T>(visitor, newPriority);
+            AggregationVisitor.ReplaceVisitor<T>(visitor, newPriority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddVisitorBefore<T>(IChainableQueryVisitor visitor) {
+            FilterVisitor.AddVisitorBefore<T>(visitor);
+            QueryVisitor.AddVisitorBefore<T>(visitor);
+            AggregationVisitor.AddVisitorBefore<T>(visitor);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddVisitorAfter<T>(IChainableQueryVisitor visitor) {
+            FilterVisitor.AddVisitorAfter<T>(visitor);
+            QueryVisitor.AddVisitorAfter<T>(visitor);
+            AggregationVisitor.AddVisitorAfter<T>(visitor);
+
+            return this;
+        }
+
+        #endregion
+
+        #region Filter Visitor Management
+
+        public ElasticQueryParserConfiguration AddFilterVisitor(IChainableQueryVisitor visitor, int priority = 0) {
+            FilterVisitor.AddVisitor(visitor, priority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration RemoveFilterVisitor<T>() where T : IChainableQueryVisitor {
+            FilterVisitor.RemoveVisitor<T>();
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration ReplaceFilterVisitor<T>(IChainableQueryVisitor visitor, int? newPriority = null) where T : IChainableQueryVisitor {
+            FilterVisitor.ReplaceVisitor<T>(visitor, newPriority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddFilterVisitorBefore<T>(IChainableQueryVisitor visitor) {
+            FilterVisitor.AddVisitorBefore<T>(visitor);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddFilterVisitorAfter<T>(IChainableQueryVisitor visitor) {
+            FilterVisitor.AddVisitorAfter<T>(visitor);
+
+            return this;
+        }
+
+        #endregion
+
+        #region Query Visitor Management
+
+        public ElasticQueryParserConfiguration AddQueryVisitor(IChainableQueryVisitor visitor, int priority = 0) {
+            QueryVisitor.AddVisitor(visitor, priority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration RemoveQueryVisitor<T>() where T : IChainableQueryVisitor {
+            QueryVisitor.RemoveVisitor<T>();
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration ReplaceQueryVisitor<T>(IChainableQueryVisitor visitor, int? newPriority = null) where T : IChainableQueryVisitor {
+            QueryVisitor.ReplaceVisitor<T>(visitor, newPriority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddQueryVisitorBefore<T>(IChainableQueryVisitor visitor) {
+            QueryVisitor.AddVisitorBefore<T>(visitor);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddQueryVisitorAfter<T>(IChainableQueryVisitor visitor) {
+            QueryVisitor.AddVisitorAfter<T>(visitor);
+
+            return this;
+        }
+
+        #endregion
+
+        #region Aggregation Visitor Management
+
+        public ElasticQueryParserConfiguration AddAggregationVisitor(IChainableQueryVisitor visitor, int priority = 0) {
+            AggregationVisitor.AddVisitor(visitor, priority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration RemoveAggregationVisitor<T>() where T : IChainableQueryVisitor {
+            AggregationVisitor.RemoveVisitor<T>();
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration ReplaceAggregationVisitor<T>(IChainableQueryVisitor visitor, int? newPriority = null) where T : IChainableQueryVisitor {
+            AggregationVisitor.ReplaceVisitor<T>(visitor, newPriority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddAggregationVisitorBefore<T>(IChainableQueryVisitor visitor) {
+            AggregationVisitor.AddVisitorBefore<T>(visitor);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddAggregationVisitorAfter<T>(IChainableQueryVisitor visitor) {
+            AggregationVisitor.AddVisitorAfter<T>(visitor);
+
+            return this;
+        }
+
+        #endregion
 
         public IElasticType GetFieldMapping(string field) {
-            if (String.IsNullOrEmpty(field) || Mapping == null)
+            if (String.IsNullOrEmpty(field) || _mapping == null)
                 return null;
 
             string[] fieldParts = field.Split('.');
-            ObjectMapping currentObject = Mapping;
+            ObjectMapping currentObject = _mapping;
 
             for (int depth = 0; depth < fieldParts.Length; depth++) {
                 string fieldPart = fieldParts[depth];
@@ -40,7 +224,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                     if (fieldMapping == null && UpdateMapping()) {
                         // we have updated mapping, start over from the top
                         depth = -1;
-                        currentObject = Mapping;
+                        currentObject = _mapping;
                         continue;
                     }
 
@@ -60,95 +244,16 @@ namespace Foundatio.Parsers.ElasticQueries {
             return null;
         }
 
+        private Func<RootObjectMapping> UpdateMappingFunc { get; set; }
+        private DateTime? _lastMappingUpdate = null;
         private bool UpdateMapping() {
             if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.Now.SubtractMinutes(1))
                 return false;
 
-            Mapping = UpdateMappingFunc();
+            _mapping = UpdateMappingFunc();
             _lastMappingUpdate = DateTime.Now;
 
             return true;
-        }
-
-        public bool IsFieldAnalyzed(string field) {
-            if (String.IsNullOrEmpty(field))
-                return true;
-
-            var mapping = GetFieldMapping(field) as StringMapping;
-            if (mapping == null)
-                return false;
-
-            return mapping.Index == FieldIndexOption.Analyzed || mapping.Index == null;
-        }
-
-        public bool IsNestedFieldType(string field) {
-            if (String.IsNullOrEmpty(field))
-                return false;
-
-            var mapping = GetFieldMapping(field) as NestedObjectMapping;
-            return mapping != null;
-        }
-
-        public bool IsGeoFieldType(string field) {
-            if (String.IsNullOrEmpty(field))
-                return false;
-
-            var mapping = GetFieldMapping(field) as GeoPointMapping;
-            return mapping != null;
-        }
-
-        public ElasticQueryParserConfiguration SetDefaultField(string field) {
-            DefaultField = field;
-            return this;
-        }
-
-        public ElasticQueryParserConfiguration SetDefaultFilterOperator(Operator op) {
-            DefaultFilterOperator = op;
-            return this;
-        }
-
-        public ElasticQueryParserConfiguration SetDefaultQueryOperator(Operator op) {
-            DefaultQueryOperator = op;
-            return this;
-        }
-
-        public ElasticQueryParserConfiguration UseMappings<T>(Func<PutMappingDescriptor<T>, PutMappingDescriptor<T>> mappingBuilder, Func<RootObjectMapping> getMapping) where T : class {
-            var descriptor = new PutMappingDescriptor<T>(new ConnectionSettings());
-            descriptor = mappingBuilder(descriptor);
-            Mapping = ((IPutMappingRequest<T>)descriptor).Mapping;
-            UpdateMappingFunc = getMapping;
-
-            return this;
-        }
-
-        public ElasticQueryParserConfiguration UseMappings(Func<RootObjectMapping> getMapping) {
-            Mapping = getMapping();
-            UpdateMappingFunc = getMapping;
-
-            return this;
-        }
-
-        public ElasticQueryParserConfiguration AddVisitor(IChainableQueryVisitor visitor, int priority = 0) {
-            _visitors.Add(new QueryVisitorWithPriority { Visitor = visitor, Priority = priority });
-            return this;
-        }
-
-        public ElasticQueryParserConfiguration UseAliases(AliasResolver defaultAliasResolver, int priority = 0) {
-            DefaultAliasResolver = defaultAliasResolver;
-            return AddVisitor(new AliasedQueryVisitor(), priority);
-        }
-
-        public ElasticQueryParserConfiguration UseAliases(AliasMap defaultAliasMap, int priority = 0) {
-            DefaultAliasResolver = defaultAliasMap.Resolve;
-            return AddVisitor(new AliasedQueryVisitor(), priority);
-        }
-
-        public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
-            return AddVisitor(new GeoVisitor(IsGeoFieldType, resolveGeoLocation), priority);
-        }
-
-        public ElasticQueryParserConfiguration UseNested(int priority = 300) {
-            return AddVisitor(new NestedVisitor(IsNestedFieldType), priority);
         }
     }
 }

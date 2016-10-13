@@ -1,68 +1,72 @@
 ﻿using System;
-using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.ElasticQueries.Filter;
-using Foundatio.Parsers.ElasticQueries.Query;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParser {
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
-        private readonly ChainedQueryVisitor _filterVisitors = new ChainedQueryVisitor();
-        private readonly CombineFiltersVisitor _combineFiltersVisitor;
-        private readonly ChainedQueryVisitor _queryVisitors = new ChainedQueryVisitor();
-        private readonly CombineQueriesVisitor _combineQueriesVisitor;
-        private readonly AliasResolver _defaultAliasResolver;
+        private readonly ElasticQueryParserConfiguration _config;
 
         public ElasticQueryParser(Action<ElasticQueryParserConfiguration> configure = null) {
             var config = new ElasticQueryParserConfiguration();
             configure?.Invoke(config);
-            _defaultAliasResolver = config.DefaultAliasResolver;
-
-            _filterVisitors.AddVisitor(new DefaultFilterVisitor(config), 100);
-            foreach (var visitor in config.Visitors.OfType<QueryVisitorWithPriority>())
-                _filterVisitors.AddVisitor(visitor);
-
-            _combineFiltersVisitor = new CombineFiltersVisitor(config);
-
-            _queryVisitors.AddVisitor(new DefaultQueryVisitor(config), 100);
-            foreach (var visitor in config.Visitors.OfType<QueryVisitorWithPriority>())
-                _queryVisitors.AddVisitor(visitor);
-
-            _combineQueriesVisitor = new CombineQueriesVisitor(config);
+            _config = config;
         }
 
-        public FilterContainer BuildFilter(string filter, string aggregations = null, IQueryVisitorContext context = null)  {
+        public FilterContainer BuildFilter(string filter, IQueryVisitorContext context = null)  {
             var result = _parser.Parse(filter);
 
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
-            if (_defaultAliasResolver != null && context.GetRootAliasResolver() == null)
-                context.SetRootAliasResolver(_defaultAliasResolver);
+            context.SetGetFieldMappingFunc(_config.GetFieldMapping)
+                .SetDefaultOperator(Operator.And)
+                .SetDefaultField(_config.DefaultField);
+
+            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
+                context.SetRootAliasResolver(_config.DefaultAliasResolver);
             
-            var filterNode = _filterVisitors.Accept(result, context);
-            filterNode = _combineFiltersVisitor.Accept(filterNode, context);
+            var filterNode = _config.FilterVisitor.Accept(result, context);
 
             return filterNode?.GetFilterContainer() ?? new MatchAllFilter();
         }
 
-        public QueryContainer BuildQuery(string query, string aggregations = null, IQueryVisitorContext context = null) {
+        public QueryContainer BuildQuery(string query, IQueryVisitorContext context = null) {
             var result = _parser.Parse(query);
 
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
-            if (_defaultAliasResolver != null && context.GetRootAliasResolver() == null)
-                context.SetRootAliasResolver(_defaultAliasResolver);
+            context.SetGetFieldMappingFunc(_config.GetFieldMapping)
+                .SetDefaultOperator(Operator.Or)
+                .SetDefaultField(_config.DefaultField);
 
-            var queryNode = _queryVisitors.Accept(result, context);
-            queryNode = _combineQueriesVisitor.Accept(queryNode, context);
+            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
+                context.SetRootAliasResolver(_config.DefaultAliasResolver);
+
+            var queryNode = _config.QueryVisitor.Accept(result, context);
 
             return queryNode?.GetQueryContainer() ?? new MatchAllQuery();
+        }
+
+        public AggregationContainer BuildAggregations(string aggregations, IQueryVisitorContext context = null) {
+            var result = _parser.Parse(aggregations);
+
+            if (context == null)
+                context = new ElasticQueryVisitorContext();
+
+            context.SetGetFieldMappingFunc(_config.GetFieldMapping);
+
+            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
+                context.SetRootAliasResolver(_config.DefaultAliasResolver);
+
+            var queryNode = _config.AggregationVisitor.Accept(result, context);
+
+            return queryNode?.GetAggregationContainer() ?? new AggregationContainer();
         }
 
         // want to be able to support things like date macro expansion (now-1d/d), geo query string filters, etc

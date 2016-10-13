@@ -58,12 +58,17 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
-    <Compile Include="Filter\CombineFiltersVisitor.cs" />
-    <Compile Include="Query\CombineQueriesVisitor.cs" />
+    <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
+    <Compile Include="Extensions\SearchDescriptorExtensions.cs" />
+    <Compile Include="Visitors\CombineAggregationsVisitor.cs" />
+    <Compile Include="Visitors\CombineFiltersVisitor.cs" />
+    <Compile Include="Visitors\CombineQueriesVisitor.cs" />
     <Compile Include="Visitors\ElasticQueryVisitorContext.cs" />
+    <Compile Include="Visitors\SwapFieldAndTermVisitor.cs" />
+    <Compile Include="Visitors\IElasticQueryVisitorContext.cs" />
     <Compile Include="Visitors\NestedVisitor.cs" />
-    <Compile Include="Query\DefaultQueryVisitor.cs" />
-    <Compile Include="Filter\DefaultFilterVisitor.cs" />
+    <Compile Include="Extensions\DefaultQueryNodeExtensions.cs" />
+    <Compile Include="Extensions\DefaultFilterNodeExtensions.cs" />
     <Compile Include="Visitors\GeoVisitor.cs" />
     <Compile Include="ElasticQueryParser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

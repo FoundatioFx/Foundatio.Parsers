@@ -21,6 +21,39 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _isDirty = true;
         }
 
+        public void RemoveVisitor<T>() where T : IChainableQueryVisitor {
+            var index = _visitors.FindIndex(v => typeof(T) == v.Visitor.GetType());
+            if (index >= 0)
+                _visitors.RemoveAt(index);
+        }
+
+        public void ReplaceVisitor<T>(IChainableQueryVisitor visitor, int? newPriority = null) where T : IChainableQueryVisitor {
+            int priority = 0;
+            var referenceVisitor = _visitors.FirstOrDefault(v => typeof(T) == v.Visitor.GetType());
+            if (referenceVisitor != null)
+                priority = referenceVisitor.Priority - 1;
+
+            _visitors.Add(new QueryVisitorWithPriority { Visitor = visitor, Priority = priority });
+        }
+
+        public void AddVisitorBefore<T>(IChainableQueryVisitor visitor) {
+            int priority = 0;
+            var referenceVisitor = _visitors.FirstOrDefault(v => typeof(T) == v.Visitor.GetType());
+            if (referenceVisitor != null)
+                priority = referenceVisitor.Priority - 1;
+
+            _visitors.Add(new QueryVisitorWithPriority { Visitor = visitor, Priority = priority });
+        }
+
+        public void AddVisitorAfter<T>(IChainableQueryVisitor visitor) {
+            int priority = 0;
+            var referenceVisitor = _visitors.FirstOrDefault(v => typeof(T) == v.Visitor.GetType());
+            if (referenceVisitor != null)
+                priority = referenceVisitor.Priority + 1;
+
+            _visitors.Add(new QueryVisitorWithPriority { Visitor = visitor, Priority = priority });
+        }
+
         public override IQueryNode Accept(IQueryNode node, IQueryVisitorContext context) {
             if (_isDirty)
                 _frozenVisitors = _visitors.OrderBy(v => v.Priority).ToArray();

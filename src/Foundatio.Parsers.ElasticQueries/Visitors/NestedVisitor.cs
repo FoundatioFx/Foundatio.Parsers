@@ -7,14 +7,8 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class NestedVisitor: ChainableQueryVisitor {
-        private readonly Func<string, bool> _isNestedField;
-
-        public NestedVisitor(Func<string, bool> isNestedField) {
-            _isNestedField = isNestedField;
-        }
-
         public override void Visit(GroupNode node, IQueryVisitorContext context) {
-            if (String.IsNullOrEmpty(node.Field) || !IsFieldNested(node.GetNameParts())) {
+            if (String.IsNullOrEmpty(node.Field) || !IsFieldNested(node.GetNameParts(), context)) {
                 base.Visit(node, context);
                 return;
             }
@@ -26,15 +20,17 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
-            if (!IsFieldNested(node.Field?.Split('.')))
+            if (!IsFieldNested(node.Field?.Split('.'), context))
                 return;
 
-            node.SetFilter(new NestedFilter { Path = node.GetParentFullName(), Filter = node.GetFilterOrDefault()?.ToContainer() });
-            node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQueryOrDefault()?.ToContainer() });
+            node.SetFilter(new NestedFilter { Path = node.GetParentFullName(), Filter = node.GetFilter(() => node.GetDefaultFilter(context))?.ToContainer() });
+            node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQuery(() => node.GetDefaultQuery(context))?.ToContainer() });
         }
 
-        private bool IsFieldNested(string[] nameParts) {
-            if (nameParts == null || _isNestedField == null || nameParts.Length == 0)
+        private bool IsFieldNested(string[] nameParts, IQueryVisitorContext context) {
+            var elasticContext = context as IElasticQueryVisitorContext;
+
+            if (nameParts == null || elasticContext == null || nameParts.Length == 0)
                 return false;
 
             string fieldName = String.Empty;
@@ -44,7 +40,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
                 fieldName += nameParts[i];
 
-                if (_isNestedField(fieldName))
+                if (elasticContext.IsNestedFieldType(fieldName))
                     return true;
             }
 

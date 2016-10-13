@@ -55,11 +55,11 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
 
             builder.Append(IsQuotedTerm ? "\"" + Term + "\"" : Term);
 
-            if (Boost != null)
-                builder.Append("^" + Boost);
-
             if (Proximity != null)
                 builder.Append("~" + Proximity);
+
+            if (Boost != null)
+                builder.Append("^" + Boost);
 
             return builder.ToString();
         }
