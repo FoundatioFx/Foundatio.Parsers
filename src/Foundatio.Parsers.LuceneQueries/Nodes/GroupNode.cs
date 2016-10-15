@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public class GroupNode : QueryNodeBase, IFieldQueryNode {
@@ -12,6 +13,8 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public bool? IsNegated { get; set; }
         public string Prefix { get; set; }
         public string Boost { get; set; }
+        public string UnescapedBoost => Boost.Unescape();
+        public string Proximity { get; set; }
 
         public GroupNode CopyTo(GroupNode target) {
             if (Left != null)
@@ -32,17 +35,21 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (Boost != null)
                 target.Boost = Boost;
 
+            if (Proximity != null)
+                target.Proximity = Proximity;
+
+            foreach (var kvp in Data)
+                target.Data.Add(kvp.Key, kvp.Value);
+
             return target;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             var builder = new StringBuilder();
 
             builder.Append(Prefix);
 
-            if (!String.IsNullOrEmpty(Field))
-            {
+            if (!String.IsNullOrEmpty(Field)) {
                 builder.Append(Field);
                 builder.Append(":");
             }
@@ -69,14 +76,19 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (HasParens)
                 builder.Append(")");
 
+            if (Proximity != null)
+                builder.Append("~" + Proximity);
+
             if (Boost != null)
                 builder.Append("^" + Boost);
 
             return builder.ToString();
         }
 
-        public override IList<IQueryNode> Children {
-            get {
+        public override IList<IQueryNode> Children
+        {
+            get
+            {
                 var children = new List<IQueryNode>();
                 if (Left != null)
                     children.Add(Left);

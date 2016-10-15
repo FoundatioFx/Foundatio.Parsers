@@ -35,11 +35,13 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (Proximity != null)
                 target.Proximity = Proximity;
 
+            foreach (var kvp in Data)
+                target.Data.Add(kvp.Key, kvp.Value);
+
             return target;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             var builder = new StringBuilder();
 
             if (IsNegated.HasValue && IsNegated.Value)
@@ -47,8 +49,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
 
             builder.Append(Prefix);
 
-            if (!String.IsNullOrEmpty(Field))
-            {
+            if (!String.IsNullOrEmpty(Field)) {
                 builder.Append(Field);
                 builder.Append(":");
             }

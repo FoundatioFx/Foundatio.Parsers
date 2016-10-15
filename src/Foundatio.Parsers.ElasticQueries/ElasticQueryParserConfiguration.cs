@@ -12,7 +12,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration() {
             AddFilterVisitor(new CombineFiltersVisitor(), 10000);
             AddQueryVisitor(new CombineQueriesVisitor(), 10000);
-            AddAggregationVisitor(new SwapFieldAndTermVisitor(), 100);
+            AddAggregationVisitor(new AssignAggregationTypeVisitor(), 100);
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
         }
 

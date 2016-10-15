@@ -121,7 +121,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void CanGenerateSingleQuery() {
-            string query = "datehistogram:(date~2^-5\\:30 min:date)";
+            string query = "datehistogram:(date~2^-5\\:30 min:date max:date)";
             var parser = new LuceneQueryParser();
 
             IQueryNode result = parser.Parse(query);
@@ -130,7 +130,7 @@ namespace Foundatio.Parsers.Tests {
             var generatedQuery = GenerateQueryVisitor.Run(result);
             Assert.Equal(query, generatedQuery);
 
-            new SwapFieldAndTermVisitor().Accept(result, null);
+            new AssignAggregationTypeVisitor().Accept(result, null);
             _logger.Info(DebugQueryVisitor.Run(result));
         }
     }

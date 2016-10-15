@@ -18,6 +18,9 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (Field != null)
                 target.Field = Field;
 
+            foreach (var kvp in Data)
+                target.Data.Add(kvp.Key, kvp.Value);
+
             return target;
         }
 

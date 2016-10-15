@@ -146,21 +146,22 @@ namespace Foundatio.Parsers.Tests {
 
             client.CreateIndex(i => i.Index("stuff"));
             client.Map<MyType>(d => d.Dynamic().Index("stuff"));
-            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
-            client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
-            client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Index(new MyType { Field2 = "value4", Field5 = DateTime.Now }, i => i.Index("stuff"));
             client.Refresh();
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildAggregations("min:Field2 min:Field1");
+            var result = processor.BuildAggregations("date:(date~1d^-3h min:field2 min:field1)");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
 
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(f => f
-                .Min("min_Field2", m => m.Field(nameof(MyType.Field2)))
-                //.Min("min_Field1", m => m.Field(nameof(MyType.Field1)))
-            ));
+            var expectedResponse = client.Search<MyType>(i => i.Index("stuff").Aggregations(f => f
+                .DateHistogram("date_field4", d => d.Field(d2 => d2.Field5).Interval("1d").Offset("-3h").Aggregations(l => l
+                    .Min("min_field2", m => m.Field(m2 => m2.Field2))
+                    .Min("min_field1", m => m.Field(m2 => m2.Field1))
+            ))));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -178,7 +179,7 @@ namespace Foundatio.Parsers.Tests {
                     .String(e => e.Name(m => m.Field3).Index(FieldIndexOption.Analyzed)))));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
-            client.Index(new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now"}, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now" }, i => i.Index("stuff"));
             client.Refresh();
 
             var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping));
@@ -572,6 +573,7 @@ namespace Foundatio.Parsers.Tests {
         public string Field2 { get; set; }
         public string Field3 { get; set; }
         public int Field4 { get; set; }
+        public DateTime Field5 { get; set; }
     }
 
     public class MyNestedType {

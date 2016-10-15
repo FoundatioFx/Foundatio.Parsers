@@ -20,6 +20,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
+            _writer.WriteLineIf(node.Boost != null, "Boost: {0}", node.Boost);
+            _writer.WriteLineIf(node.Proximity != null, "Proximity: {0}", node.Proximity);
 
             _writer.WriteIf(node.Left != null, "Left - ");
             node.Left?.Accept(this, context);
@@ -29,6 +31,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
             _writer.WriteLineIf(node.Operator != GroupOperator.Default, "Operator: {0}", node.Operator);
             _writer.WriteLineIf(node.HasParens, "Parens: true");
+
+            WriteData(node);
 
             _writer.Indent--;
         }
@@ -43,6 +47,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLineIf(node.Term != null, "Term: {0}", node.Term);
             _writer.WriteLineIf(node.Boost != null, "Boost: {0}", node.Boost);
             _writer.WriteLineIf(node.Proximity != null, "Proximity: {0}", node.Proximity);
+
+            WriteData(node);
 
             _writer.Indent--;
         }
@@ -59,6 +65,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLineIf(node.MinInclusive.HasValue, "MinInclusive: {0}", node.MinInclusive);
             _writer.WriteLineIf(node.MaxInclusive.HasValue, "MaxInclusive: {0}", node.MaxInclusive);
 
+            WriteData(node);
+
             _writer.Indent--;
         }
 
@@ -68,6 +76,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
+
+            WriteData(node);
 
             _writer.Indent--;
         }
@@ -79,6 +89,22 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
 
+            WriteData(node);
+
+            _writer.Indent--;
+        }
+
+        private void WriteData(QueryNodeBase node) {
+            if (node.Data.Count <= 0)
+                return;
+
+            _writer.WriteLine("Data:");
+            _writer.Indent++;
+            foreach (var kvp in node.Data) {
+                _writer.Write(kvp.Key);
+                _writer.Write(": ");
+                _writer.WriteLine(kvp.Value.ToString());
+            }
             _writer.Indent--;
         }
 

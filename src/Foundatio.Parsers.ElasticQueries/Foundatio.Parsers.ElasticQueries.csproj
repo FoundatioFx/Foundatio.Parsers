@@ -57,6 +57,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Extensions\DefaultAggregationNodeExtensions.cs" />
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
     <Compile Include="Extensions\SearchDescriptorExtensions.cs" />
@@ -64,7 +65,7 @@
     <Compile Include="Visitors\CombineFiltersVisitor.cs" />
     <Compile Include="Visitors\CombineQueriesVisitor.cs" />
     <Compile Include="Visitors\ElasticQueryVisitorContext.cs" />
-    <Compile Include="Visitors\SwapFieldAndTermVisitor.cs" />
+    <Compile Include="Visitors\AssignAggregationTypeVisitor.cs" />
     <Compile Include="Visitors\IElasticQueryVisitorContext.cs" />
     <Compile Include="Visitors\NestedVisitor.cs" />
     <Compile Include="Extensions\DefaultQueryNodeExtensions.cs" />

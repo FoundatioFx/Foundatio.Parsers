@@ -31,7 +31,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         public static PlainQuery GetDefaultQuery(this TermNode node, IQueryVisitorContext context) {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null)
-                throw new ArgumentException("Context must be of type ElasticQueryVisitorContext", nameof(context));
+                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             PlainQuery query = null;
             if (elasticContext.IsFieldAnalyzed(node.GetFullName())) {
