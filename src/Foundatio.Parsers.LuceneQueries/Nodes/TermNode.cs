@@ -12,6 +12,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public string UnescapedTerm => Term.Unescape();
         public bool IsQuotedTerm { get; set; }
         public string Boost { get; set; }
+        public string UnescapedBoost => Boost.Unescape();
         public string Proximity { get; set; }
 
         public TermNode CopyTo(TermNode target) {

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Nest;
@@ -110,22 +111,26 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 node.Data.Remove(AggregationTypeKey);
         }
 
-        private const string AggregationContainerKey = "@AggregationContainer";
-        public static AggregationContainer GetAggregationContainer(this IQueryNode node, Func<AggregationContainer> getDefaultValue = null) {
+        private const string AggregationKey = "@Aggregation";
+        public static NamedAggregationContainer GetAggregation(this IQueryNode node, Func<NamedAggregationContainer> getDefaultValue = null) {
             object value = null;
-            if (!node.Data.TryGetValue(AggregationContainerKey, out value))
+            if (!node.Data.TryGetValue(AggregationKey, out value))
                 return getDefaultValue?.Invoke();
 
-            return value as AggregationContainer;
+            return value as NamedAggregationContainer;
         }
 
-        public static void SetAggregationContainer(this IQueryNode node, AggregationContainer container) {
-            node.Data[AggregationContainerKey] = container;
+        public static void SetAggregation(this IQueryNode node, string name, IAggregationContainer container) {
+            node.Data[AggregationKey] = new NamedAggregationContainer(name, container);
         }
 
-        public static void RemoveAggregationContainer(this IQueryNode node) {
-            if (node.Data.ContainsKey(AggregationContainerKey))
-                node.Data.Remove(AggregationContainerKey);
+        public static void SetAggregation(this IQueryNode node, NamedAggregationContainer namedContainer) {
+            node.Data[AggregationKey] = namedContainer;
+        }
+
+        public static void RemoveAggregation(this IQueryNode node) {
+            if (node.Data.ContainsKey(AggregationKey))
+                node.Data.Remove(AggregationKey);
         }
     }
 }

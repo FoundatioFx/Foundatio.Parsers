@@ -6,7 +6,7 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultAggregationNodeExtensions {
-        public static AggregationContainer GetDefaultAggregation(this IQueryNode node, IQueryVisitorContext context) {
+        public static NamedAggregationContainer GetDefaultAggregation(this IQueryNode node, IQueryVisitorContext context) {
             var groupNode = node as GroupNode;
             if (groupNode != null)
                 return groupNode.GetDefaultAggregation(context);
@@ -18,7 +18,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return null;
         }
 
-        public static AggregationContainer GetDefaultAggregation(this GroupNode node, IQueryVisitorContext context) {
+        public static NamedAggregationContainer GetDefaultAggregation(this GroupNode node, IQueryVisitorContext context) {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -28,39 +28,113 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.DateHistogram:
-                    return new AggregationContainer {
-                        DateHistogram = new DateHistogramAggregator {
-                            Field = node.Field,
-                            Interval = node.Proximity,
-                            Offset = node.UnescapedBoost
-                        }
-                    };
+                    return new NamedAggregationContainer(
+                            "date_" + node.Field,
+                            new AggregationContainer {
+                                DateHistogram = new DateHistogramAggregator {
+                                    Field = node.Field,
+                                    Interval = node.Proximity,
+                                    Format = "date_optional_time",
+                                    Offset = node.UnescapedBoost
+                                }
+                            }
+                        );
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
-                    return new AggregationContainer {
-                        GeoHash = new GeoHashAggregator {
-                            Field = node.Field,
-                            Precision = precision
-                        }
-                    };
+                    return new NamedAggregationContainer(
+                            "geogrid_" + node.Field,
+                            new AggregationContainer {
+                                GeoHash = new GeoHashAggregator {
+                                    Field = node.Field,
+                                    Precision = precision
+                                }
+                            }
+                        );
+                case AggregationType.Terms:
+                    return new NamedAggregationContainer(
+                            "terms_" + node.Field,
+                            new AggregationContainer { Terms = new TermsAggregator { Field = node.Field } }
+                        );
             }
 
             return null;
         }
 
-        public static AggregationContainer GetDefaultAggregation(this TermNode node, IQueryVisitorContext context) {
+        public static NamedAggregationContainer GetDefaultAggregation(this TermNode node, IQueryVisitorContext context) {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
-                    return new AggregationContainer { Min = new MinAggregator { Field = node.Field } };
+                    return new NamedAggregationContainer(
+                            "min_" + node.Field,
+                            new AggregationContainer { Min = new MinAggregator { Field = node.Field } }
+                        );
                 case AggregationType.Max:
-                    return new AggregationContainer { Max = new MaxAggregator { Field = node.Field } };
+                    return new NamedAggregationContainer(
+                            "max_" + node.Field,
+                            new AggregationContainer { Max = new MaxAggregator { Field = node.Field } }
+                        );
+                case AggregationType.Avg:
+                    return new NamedAggregationContainer(
+                            "avg_" + node.Field,
+                            new AggregationContainer { Average = new AverageAggregator { Field = node.Field } }
+                        );
+                case AggregationType.Sum:
+                    return new NamedAggregationContainer(
+                            "sum_" + node.Field,
+                            new AggregationContainer { Sum = new SumAggregator { Field = node.Field } }
+                        );
+                case AggregationType.Cardinality:
+                    return new NamedAggregationContainer(
+                            "cardinality_" + node.Field,
+                            new AggregationContainer { Cardinality = new CardinalityAggregator { Field = node.Field } }
+                        );
+                case AggregationType.Missing:
+                    return new NamedAggregationContainer(
+                            "missing_" + node.Field,
+                            new AggregationContainer { Missing = new MissingAggregator { Field = node.Field } }
+                        );
+                case AggregationType.DateHistogram:
+                    return new NamedAggregationContainer(
+                            "date_" + node.Field,
+                            new AggregationContainer {
+                                DateHistogram = new DateHistogramAggregator {
+                                    Field = node.Field,
+                                    Interval = node.Proximity,
+                                    Format = "date_optional_time",
+                                    Offset = node.UnescapedBoost
+                                }
+                            }
+                        );
+                case AggregationType.Percentiles:
+                    return new NamedAggregationContainer(
+                            "percentiles_" + node.Field,
+                            new AggregationContainer { Percentiles = new PercentilesAggregator { Field = node.Field } }
+                        );
+                case AggregationType.GeoHashGrid:
+                    var precision = GeoHashPrecision.Precision1;
+                    if (!String.IsNullOrEmpty(node.Proximity))
+                        Enum.TryParse(node.Proximity, out precision);
+
+                    return new NamedAggregationContainer(
+                            "geogrid_" + node.Field,
+                            new AggregationContainer {
+                                GeoHash = new GeoHashAggregator {
+                                    Field = node.Field,
+                                    Precision = precision
+                                }
+                            }
+                        );
+                case AggregationType.Terms:
+                    return new NamedAggregationContainer(
+                            "terms_" + node.Field,
+                            new AggregationContainer { Terms = new TermsAggregator { Field = node.Field } }
+                        );
             }
 
             return null;

@@ -152,16 +152,20 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh();
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildAggregations("date:(date~1d^-3h min:field2 min:field1)");
+            var result = processor.BuildAggregations("min:field2 max:field2 date:(field5~1d^-3h min:field2 max:field2 min:field1)");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<MyType>(i => i.Index("stuff").Aggregations(f => f
-                .DateHistogram("date_field4", d => d.Field(d2 => d2.Field5).Interval("1d").Offset("-3h").Aggregations(l => l
-                    .Min("min_field2", m => m.Field(m2 => m2.Field2))
+                .Max("max_field2", m => m.Field(m2 => m2.Field2))
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Offset("-3h").Aggregations(l => l
+                    .Max("max_field2", m => m.Field(m2 => m2.Field2))
                     .Min("min_field1", m => m.Field(m2 => m2.Field1))
-            ))));
+                    .Min("min_field2", m => m.Field(m2 => m2.Field2))
+                ))
+                .Min("min_field2", m => m.Field(m2 => m2.Field2))
+            ));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 

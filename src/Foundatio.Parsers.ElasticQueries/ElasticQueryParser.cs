@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
@@ -66,7 +67,10 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             var queryNode = _config.AggregationVisitor.Accept(result, context);
 
-            return queryNode?.GetAggregationContainer() ?? new AggregationContainer();
+            var namedAggregation = queryNode?.GetAggregation();
+            return namedAggregation != null ? new AggregationContainer {
+                Aggregations = namedAggregation.Container.Aggregations
+            } : new AggregationContainer();
         }
 
         // want to be able to support things like date macro expansion (now-1d/d), geo query string filters, etc

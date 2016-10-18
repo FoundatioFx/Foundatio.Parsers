@@ -11,11 +11,11 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (leftTerm == null || !String.IsNullOrEmpty(leftTerm.Field))
                     throw new ApplicationException("The first item in an aggregation group must be the name of the target field.");
 
+                node.SetAggregationType(GetAggregationType(node.Field));
                 node.Field = leftTerm.Term;
                 node.Boost = leftTerm.Boost;
                 node.Proximity = leftTerm.Proximity;
                 node.Left = null;
-                node.SetAggregationType(GetAggregationType(node.Field));
             }
 
             base.Visit(node, context);

@@ -15,37 +15,43 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            var container = GetParentContainer(node, context);
+            var namedAgg = GetParentContainer(node, context);
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
-                var childContainer = child.GetAggregationContainer(() => child.GetDefaultAggregation(context));
-                if (childContainer != null)
-                    container.Aggregations.Add(Guid.NewGuid().ToString(), childContainer);
+                var aggregation = child.GetAggregation(() => child.GetDefaultAggregation(context));
+                if (aggregation != null)
+                    namedAgg.Container.Aggregations.Add(aggregation.Name, aggregation.Container);
             }
 
             if (node.Parent == null)
-                node.SetAggregationContainer(container);
+                node.SetAggregation(namedAgg);
         }
 
-        private AggregationContainer GetParentContainer(IQueryNode node, IQueryVisitorContext context) {
-            AggregationContainer container = null;
+        private NamedAggregationContainer GetParentContainer(IQueryNode node, IQueryVisitorContext context) {
+            NamedAggregationContainer container = null;
             var currentNode = node;
             while (container == null && currentNode != null) {
                 IQueryNode n = currentNode;
-                container = currentNode.GetAggregationContainer(() => {
+                container = n.GetAggregation(() => {
                     var result = n.GetDefaultAggregation(context);
                     if (result != null)
-                        n.SetAggregationContainer(result);
+                        n.SetAggregation(result);
 
                     return result;
                 });
-                currentNode = currentNode.Parent;
+
+                if (currentNode.Parent != null)
+                    currentNode = currentNode.Parent;
+                else
+                    break;
             }
 
-            if (container == null)
-                container = new AggregationContainer();
+            if (container == null) {
+                container = new NamedAggregationContainer();
+                currentNode.SetAggregation(container);
+            }
 
-            if (container.Aggregations == null)
-                container.Aggregations = new Dictionary<string, IAggregationContainer>();
+            if (container.Container.Aggregations == null)
+                container.Container.Aggregations = new Dictionary<string, IAggregationContainer>();
 
             return container;
         }
