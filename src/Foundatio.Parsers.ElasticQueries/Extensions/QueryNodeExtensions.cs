@@ -94,16 +94,16 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private const string AggregationTypeKey = "@AggregationType";
-        public static AggregationType GetAggregationType(this IQueryNode node) {
+        public static string GetAggregationType(this IQueryNode node) {
             object value = null;
             if (!node.Data.TryGetValue(AggregationTypeKey, out value))
-                return AggregationType.None;
+                return null;
 
-            return (AggregationType)value;
+            return (string)value;
         }
 
-        public static void SetAggregationType(this IQueryNode node, AggregationType container) {
-            node.Data[AggregationTypeKey] = container;
+        public static void SetAggregationType(this IQueryNode node, string aggregationType) {
+            node.Data[AggregationTypeKey] = aggregationType;
         }
 
         public static void RemoveAggregationType(this IQueryNode node) {
