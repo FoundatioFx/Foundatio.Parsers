@@ -42,8 +42,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return _fields;
         }
 
-        public static ISet<string> Run(IQueryNode node) {
-            return new GetReferencedFieldsQueryVisitor().Accept(node, null);
+        public static ISet<string> Run(IQueryNode node, IQueryVisitorContext context = null) {
+            return new GetReferencedFieldsQueryVisitor().Accept(node, context);
         }
     }
 }

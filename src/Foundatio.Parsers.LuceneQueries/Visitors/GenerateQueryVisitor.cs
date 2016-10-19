@@ -31,8 +31,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return _builder.ToString();
         }
 
-        public static string Run(IQueryNode node) {
-            return new GenerateQueryVisitor().Accept(node, null);
+        public static string Run(IQueryNode node, IQueryVisitorContext context = null) {
+            return new GenerateQueryVisitor().Accept(node, context);
         }
     }
 }

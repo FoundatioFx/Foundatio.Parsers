@@ -68,12 +68,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return node;
         }
 
-        public static IQueryNode Run(GroupNode node, AliasResolver resolver) {
-            return new AliasedQueryVisitor().Accept(node, new QueryVisitorContextWithAliasResolver { RootAliasResolver = resolver });
+        public static IQueryNode Run(GroupNode node, AliasResolver resolver, IQueryVisitorContextWithAliasResolver context = null) {
+            return new AliasedQueryVisitor().Accept(node, context ?? new QueryVisitorContextWithAliasResolver { RootAliasResolver = resolver });
         }
 
-        public static IQueryNode Run(GroupNode node, AliasMap aliasMap) {
-            return new AliasedQueryVisitor().Accept(node, new QueryVisitorContextWithAliasResolver { RootAliasResolver = aliasMap.Resolve });
+        public static IQueryNode Run(GroupNode node, AliasMap aliasMap, IQueryVisitorContextWithAliasResolver context = null) {
+            return new AliasedQueryVisitor().Accept(node, context ?? new QueryVisitorContextWithAliasResolver { RootAliasResolver = aliasMap.Resolve });
         }
     }
 
