@@ -176,6 +176,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void SimpleQueryProcessor() {
             var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
             client.Refresh();
 
             client.CreateIndex(i => i.Index("stuff").AddMapping<MyType>(f => f
