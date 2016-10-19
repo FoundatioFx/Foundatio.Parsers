@@ -7,35 +7,37 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public Operator DefaultOperator { get; set; }
         public string DefaultField { get; set; }
         public Func<string, IElasticType> GetFieldMappingFunc { get; set; }
+    }
 
-        public IElasticType GetFieldMapping(string field) {
-            return GetFieldMappingFunc?.Invoke(field);
+    public static class ElasticQueryVisitorContextExtensions {
+        public static IElasticType GetFieldMapping(this IElasticQueryVisitorContext context, string field) {
+            return context.GetFieldMappingFunc?.Invoke(field);
         }
 
-        public bool IsFieldAnalyzed(string field) {
+        public static bool IsFieldAnalyzed(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return true;
 
-            var mapping = GetFieldMapping(field) as StringMapping;
+            var mapping = context.GetFieldMapping(field) as StringMapping;
             if (mapping == null)
                 return false;
 
             return mapping.Index == FieldIndexOption.Analyzed || mapping.Index == null;
         }
 
-        public bool IsNestedFieldType(string field) {
+        public static bool IsNestedFieldType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = GetFieldMapping(field) as NestedObjectMapping;
+            var mapping = context.GetFieldMapping(field) as NestedObjectMapping;
             return mapping != null;
         }
 
-        public bool IsGeoFieldType(string field) {
+        public static bool IsGeoFieldType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = GetFieldMapping(field) as GeoPointMapping;
+            var mapping = context.GetFieldMapping(field) as GeoPointMapping;
             return mapping != null;
         }
     }
