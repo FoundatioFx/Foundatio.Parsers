@@ -174,6 +174,36 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void DateAggregation() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Index(new MyType { Field2 = "value4", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticQueryParser();
+            var result = processor.BuildAggregations("date:field5");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(i => i.Index("stuff").Aggregations(f => f
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d"))
+            ));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+
+        [Fact]
         public void SimpleQueryProcessor() {
             var client = new ElasticClient();
             client.DeleteIndex(i => i.Index("stuff"));

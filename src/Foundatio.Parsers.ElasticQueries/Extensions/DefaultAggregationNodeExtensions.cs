@@ -33,7 +33,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             new AggregationContainer {
                                 DateHistogram = new DateHistogramAggregator {
                                     Field = node.Field,
-                                    Interval = node.Proximity,
+                                    Interval = node.Proximity ?? "1d",
                                     Format = "date_optional_time",
                                     Offset = node.UnescapedBoost
                                 }
@@ -105,7 +105,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             new AggregationContainer {
                                 DateHistogram = new DateHistogramAggregator {
                                     Field = node.Field,
-                                    Interval = node.Proximity,
+                                    Interval = node.Proximity ?? "1d",
                                     Format = "date_optional_time",
                                     Offset = node.UnescapedBoost
                                 }
