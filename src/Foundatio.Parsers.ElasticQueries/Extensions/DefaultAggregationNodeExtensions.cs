@@ -156,7 +156,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                                         }
                                     },
                                     {
-                                        "cavg_lon",
+                                        "avg_lon",
                                         new AggregationContainer {
                                             Average = new AverageAggregator { Script = $"doc['{node.Field}'].lon" }
                                         }
