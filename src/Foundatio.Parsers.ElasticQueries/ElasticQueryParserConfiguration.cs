@@ -12,7 +12,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration() {
             AddFilterVisitor(new CombineFiltersVisitor(), 10000);
             AddQueryVisitor(new CombineQueriesVisitor(), 10000);
-            AddAggregationVisitor(new AssignAggregationTypeVisitor(), 100);
+            AddAggregationVisitor(new AssignAggregationTypeVisitor(), 0);
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
         }
 
@@ -38,13 +38,17 @@ namespace Foundatio.Parsers.ElasticQueries {
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseAliases(AliasResolver defaultAliasResolver, int priority = 0) {
+        public ElasticQueryParserConfiguration UseAliases(int priority = 50) {
+            return AddVisitor(new AliasedQueryVisitor(), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseAliases(AliasResolver defaultAliasResolver, int priority = 50) {
             DefaultAliasResolver = defaultAliasResolver;
 
             return AddVisitor(new AliasedQueryVisitor(), priority);
         }
 
-        public ElasticQueryParserConfiguration UseAliases(AliasMap defaultAliasMap, int priority = 0) {
+        public ElasticQueryParserConfiguration UseAliases(AliasMap defaultAliasMap, int priority = 50) {
             DefaultAliasResolver = defaultAliasMap.Resolve;
 
             return AddVisitor(new AliasedQueryVisitor(), priority);

@@ -82,5 +82,18 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         public static void SetAliasResolver(this IQueryNode node, AliasResolver resolver) {
             node.Data[AliasResolverKey] = resolver;
         }
+
+        private const string UnaliasedFieldKey = "@UnaliasedField";
+        public static string GetUnaliasedField(this IFieldQueryNode node) {
+            object value = null;
+            if (!node.Data.TryGetValue(UnaliasedFieldKey, out value))
+                return node.Field;
+
+            return value as string;
+        }
+
+        public static void SetUnaliasedField(this IFieldQueryNode node, string field) {
+            node.Data[UnaliasedFieldKey] = field;
+        }
     }
 }

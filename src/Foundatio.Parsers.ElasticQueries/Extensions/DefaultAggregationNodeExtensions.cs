@@ -1,5 +1,6 @@
 ﻿using System;
 using Foundatio.Parsers.ElasticQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
@@ -29,7 +30,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             switch (node.GetAggregationType()) {
                 case AggregationType.DateHistogram:
                     return new NamedAggregationContainer(
-                            "date_" + node.Field,
+                            "date_" + node.GetUnaliasedField(),
                             new AggregationContainer {
                                 DateHistogram = new DateHistogramAggregator {
                                     Field = node.Field,
@@ -45,7 +46,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         Enum.TryParse(node.Proximity, out precision);
 
                     return new NamedAggregationContainer(
-                            "geogrid_" + node.Field,
+                            "geogrid_" + node.GetUnaliasedField(),
                             new AggregationContainer {
                                 GeoHash = new GeoHashAggregator {
                                     Field = node.Field,
@@ -54,9 +55,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             }
                         );
                 case AggregationType.Terms:
+                    int? size = null;
+                    int parsedSize;
+                    if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
+                        size = parsedSize;
+
                     return new NamedAggregationContainer(
-                            "terms_" + node.Field,
-                            new AggregationContainer { Terms = new TermsAggregator { Field = node.Field } }
+                            "terms_" + node.GetUnaliasedField(),
+                            new AggregationContainer { Terms = new TermsAggregator { Field = node.Field, Size = size } }
                         );
             }
 
@@ -71,37 +77,37 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
                     return new NamedAggregationContainer(
-                            "min_" + node.Field,
+                            "min_" + node.GetUnaliasedField(),
                             new AggregationContainer { Min = new MinAggregator { Field = node.Field } }
                         );
                 case AggregationType.Max:
                     return new NamedAggregationContainer(
-                            "max_" + node.Field,
+                            "max_" + node.GetUnaliasedField(),
                             new AggregationContainer { Max = new MaxAggregator { Field = node.Field } }
                         );
                 case AggregationType.Avg:
                     return new NamedAggregationContainer(
-                            "avg_" + node.Field,
+                            "avg_" + node.GetUnaliasedField(),
                             new AggregationContainer { Average = new AverageAggregator { Field = node.Field } }
                         );
                 case AggregationType.Sum:
                     return new NamedAggregationContainer(
-                            "sum_" + node.Field,
+                            "sum_" + node.GetUnaliasedField(),
                             new AggregationContainer { Sum = new SumAggregator { Field = node.Field } }
                         );
                 case AggregationType.Cardinality:
                     return new NamedAggregationContainer(
-                            "cardinality_" + node.Field,
+                            "cardinality_" + node.GetUnaliasedField(),
                             new AggregationContainer { Cardinality = new CardinalityAggregator { Field = node.Field } }
                         );
                 case AggregationType.Missing:
                     return new NamedAggregationContainer(
-                            "missing_" + node.Field,
+                            "missing_" + node.GetUnaliasedField(),
                             new AggregationContainer { Missing = new MissingAggregator { Field = node.Field } }
                         );
                 case AggregationType.DateHistogram:
                     return new NamedAggregationContainer(
-                            "date_" + node.Field,
+                            "date_" + node.GetUnaliasedField(),
                             new AggregationContainer {
                                 DateHistogram = new DateHistogramAggregator {
                                     Field = node.Field,
@@ -113,7 +119,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         );
                 case AggregationType.Percentiles:
                     return new NamedAggregationContainer(
-                            "percentiles_" + node.Field,
+                            "percentiles_" + node.GetUnaliasedField(),
                             new AggregationContainer { Percentiles = new PercentilesAggregator { Field = node.Field } }
                         );
                 case AggregationType.GeoHashGrid:
@@ -122,7 +128,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         Enum.TryParse(node.Proximity, out precision);
 
                     return new NamedAggregationContainer(
-                            "geogrid_" + node.Field,
+                            "geogrid_" + node.GetUnaliasedField(),
                             new AggregationContainer {
                                 GeoHash = new GeoHashAggregator {
                                     Field = node.Field,
@@ -131,9 +137,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             }
                         );
                 case AggregationType.Terms:
+                    int? size = null;
+                    int parsedSize;
+                    if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
+                        size = parsedSize;
+
                     return new NamedAggregationContainer(
-                            "terms_" + node.Field,
-                            new AggregationContainer { Terms = new TermsAggregator { Field = node.Field } }
+                            "terms_" + node.GetUnaliasedField(),
+                            new AggregationContainer { Terms = new TermsAggregator { Field = node.Field, Size = size } }
                         );
             }
 
