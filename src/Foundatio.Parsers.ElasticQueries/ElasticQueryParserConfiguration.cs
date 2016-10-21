@@ -249,6 +249,9 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         private IElasticType GetRootFieldMapping(string field, ObjectMapping mapping, bool isRoot) {
+            if (mapping?.Properties == null)
+                return null;
+
             bool justName = mapping.Path == "just_name";
             
             foreach (var property in mapping.Properties) {
