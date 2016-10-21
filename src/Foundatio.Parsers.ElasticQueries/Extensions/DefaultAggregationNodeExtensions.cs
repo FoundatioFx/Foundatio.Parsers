@@ -51,6 +51,20 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                                 GeoHash = new GeoHashAggregator {
                                     Field = node.Field,
                                     Precision = precision
+                                },
+                                Aggregations = {
+                                    {
+                                        "avg_lat",
+                                        new AggregationContainer {
+                                            Average = new AverageAggregator { Script = $"doc['{node.Field}'].lat" }
+                                        }
+                                    },
+                                    {
+                                        "avg_lon",
+                                        new AggregationContainer {
+                                            Average = new AverageAggregator { Script = $"doc['{node.Field}'].lon" }
+                                        }
+                                    }
                                 }
                             }
                         );
@@ -132,7 +146,21 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             new AggregationContainer {
                                 GeoHash = new GeoHashAggregator {
                                     Field = node.Field,
-                                    Precision = precision
+                                    Precision = precision,
+                                },
+                                Aggregations = {
+                                    {
+                                        "avg_lat",
+                                        new AggregationContainer {
+                                            Average = new AverageAggregator { Script = $"doc['{node.Field}'].lat" }
+                                        }
+                                    },
+                                    {
+                                        "cavg_lon",
+                                        new AggregationContainer {
+                                            Average = new AverageAggregator { Script = $"doc['{node.Field}'].lon" }
+                                        }
+                                    }
                                 }
                             }
                         );
