@@ -233,7 +233,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                     }
 
                     if (fieldMapping == null)
-                        return null;
+                        break;
                 }
 
                 if (depth == fieldParts.Length - 1)
@@ -242,7 +242,27 @@ namespace Foundatio.Parsers.ElasticQueries {
                 if (fieldMapping is ObjectMapping)
                     currentObject = fieldMapping as ObjectMapping;
                 else
-                    return null;
+                    break;
+            }
+
+            return GetRootFieldMapping(field, _mapping, true);
+        }
+
+        private IElasticType GetRootFieldMapping(string field, ObjectMapping mapping, bool isRoot) {
+            bool justName = mapping.Path == "just_name";
+            
+            foreach (var property in mapping.Properties) {
+                var elasticCoreType = property.Value as IElasticCoreType;
+                if ((isRoot || justName) && elasticCoreType != null && (property.Key.Equals(field) || elasticCoreType.IndexName == field))
+                    return property.Value;
+
+                var objectProperty = property.Value as ObjectMapping;
+                if (objectProperty == null)
+                    continue;
+
+                var result = GetRootFieldMapping(field, objectProperty, false);
+                if (result != null)
+                    return result;
             }
 
             return null;
