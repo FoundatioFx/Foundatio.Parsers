@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -45,14 +46,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
-                    return new NamedAggregationContainer(
-                            "geogrid_" + node.GetUnaliasedField(),
-                            new AggregationContainer {
-                                GeoHash = new GeoHashAggregator {
-                                    Field = node.Field,
-                                    Precision = precision
-                                },
-                                Aggregations = {
+                    var latLonAverages = new Dictionary<string, IAggregationContainer> {
                                     {
                                         "avg_lat",
                                         new AggregationContainer {
@@ -65,9 +59,20 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                                             Average = new AverageAggregator { Script = $"doc['{node.Field}'].lon" }
                                         }
                                     }
-                                }
+                                };
+
+                    var geogridAgg = new NamedAggregationContainer(
+                            "geogrid_" + node.GetUnaliasedField(),
+                            new AggregationContainer {
+                                GeoHash = new GeoHashAggregator {
+                                    Field = node.Field,
+                                    Precision = precision
+                                },
+                                Aggregations = latLonAverages
                             }
                         );
+
+                    return geogridAgg;
                 case AggregationType.Terms:
                     int? size = null;
                     int parsedSize;
@@ -141,14 +146,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
-                    return new NamedAggregationContainer(
-                            "geogrid_" + node.GetUnaliasedField(),
-                            new AggregationContainer {
-                                GeoHash = new GeoHashAggregator {
-                                    Field = node.Field,
-                                    Precision = precision,
-                                },
-                                Aggregations = {
+                    var latLonAverages = new Dictionary<string, IAggregationContainer> {
                                     {
                                         "avg_lat",
                                         new AggregationContainer {
@@ -161,9 +159,20 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                                             Average = new AverageAggregator { Script = $"doc['{node.Field}'].lon" }
                                         }
                                     }
-                                }
+                                };
+
+                    var geogridAgg = new NamedAggregationContainer(
+                            "geogrid_" + node.GetUnaliasedField(),
+                            new AggregationContainer {
+                                GeoHash = new GeoHashAggregator {
+                                    Field = node.Field,
+                                    Precision = precision
+                                },
+                                Aggregations = latLonAverages
                             }
                         );
+
+                    return geogridAgg;
                 case AggregationType.Terms:
                     int? size = null;
                     int parsedSize;

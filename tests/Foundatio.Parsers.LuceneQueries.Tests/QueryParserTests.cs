@@ -580,6 +580,7 @@ namespace Foundatio.Parsers.Tests {
                 .UseGeo(l => "d")
                 .UseAliases(aliasMap));
             var result = processor.BuildFilter("geo:[9 TO d] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi");
+            var geogridAgg = processor.BuildAggregations("geogrid:geo");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
