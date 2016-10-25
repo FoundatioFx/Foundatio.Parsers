@@ -42,6 +42,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
+    <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
     <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="Extensions\TextWriterExtensions.cs" />
     <Compile Include="LuceneQueryParser.peg.cs">
@@ -64,9 +65,11 @@
     <Compile Include="Visitors\IQueryNodeVisitor.cs" />
     <Compile Include="Visitors\IQueryNodeVisitorWithResult.cs" />
     <Compile Include="Visitors\IQueryVisitorContext.cs" />
+    <Compile Include="Visitors\IQueryVisitorContextWithAliasResolver.cs" />
     <Compile Include="Visitors\QueryNodeVisitorBase.cs" />
     <Compile Include="Visitors\QueryNodeVisitorWithResultBase.cs" />
     <Compile Include="Visitors\QueryVisitorContext.cs" />
+    <Compile Include="Visitors\QueryVisitorContextWithAliasResolver.cs" />
     <Compile Include="Visitors\VisitorWithPriority.cs" />
   </ItemGroup>
   <ItemGroup>

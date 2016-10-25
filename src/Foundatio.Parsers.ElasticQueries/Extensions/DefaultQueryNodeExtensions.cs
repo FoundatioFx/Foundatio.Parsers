@@ -1,24 +1,43 @@
 ﻿using System;
-using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
-namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class DefaultQueryVisitor : ChainableQueryVisitor {
-        private readonly ElasticQueryParserConfiguration _config;
+namespace Foundatio.Parsers.ElasticQueries.Extensions {
+    public static class DefaultQueryNodeExtensions {
+        public static QueryBase GetDefaultQuery(this IQueryNode node, IQueryVisitorContext context) {
+            var termNode = node as TermNode;
+            if (termNode != null)
+                return termNode.GetDefaultQuery(context);
 
-        public DefaultQueryVisitor(ElasticQueryParserConfiguration config) {
-            _config = config;
+            var termRangeNode = node as TermRangeNode;
+            if (termRangeNode != null)
+                return termRangeNode.GetDefaultQuery(context);
+
+            var existsNode = node as ExistsNode;
+            if (existsNode != null)
+                return existsNode.GetDefaultQuery(context);
+
+
+            var missingNode = node as MissingNode;
+            if (missingNode != null)
+                return missingNode.GetDefaultQuery(context);
+
+            return null;
         }
 
-        public override void Visit(TermNode node, IQueryVisitorContext context) {
+        public static QueryBase GetDefaultQuery(this TermNode node, IQueryVisitorContext context) {
+            var elasticContext = context as IElasticQueryVisitorContext;
+            if (elasticContext == null)
+                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
             QueryBase query = null;
-            if (_config.IsAnalyzedPropertyType(node.GetFullName())) {
+            if (elasticContext.IsPropertyAnalyzed(node.GetFullName())) {
                 if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
                     query = new QueryStringQuery {
-                        DefaultField = node.GetFullName() ?? _config.DefaultField,
+                        DefaultField = node.GetFullName() ?? elasticContext.DefaultField,
                         AllowLeadingWildcard = false,
                         AnalyzeWildcard = true,
                         Query = node.UnescapedTerm
@@ -27,12 +46,12 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     QueryBase q;
                     if (node.IsQuotedTerm) {
                         q = new MatchPhraseQuery {
-                            Field = node.GetFullName() ?? _config.DefaultField,
+                            Field = node.GetFullName() ?? elasticContext.DefaultField,
                             Query = node.UnescapedTerm
                         };
                     } else {
                         q = new MatchQuery {
-                            Field = node.GetFullName() ?? _config.DefaultField,
+                            Field = node.GetFullName() ?? elasticContext.DefaultField,
                             Query = node.UnescapedTerm
                         };
                     }
@@ -46,10 +65,10 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 };
             }
 
-            node.SetDefaultQuery(query);
+            return query;
         }
 
-        public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
+        public static QueryBase GetDefaultQuery(this TermRangeNode node, IQueryVisitorContext context) {
             var range = new TermRangeQuery { Field = node.GetFullName() };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
@@ -65,23 +84,22 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     range.LessThanOrEqualTo = node.UnescapedMax;
             }
 
-            node.SetDefaultQuery(range);
+
+            return range;
         }
 
-        public override void Visit(ExistsNode node, IQueryVisitorContext context) {
-            node.SetDefaultQuery(new ExistsQuery {
-                Field = node.GetFullName()
-            });
+        public static QueryBase GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context) {
+            return new ExistsQuery { Field = node.GetFullName() };
         }
 
-        public override void Visit(MissingNode node, IQueryVisitorContext context) {
-            node.SetDefaultQuery(new BoolQuery {
+        public static QueryBase GetDefaultQuery(this MissingNode node, IQueryVisitorContext context) {
+            return new BoolQuery {
                 MustNot = new QueryContainer[] {
                     new ExistsQuery {
                         Field =  node.GetFullName()
                     }
                 }
-            });
+            };
         }
     }
 }

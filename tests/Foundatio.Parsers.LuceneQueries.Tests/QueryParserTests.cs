@@ -2,9 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Elasticsearch.Net;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
+using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -61,6 +64,34 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void EscapeFilterProcessor() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var response = client.Index(new MyType { Field1 = "hey \"you there\"", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping));
+            var result = processor.BuildFilter("field1:\"hey \\\"you there\\\"\"");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Query(q => q.MatchPhrase(m => m.OnField(w => w.Field1).Query("hey \"you there\"")))));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+            Assert.Equal(1, actualResponse.Total);
+        }
+
+        [Fact]
         public void ExistsFilterProcessor() {
             var client = GetClient();
             client.DeleteIndex("stuff");
@@ -107,6 +138,70 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Bool(b => b.MustNot(f => f.Exists(e => e.Field(nameof(MyType.Field2)))))));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void SimpleAggregation() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Index(new MyType { Field2 = "value4", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticQueryParser();
+            var result = processor.BuildAggregations("min:field2 max:field2 date:(field5~1d^-3h min:field2 max:field2 min:field1)");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(i => i.Index("stuff").Aggregations(f => f
+                .Max("max_field2", m => m.Field(m2 => m2.Field2))
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Offset("-3h").Aggregations(l => l
+                    .Max("max_field2", m => m.Field(m2 => m2.Field2))
+                    .Min("min_field1", m => m.Field(m2 => m2.Field1))
+                    .Min("min_field2", m => m.Field(m2 => m2.Field2))
+                ))
+                .Min("min_field2", m => m.Field(m2 => m2.Field2))
+            ));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void DateAggregation() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Index(new MyType { Field2 = "value4", Field5 = DateTime.Now }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var processor = new ElasticQueryParser();
+            var result = processor.BuildAggregations("date:field5");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(i => i.Index("stuff").Aggregations(f => f
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d"))
+            ));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -574,6 +669,7 @@ namespace Foundatio.Parsers.Tests {
         public string Field2 { get; set; }
         public string Field3 { get; set; }
         public int Field4 { get; set; }
+        public DateTime Field5 { get; set; }
     }
 
     public class MyNestedType {

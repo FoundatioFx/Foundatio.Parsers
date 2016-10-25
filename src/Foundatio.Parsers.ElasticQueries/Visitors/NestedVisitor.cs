@@ -6,15 +6,9 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class NestedVisitor : ChainableQueryVisitor {
-        private readonly Func<string, bool> _isNestedPropertyType;
-
-        public NestedVisitor(Func<string, bool> isNestedPropertyType) {
-            _isNestedPropertyType = isNestedPropertyType;
-        }
-
+    public class NestedVisitor: ChainableQueryVisitor {
         public override void Visit(GroupNode node, IQueryVisitorContext context) {
-            if (String.IsNullOrEmpty(node.Field) || !IsNestedPropertyType(node.GetNameParts())) {
+            if (String.IsNullOrEmpty(node.Field) || !IsNestedPropertyType(node.GetNameParts(), context)) {
                 base.Visit(node, context);
                 return;
             }
@@ -24,14 +18,16 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
-            if (!IsNestedPropertyType(node.Field?.Split('.')))
+            if (!IsNestedPropertyType(node.Field?.Split('.'), context))
                 return;
 
             node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQuery() });
         }
 
-        private bool IsNestedPropertyType(string[] nameParts) {
-            if (nameParts == null || _isNestedPropertyType == null || nameParts.Length == 0)
+        private bool IsNestedPropertyType(string[] nameParts, IQueryVisitorContext context) {
+            var elasticContext = context as IElasticQueryVisitorContext;
+
+            if (nameParts == null || elasticContext == null || nameParts.Length == 0)
                 return false;
 
             string fieldName = String.Empty;
@@ -41,7 +37,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
                 fieldName += nameParts[i];
 
-                if (_isNestedPropertyType(fieldName))
+                if (elasticContext.IsNestedPropertyType(fieldName))
                     return true;
             }
 

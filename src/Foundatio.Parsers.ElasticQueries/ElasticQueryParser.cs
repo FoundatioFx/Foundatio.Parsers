@@ -1,45 +1,60 @@
 ﻿using System;
-using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
-using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParser {
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
-        private readonly ChainedQueryVisitor _queryVisitors = new ChainedQueryVisitor();
-        private readonly CombineQueriesVisitor _combineQueriesVisitor;
+        private readonly ElasticQueryParserConfiguration _config;
 
         public ElasticQueryParser(Action<ElasticQueryParserConfiguration> configure = null) {
             var config = new ElasticQueryParserConfiguration();
             configure?.Invoke(config);
-
-            _queryVisitors.AddVisitor(new DefaultQueryVisitor(config), 100);
-            foreach (var visitor in config.Visitors.OfType<QueryVisitorWithPriority>())
-                _queryVisitors.AddVisitor(visitor);
-
-            _combineQueriesVisitor = new CombineQueriesVisitor(config);
+            _config = config;
         }
 
-        public QueryContainer BuildQuery(string query, Operator defaultOperator = Operator.And, bool scoreResults = false) {
+        public QueryContainer BuildQuery(string query, IElasticQueryVisitorContext context = null) {
             var result = _parser.Parse(query);
 
-            var context = new ElasticQueryVisitorContext();
-            context.SetDefaultOperator(defaultOperator);
+            if (context == null)
+                context = new ElasticQueryVisitorContext();
 
-            var queryNode = _queryVisitors.Accept(result, context);
-            queryNode = _combineQueriesVisitor.Accept(queryNode, context);
+            context.SetGetPropertyMappingFunc(_config.GetMappingProperty)
+                .SetDefaultOperator(Operator.Or)
+                .SetDefaultField(_config.DefaultField);
+
+            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
+                context.SetRootAliasResolver(_config.DefaultAliasResolver);
+
+            var queryNode = _config.QueryVisitor.Accept(result, context);
 
             var q = queryNode?.GetQuery() ?? new MatchAllQuery();
-            if (!scoreResults) {
+            if (!context.UseScoring) {
                 q = new BoolQuery {
                     Filter = new QueryContainer[] { q }
                 };
             }
+			
+			return q;
+		}	
 
-            return q;
+        public AggregationContainer BuildAggregations(string aggregations, IElasticQueryVisitorContext context = null) {
+            var result = _parser.Parse(aggregations);
+
+            if (context == null)
+                context = new ElasticQueryVisitorContext();
+
+            context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
+
+            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
+                context.SetRootAliasResolver(_config.DefaultAliasResolver);
+
+            var queryNode = _config.AggregationVisitor.Accept(result, context);
+
+            return queryNode?.GetAggregation();
         }
 
         // parser query, generate filter, generate aggregations
