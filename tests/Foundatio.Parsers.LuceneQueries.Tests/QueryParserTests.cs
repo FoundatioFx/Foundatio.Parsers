@@ -5,12 +5,14 @@ using System.Text;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;
+using LogLevel = Foundatio.Logging.LogLevel;
 
 namespace Foundatio.Parsers.Tests {
     public class QueryParserTests : TestWithLoggingBase {
@@ -326,6 +328,30 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void CanTranslateTermQueryProcessor() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var response = client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index("stuff"));
+
+            var processor = new ElasticQueryParser(c => c.AddVisitor(new UpdateFixedTermFieldToDateFixedExistsQueryVisitor()));
+            var result = processor.BuildQuery("fixed:true");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => f.Bool(b => b.Filter(filter => filter.Exists(m => m.Field("date_fixed"))))));
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void GroupedOrFilterProcessor() {
             var client = GetClient();
             client.DeleteIndex("stuff");
@@ -582,5 +608,19 @@ namespace Foundatio.Parsers.Tests {
         public string Field3 { get; set; }
         public int Field4 { get; set; }
         public IList<MyType> Nested { get; set; } = new List<MyType>();
+    }
+
+    public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryVisitor {
+        public override void Visit(TermNode node, IQueryVisitorContext context) {
+            if (!String.Equals(node.Field, "fixed", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            bool isFixed;
+            if (!Boolean.TryParse(node.Term, out isFixed))
+                return;
+
+            var query = new ExistsQuery { Field = "date_fixed" };
+            node.SetQuery(isFixed ? query : !query);
+        }
     }
 }
