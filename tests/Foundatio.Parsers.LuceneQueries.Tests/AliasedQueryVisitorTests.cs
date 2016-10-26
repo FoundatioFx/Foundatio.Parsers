@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -24,9 +25,11 @@ namespace Foundatio.Parsers.Tests {
             };
 
             var p = new ElasticQueryParser(c => c.UseAliases(aliasMap));
-            var parsed = p.BuildFilter(filter) as IFilterContainer;
-            Assert.NotNull(parsed.Term);
-            Assert.Equal("programName", parsed.Term.Field.Name);
+            IQueryContainer query = p.BuildQuery(filter);
+            var term = query.Bool.Filter.Single() as IQueryContainer;
+            Assert.NotNull(term.Term);
+            Assert.Equal("programName", term.Term.Field.Name);
+            Assert.Equal("postgrad", term.Term.Value);
         }
 
         [Fact]

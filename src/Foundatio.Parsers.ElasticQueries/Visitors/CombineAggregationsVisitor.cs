@@ -17,9 +17,13 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             var container = GetParentContainer(node, context);
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 var aggregation = child.GetAggregation(() => child.GetDefaultAggregation(context));
-                if (aggregation != null) {
-                    container.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
-                }
+                if (aggregation == null)
+                    continue;
+
+                if (container.Aggregations == null)
+                    container.Aggregations = new AggregationDictionary();
+
+                container.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
             }
 
             if (node.Parent == null)

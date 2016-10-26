@@ -150,7 +150,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         #endregion
-		
+
         public IProperty GetMappingProperty(string field) {
             if (String.IsNullOrEmpty(field) || _mapping == null)
                 return null;
@@ -166,7 +166,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                     if (currentProperties != null)
                         fieldMapping = currentProperties
                             .Select(m => m.Value)
-                            .FirstOrDefault(m => m.IndexName == fieldPart);
+                            .FirstOrDefault(m => m.Name == fieldPart);
 
                     if (fieldMapping == null && UpdateMapping()) {
                         // we have updated mapping, start over from the top

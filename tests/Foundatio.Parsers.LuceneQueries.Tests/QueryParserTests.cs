@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Elasticsearch.Net;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
@@ -14,7 +13,6 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;
-using LogLevel = Foundatio.Logging.LogLevel;
 
 namespace Foundatio.Parsers.Tests {
     public class QueryParserTests : TestWithLoggingBase {
@@ -44,7 +42,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var response = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
@@ -66,24 +64,24 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void EscapeFilterProcessor() {
-            var client = new ElasticClient();
-            client.DeleteIndex(i => i.Index("stuff"));
-            client.Refresh();
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
 
-            client.CreateIndex(i => i.Index("stuff"));
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var response = client.Index(new MyType { Field1 = "hey \"you there\"", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
-            client.Refresh();
+            client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping));
-            var result = processor.BuildFilter("field1:\"hey \\\"you there\\\"\"");
-            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
+            var result = processor.BuildQuery("field1:\"hey \\\"you there\\\"\"");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
 
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f => f.Query(q => q.MatchPhrase(m => m.OnField(w => w.Field1).Query("hey \"you there\"")))));
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.MatchPhrase(m => m.Field(w => w.Field1).Query("hey \"you there\""))));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -99,7 +97,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
@@ -126,14 +124,14 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery($"_missing_:{nameof(MyType.Field2)}", scoreResults: true);
+            var result = processor.BuildQuery($"_missing_:{nameof(MyType.Field2)}", new ElasticQueryVisitorContext { UseScoring = true });
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -148,16 +146,16 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void SimpleAggregation() {
-            var client = new ElasticClient();
-            client.DeleteIndex(i => i.Index("stuff"));
-            client.Refresh();
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
 
-            client.CreateIndex(i => i.Index("stuff"));
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
             client.Index(new MyType { Field2 = "value4", Field5 = DateTime.Now }, i => i.Index("stuff"));
-            client.Refresh();
+            client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
             var result = processor.BuildAggregations("min:field2 max:field2 date:(field5~1d^-3h min:field2 max:field2 min:field1)");
@@ -167,7 +165,7 @@ namespace Foundatio.Parsers.Tests {
 
             var expectedResponse = client.Search<MyType>(i => i.Index("stuff").Aggregations(f => f
                 .Max("max_field2", m => m.Field(m2 => m2.Field2))
-                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Offset("-3h").Aggregations(l => l
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Format("date_optional_time").Offset("-3h").Aggregations(l => l
                     .Max("max_field2", m => m.Field(m2 => m2.Field2))
                     .Min("min_field1", m => m.Field(m2 => m2.Field1))
                     .Min("min_field2", m => m.Field(m2 => m2.Field2))
@@ -183,16 +181,16 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void DateAggregation() {
-            var client = new ElasticClient();
-            client.DeleteIndex(i => i.Index("stuff"));
-            client.Refresh();
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
 
-            client.CreateIndex(i => i.Index("stuff"));
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now }, i => i.Index("stuff"));
             client.Index(new MyType { Field2 = "value4", Field5 = DateTime.Now }, i => i.Index("stuff"));
-            client.Refresh();
+            client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
             var result = processor.BuildAggregations("date:field5");
@@ -201,7 +199,7 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<MyType>(i => i.Index("stuff").Aggregations(f => f
-                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d"))
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Format("date_optional_time"))
             ));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
@@ -214,6 +212,7 @@ namespace Foundatio.Parsers.Tests {
         public void SimpleQueryProcessor() {
             var client = GetClient();
             client.DeleteIndex("stuff");
+            client.Refresh("stuff");
 
             client.CreateIndex("stuff", i => i.Mappings(m => m.Map<MyType>(t => t
                 .Properties(p => p
@@ -224,7 +223,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping));
-            var result = processor.BuildQuery("field1:value1", Operator.Or, true);
+            var result = processor.BuildQuery("field1:value1", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -236,7 +235,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            result = processor.BuildQuery("field3:hey", Operator.Or, true);
+            result = processor.BuildQuery("field3:hey", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -258,14 +257,14 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value3" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1 AND -field2:value2", Operator.Or, true);
+            var result = processor.BuildQuery("field1:value1 AND -field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -278,7 +277,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
             processor = new ElasticQueryParser();
-            result = processor.BuildQuery("field1:value1 AND NOT field2:value2", Operator.Or, true);
+            result = processor.BuildQuery("field1:value1 AND NOT field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -291,7 +290,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
             processor = new ElasticQueryParser();
-            result = processor.BuildQuery("field1:value1 OR NOT field2:value2", Operator.Or, true);
+            result = processor.BuildQuery("field1:value1 OR NOT field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -304,7 +303,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
             processor = new ElasticQueryParser();
-            result = processor.BuildQuery("field1:value1 OR -field2:value2", Operator.Or, true);
+            result = processor.BuildQuery("field1:value1 OR -field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -324,14 +323,14 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", Operator.Or, true);
+            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
@@ -352,7 +351,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
@@ -380,11 +379,11 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var response = client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index("stuff"));
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:Testing.Casing", scoreResults: true);
+            var result = processor.BuildQuery("field1:Testing.Casing", new ElasticQueryVisitorContext { UseScoring = true });
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -404,11 +403,11 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var response = client.Index(new MyType { Field1 = "Blake Niemyjski" }, i => i.Index("stuff"));
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:\"Blake Niemyjski\"", scoreResults: true);
+            var result = processor.BuildQuery("field1:\"Blake Niemyjski\"", new ElasticQueryVisitorContext { UseScoring = true });
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
@@ -428,7 +427,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var response = client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index("stuff"));
 
             var processor = new ElasticQueryParser(c => c.AddVisitor(new UpdateFixedTermFieldToDateFixedExistsQueryVisitor()));
@@ -452,14 +451,14 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", scoreResults: true);
+            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext { UseScoring = true });
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
@@ -504,7 +503,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyNestedType))).Mapping).UseNested());
-            var result = processor.BuildQuery("field1:value1 nested.field1:value1", scoreResults: true);
+            var result = processor.BuildQuery("field1:value1 nested.field1:value1", new ElasticQueryVisitorContext { UseScoring = true });
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(f => result));
             string actualRequest = GetRequest(actualResponse);
@@ -519,7 +518,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            result = processor.BuildQuery("field1:value1 nested:(field1:value1 field4:4)", scoreResults: true);
+            result = processor.BuildQuery("field1:value1 nested:(field1:value1 field4:4)", new ElasticQueryVisitorContext { UseScoring = true });
 
             actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));
             actualRequest = GetRequest(actualResponse);
@@ -567,7 +566,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyNestedType))).Mapping).UseNested());
-            var result = processor.BuildQuery("field1:value1 nested:(field1:value1 field4:4 field3:value3)", scoreResults: true);
+            var result = processor.BuildQuery("field1:value1 nested:(field1:value1 field4:4 field3:value3)", new ElasticQueryVisitorContext { UseScoring = true });
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));
             var actualRequest = GetRequest(actualResponse);
@@ -594,14 +593,14 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1 }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field4:[1 TO 2} OR field1:value1", scoreResults: true);
+            var result = processor.BuildQuery("field4:[1 TO 2} OR field1:value1", new ElasticQueryVisitorContext { UseScoring = true });
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
@@ -622,7 +621,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff").Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff").Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
@@ -631,7 +630,7 @@ namespace Foundatio.Parsers.Tests {
             var processor = new ElasticQueryParser(c => c
                 .UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping)
                 .UseGeo(l => "51.5032520,-0.1278990"));
-            var result = processor.BuildQuery("field3:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990]", scoreResults: true);
+            var result = processor.BuildQuery("field3:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990]", new ElasticQueryVisitorContext { UseScoring = true });
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
@@ -653,7 +652,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             client.CreateIndex("stuff");
-            client.Map<MyType>(d => d.Dynamic().Index("stuff").Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff").Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
@@ -664,7 +663,7 @@ namespace Foundatio.Parsers.Tests {
                 .UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping)
                 .UseGeo(l => "51.5032520,-0.1278990")
                 .UseAliases(aliasMap));
-            var result = processor.BuildQuery("geo:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi", scoreResults: true);
+            var result = processor.BuildQuery("geo:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi", new ElasticQueryVisitorContext { UseScoring = true });
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);

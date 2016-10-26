@@ -37,9 +37,9 @@ namespace Foundatio.Parsers.ElasticQueries {
                     Filter = new QueryContainer[] { q }
                 };
             }
-			
-			return q;
-		}	
+
+            return q;
+        }
 
         public AggregationContainer BuildAggregations(string aggregations, IElasticQueryVisitorContext context = null) {
             var result = _parser.Parse(aggregations);
