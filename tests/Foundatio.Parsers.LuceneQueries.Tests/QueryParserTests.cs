@@ -81,7 +81,7 @@ namespace Foundatio.Parsers.Tests {
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
 
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.MatchPhrase(m => m.Field(w => w.Field1).Query("hey \"you there\""))));
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Bool(b => b.Filter(f => f.MatchPhrase(m => m.Field(w => w.Field1).Query("hey \"you there\""))))));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -458,7 +458,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext { UseScoring = true });
+            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext { DefaultOperator = Operator.And, UseScoring = true });
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);

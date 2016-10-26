@@ -14,8 +14,8 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
-            
-			QueryBase query = node.GetQuery(() => node.GetDefaultQuery(context));
+
+            QueryBase query = node.GetQuery(() => node.GetDefaultQuery(context));
             QueryBase container = query;
             var nested = query as NestedQuery;
             if (nested != null)
