@@ -21,7 +21,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (!IsNestedPropertyType(node.Field?.Split('.'), context))
                 return;
 
-            node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQuery() });
+            node.SetQuery(new NestedQuery { Path = node.GetParentFullName(), Query = node.GetQuery(() => node.GetDefaultQuery(context)) });
         }
 
         private bool IsNestedPropertyType(string[] nameParts, IQueryVisitorContext context) {

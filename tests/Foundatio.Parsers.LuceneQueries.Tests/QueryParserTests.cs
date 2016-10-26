@@ -458,7 +458,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext { DefaultOperator = Operator.And, UseScoring = true });
+            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext().SetDefaultOperator(Operator.And).UseScoring());
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = GetRequest(actualResponse);
@@ -503,7 +503,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyNestedType))).Mapping).UseNested());
-            var result = processor.BuildQuery("field1:value1 nested.field1:value1", new ElasticQueryVisitorContext { UseScoring = true });
+            var result = processor.BuildQuery("field1:value1 nested.field1:value1", new ElasticQueryVisitorContext().UseScoring());
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(f => result));
             string actualRequest = GetRequest(actualResponse);
@@ -672,7 +672,7 @@ namespace Foundatio.Parsers.Tests {
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q =>
                 q.GeoBoundingBox(m => m.Field(p => p.Field3).BoundingBox("51.5032520,-0.1278990", "51.5032520,-0.1278990"))
                 || q.Match(y => y.Field(e => e.Field1).Query("value1"))
-                || q.Range(m => m.Field(g => g.Field2).GreaterThanOrEquals(1).LessThanOrEquals(4))
+                || q.TermRange(m => m.Field(g => g.Field2).GreaterThanOrEquals("1").LessThanOrEquals("4"))
                 || !q.GeoDistance(m => m.Field(p => p.Field3).Location("51.5032520,-0.1278990").Distance("75mi"))));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");

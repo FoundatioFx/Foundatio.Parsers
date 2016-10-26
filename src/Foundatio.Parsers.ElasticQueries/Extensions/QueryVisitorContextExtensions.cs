@@ -25,6 +25,16 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return context;
         }
 
+        public static T UseScoring<T>(this T context) where T : IQueryVisitorContext {
+            var elasticContext = context as IElasticQueryVisitorContext;
+            if (elasticContext == null)
+                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+            elasticContext.UseScoring = true;
+
+            return context;
+        }
+
         public static T SetDefaultField<T>(this T context, string defaultField) where T : IQueryVisitorContext {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null)

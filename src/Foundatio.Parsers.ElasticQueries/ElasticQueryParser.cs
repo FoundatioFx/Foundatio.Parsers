@@ -23,7 +23,6 @@ namespace Foundatio.Parsers.ElasticQueries {
                 context = new ElasticQueryVisitorContext();
 
             context.SetGetPropertyMappingFunc(_config.GetMappingProperty)
-                .SetDefaultOperator(Operator.Or)
                 .SetDefaultField(_config.DefaultField);
 
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
