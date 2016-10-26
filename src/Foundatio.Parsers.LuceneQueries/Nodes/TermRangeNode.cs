@@ -45,6 +45,9 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (MaxInclusive.HasValue)
                 target.MaxInclusive = MaxInclusive;
 
+            foreach (var kvp in Data)
+                target.Data.Add(kvp.Key, kvp.Value);
+
             return target;
         }
 

@@ -12,6 +12,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public string UnescapedTerm => Term.Unescape();
         public bool IsQuotedTerm { get; set; }
         public string Boost { get; set; }
+        public string UnescapedBoost => Boost.Unescape();
         public string Proximity { get; set; }
 
         public TermNode CopyTo(TermNode target) {
@@ -35,11 +36,13 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (Proximity != null)
                 target.Proximity = Proximity;
 
+            foreach (var kvp in Data)
+                target.Data.Add(kvp.Key, kvp.Value);
+
             return target;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             var builder = new StringBuilder();
 
             if (IsNegated.HasValue && IsNegated.Value)
@@ -47,19 +50,18 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
 
             builder.Append(Prefix);
 
-            if (!String.IsNullOrEmpty(Field))
-            {
+            if (!String.IsNullOrEmpty(Field)) {
                 builder.Append(Field);
                 builder.Append(":");
             }
 
             builder.Append(IsQuotedTerm ? "\"" + Term + "\"" : Term);
 
-            if (Boost != null)
-                builder.Append("^" + Boost);
-
             if (Proximity != null)
                 builder.Append("~" + Proximity);
+
+            if (Boost != null)
+                builder.Append("^" + Boost);
 
             return builder.ToString();
         }

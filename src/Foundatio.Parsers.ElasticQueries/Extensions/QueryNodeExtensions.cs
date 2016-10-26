@@ -1,6 +1,5 @@
 ﻿using System;
 using Foundatio.Parsers.LuceneQueries.Nodes;
-using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
@@ -20,19 +19,11 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             }
         }
 
-        public static QueryBase GetQueryOrDefault(this IQueryNode node) {
-            var q = node.GetQuery();
-            if (q != null)
-                return q;
-
-            return node.GetDefaultQuery();
-        }
-
-        private const string QueryKey = "@query";
-        public static QueryBase GetQuery(this IQueryNode node) {
+        private const string QueryKey = "@Query";
+        public static QueryBase GetQuery(this IQueryNode node, Func<QueryBase> getDefaultValue = null) {
             object value = null;
             if (!node.Data.TryGetValue(QueryKey, out value))
-                return null;
+                return getDefaultValue?.Invoke();
 
             return value as QueryBase;
         }
@@ -46,43 +37,41 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 node.Data.Remove(QueryKey);
         }
 
-        private const string DefaultQueryKey = "@default_query";
-        public static QueryBase GetDefaultQuery(this IQueryNode node) {
+        private const string AggregationTypeKey = "@AggregationType";
+        public static string GetAggregationType(this IQueryNode node) {
             object value = null;
-            if (!node.Data.TryGetValue(DefaultQueryKey, out value))
+            if (!node.Data.TryGetValue(AggregationTypeKey, out value))
                 return null;
 
-            return value as QueryBase;
+            return (string)value;
         }
 
-        public static void SetDefaultQuery(this IQueryNode node, QueryBase container) {
-            node.Data[DefaultQueryKey] = container;
+        public static void SetAggregationType(this IQueryNode node, string aggregationType) {
+            node.Data[AggregationTypeKey] = aggregationType;
         }
 
-        public static void RemoveDefaultQuery(this IQueryNode node) {
-            if (node.Data.ContainsKey(DefaultQueryKey))
-                node.Data.Remove(DefaultQueryKey);
+        public static void RemoveAggregationType(this IQueryNode node) {
+            if (node.Data.ContainsKey(AggregationTypeKey))
+                node.Data.Remove(AggregationTypeKey);
         }
 
-        private const string DEFAULT_OPERATOR_KEY = "@default_operator";
-        public static Operator GetDefaultOperator(this IQueryVisitorContext context) {
+        private const string AggregationKey = "@Aggregation";
+        public static AggregationBase GetAggregation(this IQueryNode node, Func<AggregationBase> getDefaultValue = null) {
             object value = null;
-            if (!context.Data.TryGetValue(DEFAULT_OPERATOR_KEY, out value))
-                return Operator.And;
+            if (!node.Data.TryGetValue(AggregationKey, out value))
+                return getDefaultValue?.Invoke();
 
-            if (value == null)
-                return Operator.And;
-
-            return (Operator)value;
+            return value as AggregationBase;
         }
 
-        public static void SetDefaultOperator(this IQueryVisitorContext context, Operator defaultOperator) {
-            context.Data[DEFAULT_OPERATOR_KEY] = defaultOperator;
+        public static void SetAggregation(this IQueryNode node, AggregationBase aggregation) {
+            node.Data[AggregationKey] = aggregation;
         }
 
-        public static void RemoveDefaultOperator(this IQueryVisitorContext context) {
-            if (context.Data.ContainsKey(DEFAULT_OPERATOR_KEY))
-                context.Data.Remove(DEFAULT_OPERATOR_KEY);
+        public static void RemoveAggregation(this IQueryNode node) {
+            if (node.Data.ContainsKey(AggregationKey))
+                node.Data.Remove(AggregationKey);
         }
+
     }
 }
