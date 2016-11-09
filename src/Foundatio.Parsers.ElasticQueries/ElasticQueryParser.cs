@@ -68,8 +68,6 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public FilterContainer BuildFilter(GroupNode filter, IElasticQueryVisitorContext context = null)  {
-            var result = _parser.Parse(filter);
-
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
@@ -80,7 +78,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
             
-            var filterNode = _config.FilterVisitor.Accept(result, context);
+            var filterNode = _config.FilterVisitor.Accept(filter, context);
 
             return filterNode?.GetFilterContainer() ?? new MatchAllFilter();
         }
