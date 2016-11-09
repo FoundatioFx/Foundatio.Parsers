@@ -85,10 +85,8 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             return builder.ToString();
         }
 
-        public override IList<IQueryNode> Children
-        {
-            get
-            {
+        public override IList<IQueryNode> Children {
+            get {
                 var children = new List<IQueryNode>();
                 if (Left != null)
                     children.Add(Left);

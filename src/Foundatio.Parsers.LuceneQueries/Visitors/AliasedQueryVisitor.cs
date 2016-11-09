@@ -43,7 +43,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 return;
             }
 
-            node.SetUnaliasedField(node.Field);
+            node.SetOriginalField(node.Field);
             node.Field = result.Name;
             if (node is GroupNode)
                 node.SetAliasResolver(result.Resolver);

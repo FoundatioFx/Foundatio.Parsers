@@ -31,10 +31,17 @@ namespace Foundatio.Parsers.ElasticQueries {
             return this;
         }
 
+        public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index, string type)
+        {
+            UseMappings(() => client.GetMapping(new GetMappingRequest(index, type)).Mapping);
+            
+            return this;
+        }
+
         public ElasticQueryParserConfiguration UseMappings(Func<RootObjectMapping> getMapping) {
             _mapping = getMapping();
             UpdateMappingFunc = getMapping;
-
+            
             return this;
         }
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using System.Linq;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class ElasticQueryVisitorContext : QueryVisitorContextWithAliasResolver, IElasticQueryVisitorContext {
@@ -12,6 +13,30 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public static class ElasticQueryVisitorContextExtensions {
         public static IElasticType GetFieldMapping(this IElasticQueryVisitorContext context, string field) {
             return context.GetFieldMappingFunc?.Invoke(field);
+        }
+
+        public static string GetNonAnalyzedFieldName(this IElasticQueryVisitorContext context, string field) {
+            if (String.IsNullOrEmpty(field))
+                return field;
+
+            var mapping = context.GetFieldMapping(field) as StringMapping;
+            if (mapping == null)
+                return field;
+
+            if (mapping.Index == FieldIndexOption.Analyzed || mapping.Index == null) {
+                var nonAnalyzedField = mapping.Fields.FirstOrDefault(kvp => {
+                    var childMapping = kvp.Value as StringMapping;
+                    if (childMapping.Index == FieldIndexOption.No || childMapping.Index == FieldIndexOption.NotAnalyzed)
+                        return true;
+
+                    return false;
+                });
+
+                if (nonAnalyzedField.Value != null)
+                    return field + "." + nonAnalyzedField.Key.Name;
+            }
+
+            return field;
         }
 
         public static bool IsFieldAnalyzed(this IElasticQueryVisitorContext context, string field) {

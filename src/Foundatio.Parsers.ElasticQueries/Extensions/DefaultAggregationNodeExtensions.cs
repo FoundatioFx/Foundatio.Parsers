@@ -5,6 +5,7 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using System.Linq;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultAggregationNodeExtensions {
@@ -28,13 +29,15 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left != null)
                 return null;
 
+            string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+
             switch (node.GetAggregationType()) {
                 case AggregationType.DateHistogram:
                     return new NamedAggregationContainer(
-                            "date_" + node.GetUnaliasedField(),
+                            "date_" + node.GetOriginalField(),
                             new AggregationContainer {
                                 DateHistogram = new DateHistogramAggregator {
-                                    Field = node.Field,
+                                    Field = field,
                                     Interval = node.Proximity ?? "1d",
                                     Format = "date_optional_time",
                                     Offset = node.UnescapedBoost
@@ -50,22 +53,22 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                                     {
                                         "avg_lat",
                                         new AggregationContainer {
-                                            Average = new AverageAggregator { Script = $"doc['{node.Field}'].lat" }
+                                            Average = new AverageAggregator { Script = $"doc['{field}'].lat" }
                                         }
                                     },
                                     {
                                         "avg_lon",
                                         new AggregationContainer {
-                                            Average = new AverageAggregator { Script = $"doc['{node.Field}'].lon" }
+                                            Average = new AverageAggregator { Script = $"doc['{field}'].lon" }
                                         }
                                     }
                                 };
 
                     var geogridAgg = new NamedAggregationContainer(
-                            "geogrid_" + node.GetUnaliasedField(),
+                            "geogrid_" + node.GetOriginalField(),
                             new AggregationContainer {
                                 GeoHash = new GeoHashAggregator {
-                                    Field = node.Field,
+                                    Field = field,
                                     Precision = precision
                                 },
                                 Aggregations = latLonAverages
@@ -80,8 +83,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         size = parsedSize;
 
                     return new NamedAggregationContainer(
-                            "terms_" + node.GetUnaliasedField(),
-                            new AggregationContainer { Terms = new TermsAggregator { Field = node.Field, Size = size } }
+                            "terms_" + node.GetOriginalField(),
+                            new AggregationContainer { Terms = new TermsAggregator { Field = field, Size = size } }
                         );
             }
 
@@ -93,43 +96,45 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
+            string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
                     return new NamedAggregationContainer(
-                            "min_" + node.GetUnaliasedField(),
-                            new AggregationContainer { Min = new MinAggregator { Field = node.Field } }
+                            "min_" + node.GetOriginalField(),
+                            new AggregationContainer { Min = new MinAggregator { Field = field } }
                         );
                 case AggregationType.Max:
                     return new NamedAggregationContainer(
-                            "max_" + node.GetUnaliasedField(),
-                            new AggregationContainer { Max = new MaxAggregator { Field = node.Field } }
+                            "max_" + node.GetOriginalField(),
+                            new AggregationContainer { Max = new MaxAggregator { Field = field } }
                         );
                 case AggregationType.Avg:
                     return new NamedAggregationContainer(
-                            "avg_" + node.GetUnaliasedField(),
-                            new AggregationContainer { Average = new AverageAggregator { Field = node.Field } }
+                            "avg_" + node.GetOriginalField(),
+                            new AggregationContainer { Average = new AverageAggregator { Field = field } }
                         );
                 case AggregationType.Sum:
                     return new NamedAggregationContainer(
-                            "sum_" + node.GetUnaliasedField(),
-                            new AggregationContainer { Sum = new SumAggregator { Field = node.Field } }
+                            "sum_" + node.GetOriginalField(),
+                            new AggregationContainer { Sum = new SumAggregator { Field = field } }
                         );
                 case AggregationType.Cardinality:
                     return new NamedAggregationContainer(
-                            "cardinality_" + node.GetUnaliasedField(),
-                            new AggregationContainer { Cardinality = new CardinalityAggregator { Field = node.Field } }
+                            "cardinality_" + node.GetOriginalField(),
+                            new AggregationContainer { Cardinality = new CardinalityAggregator { Field = field } }
                         );
                 case AggregationType.Missing:
                     return new NamedAggregationContainer(
-                            "missing_" + node.GetUnaliasedField(),
-                            new AggregationContainer { Missing = new MissingAggregator { Field = node.Field } }
+                            "missing_" + node.GetOriginalField(),
+                            new AggregationContainer { Missing = new MissingAggregator { Field = field } }
                         );
                 case AggregationType.DateHistogram:
                     return new NamedAggregationContainer(
-                            "date_" + node.GetUnaliasedField(),
+                            "date_" + node.GetOriginalField(),
                             new AggregationContainer {
                                 DateHistogram = new DateHistogramAggregator {
-                                    Field = node.Field,
+                                    Field = field,
                                     Interval = node.Proximity ?? "1d",
                                     Format = "date_optional_time",
                                     Offset = node.UnescapedBoost
@@ -138,8 +143,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         );
                 case AggregationType.Percentiles:
                     return new NamedAggregationContainer(
-                            "percentiles_" + node.GetUnaliasedField(),
-                            new AggregationContainer { Percentiles = new PercentilesAggregator { Field = node.Field } }
+                            "percentiles_" + node.GetOriginalField(),
+                            new AggregationContainer { Percentiles = new PercentilesAggregator { Field = field } }
                         );
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
@@ -150,22 +155,22 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                                     {
                                         "avg_lat",
                                         new AggregationContainer {
-                                            Average = new AverageAggregator { Script = $"doc['{node.Field}'].lat" }
+                                            Average = new AverageAggregator { Script = $"doc['{field}'].lat" }
                                         }
                                     },
                                     {
                                         "avg_lon",
                                         new AggregationContainer {
-                                            Average = new AverageAggregator { Script = $"doc['{node.Field}'].lon" }
+                                            Average = new AverageAggregator { Script = $"doc['{field}'].lon" }
                                         }
                                     }
                                 };
 
                     var geogridAgg = new NamedAggregationContainer(
-                            "geogrid_" + node.GetUnaliasedField(),
+                            "geogrid_" + node.GetOriginalField(),
                             new AggregationContainer {
                                 GeoHash = new GeoHashAggregator {
-                                    Field = node.Field,
+                                    Field = field,
                                     Precision = precision
                                 },
                                 Aggregations = latLonAverages
@@ -180,8 +185,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         size = parsedSize;
 
                     return new NamedAggregationContainer(
-                            "terms_" + node.GetUnaliasedField(),
-                            new AggregationContainer { Terms = new TermsAggregator { Field = node.Field, Size = size } }
+                            "terms_" + node.GetOriginalField(),
+                            new AggregationContainer { Terms = new TermsAggregator { Field = field, Size = size } }
                         );
             }
 
