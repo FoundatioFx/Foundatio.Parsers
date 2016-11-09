@@ -20,9 +20,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (aggregation == null)
                     continue;
 
-                if (container.Aggregations == null)
-                    container.Aggregations = new AggregationDictionary();
-
                 container.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
             }
 
@@ -53,6 +50,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 container = new ChildrenAggregation(null, null);
                 currentNode.SetAggregation(container);
             }
+
+            if (container.Aggregations == null)
+                container.Aggregations = new AggregationDictionary();
 
             return container;
         }

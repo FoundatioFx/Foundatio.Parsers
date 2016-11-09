@@ -4,6 +4,7 @@ using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParserConfiguration {
@@ -211,6 +212,18 @@ namespace Foundatio.Parsers.ElasticQueries {
             UpdateMappingFunc = getMapping;
 
             return this;
+        }
+
+        public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client) {
+            return UseMappings(() => client.GetMapping(new GetMappingRequest(Indices.Index<T>(), Types.Type<T>())).Mapping);
+        }
+
+        public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client, string index) {
+            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Mapping);
+        }
+
+        public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index, string type) {
+            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, type)).Mapping);
         }
 
         public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping) {

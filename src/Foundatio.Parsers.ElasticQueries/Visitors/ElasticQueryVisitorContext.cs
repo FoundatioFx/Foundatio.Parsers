@@ -1,6 +1,7 @@
 ﻿using System;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using System.Linq;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class ElasticQueryVisitorContext : QueryVisitorContextWithAliasResolver, IElasticQueryVisitorContext {
@@ -15,15 +16,52 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             return context.GetPropertyMappingFunc?.Invoke(field);
         }
 
+        public static string GetNonAnalyzedFieldName(this IElasticQueryVisitorContext context, string field) {
+            if (String.IsNullOrEmpty(field))
+                return field;
+
+            var property = context.GetPropertyMapping(field);
+            if (property == null || !context.IsPropertyAnalyzed(property))
+                return field;
+
+            var multiFieldProperty = property as ICoreProperty;
+            var nonAnalyzedProperty = multiFieldProperty.Fields.FirstOrDefault(kvp => {
+                if (kvp.Value is IKeywordProperty)
+                    return true;
+
+                if (!context.IsPropertyAnalyzed(kvp.Value))
+                    return true;
+
+                return false;
+            });
+
+            if (nonAnalyzedProperty.Value != null)
+                return field + "." + nonAnalyzedProperty.Key.Name;
+
+            return field;
+        }
+
         public static bool IsPropertyAnalyzed(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return true;
 
-            var mapping = context.GetPropertyMapping(field) as TextProperty;
-            if (mapping == null)
+            var property = context.GetPropertyMapping(field);
+            if (property == null)
                 return false;
 
-            return !mapping.Index.HasValue || mapping.Index.Value;
+            return context.IsPropertyAnalyzed(property);
+        }
+
+        public static bool IsPropertyAnalyzed(this IElasticQueryVisitorContext context, IProperty property) {
+            var textProperty = property as TextProperty;
+            if (textProperty != null)
+                return !textProperty.Index.HasValue || textProperty.Index.Value;
+
+            var stringMapping = property as StringProperty;
+            if (stringMapping != null)
+                return stringMapping.Index == FieldIndexOption.Analyzed || stringMapping.Index == null;
+
+            return false;
         }
 
         public static bool IsNestedPropertyType(this IElasticQueryVisitorContext context, string field) {

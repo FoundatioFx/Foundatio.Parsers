@@ -27,10 +27,12 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left != null)
                 return null;
 
+            string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+
             switch (node.GetAggregationType()) {
                 case AggregationType.DateHistogram:
                     return new DateHistogramAggregation("date_" + node.GetUnaliasedField()) {
-                        Field = node.Field,
+                        Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
                         Offset = node.UnescapedBoost
@@ -41,7 +43,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         Enum.TryParse(node.Proximity, out precision);
 
                     return new GeoHashGridAggregation("geogrid_" + node.GetUnaliasedField()) {
-                        Field = node.Field,
+                        Field = field,
                         Precision = precision,
                         Aggregations = new AverageAggregation("avg_lat", null) {
                             Script = new InlineScript($"doc['{node.Field}'].lat")
@@ -55,7 +57,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
                         size = parsedSize;
 
-                    return new TermsAggregation("terms_" + node.GetUnaliasedField()) { Field = node.Field, Size = size };
+                    return new TermsAggregation("terms_" + node.GetUnaliasedField()) { Field = field, Size = size };
             }
 
             return null;
@@ -66,35 +68,37 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
+            string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetUnaliasedField(), node.Field);
+                    return new MinAggregation("min_" + node.GetUnaliasedField(), field);
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetUnaliasedField(), node.Field);
+                    return new MaxAggregation("max_" + node.GetUnaliasedField(), field);
                 case AggregationType.Avg:
-                    return new AverageAggregation("avg_" + node.GetUnaliasedField(), node.Field);
+                    return new AverageAggregation("avg_" + node.GetUnaliasedField(), field);
                 case AggregationType.Sum:
-                    return new SumAggregation("sum_" + node.GetUnaliasedField(), node.Field);
+                    return new SumAggregation("sum_" + node.GetUnaliasedField(), field);
                 case AggregationType.Cardinality:
-                    return new CardinalityAggregation("cardinality_" + node.GetUnaliasedField(), node.Field);
+                    return new CardinalityAggregation("cardinality_" + node.GetUnaliasedField(), field);
                 case AggregationType.Missing:
-                    return new MissingAggregation("missing_" + node.GetUnaliasedField()) { Field = node.Field };
+                    return new MissingAggregation("missing_" + node.GetUnaliasedField()) { Field = field };
                 case AggregationType.DateHistogram:
                     return new DateHistogramAggregation("date_" + node.GetUnaliasedField()) {
-                        Field = node.Field,
+                        Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
                         Offset = node.UnescapedBoost
                     };
                 case AggregationType.Percentiles:
-                    return new PercentilesAggregation("percentiles_" + node.GetUnaliasedField(), node.Field);
+                    return new PercentilesAggregation("percentiles_" + node.GetUnaliasedField(), field);
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
                     return new GeoHashGridAggregation("geogrid_" + node.GetUnaliasedField()) {
-                        Field = node.Field,
+                        Field = field,
                         Precision = precision,
                         Aggregations = new AverageAggregation("avg_lat", null) {
                             Script = new InlineScript($"doc['{node.Field}'].lat")
@@ -108,7 +112,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
                         size = parsedSize;
 
-                    return new TermsAggregation("terms_" + node.GetUnaliasedField()) { Field = node.Field, Size = size };
+                    return new TermsAggregation("terms_" + node.GetUnaliasedField()) { Field = field, Size = size };
             }
 
             return null;
