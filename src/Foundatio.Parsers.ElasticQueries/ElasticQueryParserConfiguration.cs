@@ -35,8 +35,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             return UseMappings(() => client.GetMapping(new GetMappingRequest(null, typeof(T))).Mapping);
         }
 
-        public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client, string index)
-        {
+        public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client, string index) {
             return UseMappings(() => client.GetMapping(new GetMappingRequest(index, typeof(T))).Mapping);
         }
 
