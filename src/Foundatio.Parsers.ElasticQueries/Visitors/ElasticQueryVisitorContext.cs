@@ -38,7 +38,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
             return field;
         }
-
+        
         public static bool IsFieldAnalyzed(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return true;

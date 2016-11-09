@@ -69,7 +69,7 @@ namespace Foundatio.Parsers.Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping));
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client));
             var result = processor.BuildFilter("field1:\"hey \\\"you there\\\"\"");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
             string actualRequest = GetRequest(actualResponse);
@@ -154,7 +154,7 @@ namespace Foundatio.Parsers.Tests {
             client.Index(new MyType { Field2 = "value4", Field5 = DateTime.Now }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticQueryParser(c => c.UseMappings(client, "stuff", "mytype"));
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client));
             var result = processor.BuildAggregations("min:field2 max:field2 date:(field5~1d^-3h min:field2 max:field2 min:field1)");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
             string actualRequest = GetRequest(actualResponse);
@@ -220,7 +220,7 @@ namespace Foundatio.Parsers.Tests {
             client.Index(new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now" }, i => i.Index("stuff"));
             client.Refresh();
 
-            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping));
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client));
             var result = processor.BuildQuery("field1:value1");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(result));
             string actualRequest = GetRequest(actualResponse);
@@ -448,7 +448,7 @@ namespace Foundatio.Parsers.Tests {
             });
             client.Refresh();
 
-            var processor = new ElasticQueryParser(c => c.UseMappings(client, "stuff", "things").UseNested());
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyNestedType>(client).UseNested());
             var result = processor.BuildFilter("field1:value1 nested.field1:value1");
 
             var actualResponse = client.Search<MyNestedType>(d => d.Filter(result));
@@ -515,7 +515,7 @@ namespace Foundatio.Parsers.Tests {
             });
             client.Refresh();
 
-            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyNestedType))).Mapping).UseNested());
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyNestedType>(client).UseNested());
             var result = processor.BuildFilter("field1:value1 nested:(field1:value1 field4:4 field3:value3)");
 
             var actualResponse = client.Search<MyNestedType>(d => d.Filter(result));
@@ -566,7 +566,7 @@ namespace Foundatio.Parsers.Tests {
             });
             client.Refresh();
 
-            var processor = new ElasticQueryParser(c => c.UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyNestedType))).Mapping).UseNested());
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyNestedType>(client).UseNested());
             var result = processor.BuildFilter("moved:hey");
 
             var actualResponse = client.Search<MyNestedType>(d => d.Filter(result));
@@ -626,7 +626,7 @@ namespace Foundatio.Parsers.Tests {
 
             var aliasMap = new AliasMap { { "geo", "field3" } };
             var processor = new ElasticQueryParser(c => c
-                .UseMappings(() => client.GetMapping(new GetMappingRequest("stuff", typeof(MyType))).Mapping)
+                .UseMappings<MyType>(client)
                 .UseGeo(l => "d")
                 .UseAliases(aliasMap));
             var result = processor.BuildFilter("geo:[9 TO d] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi");
