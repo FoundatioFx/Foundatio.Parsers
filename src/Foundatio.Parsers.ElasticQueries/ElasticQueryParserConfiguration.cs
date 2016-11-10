@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
@@ -12,6 +13,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration() {
             AddFilterVisitor(new CombineFiltersVisitor(), 10000);
             AddQueryVisitor(new CombineQueriesVisitor(), 10000);
+            AddSortVisitor(new TermToFieldVisitor(), 0);
             AddAggregationVisitor(new AssignAggregationTypeVisitor(), 0);
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
         }
@@ -19,6 +21,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public string DefaultField { get; private set; } = "_all";
         public AliasResolver DefaultAliasResolver { get; private set; }
         public ChainedQueryVisitor FilterVisitor { get; } = new ChainedQueryVisitor();
+        public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
 
@@ -70,6 +73,11 @@ namespace Foundatio.Parsers.ElasticQueries {
             return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
         }
 
+        public ElasticQueryParserConfiguration UseIncludes(Func<string, GroupNode> resolveInclude, int priority = 200) {
+            return this;
+            //return AddVisitor(new GeoVisitor(resolveInclude), priority);
+        }
+
         public ElasticQueryParserConfiguration UseNested(int priority = 300) {
             return AddVisitor(new NestedVisitor(), priority);
         }
@@ -80,6 +88,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             FilterVisitor.AddVisitor(visitor, priority);
             QueryVisitor.AddVisitor(visitor, priority);
             AggregationVisitor.AddVisitor(visitor, priority);
+            SortVisitor.AddVisitor(visitor, priority);
 
             return this;
         }
@@ -88,6 +97,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             FilterVisitor.RemoveVisitor<T>();
             QueryVisitor.RemoveVisitor<T>();
             AggregationVisitor.RemoveVisitor<T>();
+            SortVisitor.RemoveVisitor<T>();
 
             return this;
         }
@@ -96,6 +106,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             FilterVisitor.ReplaceVisitor<T>(visitor, newPriority);
             QueryVisitor.ReplaceVisitor<T>(visitor, newPriority);
             AggregationVisitor.ReplaceVisitor<T>(visitor, newPriority);
+            SortVisitor.ReplaceVisitor<T>(visitor, newPriority);
 
             return this;
         }
@@ -104,6 +115,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             FilterVisitor.AddVisitorBefore<T>(visitor);
             QueryVisitor.AddVisitorBefore<T>(visitor);
             AggregationVisitor.AddVisitorBefore<T>(visitor);
+            SortVisitor.AddVisitorBefore<T>(visitor);
 
             return this;
         }
@@ -112,6 +124,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             FilterVisitor.AddVisitorAfter<T>(visitor);
             QueryVisitor.AddVisitorAfter<T>(visitor);
             AggregationVisitor.AddVisitorAfter<T>(visitor);
+            SortVisitor.AddVisitorAfter<T>(visitor);
 
             return this;
         }
@@ -180,6 +193,45 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ElasticQueryParserConfiguration AddQueryVisitorAfter<T>(IChainableQueryVisitor visitor) {
             QueryVisitor.AddVisitorAfter<T>(visitor);
+
+            return this;
+        }
+
+        #endregion
+
+        #region Sort Visitor Management
+
+        public ElasticQueryParserConfiguration AddSortVisitor(IChainableQueryVisitor visitor, int priority = 0)
+        {
+            SortVisitor.AddVisitor(visitor, priority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration RemoveSortVisitor<T>() where T : IChainableQueryVisitor
+        {
+            SortVisitor.RemoveVisitor<T>();
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration ReplaceSortVisitor<T>(IChainableQueryVisitor visitor, int? newPriority = null) where T : IChainableQueryVisitor
+        {
+            SortVisitor.ReplaceVisitor<T>(visitor, newPriority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddSortVisitorBefore<T>(IChainableQueryVisitor visitor)
+        {
+            SortVisitor.AddVisitorBefore<T>(visitor);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddSortVisitorAfter<T>(IChainableQueryVisitor visitor)
+        {
+            SortVisitor.AddVisitorAfter<T>(visitor);
 
             return this;
         }

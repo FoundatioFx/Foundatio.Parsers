@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Net;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
@@ -82,7 +84,26 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             return filterNode?.GetFilterContainer() ?? new MatchAllFilter();
         }
-		
+
+        public IEnumerable<IFieldSort> BuildSort(string sort, IElasticQueryVisitorContext context = null) {
+            var result = _parser.Parse(sort);
+            return BuildSort(result, context);
+        }
+
+        public IEnumerable<IFieldSort> BuildSort(GroupNode filter, IElasticQueryVisitorContext context = null) {
+            if (context == null)
+                context = new ElasticQueryVisitorContext();
+
+            context.SetGetFieldMappingFunc(_config.GetFieldMapping);
+
+            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
+                context.SetRootAliasResolver(_config.DefaultAliasResolver);
+
+            var sortNode = _config.SortVisitor.Accept(filter, context);
+
+            return GetSortFieldsVisitor.Run(sortNode, context);
+        }
+
         // want to be able to support things like date macro expansion (now-1d/d), geo query string filters, etc
         // date:"last 30 days"
         // number ranges field:1..

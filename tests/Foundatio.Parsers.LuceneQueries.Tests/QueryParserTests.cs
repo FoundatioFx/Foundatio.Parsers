@@ -617,8 +617,12 @@ namespace Foundatio.Parsers.Tests {
             client.DeleteIndex(i => i.Index("stuff"));
             client.Refresh();
 
-            client.CreateIndex(i => i.Index("stuff"));
-            client.Map<MyType>(d => d.Dynamic().Index("stuff").Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+            client.CreateIndex(i => i.Index("stuff").AddMapping<MyType>(f => f.Dynamic()
+                .Properties(p => p
+                    .GeoPoint(g => g.Name(gp => gp.Field3))
+                    .String(e => e.Name(m => m.Field1).Index(FieldIndexOption.Analyzed)
+                        .Fields(f1 => f1.String(e1 => e1.Name("keyword").Index(FieldIndexOption.NotAnalyzed)))))));
+
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
@@ -626,21 +630,24 @@ namespace Foundatio.Parsers.Tests {
 
             var aliasMap = new AliasMap { { "geo", "field3" } };
             var processor = new ElasticQueryParser(c => c
-                .UseMappings<MyType>(client)
+                .UseMappings<MyType>(client, "stuff")
                 .UseGeo(l => "d")
                 .UseAliases(aliasMap));
             var result = processor.BuildFilter("geo:[9 TO d] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi");
             var geogridAgg = processor.BuildAggregations("geogrid:geo");
+            var sort = processor.BuildSort("geo -field1");
 
-            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result).Sort(sort));
             string actualRequest = GetRequest(actualResponse);
             _logger.Info($"Actual: {actualRequest}");
 
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f =>
-                f.GeoBoundingBox(m => m.Field3, "9", "d")
-                || f.Query(m => m.Match(y => y.OnField(e => e.Field1).Query("value1")))
-                || f.Range(m => m.OnField(g => g.Field2).GreaterOrEquals(1).LowerOrEquals(4))
-                || !f.GeoDistance(m => m.Field3, e => e.Location("d").Distance("75mi"))));
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff")
+                .SortMulti(s => s.OnField("field3"), s => s.OnField("field1.keyword").Descending())
+                .Filter(f =>
+                    f.GeoBoundingBox(m => m.Field3, "9", "d")
+                    || f.Query(m => m.Match(y => y.OnField(e => e.Field1).Query("value1")))
+                    || f.Range(m => m.OnField(g => g.Field2).GreaterOrEquals(1).LowerOrEquals(4))
+                    || !f.GeoDistance(m => m.Field3, e => e.Location("d").Distance("75mi"))));
             string expectedRequest = GetRequest(expectedResponse);
             _logger.Info($"Expected: {expectedRequest}");
 
