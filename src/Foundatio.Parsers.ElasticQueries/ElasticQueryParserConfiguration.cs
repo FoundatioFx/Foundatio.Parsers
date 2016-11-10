@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -72,10 +73,13 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
             return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
         }
+        
+        public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, int priority = 0) {
+            return AddVisitor(new IncludeVisitor(resolveInclude), priority);
+        }
 
-        public ElasticQueryParserConfiguration UseIncludes(Func<string, GroupNode> resolveInclude, int priority = 200) {
-            return this;
-            //return AddVisitor(new GeoVisitor(resolveInclude), priority);
+        public ElasticQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, int priority = 0) {
+            return AddVisitor(new IncludeVisitor(name => includes.ContainsKey(name) ? includes[name] : null), priority);
         }
 
         public ElasticQueryParserConfiguration UseNested(int priority = 300) {

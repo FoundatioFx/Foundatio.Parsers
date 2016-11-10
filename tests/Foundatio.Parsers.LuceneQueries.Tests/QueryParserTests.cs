@@ -57,6 +57,40 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void IncludeProcessor() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff"));
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var response = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field2 = "value4" }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var includes = new Dictionary<string, string> {
+                { "stuff", "field2:value2" }
+            };
+
+            var processor = new ElasticQueryParser(c => c.UseIncludes(includes));
+            var result = processor.BuildFilter("field1:value1 @include:stuff");
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Filter(result));
+            string actualRequest = GetRequest(actualResponse);
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Filter(f =>
+                f.Term(m => m.Field1, "value1")
+                && f.Term(m => m.Field2, "value2")));
+
+            string expectedRequest = GetRequest(expectedResponse);
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void EscapeFilterProcessor() {
             var client = new ElasticClient();
             client.DeleteIndex(i => i.Index("stuff"));

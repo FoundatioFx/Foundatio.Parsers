@@ -62,6 +62,7 @@
     <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
     <Compile Include="Extensions\SearchDescriptorExtensions.cs" />
     <Compile Include="NamedAggregationContainer.cs" />
+    <Compile Include="Visitors\IncludeVisitor.cs" />
     <Compile Include="Visitors\TermToFieldVisitor.cs" />
     <Compile Include="Visitors\GetSortFieldsVisitor.cs" />
     <Compile Include="Visitors\CombineAggregationsVisitor.cs" />
