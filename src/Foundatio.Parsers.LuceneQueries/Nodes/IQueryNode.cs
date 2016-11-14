@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
@@ -6,7 +7,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         IQueryNode Parent { get; set; }
         IList<IQueryNode> Children { get; }
         IDictionary<string, object> Data { get; }
-        void Accept(IQueryNodeVisitor visitor, IQueryVisitorContext context);
+        Task AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context);
         string ToString();
     }
 

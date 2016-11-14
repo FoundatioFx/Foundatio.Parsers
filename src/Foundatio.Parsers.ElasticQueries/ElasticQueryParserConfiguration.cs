@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -12,12 +14,14 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ElasticQueryParserConfiguration() {
             AddQueryVisitor(new CombineQueriesVisitor(), 10000);
+            AddSortVisitor(new TermToFieldVisitor(), 0);
             AddAggregationVisitor(new AssignAggregationTypeVisitor(), 0);
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
         }
 
         public string DefaultField { get; private set; } = "_all";
         public AliasResolver DefaultAliasResolver { get; private set; }
+        public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
 
@@ -38,7 +42,23 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
+            return UseGeo(location => Task.FromResult(resolveGeoLocation(location)), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseGeo(Func<string, Task<string>> resolveGeoLocation, int priority = 200) {
             return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseIncludes(Func<string, Task<string>> resolveInclude, int priority = 0) {
+            return AddVisitor(new IncludeVisitor(resolveInclude), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, int priority = 0) {
+            return UseIncludes(name => Task.FromResult(resolveInclude(name)), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, int priority = 0) {
+            return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, priority);
         }
 
         public ElasticQueryParserConfiguration UseNested(int priority = 300) {
@@ -112,6 +132,45 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ElasticQueryParserConfiguration AddQueryVisitorAfter<T>(IChainableQueryVisitor visitor) {
             QueryVisitor.AddVisitorAfter<T>(visitor);
+
+            return this;
+        }
+
+        #endregion
+
+        #region Sort Visitor Management
+
+        public ElasticQueryParserConfiguration AddSortVisitor(IChainableQueryVisitor visitor, int priority = 0)
+        {
+            SortVisitor.AddVisitor(visitor, priority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration RemoveSortVisitor<T>() where T : IChainableQueryVisitor
+        {
+            SortVisitor.RemoveVisitor<T>();
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration ReplaceSortVisitor<T>(IChainableQueryVisitor visitor, int? newPriority = null) where T : IChainableQueryVisitor
+        {
+            SortVisitor.ReplaceVisitor<T>(visitor, newPriority);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddSortVisitorBefore<T>(IChainableQueryVisitor visitor)
+        {
+            SortVisitor.AddVisitorBefore<T>(visitor);
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration AddSortVisitorAfter<T>(IChainableQueryVisitor visitor)
+        {
+            SortVisitor.AddVisitorAfter<T>(visitor);
 
             return this;
         }

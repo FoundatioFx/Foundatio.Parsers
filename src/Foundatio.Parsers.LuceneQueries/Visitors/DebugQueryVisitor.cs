@@ -2,6 +2,7 @@
 using System.CodeDom.Compiler;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
@@ -14,7 +15,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer = new IndentedTextWriter(new StringWriter(_builder));
         }
 
-        public override void Visit(GroupNode node, IQueryVisitorContext context) {
+        public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             _writer.WriteLine("Group:");
             _writer.Indent++;
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
@@ -24,10 +25,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLineIf(node.Proximity != null, "Proximity: {0}", node.Proximity);
 
             _writer.WriteIf(node.Left != null, "Left - ");
-            node.Left?.Accept(this, context);
+            if (node.Left != null)
+                await node.Left.AcceptAsync(this, context).ConfigureAwait(false);
 
             _writer.WriteIf(node.Right != null, "Right - ");
-            node.Right?.Accept(this, context);
+            if (node.Right != null)
+                await node.Right.AcceptAsync(this, context).ConfigureAwait(false);
 
             _writer.WriteLineIf(node.Operator != GroupOperator.Default, "Operator: {0}", node.Operator);
             _writer.WriteLineIf(node.HasParens, "Parens: true");
@@ -108,13 +111,17 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.Indent--;
         }
 
-        public override string Accept(IQueryNode node, IQueryVisitorContext context) {
-            node.Accept(this, context);
-            return _builder.ToString();
+        public override Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+            node.AcceptAsync(this, context);
+            return Task.FromResult(_builder.ToString());
+        }
+
+        public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext context = null) {
+            return new DebugQueryVisitor().AcceptAsync(node, context);
         }
 
         public static string Run(IQueryNode node, IQueryVisitorContext context = null) {
-            return new DebugQueryVisitor().Accept(node, context);
+            return RunAsync(node, context).GetAwaiter().GetResult();
         }
     }
 }

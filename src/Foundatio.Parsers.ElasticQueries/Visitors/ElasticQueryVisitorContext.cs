@@ -57,9 +57,11 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (textProperty != null)
                 return !textProperty.Index.HasValue || textProperty.Index.Value;
 
+#pragma warning disable 618
             var stringMapping = property as StringProperty;
             if (stringMapping != null)
                 return stringMapping.Index == FieldIndexOption.Analyzed || stringMapping.Index == null;
+#pragma warning restore 618
 
             return false;
         }

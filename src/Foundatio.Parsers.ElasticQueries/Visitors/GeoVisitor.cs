@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -6,18 +7,18 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class GeoVisitor: ChainableQueryVisitor {
-        private readonly Func<string, string> _resolveGeoLocation;
+        private readonly Func<string, Task<string>> _resolveGeoLocation;
 
-        public GeoVisitor(Func<string, string> resolveGeoLocation = null) {
+        public GeoVisitor(Func<string, Task<string>> resolveGeoLocation = null) {
             _resolveGeoLocation = resolveGeoLocation;
         }
 
-        public override void Visit(TermNode node, IQueryVisitorContext context) {
+        public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null || !elasticContext.IsGeoPropertyType(node.Field))
                 return;
 
-            string location = _resolveGeoLocation != null ? _resolveGeoLocation(node.Term) ?? node.Term : node.Term;
+            string location = _resolveGeoLocation != null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;
             var query = new GeoDistanceQuery { Field = node.Field, Location = location, Distance = node.Proximity };
             node.SetQuery(query);
         }

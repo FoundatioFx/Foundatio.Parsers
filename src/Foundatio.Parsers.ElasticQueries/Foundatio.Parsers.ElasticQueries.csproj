@@ -66,13 +66,16 @@
     <Compile Include="Visitors\CombineQueriesVisitor.cs" />
     <Compile Include="Visitors\ElasticQueryVisitorContext.cs" />
     <Compile Include="Visitors\AssignAggregationTypeVisitor.cs" />
+    <Compile Include="Visitors\GetSortFieldsVisitor.cs" />
     <Compile Include="Visitors\IElasticQueryVisitorContext.cs" />
+    <Compile Include="Visitors\IncludeVisitor.cs" />
     <Compile Include="Visitors\NestedVisitor.cs" />
     <Compile Include="Extensions\DefaultQueryNodeExtensions.cs" />
     <Compile Include="Visitors\GeoVisitor.cs" />
     <Compile Include="ElasticQueryParser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ElasticQueryParserConfiguration.cs" />
+    <Compile Include="Visitors\TermToFieldVisitor.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Foundatio.Parsers.ElasticQueries.nuspec" />

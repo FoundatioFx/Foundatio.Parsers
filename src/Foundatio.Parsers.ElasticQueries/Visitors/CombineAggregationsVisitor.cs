@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -7,8 +8,8 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class CombineAggregationsVisitor : ChainableQueryVisitor {
-        public override void Visit(GroupNode node, IQueryVisitorContext context) {
-            base.Visit(node, context);
+        public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+            await base.VisitAsync(node, context).ConfigureAwait(false);
 
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null)

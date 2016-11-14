@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
@@ -7,9 +8,11 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorWithResultBase<ISet<string>> {
         private readonly HashSet<string> _fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        public override void Visit(GroupNode node, IQueryVisitorContext context) {
+        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             if (!String.IsNullOrEmpty(node.Field))
                 _fields.Add(node.GetFullName());
+
+            return Task.CompletedTask;
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
@@ -37,13 +40,13 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 _fields.Add(node.GetFullName());
         }
 
-        public override ISet<string> Accept(IQueryNode node, IQueryVisitorContext context) {
-            node.Accept(this, context);
-            return _fields;
+        public override Task<ISet<string>> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+            node.AcceptAsync(this, context);
+            return Task.FromResult<ISet<string>>(_fields);
         }
 
-        public static ISet<string> Run(IQueryNode node, IQueryVisitorContext context = null) {
-            return new GetReferencedFieldsQueryVisitor().Accept(node, context);
+        public static Task<ISet<string>> RunAsync(IQueryNode node, IQueryVisitorContext context = null) {
+            return new GetReferencedFieldsQueryVisitor().AcceptAsync(node, context);
         }
     }
 }

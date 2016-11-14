@@ -31,7 +31,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.DateHistogram:
-                    return new DateHistogramAggregation("date_" + node.GetUnaliasedField()) {
+                    return new DateHistogramAggregation("date_" + node.GetOriginalField()) {
                         Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
@@ -42,7 +42,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
-                    return new GeoHashGridAggregation("geogrid_" + node.GetUnaliasedField()) {
+                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
                         Field = field,
                         Precision = precision,
                         Aggregations = new AverageAggregation("avg_lat", null) {
@@ -57,7 +57,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
                         size = parsedSize;
 
-                    return new TermsAggregation("terms_" + node.GetUnaliasedField()) { Field = field, Size = size };
+                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = size };
             }
 
             return null;
@@ -72,32 +72,32 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetUnaliasedField(), field);
+                    return new MinAggregation("min_" + node.GetOriginalField(), field);
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetUnaliasedField(), field);
+                    return new MaxAggregation("max_" + node.GetOriginalField(), field);
                 case AggregationType.Avg:
-                    return new AverageAggregation("avg_" + node.GetUnaliasedField(), field);
+                    return new AverageAggregation("avg_" + node.GetOriginalField(), field);
                 case AggregationType.Sum:
-                    return new SumAggregation("sum_" + node.GetUnaliasedField(), field);
+                    return new SumAggregation("sum_" + node.GetOriginalField(), field);
                 case AggregationType.Cardinality:
-                    return new CardinalityAggregation("cardinality_" + node.GetUnaliasedField(), field);
+                    return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field);
                 case AggregationType.Missing:
-                    return new MissingAggregation("missing_" + node.GetUnaliasedField()) { Field = field };
+                    return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
                 case AggregationType.DateHistogram:
-                    return new DateHistogramAggregation("date_" + node.GetUnaliasedField()) {
+                    return new DateHistogramAggregation("date_" + node.GetOriginalField()) {
                         Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
                         Offset = node.UnescapedBoost
                     };
                 case AggregationType.Percentiles:
-                    return new PercentilesAggregation("percentiles_" + node.GetUnaliasedField(), field);
+                    return new PercentilesAggregation("percentiles_" + node.GetOriginalField(), field);
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
-                    return new GeoHashGridAggregation("geogrid_" + node.GetUnaliasedField()) {
+                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
                         Field = field,
                         Precision = precision,
                         Aggregations = new AverageAggregation("avg_lat", null) {
@@ -112,7 +112,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
                         size = parsedSize;
 
-                    return new TermsAggregation("terms_" + node.GetUnaliasedField()) { Field = field, Size = size };
+                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = size };
             }
 
             return null;

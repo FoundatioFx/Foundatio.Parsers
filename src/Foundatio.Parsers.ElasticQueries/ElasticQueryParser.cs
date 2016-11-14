@@ -5,6 +5,8 @@ using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Nest;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParser {
@@ -17,12 +19,14 @@ namespace Foundatio.Parsers.ElasticQueries {
             _config = config;
         }
 
-        public QueryContainer BuildQuery(string query, IElasticQueryVisitorContext context = null) {
+
+        public Task<QueryContainer> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null) {
             var result = _parser.Parse(query);
-            return BuildQuery(result, context);
+            return BuildQueryAsync(result, context);
         }
 
-        public QueryContainer BuildQuery(GroupNode query, IElasticQueryVisitorContext context = null) {
+
+        public async Task<QueryContainer> BuildQueryAsync(GroupNode query, IElasticQueryVisitorContext context = null) {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
@@ -32,7 +36,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
 
-            var queryNode = _config.QueryVisitor.Accept(query, context);
+            var queryNode = await _config.QueryVisitor.AcceptAsync(query, context).ConfigureAwait(false);
 
             var q = queryNode?.GetQuery() ?? new MatchAllQuery();
             if (!context.UseScoring) {
@@ -43,13 +47,13 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             return q;
         }
-
-        public AggregationContainer BuildAggregations(string aggregations, IElasticQueryVisitorContext context = null) {
+		
+        public Task<AggregationContainer> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null) {
             var result = _parser.Parse(aggregations);
-            return BuildAggregations(result, context);
+            return BuildAggregationsAsync(result, context);
         }
 
-        public AggregationContainer BuildAggregations(GroupNode aggregations, IElasticQueryVisitorContext context = null) {
+        public async Task<AggregationContainer> BuildAggregationsAsync(GroupNode aggregations, IElasticQueryVisitorContext context = null) {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
@@ -58,9 +62,28 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
 
-            var queryNode = _config.AggregationVisitor.Accept(aggregations, context);
+            var queryNode = await _config.AggregationVisitor.AcceptAsync(aggregations, context).ConfigureAwait(false);
 
             return queryNode?.GetAggregation();
+        }
+
+        public Task<IEnumerable<IFieldSort>> BuildSortAsync(string sort, IElasticQueryVisitorContext context = null) {
+            var result = _parser.Parse(sort);
+            return BuildSortAsync(result, context);
+        }
+
+        public async Task<IEnumerable<IFieldSort>> BuildSortAsync(GroupNode filter, IElasticQueryVisitorContext context = null) {
+            if (context == null)
+                context = new ElasticQueryVisitorContext();
+
+            context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
+
+            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
+                context.SetRootAliasResolver(_config.DefaultAliasResolver);
+
+            var sortNode = await _config.SortVisitor.AcceptAsync(filter, context).ConfigureAwait(false);
+
+            return await GetSortFieldsVisitor.RunAsync(sortNode, context).ConfigureAwait(false);
         }
 
         // parser query, generate filter, generate aggregations

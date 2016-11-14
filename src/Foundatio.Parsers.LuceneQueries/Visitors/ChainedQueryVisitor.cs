@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
@@ -54,12 +55,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _visitors.Add(new QueryVisitorWithPriority { Visitor = visitor, Priority = priority });
         }
 
-        public override IQueryNode Accept(IQueryNode node, IQueryVisitorContext context) {
+        public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
             if (_isDirty)
                 _frozenVisitors = _visitors.OrderBy(v => v.Priority).ToArray();
 
             foreach (var visitor in _frozenVisitors)
-                visitor.Accept(node, context);
+                await visitor.AcceptAsync(node, context).ConfigureAwait(false);
 
             return node;
         }

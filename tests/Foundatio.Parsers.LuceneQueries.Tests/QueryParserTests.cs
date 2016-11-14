@@ -49,7 +49,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1");
+            var result = processor.BuildQueryAsync("field1:value1").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -76,7 +76,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var result = processor.BuildQuery("field1:\"hey \\\"you there\\\"\"");
+            var result = processor.BuildQueryAsync("field1:\"hey \\\"you there\\\"\"").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -104,7 +104,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery($"_exists_:{nameof(MyType.Field2)}");
+            var result = processor.BuildQueryAsync($"_exists_:{nameof(MyType.Field2)}").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -131,7 +131,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery($"_missing_:{nameof(MyType.Field2)}", new ElasticQueryVisitorContext { UseScoring = true });
+            var result = processor.BuildQueryAsync($"_missing_:{nameof(MyType.Field2)}", new ElasticQueryVisitorContext { UseScoring = true }).Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -158,7 +158,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var result = processor.BuildAggregations("min:field2 max:field2 date:(field5~1d^-3h min:field2 max:field2 min:field1)");
+            var result = processor.BuildAggregationsAsync("min:field2 max:field2 date:(field5~1d^-3h min:field2 max:field2 min:field1)").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -193,7 +193,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildAggregations("date:field5");
+            var result = processor.BuildAggregationsAsync("date:field5").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -223,7 +223,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var result = processor.BuildQuery("field1:value1", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
+            var result = processor.BuildQueryAsync("field1:value1", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -235,7 +235,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            result = processor.BuildQuery("field3:hey", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
+            result = processor.BuildQueryAsync("field3:hey", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -264,7 +264,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1 AND -field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
+            var result = processor.BuildQueryAsync("field1:value1 AND -field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -277,7 +277,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
             processor = new ElasticQueryParser();
-            result = processor.BuildQuery("field1:value1 AND NOT field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
+            result = processor.BuildQueryAsync("field1:value1 AND NOT field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -290,7 +290,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
             processor = new ElasticQueryParser();
-            result = processor.BuildQuery("field1:value1 OR NOT field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
+            result = processor.BuildQueryAsync("field1:value1 OR NOT field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -303,7 +303,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
             processor = new ElasticQueryParser();
-            result = processor.BuildQuery("field1:value1 OR -field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
+            result = processor.BuildQueryAsync("field1:value1 OR -field2:value2", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -330,7 +330,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true });
+            var result = processor.BuildQueryAsync("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
@@ -358,7 +358,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)");
+            var result = processor.BuildQueryAsync("field1:value1 (field2:value2 OR field3:value3)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
@@ -383,7 +383,7 @@ namespace Foundatio.Parsers.Tests {
             var response = client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index("stuff"));
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:Testing.Casing", new ElasticQueryVisitorContext { UseScoring = true });
+            var result = processor.BuildQueryAsync("field1:Testing.Casing", new ElasticQueryVisitorContext { UseScoring = true }).Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -407,7 +407,7 @@ namespace Foundatio.Parsers.Tests {
             var response = client.Index(new MyType { Field1 = "Blake Niemyjski" }, i => i.Index("stuff"));
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:\"Blake Niemyjski\"", new ElasticQueryVisitorContext { UseScoring = true });
+            var result = processor.BuildQueryAsync("field1:\"Blake Niemyjski\"", new ElasticQueryVisitorContext { UseScoring = true }).Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -431,7 +431,7 @@ namespace Foundatio.Parsers.Tests {
             var response = client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index("stuff"));
 
             var processor = new ElasticQueryParser(c => c.AddVisitor(new UpdateFixedTermFieldToDateFixedExistsQueryVisitor()));
-            var result = processor.BuildQuery("fixed:true");
+            var result = processor.BuildQueryAsync("fixed:true").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -458,7 +458,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext().SetDefaultOperator(Operator.And).UseScoring());
+            var result = processor.BuildQueryAsync("field1:value1 (field2:value2 OR field3:value3)", new ElasticQueryVisitorContext().SetDefaultOperator(Operator.And).UseScoring()).Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
@@ -503,7 +503,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyNestedType>(client).UseNested());
-            var result = processor.BuildQuery("field1:value1 nested.field1:value1", new ElasticQueryVisitorContext().UseScoring());
+            var result = processor.BuildQueryAsync("field1:value1 nested.field1:value1", new ElasticQueryVisitorContext().UseScoring()).Result;
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(f => result));
             string actualRequest = actualResponse.GetRequest();
@@ -518,7 +518,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            result = processor.BuildQuery("field1:value1 nested:(field1:value1 field4:4)", new ElasticQueryVisitorContext { UseScoring = true });
+            result = processor.BuildQueryAsync("field1:value1 nested:(field1:value1 field4:4)", new ElasticQueryVisitorContext { UseScoring = true }).Result;
 
             actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));
             actualRequest = actualResponse.GetRequest();
@@ -566,7 +566,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyNestedType>(client).UseNested());
-            var result = processor.BuildQuery("field1:value1 nested:(field1:value1 field4:4 field3:value3)", new ElasticQueryVisitorContext { UseScoring = true });
+            var result = processor.BuildQueryAsync("field1:value1 nested:(field1:value1 field4:4 field3:value3)", new ElasticQueryVisitorContext { UseScoring = true }).Result;
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));
             var actualRequest = actualResponse.GetRequest();
@@ -600,7 +600,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser();
-            var result = processor.BuildQuery("field4:[1 TO 2} OR field1:value1", new ElasticQueryVisitorContext { UseScoring = true });
+            var result = processor.BuildQueryAsync("field4:[1 TO 2} OR field1:value1", new ElasticQueryVisitorContext { UseScoring = true }).Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
@@ -630,7 +630,7 @@ namespace Foundatio.Parsers.Tests {
             var processor = new ElasticQueryParser(c => c
                 .UseMappings<MyType>(client, "stuff")
                 .UseGeo(l => "51.5032520,-0.1278990"));
-            var result = processor.BuildQuery("field3:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990]", new ElasticQueryVisitorContext { UseScoring = true });
+            var result = processor.BuildQueryAsync("field3:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990]", new ElasticQueryVisitorContext { UseScoring = true }).Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
@@ -663,7 +663,7 @@ namespace Foundatio.Parsers.Tests {
                 .UseMappings<MyType>(client, "stuff")
                 .UseGeo(l => "51.5032520,-0.1278990")
                 .UseAliases(aliasMap));
-            var result = processor.BuildQuery("geo:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi", new ElasticQueryVisitorContext { UseScoring = true });
+            var result = processor.BuildQueryAsync("geo:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi", new ElasticQueryVisitorContext { UseScoring = true }).Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();

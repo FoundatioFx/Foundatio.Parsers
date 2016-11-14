@@ -1,20 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public abstract class QueryNodeBase : IQueryNode {
-        public virtual void Accept(IQueryNodeVisitor visitor, IQueryVisitorContext context) {
+        public virtual Task AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context) {
             if (this is GroupNode)
-                visitor.Visit((GroupNode)this, context);
-            else if (this is TermNode)
-                visitor.Visit((TermNode)this, context);
-            else if (this is TermRangeNode)
-                visitor.Visit((TermRangeNode)this, context);
-            else if (this is MissingNode)
-                visitor.Visit((MissingNode)this, context);
-            else if (this is ExistsNode)
-                visitor.Visit((ExistsNode)this, context);
+                return visitor.VisitAsync((GroupNode)this, context);
+
+            if (this is TermNode)
+                return visitor.VisitAsync((TermNode)this, context);
+
+            if (this is TermRangeNode)
+                return visitor.VisitAsync((TermRangeNode)this, context);
+
+            if (this is MissingNode)
+                return visitor.VisitAsync((MissingNode)this, context);
+
+            if (this is ExistsNode)
+                return visitor.VisitAsync((ExistsNode)this, context);
+
+            return Task.CompletedTask;
         }
 
         public IDictionary<string, object> Data { get; } = new Dictionary<string, object>();
