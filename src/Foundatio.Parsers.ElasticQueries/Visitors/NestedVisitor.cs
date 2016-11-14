@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -7,16 +8,14 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class NestedVisitor: ChainableQueryVisitor {
-        public override void Visit(GroupNode node, IQueryVisitorContext context) {
-            if (String.IsNullOrEmpty(node.Field) || !IsFieldNested(node.GetNameParts(), context)) {
-                base.Visit(node, context);
-                return;
-            }
+        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+            if (String.IsNullOrEmpty(node.Field) || !IsFieldNested(node.GetNameParts(), context))
+                return base.VisitAsync(node, context);
 
             node.SetFilter(new NestedFilter { Path = node.GetFullName() });
             node.SetQuery(new NestedQuery { Path = node.GetFullName() });
 
-            base.Visit(node, context);
+            return base.VisitAsync(node, context);
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {

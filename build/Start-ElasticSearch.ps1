@@ -21,6 +21,4 @@ If ((Test-Path -Path "elasticsearch.zip") -And !(Test-Path -Path "elasticsearch-
     rm elasticsearch.zip
 }
 
-Start-Process -NoNewWindow "$(Get-Location)\elasticsearch-$es_version\bin\elasticsearch.bat"
-
-Pop-Location
+&"$(Get-Location)\elasticsearch-$es_version\bin\elasticsearch.bat"

@@ -62,6 +62,7 @@
     <Compile Include="Visitors\DebugQueryVisitor.cs" />
     <Compile Include="Visitors\GenerateQueryVisitor.cs" />
     <Compile Include="Visitors\IChainableQueryVisitor.cs" />
+    <Compile Include="Visitors\IncludeVisitor.cs" />
     <Compile Include="Visitors\IQueryNodeVisitor.cs" />
     <Compile Include="Visitors\IQueryNodeVisitorWithResult.cs" />
     <Compile Include="Visitors\IQueryVisitorContext.cs" />
@@ -70,6 +71,7 @@
     <Compile Include="Visitors\QueryNodeVisitorWithResultBase.cs" />
     <Compile Include="Visitors\QueryVisitorContext.cs" />
     <Compile Include="Visitors\QueryVisitorContextWithAliasResolver.cs" />
+    <Compile Include="Visitors\TermToFieldVisitor.cs" />
     <Compile Include="Visitors\VisitorWithPriority.cs" />
   </ItemGroup>
   <ItemGroup>

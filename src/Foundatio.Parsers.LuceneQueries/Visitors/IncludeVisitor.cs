@@ -1,23 +1,21 @@
 ﻿using System;
-using Foundatio.Parsers.LuceneQueries;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
-using Foundatio.Parsers.LuceneQueries.Visitors;
 
-namespace Foundatio.Parsers.ElasticQueries.Visitors {
+namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class IncludeVisitor: ChainableQueryVisitor {
-        private readonly Func<string, string> _resolveInclude;
+        private readonly Func<string, Task<string>> _resolveInclude;
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
 
-        public IncludeVisitor(Func<string, string> resolveInclude = null) {
+        public IncludeVisitor(Func<string, Task<string>> resolveInclude = null) {
             _resolveInclude = resolveInclude;
         }
 
-        public override void Visit(TermNode node, IQueryVisitorContext context) {
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null || node.Field != "@include")
+        public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
+            if (node.Field != "@include")
                 return;
 
-            string includedQuery = _resolveInclude(node.Term);
+            string includedQuery = await _resolveInclude(node.Term).ConfigureAwait(false);
             if (String.IsNullOrEmpty(includedQuery))
                 return;
 

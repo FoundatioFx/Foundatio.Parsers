@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -26,13 +27,13 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             _fields.Add(sort);
         }
 
-        public override IEnumerable<IFieldSort> Accept(IQueryNode node, IQueryVisitorContext context) {
-            node.Accept(this, context);
+        public override async Task<IEnumerable<IFieldSort>> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+            await node.AcceptAsync(this, context).ConfigureAwait(false);
             return _fields;
         }
 
-        public static IEnumerable<IFieldSort> Run(IQueryNode node, IQueryVisitorContext context = null) {
-            return new GetSortFieldsVisitor().Accept(node, context);
+        public static Task<IEnumerable<IFieldSort>> RunAsync(IQueryNode node, IQueryVisitorContext context = null) {
+            return new GetSortFieldsVisitor().AcceptAsync(node, context);
         }
     }
 }

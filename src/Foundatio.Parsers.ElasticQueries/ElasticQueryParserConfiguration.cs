@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
-using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
@@ -36,7 +36,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(null, typeof(T))).Mapping);
+            return UseMappings(() => client.GetMapping(new GetMappingRequest(typeof(T), typeof(T))).Mapping);
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client, string index) {
@@ -71,15 +71,23 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
+            return AddVisitor(new GeoVisitor(location => Task.FromResult(resolveGeoLocation(location))), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseGeo(Func<string, Task<string>> resolveGeoLocation, int priority = 200) {
             return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
         }
         
-        public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, int priority = 0) {
+        public ElasticQueryParserConfiguration UseIncludes(Func<string, Task<string>> resolveInclude, int priority = 0) {
             return AddVisitor(new IncludeVisitor(resolveInclude), priority);
         }
 
+        public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, int priority = 0) {
+            return UseIncludes(name => Task.FromResult(resolveInclude(name)), priority);
+        }
+
         public ElasticQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, int priority = 0) {
-            return AddVisitor(new IncludeVisitor(name => includes.ContainsKey(name) ? includes[name] : null), priority);
+            return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, priority);
         }
 
         public ElasticQueryParserConfiguration UseNested(int priority = 300) {

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -120,7 +121,7 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
-        public void CanGenerateSingleQuery() {
+        public async Task CanGenerateSingleQuery() {
             string query = "datehistogram:(date~2^-5\\:30 min:date max:date)";
             var parser = new LuceneQueryParser();
 
@@ -130,7 +131,7 @@ namespace Foundatio.Parsers.Tests {
             var generatedQuery = GenerateQueryVisitor.Run(result);
             Assert.Equal(query, generatedQuery);
 
-            new AssignAggregationTypeVisitor().Accept(result, null);
+            await new AssignAggregationTypeVisitor().AcceptAsync(result, null);
             _logger.Info(DebugQueryVisitor.Run(result));
         }
     }

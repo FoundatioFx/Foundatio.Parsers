@@ -24,7 +24,7 @@ namespace Foundatio.Parsers.Tests {
             };
 
             var p = new ElasticQueryParser(c => c.UseAliases(aliasMap));
-            var parsed = p.BuildFilter(filter) as IFilterContainer;
+            var parsed = p.BuildFilterAsync(filter).Result as IFilterContainer;
             Assert.NotNull(parsed.Term);
             Assert.Equal("programName", parsed.Term.Field.Name);
         }

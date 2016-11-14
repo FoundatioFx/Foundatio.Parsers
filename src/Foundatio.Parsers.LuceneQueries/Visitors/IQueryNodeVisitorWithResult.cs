@@ -1,7 +1,8 @@
-﻿using Foundatio.Parsers.LuceneQueries.Nodes;
+﻿using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public interface IQueryNodeVisitorWithResult<T>: IQueryNodeVisitor {
-        T Accept(IQueryNode node, IQueryVisitorContext context);
+        Task<T> AcceptAsync(IQueryNode node, IQueryVisitorContext context);
     }
 }

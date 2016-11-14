@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class AssignAggregationTypeVisitor: ChainableQueryVisitor {
-        public override void Visit(GroupNode node, IQueryVisitorContext context) {
+        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             if (!String.IsNullOrEmpty(node.Field)) {
                 var leftTerm = node.Left as TermNode;
                 if (leftTerm == null || !String.IsNullOrEmpty(leftTerm.Field))
@@ -18,7 +19,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 node.Left = null;
             }
 
-            base.Visit(node, context);
+            return base.VisitAsync(node, context);
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {

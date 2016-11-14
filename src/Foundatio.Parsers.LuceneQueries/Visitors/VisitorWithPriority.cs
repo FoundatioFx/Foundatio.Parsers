@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
@@ -7,28 +8,28 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         public int Priority { get; set; }
         public IQueryNodeVisitorWithResult<IQueryNode> Visitor { get; set; }
 
-        public IQueryNode Accept(IQueryNode node, IQueryVisitorContext context) {
-            return Visitor.Accept(node, context);
+        public Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+            return Visitor.AcceptAsync(node, context);
         }
 
-        public void Visit(GroupNode node, IQueryVisitorContext context) {
-            Visitor.Visit(node, context);
+        public Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+            return Visitor.VisitAsync(node, context);
         }
 
-        public void Visit(TermNode node, IQueryVisitorContext context) {
-            Visitor.Visit(node, context);
+        public Task VisitAsync(TermNode node, IQueryVisitorContext context) {
+            return Visitor.VisitAsync(node, context);
         }
 
-        public void Visit(TermRangeNode node, IQueryVisitorContext context) {
-            Visitor.Visit(node, context);
+        public Task VisitAsync(TermRangeNode node, IQueryVisitorContext context) {
+            return Visitor.VisitAsync(node, context);
         }
 
-        public void Visit(ExistsNode node, IQueryVisitorContext context) {
-            Visitor.Visit(node, context);
+        public Task VisitAsync(ExistsNode node, IQueryVisitorContext context) {
+            return Visitor.VisitAsync(node, context);
         }
 
-        public void Visit(MissingNode node, IQueryVisitorContext context) {
-            Visitor.Visit(node, context);
+        public Task VisitAsync(MissingNode node, IQueryVisitorContext context) {
+            return Visitor.VisitAsync(node, context);
         }
 
         public class PriorityComparer : IComparer<QueryVisitorWithPriority> {

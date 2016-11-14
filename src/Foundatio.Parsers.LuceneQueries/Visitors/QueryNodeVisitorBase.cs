@@ -1,37 +1,63 @@
-﻿using Foundatio.Parsers.LuceneQueries.Nodes;
+﻿using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public abstract class QueryNodeVisitorBase : IQueryNodeVisitor {
-        public virtual void Visit(GroupNode node, IQueryVisitorContext context) {
+        public virtual async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             foreach (var child in node.Children)
-                Visit(child, context);
+                await VisitAsync(child, context).ConfigureAwait(false);
         }
 
-        public virtual void Visit(TermNode node, IQueryVisitorContext context) { }
-        public virtual void Visit(TermRangeNode node, IQueryVisitorContext context) { }
-        public virtual void Visit(ExistsNode node, IQueryVisitorContext context) { }
-        public virtual void Visit(MissingNode node, IQueryVisitorContext context) { }
+        public virtual void Visit(TermNode node, IQueryVisitorContext context) {}
 
-        public virtual void Visit(IQueryNode node, IQueryVisitorContext context) {
+        public virtual Task VisitAsync(TermNode node, IQueryVisitorContext context) {
+            Visit(node, context);
+            return Task.CompletedTask;
+        }
+
+        public virtual void Visit(TermRangeNode node, IQueryVisitorContext context) {}
+
+        public virtual Task VisitAsync(TermRangeNode node, IQueryVisitorContext context) {
+            Visit(node, context);
+            return Task.CompletedTask;
+        }
+
+        public virtual void Visit(ExistsNode node, IQueryVisitorContext context) {}
+
+        public virtual Task VisitAsync(ExistsNode node, IQueryVisitorContext context) {
+            Visit(node, context);
+            return Task.CompletedTask;
+        }
+
+        public virtual void Visit(MissingNode node, IQueryVisitorContext context) {}
+
+        public virtual Task VisitAsync(MissingNode node, IQueryVisitorContext context) {
+            Visit(node, context);
+            return Task.CompletedTask;
+        }
+
+        public virtual Task VisitAsync(IQueryNode node, IQueryVisitorContext context) {
             var groupNode = node as GroupNode;
             if (groupNode != null)
-                Visit(groupNode, context);
+                return VisitAsync(groupNode, context);
 
             var termNode = node as TermNode;
             if (termNode != null)
-                Visit(termNode, context);
+                return VisitAsync(termNode, context);
 
             var termRangeNode = node as TermRangeNode;
             if (termRangeNode != null)
-                Visit(termRangeNode, context);
+                return VisitAsync(termRangeNode, context);
 
             var missingNode = node as MissingNode;
             if (missingNode != null)
-                Visit(missingNode, context);
+                return VisitAsync(missingNode, context);
 
             var existsNode = node as ExistsNode;
             if (existsNode != null)
-                Visit(existsNode, context);
+                return VisitAsync(existsNode, context);
+
+            return Task.CompletedTask;
         }
     }
 }

@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class AliasedQueryVisitor : ChainableQueryVisitor {
-        public override void Visit(GroupNode node, IQueryVisitorContext context) {
+        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             ApplyAlias(node, context);
 
-            foreach (var child in node.Children)
-                child.Accept(this, context);
+            return base.VisitAsync(node, context);
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
@@ -53,7 +53,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return f => resolver(!String.IsNullOrEmpty(scope) ? scope + "." + f : f);
         }
 
-        public override IQueryNode Accept(IQueryNode node, IQueryVisitorContext context) {
+        public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
             var rootResolver = context.GetRootAliasResolver();
             if (rootResolver == null)
                 throw new ArgumentNullException(nameof(context), "Context must have a root alias resolver set.");
@@ -63,17 +63,25 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             else
                 throw new InvalidOperationException("Node must be GroupNode.");
 
-            node.Accept(this, context);
+            await node.AcceptAsync(this, context).ConfigureAwait(false);
 
             return node;
         }
 
+        public static Task<IQueryNode> RunAsync(GroupNode node, AliasResolver resolver, IQueryVisitorContextWithAliasResolver context = null) {
+            return new AliasedQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContextWithAliasResolver { RootAliasResolver = resolver });
+        }
+
         public static IQueryNode Run(GroupNode node, AliasResolver resolver, IQueryVisitorContextWithAliasResolver context = null) {
-            return new AliasedQueryVisitor().Accept(node, context ?? new QueryVisitorContextWithAliasResolver { RootAliasResolver = resolver });
+            return RunAsync(node, resolver, context).GetAwaiter().GetResult();
+        }
+
+        public static Task<IQueryNode> RunAsync(GroupNode node, AliasMap aliasMap, IQueryVisitorContextWithAliasResolver context = null) {
+            return new AliasedQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContextWithAliasResolver { RootAliasResolver = aliasMap.Resolve });
         }
 
         public static IQueryNode Run(GroupNode node, AliasMap aliasMap, IQueryVisitorContextWithAliasResolver context = null) {
-            return new AliasedQueryVisitor().Accept(node, context ?? new QueryVisitorContextWithAliasResolver { RootAliasResolver = aliasMap.Resolve });
+            return RunAsync(node, aliasMap, context).GetAwaiter().GetResult();
         }
     }
 
