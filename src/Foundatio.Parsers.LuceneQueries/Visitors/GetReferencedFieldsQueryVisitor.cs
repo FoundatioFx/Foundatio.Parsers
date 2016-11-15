@@ -48,5 +48,9 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         public static Task<ISet<string>> RunAsync(IQueryNode node, IQueryVisitorContext context = null) {
             return new GetReferencedFieldsQueryVisitor().AcceptAsync(node, context);
         }
+
+        public static ISet<string> Run(IQueryNode node, IQueryVisitorContext context = null) {
+            return RunAsync(node, context).GetAwaiter().GetResult();
+        }
     }
 }
