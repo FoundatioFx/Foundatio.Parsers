@@ -35,5 +35,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public static Task<IEnumerable<IFieldSort>> RunAsync(IQueryNode node, IQueryVisitorContext context = null) {
             return new GetSortFieldsVisitor().AcceptAsync(node, context);
         }
+
+        public static IEnumerable<IFieldSort> Run(IQueryNode node, IQueryVisitorContext context = null) {
+            return RunAsync(node, context).GetAwaiter().GetResult();
+        }
     }
 }
