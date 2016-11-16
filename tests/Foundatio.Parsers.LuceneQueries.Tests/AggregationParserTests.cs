@@ -26,7 +26,7 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
-        public void SimpleFilterProcessor() {
+        public void ProcessAggregations() {
             var client = GetClient();
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
@@ -54,7 +54,7 @@ namespace Foundatio.Parsers.Tests {
                     .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
                 .Terms("terms_field1", t => t.Field("field1.keyword"))
                 .DateHistogram("date_field5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time"))
-                .Missing("missing_field2", t => t.Field("field2"))
+                .Missing("missing_field2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_field4", c => c.Field("field4"))
                 .Percentiles("percentiles_field4", c => c.Field("field4"))
                 .Sum("sum_field4", c => c.Field("field4"))
