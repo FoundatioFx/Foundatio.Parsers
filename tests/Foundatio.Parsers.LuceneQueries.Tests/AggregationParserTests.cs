@@ -65,7 +65,8 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
-            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+            Assert.True(actualResponse.IsValid);
+            Assert.True(expectedResponse.IsValid);
         }
     }
 }
