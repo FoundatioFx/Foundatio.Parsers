@@ -1,15 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.ElasticQueries.Visitors;
-using Foundatio.Parsers.LuceneQueries;
-using Foundatio.Parsers.LuceneQueries.Nodes;
-using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;

@@ -58,10 +58,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Extensions\DefaultAggregationNodeExtensions.cs" />
+    <Compile Include="Extensions\MappingExtensions.cs" />
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
     <Compile Include="Extensions\ResponseExtensions.cs" />
     <Compile Include="Extensions\SearchDescriptorExtensions.cs" />
+    <Compile Include="Visitors\AliasMappingVisitor.cs" />
     <Compile Include="Visitors\CombineAggregationsVisitor.cs" />
     <Compile Include="Visitors\CombineQueriesVisitor.cs" />
     <Compile Include="Visitors\ElasticQueryVisitorContext.cs" />
