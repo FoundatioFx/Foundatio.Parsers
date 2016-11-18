@@ -4,7 +4,7 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class MappingExtensions {
-        private const string ALIAS_KEY = "@@alias";
+        private const string ALIAS_KEY = "@Alias";
 
         public static TDescriptor RootAlias<TDescriptor>(this TDescriptor descriptor, string alias) where TDescriptor : IDescriptor => AddAlias(descriptor, alias);
 

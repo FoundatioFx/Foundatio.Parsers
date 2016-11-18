@@ -9,6 +9,8 @@ using Foundatio.Parsers.ElasticQueries.Visitors;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;
+using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.Tests {
     public sealed class AliasMappingVisitorTests : TestWithLoggingBase {
@@ -34,6 +36,11 @@ namespace Foundatio.Parsers.Tests {
             Assert.True(map.ContainsKey("employee_id"));
             Assert.Equal("id", map["employee_id"].Name);
             Assert.False(map["employee_id"].HasChildMappings);
+
+            var parser = new LuceneQueryParser();
+            var result = parser.Parse("employee_id:1234");
+            var aliased = AliasedQueryVisitor.Run(result, map);
+            Assert.Equal("id:1234", aliased.ToString());
         }
 
         [Fact]
@@ -43,7 +50,7 @@ namespace Foundatio.Parsers.Tests {
             var walker = new MappingWalker(visitor);
             walker.Accept(new TypeMappingDescriptor<Employee>().Properties(p => p
                 .Keyword(f => f.Name(e => e.Id).Alias("employee_id"))
-                .Object<object>(o => o.Name("Data").Properties(p1 => p1
+                .Object<object>(o => o.Name("data").Properties(p1 => p1
                     .Keyword(f => f.Name("Profile_URL").Alias("url"))))));
 
             var map = visitor.RootAliasMap;
@@ -52,13 +59,43 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal("id", map["employee_id"].Name);
             Assert.False(map["employee_id"].HasChildMappings);
 
-            Assert.True(map.ContainsKey("Data"));
-            Assert.Equal("Data", map["Data"].Name);
-            Assert.True(map["Data"].HasChildMappings);
-            Assert.Equal(1, map["Data"].ChildMap.Count);
-            Assert.True(map["Data"].ChildMap.ContainsKey("url"));
-            Assert.Equal("Profile_URL", map["Data"].ChildMap["url"].Name);
-            Assert.False(map["Data"].ChildMap["url"].HasChildMappings);
+            Assert.True(map.ContainsKey("data"));
+            Assert.Equal("data", map["data"].Name);
+            Assert.True(map["data"].HasChildMappings);
+            Assert.Equal(1, map["data"].ChildMap.Count);
+            Assert.True(map["data"].ChildMap.ContainsKey("url"));
+            Assert.Equal("Profile_URL", map["data"].ChildMap["url"].Name);
+            Assert.False(map["data"].ChildMap["url"].HasChildMappings);
+
+            var parser = new LuceneQueryParser();
+            var result = parser.Parse("employee_id:1234 data.url:test");
+            var aliased = AliasedQueryVisitor.Run(result, map);
+            Assert.Equal("id:1234 data.Profile_URL:test", aliased.ToString());
+        }
+
+        [Fact]
+        public void VerifyRootNestedAlias() {
+            var client = GetClient();
+            var visitor = new AliasMappingVisitor(client.Infer);
+            var walker = new MappingWalker(visitor);
+            walker.Accept(new TypeMappingDescriptor<Employee>().Properties(p => p
+                .Object<object>(o => o.Name("data").Properties(p1 => p1
+                    .Keyword(f => f.Name("Profile_URL").RootAlias("url"))))));
+
+            var map = visitor.RootAliasMap;
+            Assert.Equal(2, map.Count);
+            Assert.True(map.ContainsKey("url"));
+            Assert.Equal("data.Profile_URL", map["url"].Name);
+            Assert.False(map["url"].HasChildMappings);
+
+            Assert.True(map.ContainsKey("data"));
+            Assert.Equal("data", map["data"].Name);
+            Assert.False(map["data"].HasChildMappings);
+
+            var parser = new LuceneQueryParser();
+            var result = parser.Parse("url:test");
+            var aliased = AliasedQueryVisitor.Run(result, map);
+            Assert.Equal("data.Profile_URL:test", aliased.ToString());
         }
 
         [Fact]

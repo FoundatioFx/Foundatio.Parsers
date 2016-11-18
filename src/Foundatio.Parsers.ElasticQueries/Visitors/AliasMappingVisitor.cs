@@ -56,7 +56,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             var alias = property.GetAlias();
             if (alias.HasValue) {
                 if (alias.Value.Value)
-                    RootAliasMap.Add(alias.Value.Key, amv);
+                    RootAliasMap.Add(alias.Value.Key, new AliasMapValue { Name = GetFullPath(amv.Name, _stack) });
                 else
                     map.Add(alias.Value.Key, amv);
             }
@@ -68,6 +68,18 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
                 _stack.Push(amv);
             }
+        }
+
+        private string GetFullPath(string name, Stack<AliasMapValue> stack) {
+            if (stack.Count == 0)
+                return name;
+
+            string path = name;
+            var items = stack.ToArray();
+            for (int index = items.Length - 1; index >= 0; index--)
+                path = $"{items[index].Name}.{path}";
+
+            return path;
         }
     }
 }
