@@ -50,3 +50,14 @@ Finally, lets translate the parse result back into the original query.
 var generatedQuery = GenerateQueryVisitor.Run(result);
 System.Diagnostics.Debug.Assert(query == generatedQuery);
 ```
+
+## Features
+- Lucene Query Syntax Parser
+- Field Aliases
+- Query Includes
+- Elasticsearch
+  - Query
+  - Aggregation
+  - Sort
+  - Geo Queries
+  - Nested Mapping
