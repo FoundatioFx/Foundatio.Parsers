@@ -19,12 +19,10 @@ namespace Foundatio.Parsers.ElasticQueries {
             _config = config;
         }
 
-
         public Task<QueryContainer> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null) {
             var result = _parser.Parse(query);
             return BuildQueryAsync(result, context);
         }
-
 
         public async Task<QueryContainer> BuildQueryAsync(GroupNode query, IElasticQueryVisitorContext context = null) {
             if (context == null)
@@ -35,6 +33,9 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
+
+            if (_config.IncludeResolver != null && context.GetIncludeResolver() == null)
+                context.SetIncludeResolver(_config.IncludeResolver);
 
             var queryNode = await _config.QueryVisitor.AcceptAsync(query, context).ConfigureAwait(false);
 

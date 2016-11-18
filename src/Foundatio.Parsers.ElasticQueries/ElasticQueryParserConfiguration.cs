@@ -6,7 +6,6 @@ using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
-using Foundatio.Parsers.ElasticQueries.Extensions;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParserConfiguration {
@@ -21,6 +20,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public string DefaultField { get; private set; } = "_all";
         public AliasResolver DefaultAliasResolver { get; private set; }
+        public Func<string, Task<string>> IncludeResolver { get; private set; }
         public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
@@ -49,8 +49,10 @@ namespace Foundatio.Parsers.ElasticQueries {
             return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
         }
 
-        public ElasticQueryParserConfiguration UseIncludes(Func<string, Task<string>> resolveInclude, int priority = 0) {
-            return AddVisitor(new IncludeVisitor(resolveInclude), priority);
+        public ElasticQueryParserConfiguration UseIncludes(Func<string, Task<string>> includeResolver, int priority = 0) {
+            IncludeResolver = includeResolver;
+
+            return AddVisitor(new IncludeVisitor(), priority);
         }
 
         public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, int priority = 0) {

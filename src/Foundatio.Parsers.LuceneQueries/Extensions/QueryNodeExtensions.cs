@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using System.Threading.Tasks;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class QueryNodeExtensions {
