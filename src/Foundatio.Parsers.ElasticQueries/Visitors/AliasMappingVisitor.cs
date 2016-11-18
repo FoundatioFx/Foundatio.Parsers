@@ -53,13 +53,17 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             string name = _inferrer.PropertyName(property.Name);
             var amv = new AliasMapValue { Name = name };
 
-            string alias = property.GetAlias();
-            if (alias != null)
-                map.Add(alias, amv);
+            var alias = property.GetAlias();
+            if (alias.HasValue) {
+                if (alias.Value.Value)
+                    RootAliasMap.Add(alias.Value.Key, amv);
+                else
+                    map.Add(alias.Value.Key, amv);
+            }
 
             bool hasChildren = property is IObjectProperty;
             if (hasChildren) {
-                if (!String.Equals(name, alias, StringComparison.OrdinalIgnoreCase))
+                if (!alias.HasValue || !String.Equals(name, alias.Value.Key, StringComparison.OrdinalIgnoreCase))
                     map.Add(name, amv);
 
                 _stack.Push(amv);
