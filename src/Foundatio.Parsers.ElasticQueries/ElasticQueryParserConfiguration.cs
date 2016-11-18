@@ -257,6 +257,9 @@ namespace Foundatio.Parsers.ElasticQueries {
         private Func<ITypeMapping> UpdateMappingFunc { get; set; }
         private DateTime? _lastMappingUpdate = null;
         private bool UpdateMapping() {
+            if (UpdateMappingFunc == null)
+                throw new InvalidOperationException("UseMappings must be called first.");
+
             if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.Now.SubtractMinutes(1))
                 return false;
 

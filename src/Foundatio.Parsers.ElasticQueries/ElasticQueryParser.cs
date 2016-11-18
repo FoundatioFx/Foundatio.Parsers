@@ -48,7 +48,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             return q;
         }
-		
+
         public Task<AggregationContainer> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null) {
             var result = _parser.Parse(aggregations);
             return BuildAggregationsAsync(result, context);

@@ -109,6 +109,7 @@
   <ItemGroup>
     <Compile Include="IncludeQueryVisitorTests.cs" />
     <Compile Include="AliasedQueryVisitorTests.cs" />
+    <Compile Include="AliasMappingVisitorTests.cs" />
     <Compile Include="GenerateQueryVisitorTests.cs" />
     <Compile Include="AggregationParserTests.cs" />
     <Compile Include="QueryParserTests.cs" />
