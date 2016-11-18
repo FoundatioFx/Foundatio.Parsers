@@ -5,12 +5,6 @@
 
 A lucene style query parser that is extensible and allows additional syntax features.
 
-## Primary Sponsors
-
-[![Exceptionless](https://github.com/exceptionless/MediaKit/blob/master/Exceptionless_350.png)](http://exceptionless.com)
-
-[![Learning Machine](http://www.learningmachine.com/assets/images/LearningMachine.png)](http://learningmachine.com)
-
 ## Getting Started (Development)
 
 [This package](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) can be installed via the [NuGet package manager](https://docs.nuget.org/consume/Package-Manager-Dialog). If you need help, please contact us via in-app support or [open an issue](https://github.com/exceptionless/Foundatio.Parsers/issues/new). We’re always here to help if you have any questions!
