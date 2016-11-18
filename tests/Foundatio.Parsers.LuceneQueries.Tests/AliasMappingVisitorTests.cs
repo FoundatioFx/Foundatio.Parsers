@@ -86,13 +86,18 @@ namespace Foundatio.Parsers.Tests {
             walker.Accept(mapping);
             
             var processor = new ElasticQueryParser(c => c.UseAliases(visitor.RootAliasMap).UseMappings<Employee>(m => mapping, () => client.GetMapping(new GetMappingRequest(index, index)).Mapping));
-            var result = await processor.BuildQueryAsync("employee_id:ex-001 url:\"http://contoso.com/u/ex-001/profile.png\"");
+            var result = await processor.BuildQueryAsync("employee_id:ex-001 data.url:profile.png url:\"http://contoso.com/u/ex-001/profile.png\"");
             var actualResponse = client.Search<Employee>(d => d.Index(index).Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<Employee>(d => d.Index(index).Type(index).Query(q => q
-                .Bool(b => b.Filter(Query<Employee>.Term(f1 => f1.Id, "ex-001") && Query<Employee>.Term(f1 => f1.Data["Profile_URL"], "http://contoso.com/u/ex-001/profile.png")))));
+                .Bool(b => b.Filter(
+                    Query<Employee>.Term(f1 => f1.Id, "ex-001") && 
+                    Query<Employee>.Term(f1 => f1.Data["Profile_URL"], "profile.png") && 
+                    Query<Employee>.Term(f1 => f1.Data["Profile_URL"], "http://contoso.com/u/ex-001/profile.png")))
+                ));
+
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
