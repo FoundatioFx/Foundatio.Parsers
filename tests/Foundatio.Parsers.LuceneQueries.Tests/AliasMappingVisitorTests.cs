@@ -31,9 +31,9 @@ namespace Foundatio.Parsers.Tests {
 
             var map = visitor.RootAliasMap;
             Assert.Equal(1, map.Count);
-            Assert.True(map.ContainsKey("id"));
-            Assert.Equal("employee_id", map["id"].Name);
-            Assert.False(map["id"].HasChildMappings);
+            Assert.True(map.ContainsKey("employee_id"));
+            Assert.Equal("id", map["employee_id"].Name);
+            Assert.False(map["employee_id"].HasChildMappings);
         }
 
         [Fact]
@@ -48,17 +48,17 @@ namespace Foundatio.Parsers.Tests {
 
             var map = visitor.RootAliasMap;
             Assert.Equal(2, map.Count);
-            Assert.True(map.ContainsKey("id"));
-            Assert.Equal("employee_id", map["id"].Name);
-            Assert.False(map["id"].HasChildMappings);
+            Assert.True(map.ContainsKey("employee_id"));
+            Assert.Equal("id", map["employee_id"].Name);
+            Assert.False(map["employee_id"].HasChildMappings);
 
             Assert.True(map.ContainsKey("Data"));
-            Assert.Null(map["Data"].Name);
+            Assert.Equal("Data", map["Data"].Name);
             Assert.True(map["Data"].HasChildMappings);
             Assert.Equal(1, map["Data"].ChildMap.Count);
-            Assert.True(map["Data"].ChildMap.ContainsKey("Profile_URL"));
-            Assert.Equal("url", map["Data"].ChildMap["Profile_URL"].Name);
-            Assert.False(map["Data"].ChildMap["Profile_URL"].HasChildMappings);
+            Assert.True(map["Data"].ChildMap.ContainsKey("url"));
+            Assert.Equal("Profile_URL", map["Data"].ChildMap["url"].Name);
+            Assert.False(map["Data"].ChildMap["url"].HasChildMappings);
         }
 
         [Fact]

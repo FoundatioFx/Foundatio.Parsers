@@ -49,16 +49,21 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             while (Depth > _stack.Count)
                 _stack.Pop();
 
+            var map = Depth == 0 ? RootAliasMap : _stack.Peek().ChildMap;
             string name = _inferrer.PropertyName(property.Name);
-            var aliasMap = new AliasMapValue { Name = property.GetAlias() };
-            if (Depth == 0)
-                RootAliasMap.Add(name, aliasMap);
-            else
-                _stack.Peek().ChildMap.Add(name, aliasMap);
+            var amv = new AliasMapValue { Name = name };
+
+            string alias = property.GetAlias();
+            if (alias != null)
+                map.Add(alias, amv);
 
             bool hasChildren = property is IObjectProperty;
-            if (hasChildren)
-                _stack.Push(aliasMap);
+            if (hasChildren) {
+                if (!String.Equals(name, alias, StringComparison.OrdinalIgnoreCase))
+                    map.Add(name, amv);
+
+                _stack.Push(amv);
+            }
         }
     }
 }
