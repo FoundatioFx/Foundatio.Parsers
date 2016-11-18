@@ -2,12 +2,15 @@
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class ElasticQueryVisitorContext : QueryVisitorContextWithAliasResolver, IElasticQueryVisitorContext {
+    public class ElasticQueryVisitorContext : QueryVisitorContext, IQueryVisitorContextWithIncludeResolver, IQueryVisitorContextWithAliasResolver, IElasticQueryVisitorContext {
         public Operator DefaultOperator { get; set; }
         public string DefaultField { get; set; }
         public Func<string, IElasticType> GetFieldMappingFunc { get; set; }
+        public Func<string, Task<string>> IncludeResolver { get; set; }
+        public AliasResolver RootAliasResolver { get; set; }
     }
 
     public static class ElasticQueryVisitorContextExtensions {

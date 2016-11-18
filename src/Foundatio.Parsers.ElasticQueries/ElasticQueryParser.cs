@@ -37,6 +37,9 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
 
+            if (_config.IncludeResolver != null && context.GetIncludeResolver() == null)
+                context.SetIncludeResolver(_config.IncludeResolver);
+
             var queryNode = await _config.QueryVisitor.AcceptAsync(query, context).ConfigureAwait(false);
 
             return queryNode?.GetQueryContainer() ?? new MatchAllQuery();
@@ -79,7 +82,10 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
-            
+
+            if (_config.IncludeResolver != null && context.GetIncludeResolver() == null)
+                context.SetIncludeResolver(_config.IncludeResolver);
+
             var filterNode = await _config.FilterVisitor.AcceptAsync(filter, context).ConfigureAwait(false);
 
             return filterNode?.GetFilterContainer() ?? new MatchAllFilter();
