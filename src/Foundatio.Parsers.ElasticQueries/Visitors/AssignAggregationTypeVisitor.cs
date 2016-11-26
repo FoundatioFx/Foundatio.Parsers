@@ -11,7 +11,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 var leftTerm = node.Left as TermNode;
                 if (leftTerm == null || !String.IsNullOrEmpty(leftTerm.Field))
                     throw new ApplicationException("The first item in an aggregation group must be the name of the target field.");
-                
+
                 node.SetAggregationType(node.Field);
                 node.Field = leftTerm.Term;
                 node.Boost = leftTerm.Boost;
@@ -31,7 +31,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             node.Term = null;
         }
     }
-    
+
     public static class AggregationType {
         public const string Min = "min";
         public const string Max = "max";

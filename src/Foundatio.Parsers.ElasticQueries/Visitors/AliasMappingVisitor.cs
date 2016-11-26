@@ -46,7 +46,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override void Visit(ITokenCountProperty property) => AddAlias(property);
 
         private void AddAlias(IProperty property) {
-            while (Depth > _stack.Count)
+            while (Depth < _stack.Count)
                 _stack.Pop();
 
             var map = Depth == 0 ? RootAliasMap : _stack.Peek().ChildMap;
@@ -61,12 +61,13 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     map.Add(alias.Value.Key, amv);
             }
 
-            bool hasChildren = property is IObjectProperty;
-            if (hasChildren) {
+            var objectProperty = property as IObjectProperty;
+            if (objectProperty != null) {
                 if (!alias.HasValue || !String.Equals(name, alias.Value.Key, StringComparison.OrdinalIgnoreCase))
                     map.Add(name, amv);
 
-                _stack.Push(amv);
+                if (objectProperty.Properties != null)
+                    _stack.Push(amv);
             }
         }
 
