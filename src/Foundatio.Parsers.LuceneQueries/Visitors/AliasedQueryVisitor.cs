@@ -34,6 +34,9 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 return;
 
             var resolver = node.Parent.GetAliasResolver();
+            if (resolver == null)
+                return;
+
             var result = resolver(node.Field);
             if (result == null) {
                 var groupNode = node as GroupNode;

@@ -72,6 +72,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration AddVisitor(IChainableQueryVisitor visitor, int priority = 0) {
             QueryVisitor.AddVisitor(visitor, priority);
             AggregationVisitor.AddVisitor(visitor, priority);
+            SortVisitor.AddVisitor(visitor, priority);
 
             return this;
         }
@@ -79,6 +80,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration RemoveVisitor<T>() where T : IChainableQueryVisitor {
             QueryVisitor.RemoveVisitor<T>();
             AggregationVisitor.RemoveVisitor<T>();
+            SortVisitor.RemoveVisitor<T>();
 
             return this;
         }
@@ -86,6 +88,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration ReplaceVisitor<T>(IChainableQueryVisitor visitor, int? newPriority = null) where T : IChainableQueryVisitor {
             QueryVisitor.ReplaceVisitor<T>(visitor, newPriority);
             AggregationVisitor.ReplaceVisitor<T>(visitor, newPriority);
+            SortVisitor.ReplaceVisitor<T>(visitor, newPriority);
 
             return this;
         }
@@ -93,6 +96,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration AddVisitorBefore<T>(IChainableQueryVisitor visitor) {
             QueryVisitor.AddVisitorBefore<T>(visitor);
             AggregationVisitor.AddVisitorBefore<T>(visitor);
+            SortVisitor.AddVisitorBefore<T>(visitor);
 
             return this;
         }
@@ -100,6 +104,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration AddVisitorAfter<T>(IChainableQueryVisitor visitor) {
             QueryVisitor.AddVisitorAfter<T>(visitor);
             AggregationVisitor.AddVisitorAfter<T>(visitor);
+            SortVisitor.AddVisitorAfter<T>(visitor);
 
             return this;
         }
