@@ -584,6 +584,37 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
+        [Fact]
+        public void CanBuildAliasQueryProcessor() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+
+            var mapping = new TypeMappingDescriptor<MyType>().Properties(p => p
+                .Object<Dictionary<string, object>>(f => f.Name(e => e.Data).Properties(p2 => p2
+                    .Text(e => e.Name("@browser").RootAlias("browser"))
+                    .Text(e => e.Name("@browser_version").RootAlias("browser.version")))));
+
+            client.CreateIndex("stuff", i => i.Mappings(m => m.Map("stuff", d => mapping)));
+            client.Refresh("stuff");
+
+            var visitor = new AliasMappingVisitor(client.Infer);
+            var walker = new MappingWalker(visitor);
+            walker.Accept(mapping);
+
+            var processor = new ElasticQueryParser(c => c.UseAliases(visitor.RootAliasMap));
+            var result = processor.BuildQueryAsync("browser.version:1", new ElasticQueryVisitorContext().UseScoring()).Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Term(m => m.Field(e => e.Data["@browser_version"]).Value("1"))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
 
         [Fact]
         public void RangeQueryProcessor() {
@@ -687,6 +718,7 @@ namespace Foundatio.Parsers.Tests {
         public string Field3 { get; set; }
         public int Field4 { get; set; }
         public DateTime Field5 { get; set; }
+        public Dictionary<string, object> Data { get; set; }
     }
 
     public class MyNestedType {
