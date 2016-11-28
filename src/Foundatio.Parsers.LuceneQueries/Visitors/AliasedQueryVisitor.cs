@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -87,6 +88,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
     public delegate GetAliasResult AliasResolver(string field);
 
+    [DebuggerDisplay("{Name}")]
     public class GetAliasResult {
         public string Name { get; set; }
         public AliasResolver Resolver { get; set; }
@@ -152,6 +154,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
     }
 
+    [DebuggerDisplay("{Name} HasChildMappings: {HasChildMappings}")]
     public class AliasMapValue {
         public string Name { get; set; }
 

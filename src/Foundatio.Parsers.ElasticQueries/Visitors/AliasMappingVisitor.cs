@@ -76,9 +76,8 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return name;
 
             string path = name;
-            var items = stack.ToArray();
-            for (int index = items.Length - 1; index >= 0; index--)
-                path = $"{items[index].Name}.{path}";
+            foreach (var map in stack.ToArray())
+                path = $"{map.Name}.{path}";
 
             return path;
         }
