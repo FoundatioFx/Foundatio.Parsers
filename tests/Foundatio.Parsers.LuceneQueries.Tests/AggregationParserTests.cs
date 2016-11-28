@@ -4,6 +4,7 @@ using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.Tests.Extensions;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;

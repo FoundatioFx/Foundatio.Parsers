@@ -107,6 +107,7 @@
     <Otherwise />
   </Choose>
   <ItemGroup>
+    <Compile Include="Extensions\ResponseExtensions.cs" />
     <Compile Include="IncludeQueryVisitorTests.cs" />
     <Compile Include="AliasedQueryVisitorTests.cs" />
     <Compile Include="AliasMappingVisitorTests.cs" />
