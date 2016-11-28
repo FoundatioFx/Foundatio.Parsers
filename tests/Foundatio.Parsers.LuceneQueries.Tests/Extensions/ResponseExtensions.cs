@@ -1,7 +1,8 @@
-﻿using Nest;
+﻿using System;
 using System.Text;
+using Nest;
 
-namespace Foundatio.Parsers.ElasticQueries.Extensions {
+namespace Foundatio.Parsers.Tests.Extensions {
     public static class ResponseExtensions {
         public static string GetRequest(this IResponse response) {
             return response.ApiCall.RequestBodyInBytes != null ?

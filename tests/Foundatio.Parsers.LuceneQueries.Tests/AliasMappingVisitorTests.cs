@@ -11,6 +11,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.Tests.Extensions;
 
 namespace Foundatio.Parsers.Tests {
     public sealed class AliasMappingVisitorTests : TestWithLoggingBase {
@@ -107,14 +108,20 @@ namespace Foundatio.Parsers.Tests {
                 .Object<object>(o1 => o1.Name("data").Properties(p1 => p1
                     .Object<object>(o2 => o2.Name("@request_info").Properties(p2 => p2
                         .Keyword(f => f.Name("user_agent").RootAlias("useragent"))
+                        .Text(f4 => f4.Name("@browser_major_version").RootAlias("browser.major")
+                            .Fields(sf => sf.Keyword(s => s.Name("keyword").IgnoreAbove(256))))
                         .Object<object>(o3 => o3.Name("data").Properties(p3 => p3
                             .Keyword(f => f.Name("@is_bot").RootAlias("bot"))))))))));
 
             var map = visitor.RootAliasMap;
-            Assert.Equal(3, map.Count);
+            Assert.Equal(4, map.Count);
             Assert.True(map.ContainsKey("useragent"));
             Assert.Equal("data.@request_info.user_agent", map["useragent"].Name);
             Assert.False(map["useragent"].HasChildMappings);
+
+            Assert.True(map.ContainsKey("browser.major"));
+            Assert.Equal("data.@request_info.@browser_major_version", map["browser.major"].Name);
+            Assert.False(map["browser.major"].HasChildMappings);
 
             Assert.True(map.ContainsKey("bot"));
             Assert.Equal("data.@request_info.data.@is_bot", map["bot"].Name);
@@ -125,9 +132,9 @@ namespace Foundatio.Parsers.Tests {
             Assert.True(map["data"].HasChildMappings);
 
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("useragent:test bot:true");
+            var result = parser.Parse("useragent:test browser.major:10 bot:true");
             var aliased = AliasedQueryVisitor.Run(result, map);
-            Assert.Equal("data.@request_info.user_agent:test data.@request_info.data.@is_bot:true", aliased.ToString());
+            Assert.Equal("data.@request_info.user_agent:test data.@request_info.@browser_major_version:10 data.@request_info.data.@is_bot:true", aliased.ToString());
         }
 
         [Fact]

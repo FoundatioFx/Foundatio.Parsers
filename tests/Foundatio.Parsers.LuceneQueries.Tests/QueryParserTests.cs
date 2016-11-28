@@ -9,6 +9,7 @@ using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.Tests.Extensions;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;
