@@ -16,7 +16,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-            _writer.WriteLine("Group:");
+            await _writer.WriteLineAsync("Group:").ConfigureAwait(false);
             _writer.Indent++;
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);

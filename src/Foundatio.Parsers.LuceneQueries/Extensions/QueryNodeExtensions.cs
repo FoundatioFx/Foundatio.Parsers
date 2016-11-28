@@ -71,12 +71,15 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
 
         private const string AliasResolverKey = "@AliasResolver";
-        public static AliasResolver GetAliasResolver(this IQueryNode node) {
+        public static AliasResolver GetAliasResolver(this IQueryNode node, IQueryVisitorContext context) {
             object value = null;
-            if (!node.Data.TryGetValue(AliasResolverKey, out value))
-                return null;
+            if (node.Data.TryGetValue(AliasResolverKey, out value))
+                return value as AliasResolver;
 
-            return value as AliasResolver;
+            if (node.Parent == null)
+                return context.GetRootAliasResolver();
+
+            return null;
         }
 
         public static void SetAliasResolver(this IQueryNode node, AliasResolver resolver) {

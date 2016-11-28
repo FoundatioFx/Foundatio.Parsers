@@ -60,6 +60,7 @@
     <Compile Include="Extensions\DefaultAggregationNodeExtensions.cs" />
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
+    <Compile Include="Extensions\ResponseExtensions.cs" />
     <Compile Include="Extensions\SearchDescriptorExtensions.cs" />
     <Compile Include="NamedAggregationContainer.cs" />
     <Compile Include="Visitors\GetSortFieldsVisitor.cs" />
