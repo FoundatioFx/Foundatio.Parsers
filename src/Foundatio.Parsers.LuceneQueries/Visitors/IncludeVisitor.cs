@@ -21,6 +21,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 return;
 
             var result = _parser.Parse(includedQuery);
+            result.HasParens = true;
             await VisitAsync(result, context).ConfigureAwait(false);
 
             var parent = node.Parent as GroupNode;
