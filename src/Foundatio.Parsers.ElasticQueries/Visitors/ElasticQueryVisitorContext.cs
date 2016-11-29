@@ -56,12 +56,12 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public static bool IsPropertyAnalyzed(this IElasticQueryVisitorContext context, IProperty property) {
-            var textProperty = property as TextProperty;
+            var textProperty = property as ITextProperty;
             if (textProperty != null)
                 return !textProperty.Index.HasValue || textProperty.Index.Value;
 
 #pragma warning disable 618
-            var stringMapping = property as StringProperty;
+            var stringMapping = property as IStringProperty;
             if (stringMapping != null)
                 return stringMapping.Index == FieldIndexOption.Analyzed || stringMapping.Index == null;
 #pragma warning restore 618
@@ -73,7 +73,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = context.GetPropertyMapping(field) as NestedProperty;
+            var mapping = context.GetPropertyMapping(field) as INestedProperty;
             return mapping != null;
         }
 
@@ -81,7 +81,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = context.GetPropertyMapping(field) as GeoPointProperty;
+            var mapping = context.GetPropertyMapping(field) as IGeoPointProperty;
             return mapping != null;
         }
 
@@ -89,7 +89,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = context.GetPropertyMapping(field) as NumberProperty;
+            var mapping = context.GetPropertyMapping(field) as INumberProperty;
             return mapping != null;
         }
     }
