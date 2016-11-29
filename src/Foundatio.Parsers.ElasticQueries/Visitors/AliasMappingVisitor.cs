@@ -66,7 +66,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (!alias.HasValue || !String.Equals(name, alias.Value.Key, StringComparison.OrdinalIgnoreCase))
                     map.Add(name, amv);
 
-                if (objectProperty.Properties != null)
+                if (objectProperty.Properties?.Count > 0)
                     _stack.Push(amv);
             }
         }
