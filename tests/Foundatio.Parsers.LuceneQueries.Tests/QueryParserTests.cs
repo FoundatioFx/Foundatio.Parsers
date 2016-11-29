@@ -586,6 +586,32 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void CanGenerateMatchQuery() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+
+            var mapping = new TypeMappingDescriptor<MyType>().Properties(p => p
+                .Text(f => f.Name(e => e.Field1).Fields(f1 => f1.Keyword(k => k.Name("keyword").IgnoreAbove(256)))));
+
+            client.CreateIndex("stuff", i => i.Mappings(m => m.Map("mytype", d => mapping)));
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var result = processor.BuildQueryAsync("field1:test", new ElasticQueryVisitorContext().UseScoring()).Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => q.Match(m => m.Field(e => e.Field1).Query("test"))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void CanBuildAliasQueryProcessor() {
             var client = GetClient();
             client.DeleteIndex("stuff");
@@ -595,7 +621,7 @@ namespace Foundatio.Parsers.Tests {
                     .Text(e => e.Name("@browser").RootAlias("browser"))
                     .Text(e => e.Name("@browser_version").RootAlias("browser.version")))));
 
-            client.CreateIndex("stuff", i => i.Mappings(m => m.Map("stuff", d => mapping)));
+            client.CreateIndex("stuff", i => i.Mappings(m => m.Map("mytype", d => mapping)));
             client.Refresh("stuff");
 
             var visitor = new AliasMappingVisitor(client.Infer);
