@@ -7,9 +7,9 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
     }
 
     public abstract class ChainableQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode>, IChainableQueryVisitor {
-        public override Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
-            node.AcceptAsync(this, context);
-            return Task.FromResult(node);
+        public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+            await node.AcceptAsync(this, context).ConfigureAwait(false);
+            return node;
         }
     }
 }
