@@ -19,7 +19,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return;
 
             string location = _resolveGeoLocation != null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;
-            var query = new GeoDistanceQuery { Field = node.Field, Location = location, Distance = node.Proximity };
+            var query = new GeoDistanceQuery { Field = node.Field, Location = location, Distance = node.Proximity ?? Distance.Miles(10) };
             node.SetQuery(query);
         }
 
