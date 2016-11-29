@@ -61,6 +61,7 @@
     <Compile Include="Extensions\MappingExtensions.cs" />
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
+    <Compile Include="Extensions\ResponseExtensions.cs" />
     <Compile Include="Extensions\SearchDescriptorExtensions.cs" />
     <Compile Include="Visitors\AliasMappingVisitor.cs" />
     <Compile Include="Visitors\CombineAggregationsVisitor.cs" />
@@ -85,6 +86,9 @@
       <Project>{f759e45d-c914-4546-947d-b9f0854d22e9}</Project>
       <Name>Foundatio.Parsers.LuceneQueries</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Analyzer Include="..\..\packages\AsyncFixer.1.1.4\analyzers\dotnet\cs\AsyncFixer.dll" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

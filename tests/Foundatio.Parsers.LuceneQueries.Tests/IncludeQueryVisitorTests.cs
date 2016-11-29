@@ -5,10 +5,10 @@ using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Foundatio.Parsers.Tests.Extensions;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 
 namespace Foundatio.Parsers.Tests {
     public class IncludeQueryVisitorTests : TestWithLoggingBase {

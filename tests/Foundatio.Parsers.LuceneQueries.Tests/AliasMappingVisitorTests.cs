@@ -11,7 +11,6 @@ using Xunit;
 using Xunit.Abstractions;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Foundatio.Parsers.Tests.Extensions;
 
 namespace Foundatio.Parsers.Tests {
     public sealed class AliasMappingVisitorTests : TestWithLoggingBase {
