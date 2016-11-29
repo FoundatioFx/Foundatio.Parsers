@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -87,6 +88,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
     public delegate GetAliasResult AliasResolver(string field);
 
+    [DebuggerDisplay("{Name}")]
     public class GetAliasResult {
         public string Name { get; set; }
         public AliasResolver Resolver { get; set; }
@@ -101,9 +103,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             if (String.IsNullOrEmpty(field))
                 return null;
 
-            var fieldParts = field.Split('.');
             var currentResolver = InternalResolve(this);
-            GetAliasResult result = null;
+            GetAliasResult result = InternalResolve(field, currentResolver);
+            if (result != null)
+                return result;
+
+            var fieldParts = field.Split('.');
             for (int i = 0; i < fieldParts.Length; i++) {
                 var currentResult = InternalResolve(fieldParts, i, currentResolver);
                 if (currentResult == null)
@@ -138,9 +143,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             };
         }
 
-        private GetAliasResult InternalResolve(string[] fieldParts, int index, AliasResolver resolver) {
-            var part = index == 0 ? fieldParts[0] : String.Join(".", fieldParts.Take(index + 1));
-            var result = resolver?.Invoke(part);
+        private GetAliasResult InternalResolve(string field, AliasResolver resolver) {
+            var result = resolver?.Invoke(field);
             if (result != null) {
                 return new GetAliasResult {
                     Name = result.Name,
@@ -150,8 +154,14 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
             return null;
         }
+
+        private GetAliasResult InternalResolve(string[] fieldParts, int index, AliasResolver resolver) {
+            var part = index == 0 ? fieldParts[0] : String.Join(".", fieldParts.Take(index + 1));
+            return InternalResolve(part, resolver);
+        }
     }
 
+    [DebuggerDisplay("{Name} HasChildMappings: {HasChildMappings}")]
     public class AliasMapValue {
         public string Name { get; set; }
 
