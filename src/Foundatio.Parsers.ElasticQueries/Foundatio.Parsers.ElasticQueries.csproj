@@ -61,7 +61,7 @@
     <Compile Include="Extensions\MappingExtensions.cs" />
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
-    <Compile Include="Extensions\ResponseExtensions.cs" />
+    <Compile Include="Extensions\ElasticExtensions.cs" />
     <Compile Include="Extensions\SearchDescriptorExtensions.cs" />
     <Compile Include="Visitors\AliasMappingVisitor.cs" />
     <Compile Include="Visitors\CombineAggregationsVisitor.cs" />
