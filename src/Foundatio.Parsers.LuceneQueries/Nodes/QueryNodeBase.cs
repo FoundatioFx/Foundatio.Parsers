@@ -25,7 +25,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         }
 
         public IDictionary<string, object> Data { get; } = new Dictionary<string, object>();
-        public abstract IList<IQueryNode> Children { get; }
+        public abstract IEnumerable<IQueryNode> Children { get; }
         public IQueryNode Parent { get; set; }
         public static readonly IList<IQueryNode> EmptyNodeList = new List<IQueryNode>().AsReadOnly();
 

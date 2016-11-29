@@ -1,4 +1,4 @@
-﻿$es_version = "5.0.0"
+﻿$es_version = "5.0.1"
 If ($env:ES_VERSION) {
     $es_version = $env:ES_VERSION
 }
@@ -21,7 +21,7 @@ If ((Test-Path -Path "elasticsearch-$es_version.zip") -And !(Test-Path -Path "el
     rm elasticsearch-$es_version.zip
 }
 
-Start-Process -NoNewWindow "$(Get-Location)\elasticsearch-$es_version\bin\elasticsearch.bat"
+Start-Process "$(Get-Location)\elasticsearch-$es_version\bin\elasticsearch.bat"
 
 Pop-Location
 
