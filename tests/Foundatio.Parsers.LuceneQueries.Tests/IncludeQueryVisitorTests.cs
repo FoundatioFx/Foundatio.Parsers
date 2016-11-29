@@ -19,7 +19,7 @@ namespace Foundatio.Parsers.Tests {
             var result = parser.Parse("@include:other");
             var includes = new Dictionary<string, string> { { "other", "field:value" } };
             var resolved = IncludeVisitor.Run(result, includes);
-            Assert.Equal("field:value", resolved.ToString());
+            Assert.Equal("(field:value)", resolved.ToString());
         }
 
         [Fact]
@@ -28,7 +28,7 @@ namespace Foundatio.Parsers.Tests {
             var result = parser.Parse("field1:value1 @include:other");
             var includes = new Dictionary<string, string> { { "other", "field:value" } };
             var resolved = IncludeVisitor.Run(result, includes);
-            Assert.Equal("field1:value1 field:value", resolved.ToString());
+            Assert.Equal("field1:value1 (field:value)", resolved.ToString());
         }
 
         [Fact]
@@ -37,7 +37,7 @@ namespace Foundatio.Parsers.Tests {
             var result = parser.Parse("field1:value1 OR (@include:other field2:value2)");
             var includes = new Dictionary<string, string> { { "other", "field:value" } };
             var resolved = IncludeVisitor.Run(result, includes);
-            Assert.Equal("field1:value1 OR (field:value field2:value2)", resolved.ToString());
+            Assert.Equal("field1:value1 OR ((field:value) field2:value2)", resolved.ToString());
         }
 
         [Fact]
@@ -49,7 +49,7 @@ namespace Foundatio.Parsers.Tests {
                 { "other2", "field2:value2" }
             };
             var resolved = IncludeVisitor.Run(result, includes);
-            Assert.Equal("field2:value2", resolved.ToString());
+            Assert.Equal("((field2:value2))", resolved.ToString());
         }
 
         [Fact]
