@@ -249,7 +249,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 if (depth == fieldParts.Length - 1)
                     return fieldMapping;
 
-                var objectProperty = fieldMapping as ObjectProperty;
+                var objectProperty = fieldMapping as IObjectProperty;
                 if (objectProperty != null)
                     currentProperties = objectProperty.Properties;
                 else
