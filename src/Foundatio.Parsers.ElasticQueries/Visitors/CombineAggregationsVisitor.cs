@@ -18,18 +18,52 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
             var container = GetParentContainer(node, context);
             var termsAggregation = container as ITermsAggregation;
-            
+            var dateHistogramAggregation = container as IDateHistogramAggregation;
+
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 var aggregation = child.GetAggregation(() => child.GetDefaultAggregation(context));
-                if (aggregation == null)
+                if (aggregation == null) {
+                    var termNode = child as TermNode;
+                    if (termNode != null && termsAggregation != null) {
+                        if (termNode.Field == "@exclude")
+                            termsAggregation.Exclude.Pattern = termNode.Term;
+                        else if (termNode.Field == "@include")
+                            termsAggregation.Include.Pattern = termNode.Term;
+                        else if (termNode.Field == "@missing")
+                            termsAggregation.Missing = termNode.Term;
+                        else if (termNode.Field == "@min") {
+                            int? minCount = null;
+                            int parsedMinCount;
+                            if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.Term, out parsedMinCount))
+                                minCount = parsedMinCount;
+
+                            termsAggregation.MinimumDocumentCount = minCount;
+                        }
+                    }
+
+                    if (termNode != null && dateHistogramAggregation != null) {
+                        if (termNode.Field == "@missing") {
+                            DateTime? missingValue = null;
+                            DateTime parsedMissingDate;
+                            if (!String.IsNullOrEmpty(termNode.Term) && DateTime.TryParse(termNode.Term, out parsedMissingDate))
+                                missingValue = parsedMissingDate;
+
+                            dateHistogramAggregation.Missing = missingValue;
+                        }
+                    }
+
                     continue;
+                }
 
                 container.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
                 if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+")) {
                     if (termsAggregation.Order == null)
                         termsAggregation.Order = new List<TermsOrder>();
 
-                    termsAggregation.Order.Add(new TermsOrder { Key = ((IAggregation)aggregation).Name, Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending });
+                    termsAggregation.Order.Add(new TermsOrder {
+                        Key = ((IAggregation)aggregation).Name,
+                        Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
+                    });
                 }
             }
 
