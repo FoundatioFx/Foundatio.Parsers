@@ -4,6 +4,7 @@ using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Utility;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;
@@ -55,6 +56,109 @@ namespace Foundatio.Parsers.Tests {
                 .Average("avg_field4", c => c.Field("field4"))
                 .Max("max_field4", c => c.Field("field4"))
                 .Min("min_field4", c => c.Field("field4"))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.True(actualResponse.IsValid);
+            Assert.True(expectedResponse.IsValid);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void ProcessTermAggregations() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var aggregations = processor.BuildAggregationsAsync("terms:(field1 @exclude:-F @include:myinclude @missing:mymissing @min:1)").Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+                .Terms("terms_field1", t => t
+                    .Field("field1.keyword")
+                    .MinimumDocumentCount(1)
+                    .Include("myinclude")
+                    .Exclude("-F")
+                    .Missing("mymissing"))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.True(actualResponse.IsValid);
+            Assert.True(expectedResponse.IsValid);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void ProcessSortedTermAggregations() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var aggregations = processor.BuildAggregationsAsync("terms:(-field1) terms:+field2").Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+                .Terms("terms_field1", t => t
+                    .Field("field1.keyword")
+                    .OrderDescending("field1.keyword")
+                    .Exclude("1"))
+                .Terms("terms_field2", t => t
+                    .Field("field2.keyword")
+                    .OrderAscending("field2.keyword")
+                    .Exclude("1"))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.True(actualResponse.IsValid);
+            Assert.True(expectedResponse.IsValid);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void ProcessDateHistogramAggregations() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.IndexMany(new List<MyType> { new MyType { Field5 = SystemClock.UtcNow } }, "stuff");
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var aggregations = processor.BuildAggregationsAsync("date:(field5 @missing:\"0001-01-01T00:00:00\")").Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+                .DateHistogram("date_field5", d1 => d1
+                    .Field("field5")
+                    .Interval("1d")
+                    .Format("date_optional_time")
+                    .Missing(DateTime.MinValue))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 

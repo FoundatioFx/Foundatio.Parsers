@@ -26,15 +26,15 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     var termNode = child as TermNode;
                     if (termNode != null && termsAggregation != null) {
                         if (termNode.Field == "@exclude")
-                            termsAggregation.Exclude.Pattern = termNode.Term;
+                            termsAggregation.Exclude = new TermsIncludeExclude { Pattern = $"{termNode.Prefix}{termNode.Term}" };
                         else if (termNode.Field == "@include")
-                            termsAggregation.Include.Pattern = termNode.Term;
+                            termsAggregation.Include = new TermsIncludeExclude { Pattern = $"{termNode.Prefix}{termNode.Term}" };
                         else if (termNode.Field == "@missing")
-                            termsAggregation.Missing = termNode.Term;
+                            termsAggregation.Missing = $"{termNode.Prefix}{termNode.Term}";
                         else if (termNode.Field == "@min") {
                             int? minCount = null;
                             int parsedMinCount;
-                            if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.Term, out parsedMinCount))
+                            if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse($"{termNode.Prefix}{termNode.Term}", out parsedMinCount))
                                 minCount = parsedMinCount;
 
                             termsAggregation.MinimumDocumentCount = minCount;
@@ -54,6 +54,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
                     continue;
                 }
+
+                if (container.Aggregations == null)
+                    container.Aggregations = new AggregationDictionary();
 
                 container.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
                 if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+")) {
@@ -94,9 +97,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 container = new ChildrenAggregation(null, null);
                 currentNode.SetAggregation(container);
             }
-
-            if (container.Aggregations == null)
-                container.Aggregations = new AggregationDictionary();
 
             return container;
         }

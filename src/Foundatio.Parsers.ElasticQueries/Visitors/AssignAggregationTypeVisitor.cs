@@ -12,11 +12,13 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (leftTerm == null || !String.IsNullOrEmpty(leftTerm.Field))
                     throw new ApplicationException("The first item in an aggregation group must be the name of the target field.");
 
-                node.SetAggregationType(node.Field);
-                node.Field = leftTerm.Term;
-                node.Boost = leftTerm.Boost;
-                node.Proximity = leftTerm.Proximity;
-                node.Left = null;
+                if (IsKnownAggregationType(node.Field)) {
+                    node.SetAggregationType(node.Field);
+                    node.Field = leftTerm.Term;
+                    node.Boost = leftTerm.Boost;
+                    node.Proximity = leftTerm.Proximity;
+                    node.Left = null;
+                }
             }
 
             return base.VisitAsync(node, context);
@@ -26,9 +28,29 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (String.IsNullOrEmpty(node.Term))
                 return;
 
-            node.SetAggregationType(node.Field);
-            node.Field = node.Term;
-            node.Term = null;
+            if (IsKnownAggregationType(node.Field)) {
+                node.SetAggregationType(node.Field);
+                node.Field = node.Term;
+                node.Term = null;
+            }
+        }
+
+        private bool IsKnownAggregationType(string type) {
+            switch (type) {
+                case AggregationType.Min:
+                case AggregationType.Max:
+                case AggregationType.Avg:
+                case AggregationType.Sum:
+                case AggregationType.Cardinality:
+                case AggregationType.Missing:
+                case AggregationType.DateHistogram:
+                case AggregationType.Percentiles:
+                case AggregationType.GeoHashGrid:
+                case AggregationType.Terms:
+                    return true;
+                default:
+                    return false;
+            }
         }
     }
 
