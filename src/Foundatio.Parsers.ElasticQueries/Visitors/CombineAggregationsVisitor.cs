@@ -5,6 +5,7 @@ using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using System.Collections.Generic;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class CombineAggregationsVisitor : ChainableQueryVisitor {
@@ -16,12 +17,20 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             var container = GetParentContainer(node, context);
+            var termsAggregation = container as ITermsAggregation;
+            
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 var aggregation = child.GetAggregation(() => child.GetDefaultAggregation(context));
                 if (aggregation == null)
                     continue;
 
                 container.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+")) {
+                    if (termsAggregation.Order == null)
+                        termsAggregation.Order = new List<TermsOrder>();
+
+                    termsAggregation.Order.Add(new TermsOrder { Key = ((IAggregation)aggregation).Name, Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending });
+                }
             }
 
             if (node.Parent == null)
