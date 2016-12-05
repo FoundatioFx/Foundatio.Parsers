@@ -59,19 +59,27 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     container.Aggregations = new AggregationDictionary();
 
                 container.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
-                if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+")) {
-                    if (termsAggregation.Order == null)
-                        termsAggregation.Order = new List<TermsOrder>();
-
-                    termsAggregation.Order.Add(new TermsOrder {
-                        Key = ((IAggregation)aggregation).Name,
-                        Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
-                    });
+                if (child.Prefix == "-" || child.Prefix == "+") {
+                    var termsAgg = aggregation as ITermsAggregation;
+                    if (termsAgg != null)
+                        ApplyTermsSort(termsAgg, termsAgg, child.Prefix);
+                    else if (termsAggregation != null)
+                        ApplyTermsSort(termsAggregation, aggregation, child.Prefix);
                 }
             }
 
             if (node.Parent == null)
                 node.SetAggregation(container);
+        }
+
+        private static void ApplyTermsSort(ITermsAggregation termsAggregation, IAggregation aggregation, string prefix) {
+            if (termsAggregation.Order == null)
+                termsAggregation.Order = new List<TermsOrder>();
+
+            termsAggregation.Order.Add(new TermsOrder {
+                Key = aggregation.Name,
+                Order = prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
+            });
         }
 
         private BucketAggregationBase GetParentContainer(IQueryNode node, IQueryVisitorContext context) {

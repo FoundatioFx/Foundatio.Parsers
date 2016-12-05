@@ -167,5 +167,40 @@ namespace Foundatio.Parsers.Tests {
             Assert.True(expectedResponse.IsValid);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
+
+
+        [Fact]
+        public void CanSpecifyDefaultValuesAggregations() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "test" }, new MyType { Field4 = 1 } }, "stuff");
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var aggregations = processor.BuildAggregationsAsync("min:(field4 @default:0) max:(field4 @default:0) avg:(field4 @default:0) sum:(field4 @default:0) cardinality:(field4 @default:0)").Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            const string script = "doc['field4'].empty ? 0 : doc['field4'].value";
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+                .Cardinality("cardinality_field4", c => c.Script(script))
+                .Sum("sum_field4", c => c.Script(script))
+                .Average("avg_field4", c => c.Script(script))
+                .Max("max_field4", c => c.Script(script))
+                .Min("min_field4", c => c.Script(script))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.True(actualResponse.IsValid);
+            Assert.True(expectedResponse.IsValid);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
     }
 }
