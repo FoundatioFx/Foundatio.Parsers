@@ -72,15 +72,15 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), field);
+                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), field);
+                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
                 case AggregationType.Avg:
-                    return new AverageAggregation("avg_" + node.GetOriginalField(), field);
+                    return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
                 case AggregationType.Sum:
-                    return new SumAggregation("sum_" + node.GetOriginalField(), field);
+                    return new SumAggregation("sum_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
                 case AggregationType.Cardinality:
-                    return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field);
+                    return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
                 case AggregationType.Missing:
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
                 case AggregationType.DateHistogram:
@@ -107,13 +107,24 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         }
                     };
                 case AggregationType.Terms:
-                    int? size = null;
-                    int parsedSize;
-                    if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
-                        size = parsedSize;
-
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = size };
+                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32() };
             }
+
+            return null;
+        }
+
+        public static int? GetProximityAsInt32(this TermNode node) {
+            int parsedSize;
+            if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
+                return parsedSize;
+
+            return null;
+        }
+
+        public static double? GetProximityAsDouble(this TermNode node) {
+            double parsedSize;
+            if (!String.IsNullOrEmpty(node.Proximity) && Double.TryParse(node.Proximity, out parsedSize))
+                return parsedSize;
 
             return null;
         }

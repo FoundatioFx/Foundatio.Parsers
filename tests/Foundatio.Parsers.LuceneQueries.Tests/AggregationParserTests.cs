@@ -77,7 +77,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var aggregations = processor.BuildAggregationsAsync("terms:(field1 @exclude:-F @include:myinclude @missing:mymissing @min:1)").Result;
+            var aggregations = processor.BuildAggregationsAsync("terms:(field1 @exclude:F @include:myinclude @missing:mymissing @min:1)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
@@ -88,7 +88,7 @@ namespace Foundatio.Parsers.Tests {
                     .Field("field1.keyword")
                     .MinimumDocumentCount(1)
                     .Include("myinclude")
-                    .Exclude("-F")
+                    .Exclude("F")
                     .Missing("mymissing"))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
@@ -111,7 +111,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var aggregations = processor.BuildAggregationsAsync("terms:(-field1) terms:+field2").Result;
+            var aggregations = processor.BuildAggregationsAsync("terms:(field1 -cardinality:field4)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
@@ -120,12 +120,10 @@ namespace Foundatio.Parsers.Tests {
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Terms("terms_field1", t => t
                     .Field("field1.keyword")
-                    .OrderDescending("field1.keyword")
-                    .Exclude("1"))
-                .Terms("terms_field2", t => t
-                    .Field("field2.keyword")
-                    .OrderAscending("field2.keyword")
-                    .Exclude("1"))));
+                    .OrderDescending("cardinality_field4")
+                    .Aggregations(a2 => a2
+                        .Cardinality("cardinality_field4", c => c.Field("field4"))))
+                     ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -181,19 +179,18 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var aggregations = processor.BuildAggregationsAsync("min:(field4 @default:0) max:(field4 @default:0) avg:(field4 @default:0) sum:(field4 @default:0) cardinality:(field4 @default:0)").Result;
+            var aggregations = processor.BuildAggregationsAsync("min:field4~0 max:field4~0 avg:field4~0 sum:field4~0 cardinality:field4~0").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
-
-            const string script = "doc['field4'].empty ? 0 : doc['field4'].value";
+            
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
-                .Cardinality("cardinality_field4", c => c.Script(script))
-                .Sum("sum_field4", c => c.Script(script))
-                .Average("avg_field4", c => c.Script(script))
-                .Max("max_field4", c => c.Script(script))
-                .Min("min_field4", c => c.Script(script))));
+                .Sum("sum_field4", c => c.Field("field4").Missing(0))
+                .Cardinality("cardinality_field4", c => c.Field("field4").Missing(0))
+                .Average("avg_field4", c => c.Field("field4").Missing(0))
+                .Max("max_field4", c => c.Field("field4").Missing(0))
+                .Min("min_field4", c => c.Field("field4").Missing(0))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
