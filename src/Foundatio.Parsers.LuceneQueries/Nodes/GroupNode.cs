@@ -13,7 +13,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public bool? IsNegated { get; set; }
         public string Prefix { get; set; }
         public string Boost { get; set; }
-        public string UnescapedBoost => Boost.Unescape();
+        public string UnescapedBoost => Boost?.Unescape();
         public string Proximity { get; set; }
 
         public GroupNode CopyTo(GroupNode target) {

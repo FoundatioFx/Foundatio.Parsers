@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<IFieldSort>> {
@@ -14,17 +14,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (String.IsNullOrEmpty(node.Field))
                 return;
 
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null)
-                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
-
-            string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
-
-            var sort = new Sort { Field = field };
-            if (node.IsNodeNegated())
-                sort.Order = SortOrder.Descending;
-
-            _fields.Add(sort);
+            _fields.Add(node.GetSort(() => node.GetDefaultSort(context)));
         }
 
         public override async Task<IEnumerable<IFieldSort>> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
