@@ -9,9 +9,9 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public string Field { get; set; }
         public string Prefix { get; set; }
         public string Min { get; set; }
-        public string UnescapedMin => Min.Unescape();
+        public string UnescapedMin => Min?.Unescape();
         public string Max { get; set; }
-        public string UnescapedMax => Max.Unescape();
+        public string UnescapedMax => Max?.Unescape();
         public string Operator { get; set; }
         public string Delimiter { get; set; }
         public bool? MinInclusive { get; set; }

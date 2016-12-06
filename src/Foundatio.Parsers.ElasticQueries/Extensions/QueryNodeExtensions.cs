@@ -73,5 +73,22 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 node.Data.Remove(AggregationKey);
         }
 
+        private const string SortKey = "@Sort";
+        public static IFieldSort GetSort(this IQueryNode node, Func<IFieldSort> getDefaultValue = null) {
+            object value = null;
+            if (!node.Data.TryGetValue(SortKey, out value))
+                return getDefaultValue?.Invoke();
+
+            return value as IFieldSort;
+        }
+
+        public static void SetSort(this IQueryNode node, IFieldSort sort) {
+            node.Data[SortKey] = sort;
+        }
+
+        public static void RemoveSort(this IQueryNode node) {
+            if (node.Data.ContainsKey(SortKey))
+                node.Data.Remove(SortKey);
+        }
     }
 }

@@ -58,6 +58,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Extensions\DefaultAggregationNodeExtensions.cs" />
+    <Compile Include="Extensions\DefaultSortNodeExtensions.cs" />
     <Compile Include="Extensions\MappingExtensions.cs" />
     <Compile Include="Extensions\QueryNodeExtensions.cs" />
     <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
