@@ -5,7 +5,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class TermToFieldVisitor : ChainableQueryVisitor {
         public override void Visit(TermNode node, IQueryVisitorContext context) {
-            if (String.IsNullOrEmpty(node.Term) || node.Field.StartsWith("@"))
+            if (String.IsNullOrEmpty(node.Term) || (node.Field != null && node.Field.StartsWith("@")))
                 return;
 
             node.Field = node.Term;
