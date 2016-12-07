@@ -16,6 +16,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
     public static class ElasticQueryVisitorContextExtensions {
         public static IProperty GetPropertyMapping(this IElasticQueryVisitorContext context, string field) {
+            if (String.IsNullOrEmpty(field))
+                return null;
+
             return context.GetPropertyMappingFunc?.Invoke(field);
         }
 
@@ -90,6 +93,14 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return false;
 
             var mapping = context.GetPropertyMapping(field) as INumberProperty;
+            return mapping != null;
+        }
+
+        public static bool IsBooleanPropertyType(this IElasticQueryVisitorContext context, string field) {
+            if (String.IsNullOrEmpty(field))
+                return false;
+
+            var mapping = context.GetPropertyMapping(field) as IBooleanProperty;
             return mapping != null;
         }
     }

@@ -18,6 +18,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
             var container = GetParentContainer(node, context);
             var termsAggregation = container as ITermsAggregation;
+            var termsProperty = elasticContext.GetPropertyMapping(termsAggregation?.Field?.Name);
             var dateHistogramAggregation = container as IDateHistogramAggregation;
 
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
@@ -25,13 +26,19 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (aggregation == null) {
                     var termNode = child as TermNode;
                     if (termNode != null && termsAggregation != null) {
-                        if (termNode.Field == "@exclude")
-                            termsAggregation.Exclude = new TermsIncludeExclude { Pattern = termNode.UnescapedTerm };
-                        else if (termNode.Field == "@include")
-                            termsAggregation.Include = new TermsIncludeExclude { Pattern = termNode.UnescapedTerm };
-                        else if (termNode.Field == "@missing")
+                        if (termNode.Field == "@exclude") {
+                            if (termsProperty is ITextProperty || termsProperty is IKeywordProperty)
+                                termsAggregation.Exclude = new TermsIncludeExclude { Pattern = termNode.UnescapedTerm };
+                            else
+                                termsAggregation.Exclude = new TermsIncludeExclude { Values = new List<string> { termNode.UnescapedTerm } };
+                        } else if (termNode.Field == "@include") {
+                            if (termsProperty is ITextProperty || termsProperty is IKeywordProperty)
+                                termsAggregation.Include = new TermsIncludeExclude { Pattern = termNode.UnescapedTerm };
+                            else
+                                termsAggregation.Include = new TermsIncludeExclude { Values = new List<string> { termNode.UnescapedTerm } };
+                        } else if (termNode.Field == "@missing") {
                             termsAggregation.Missing = termNode.UnescapedTerm;
-                        else if (termNode.Field == "@min") {
+                        } else if (termNode.Field == "@min") {
                             int? minCount = null;
                             int parsedMinCount;
                             if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out parsedMinCount))
