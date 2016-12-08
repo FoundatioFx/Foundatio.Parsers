@@ -15,7 +15,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
 
             var sort = new Sort { Field = field };
-            if (node.IsNodeNegated())
+            if (node.IsNodeOrGroupedParentNegated())
                 sort.Order = SortOrder.Descending;
 
             return sort;

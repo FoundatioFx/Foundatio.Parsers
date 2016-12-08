@@ -38,6 +38,9 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (Proximity != null)
                 target.Proximity = Proximity;
 
+            if (Prefix != null)
+                target.Prefix = Prefix;
+
             foreach (var kvp in Data)
                 target.Data.Add(kvp.Key, kvp.Value);
 

@@ -646,6 +646,47 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void CanParseSort() {
+            var client = new ElasticClient();
+            client.DeleteIndex(i => i.Index("stuff"));
+            client.Refresh();
+
+            client.CreateIndex(i => i.Index("stuff").AddMapping<MyType>(f => f.Dynamic()
+                .Properties(p => p
+                    .GeoPoint(g => g.Name(gp => gp.Field3))
+                    .String(e => e.Name(m => m.Field1).Index(FieldIndexOption.Analyzed)
+                        .Fields(f1 => f1.String(e1 => e1.Name("keyword").Index(FieldIndexOption.NotAnalyzed)))))));
+
+            var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index("stuff"));
+            client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index("stuff"));
+            client.Refresh();
+
+            var aliasMap = new AliasMap { { "geo", "field3" } };
+            var processor = new ElasticQueryParser(c => c
+                .UseMappings<MyType>(client, "stuff")
+                .UseAliases(aliasMap));
+            var sort = processor.BuildSortAsync("geo -field1 -(field2 field3 +field4)").Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Sort(sort));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff")
+                .SortMulti(
+                    s => s.OnField("field3"),
+                    s => s.OnField("field1.keyword").Descending(),
+                    s => s.OnField("field2").Descending(),
+                    s => s.OnField("field3").Descending(),
+                    s => s.OnField("field4")));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void GeoRangeQueryProcessor() {
             var client = new ElasticClient();
             client.DeleteIndex(i => i.Index("stuff"));
