@@ -6,6 +6,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 using System.Collections.Generic;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class CombineAggregationsVisitor : ChainableQueryVisitor {
@@ -18,7 +19,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
             var container = GetParentContainer(node, context);
             var termsAggregation = container as ITermsAggregation;
-            var termsProperty = elasticContext.GetPropertyMapping(termsAggregation?.Field?.Name);
+            var termsProperty = elasticContext.GetPropertyMapping(node.GetFullName());
             var dateHistogramAggregation = container as IDateHistogramAggregation;
 
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
