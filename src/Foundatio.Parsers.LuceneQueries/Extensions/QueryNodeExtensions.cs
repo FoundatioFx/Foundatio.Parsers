@@ -70,6 +70,30 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return (node.IsNegated.HasValue && node.IsNegated.Value == true) || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-");
         }
 
+        public static bool IsNodeOrGroupedParentNegated(this IFieldQueryNode node) {
+            if (!String.IsNullOrEmpty(node.Prefix))
+                return node.IsNodeNegated();
+             
+            IQueryNode current = node;
+            do {
+                var groupNode = current as GroupNode;
+                if (groupNode != null && !groupNode.HasParens) {
+                    current = current.Parent;
+                    continue;
+                }
+                
+                var fieldQueryNode = current as IFieldQueryNode;
+                if (fieldQueryNode != null
+                    && ((fieldQueryNode.IsNegated.HasValue && fieldQueryNode.IsNegated.Value == true)
+                        || (!String.IsNullOrEmpty(fieldQueryNode.Prefix) && fieldQueryNode.Prefix == "-")))
+                    return true;
+
+                current = node.Parent;
+            } while (current.Parent != null);
+
+            return false;
+        }
+
         private const string AliasResolverKey = "@AliasResolver";
         public static AliasResolver GetAliasResolver(this IQueryNode node, IQueryVisitorContext context) {
             object value = null;
