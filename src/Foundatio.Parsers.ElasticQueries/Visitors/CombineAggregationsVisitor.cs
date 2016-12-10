@@ -27,6 +27,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (aggregation == null) {
                     var termNode = child as TermNode;
                     if (termNode != null && termsAggregation != null) {
+                        // TODO: Move these to the default aggs method using a visitor to walk down the tree to gather them but not going into any sub groups
                         if (termNode.Field == "@exclude") {
                             if (termsProperty is ITextProperty || termsProperty is IKeywordProperty)
                                 termsAggregation.Exclude = new TermsIncludeExclude { Pattern = termNode.UnescapedTerm };

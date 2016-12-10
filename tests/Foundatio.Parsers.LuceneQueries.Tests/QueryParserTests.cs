@@ -197,13 +197,13 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<MyType>(i => i.Index("stuff").Aggregations(f => f
-                .Max("max_field2", m => m.Field("field2.keyword"))
-                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Format("date_optional_time").Offset("-3h").Aggregations(l => l
-                    .Max("max_field2", m => m.Field("field2.keyword"))
-                    .Min("min_field1", m => m.Field("field1.keyword"))
-                    .Min("min_field2", m => m.Field("field2.keyword"))
+                .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Format("date_optional_time").Offset("-3h").Meta(m2 => m2.Add("@offset", "-3h")).Aggregations(l => l
+                    .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
+                    .Min("min_field1", m => m.Field("field1.keyword").Meta(m2 => m2.Add("@type", "keyword")))
+                    .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
                 ))
-                .Min("min_field2", m => m.Field("field2.keyword"))
+                .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
             ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");

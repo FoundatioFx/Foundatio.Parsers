@@ -253,7 +253,13 @@ namespace Foundatio.Parsers.ElasticQueries {
                 if (objectProperty != null)
                     currentProperties = objectProperty.Properties;
                 else
-                    return null;
+                {
+                    var textProperty = fieldMapping as ITextProperty;
+                    if (textProperty != null)
+                        currentProperties = textProperty.Fields;
+                    else
+                        return null;
+                }
             }
 
             return null;

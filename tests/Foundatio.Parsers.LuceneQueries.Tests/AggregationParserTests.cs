@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
@@ -21,7 +22,7 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
-        public void ProcessAggregations() {
+        public async Task ProcessAggregationsAsync() {
             var client = GetClient();
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
@@ -38,7 +39,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990"));
-            var aggregations = processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4 cardinality:field4 missing:field2 date:field5 geogrid:field3 terms:field1").Result;
+            var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4 cardinality:field4 missing:field2 date:field5 geogrid:field3 terms:field1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
@@ -47,15 +48,15 @@ namespace Foundatio.Parsers.Tests {
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
                     .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
-                .Terms("terms_field1", t => t.Field("field1.keyword"))
+                .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@type", "keyword")))
                 .DateHistogram("date_field5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time"))
                 .Missing("missing_field2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_field4", c => c.Field("field4"))
                 .Percentiles("percentiles_field4", c => c.Field("field4"))
-                .Sum("sum_field4", c => c.Field("field4"))
-                .Average("avg_field4", c => c.Field("field4"))
-                .Max("max_field4", c => c.Field("field4"))
-                .Min("min_field4", c => c.Field("field4"))));
+                .Sum("sum_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
+                .Average("avg_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
+                .Max("max_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
+                .Min("min_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -89,7 +90,8 @@ namespace Foundatio.Parsers.Tests {
                     .MinimumDocumentCount(1)
                     .Include("myinclude")
                     .Exclude("F")
-                    .Missing("mymissing"))));
+                    .Missing("mymissing")
+                    .Meta(m => m.Add("@type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -122,8 +124,8 @@ namespace Foundatio.Parsers.Tests {
                     .Field("field1.keyword")
                     .OrderDescending("cardinality_field4")
                     .Aggregations(a2 => a2
-                        .Cardinality("cardinality_field4", c => c.Field("field4"))))
-                     ));
+                        .Cardinality("cardinality_field4", c => c.Field("field4")))
+                    .Meta(m => m.Add("@type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -186,11 +188,11 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
             
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
-                .Sum("sum_field4", c => c.Field("field4").Missing(0))
+                .Sum("sum_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@type", "long")))
                 .Cardinality("cardinality_field4", c => c.Field("field4").Missing(0))
-                .Average("avg_field4", c => c.Field("field4").Missing(0))
-                .Max("max_field4", c => c.Field("field4").Missing(0))
-                .Min("min_field4", c => c.Field("field4").Missing(0))));
+                .Average("avg_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@type", "long")))
+                .Max("max_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@type", "long")))
+                .Min("min_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 

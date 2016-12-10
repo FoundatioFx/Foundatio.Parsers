@@ -47,6 +47,8 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 case AggregationType.Percentiles:
                 case AggregationType.GeoHashGrid:
                 case AggregationType.Terms:
+                case AggregationType.Stats:
+                case AggregationType.ExtendedStats:
                     return true;
                 default:
                     return false;
@@ -65,5 +67,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public const string Percentiles = "percentiles";
         public const string GeoHashGrid = "geogrid";
         public const string Terms = "terms";
+        public const string Stats = "stats";
+        public const string ExtendedStats = "exstats";
     }
 }

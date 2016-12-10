@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -28,6 +29,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 return null;
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+            var mapping = elasticContext.GetPropertyMapping(field);
 
             switch (node.GetAggregationType()) {
                 case AggregationType.DateHistogram:
@@ -35,7 +37,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
-                        Offset = node.UnescapedBoost
+                        Offset = node.UnescapedBoost,
+                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary<string, object> { { "@offset", node.UnescapedBoost } } : null
                     };
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
@@ -57,7 +60,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
                         size = parsedSize;
 
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = size };
+                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = size, Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
             }
 
             return null;
@@ -69,16 +72,21 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+            var mapping = elasticContext.GetPropertyMapping(field);
 
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
+                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
+                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
                 case AggregationType.Avg:
-                    return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
+                    return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
                 case AggregationType.Sum:
-                    return new SumAggregation("sum_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
+                    return new SumAggregation("sum_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+                case AggregationType.Stats:
+                    return new StatsAggregation("stats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+                case AggregationType.ExtendedStats:
+                    return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
                 case AggregationType.Cardinality:
                     return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
                 case AggregationType.Missing:
@@ -107,7 +115,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         }
                     };
                 case AggregationType.Terms:
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32() };
+                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
             }
 
             return null;
