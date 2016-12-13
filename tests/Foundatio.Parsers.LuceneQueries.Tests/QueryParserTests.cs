@@ -63,7 +63,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void IncludeProcessor() {
-            var client = new ElasticClient();
+            var client = GetClient();
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
 
@@ -79,7 +79,7 @@ namespace Foundatio.Parsers.Tests {
             };
 
             var processor = new ElasticQueryParser(c => c.UseIncludes(includes));
-            var result = processor.BuildQueryAsync("field1:value1 @include:stuff").Result;
+            var result = processor.BuildQueryAsync("field1:value1 @include:stuff", new ElasticQueryVisitorContext {  UseScoring = true }).Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -87,6 +87,33 @@ namespace Foundatio.Parsers.Tests {
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f =>
                 f.Term(m => m.Field1, "value1")
                 && f.Term(m => m.Field2, "value2")));
+
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void ShouldGenerateORedTermsQuery() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic().Index("stuff"));
+            var response = client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index("stuff"));
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser();
+            var result = processor.BuildQueryAsync("field1:value1 field2:value2 field3:value3", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f =>
+                f.Term(m => m.Field1, "value1") || f.Term(m => m.Field2, "value2") || f.Term(m => m.Field3, "value3")));
 
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
@@ -178,7 +205,7 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
-        public void SimpleAggregation() {
+        public void MinMaxWithDateHistogramAggregation() {
             var client = GetClient();
             client.DeleteIndex("stuff");
             client.Refresh("stuff");

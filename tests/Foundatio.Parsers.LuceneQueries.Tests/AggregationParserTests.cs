@@ -78,7 +78,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var aggregations = processor.BuildAggregationsAsync("terms:(field1 @exclude:F @include:myinclude @missing:mymissing @min:1)").Result;
+            var aggregations = processor.BuildAggregationsAsync("terms:(field1 @exclude:myexclude @include:myinclude @missing:mymissing @min:1)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
@@ -89,7 +89,7 @@ namespace Foundatio.Parsers.Tests {
                     .Field("field1.keyword")
                     .MinimumDocumentCount(1)
                     .Include("myinclude")
-                    .Exclude("F")
+                    .Exclude("myexclude")
                     .Missing("mymissing")
                     .Meta(m => m.Add("@type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
