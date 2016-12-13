@@ -149,3 +149,4 @@ UpgradeLog*.htm
 # Microsoft Fakes
 FakesAssemblies/
 build/elasticsearch-*
+build/kibana-*

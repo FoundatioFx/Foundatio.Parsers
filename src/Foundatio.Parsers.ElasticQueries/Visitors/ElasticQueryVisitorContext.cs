@@ -31,6 +31,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return field;
 
             var multiFieldProperty = property as ICoreProperty;
+            if (multiFieldProperty?.Fields == null)
+                return field;
+
             var nonAnalyzedProperty = multiFieldProperty.Fields.FirstOrDefault(kvp => {
                 if (kvp.Value is IKeywordProperty)
                     return true;

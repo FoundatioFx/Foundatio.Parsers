@@ -17,6 +17,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             var sort = new SortField { Field = field };
             if (node.IsNodeOrGroupedParentNegated())
                 sort.Order = SortOrder.Descending;
+            else
+                sort.Order = SortOrder.Ascending;
 
             return sort;
         }
