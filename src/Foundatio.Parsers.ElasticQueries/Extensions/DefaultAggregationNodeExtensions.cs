@@ -76,9 +76,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
                 case AggregationType.Avg:
                     return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
                 case AggregationType.Sum:
@@ -96,7 +96,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
-                        Offset = node.UnescapedBoost
+                        Offset = node.UnescapedBoost,
+                        Meta = new Dictionary<string, object> { { "@offset", node.UnescapedBoost } }
                     };
                 case AggregationType.Percentiles:
                     return new PercentilesAggregation("percentiles_" + node.GetOriginalField(), field);
