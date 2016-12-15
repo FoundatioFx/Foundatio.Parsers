@@ -97,7 +97,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
                         Offset = node.UnescapedBoost,
-                        Meta = new Dictionary<string, object> { { "@offset", node.UnescapedBoost } }
+                        Meta = node.UnescapedBoost != null ? new Dictionary <string, object> { { "@offset", node.UnescapedBoost } } : null
                     };
                 case AggregationType.Percentiles:
                     return new PercentilesAggregation("percentiles_" + node.GetOriginalField(), field);
