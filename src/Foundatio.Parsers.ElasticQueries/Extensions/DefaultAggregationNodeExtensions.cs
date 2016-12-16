@@ -33,12 +33,13 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.DateHistogram:
+                    TimeSpan? timezone = node.UnescapedBoost != null ? new Time(node.UnescapedBoost).ToTimeSpan() : (TimeSpan?)null;
                     return new DateHistogramAggregation("date_" + node.GetOriginalField()) {
                         Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
-                        Offset = node.UnescapedBoost,
-                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary<string, object> { { "@offset", node.UnescapedBoost } } : null
+                        TimeZone = timezone.HasValue ? (timezone.Value < TimeSpan.Zero ? "-" : "+") + timezone.Value.ToString("hh\\:mm") : null,
+                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary<string, object> { { "@timezone", node.UnescapedBoost } } : null
                     };
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
@@ -76,9 +77,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
+                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@timezone", node.UnescapedBoost } } };
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
+                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@timezone", node.UnescapedBoost } } };
                 case AggregationType.Avg:
                     return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
                 case AggregationType.Sum:
@@ -92,12 +93,13 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 case AggregationType.Missing:
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
                 case AggregationType.DateHistogram:
+                    TimeSpan? timezone = node.UnescapedBoost != null ? new Time(node.UnescapedBoost).ToTimeSpan() : (TimeSpan?)null;
                     return new DateHistogramAggregation("date_" + node.GetOriginalField()) {
                         Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
-                        Offset = node.UnescapedBoost,
-                        Meta = node.UnescapedBoost != null ? new Dictionary <string, object> { { "@offset", node.UnescapedBoost } } : null
+                        TimeZone = timezone.HasValue ? (timezone.Value < TimeSpan.Zero ? "-" : "+") + timezone.Value.ToString("hh\\:mm") : null,
+                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary <string, object> { { "@timezone", node.UnescapedBoost } } : null
                     };
                 case AggregationType.Percentiles:
                     return new PercentilesAggregation("percentiles_" + node.GetOriginalField(), field);
