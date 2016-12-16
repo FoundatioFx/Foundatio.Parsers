@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -33,7 +34,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.DateHistogram:
-                    TimeSpan? timezone = node.UnescapedBoost != null ? new Time(node.UnescapedBoost).ToTimeSpan() : (TimeSpan?)null;
+                    // TODO: Look into memoizing this lookup
+                    TimeSpan? timezone = node.UnescapedBoost != null ? Exceptionless.DateTimeExtensions.TimeUnit.Parse(node.UnescapedBoost) : (TimeSpan?)null;
                     return new DateHistogramAggregation("date_" + node.GetOriginalField()) {
                         Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
@@ -93,7 +95,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 case AggregationType.Missing:
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
                 case AggregationType.DateHistogram:
-                    TimeSpan? timezone = node.UnescapedBoost != null ? new Time(node.UnescapedBoost).ToTimeSpan() : (TimeSpan?)null;
+                    // TODO: Look into memoizing this lookup
+                    TimeSpan? timezone = node.UnescapedBoost != null ? Exceptionless.DateTimeExtensions.TimeUnit.Parse(node.UnescapedBoost) : (TimeSpan?)null;
                     return new DateHistogramAggregation("date_" + node.GetOriginalField()) {
                         Field = field,
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
