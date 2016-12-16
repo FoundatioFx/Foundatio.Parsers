@@ -262,7 +262,7 @@ namespace Foundatio.Parsers.Tests {
                             .Interval("1d")
                             .Format("date_optional_time")
                             .TimeZone("-03:00")
-                            .Meta(m2 => m2.Add("@timezone", "-3h"))
+                            .Meta(m2 => m2.Add("@offset", "-3h"))
                             .Aggregations(l => l
                                 .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
                                 .Min("min_field1", m => m.Field("field1.keyword").Meta(m2 => m2.Add("@type", "keyword")))

@@ -39,7 +39,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
                         TimeZone = timezone.HasValue ? (timezone.Value < TimeSpan.Zero ? "-" : "+") + timezone.Value.ToString("hh\\:mm") : null,
-                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary<string, object> { { "@timezone", node.UnescapedBoost } } : null
+                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary<string, object> { { "@offset", node.UnescapedBoost } } : null
                     };
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
@@ -77,9 +77,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@timezone", node.UnescapedBoost } } };
+                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@timezone", node.UnescapedBoost } } };
+                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
                 case AggregationType.Avg:
                     return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
                 case AggregationType.Sum:
@@ -99,7 +99,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
                         Format = "date_optional_time",
                         TimeZone = timezone.HasValue ? (timezone.Value < TimeSpan.Zero ? "-" : "+") + timezone.Value.ToString("hh\\:mm") : null,
-                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary <string, object> { { "@timezone", node.UnescapedBoost } } : null
+                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary <string, object> { { "@offset", node.UnescapedBoost } } : null
                     };
                 case AggregationType.Percentiles:
                     return new PercentilesAggregation("percentiles_" + node.GetOriginalField(), field);
