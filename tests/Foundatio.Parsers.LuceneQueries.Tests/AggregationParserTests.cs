@@ -49,7 +49,7 @@ namespace Foundatio.Parsers.Tests {
                 .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
                     .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
                 .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@type", "keyword")))
-                .DateHistogram("date_field5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time"))
+                .DateHistogram("date_field5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
                 .Missing("missing_field2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_field4", c => c.Field("field4"))
                 .Percentiles("percentiles_field4", c => c.Field("field4"))
@@ -158,6 +158,7 @@ namespace Foundatio.Parsers.Tests {
                     .Field("field5")
                     .Interval("1d")
                     .Format("date_optional_time")
+                    .MinimumDocumentCount(0)
                     .Missing(DateTime.MinValue))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
@@ -186,7 +187,7 @@ namespace Foundatio.Parsers.Tests {
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
-            
+
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Sum("sum_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@type", "long")))
                 .Cardinality("cardinality_field4", c => c.Field("field4").Missing(0))
