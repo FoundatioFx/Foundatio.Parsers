@@ -11,7 +11,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
 
             return aliasContext.RootAliasResolver;
         }
-        
+
         public static T SetRootAliasResolver<T>(this T context, AliasResolver aliasResolver) where T: IQueryVisitorContext {
             var aliasContext = context as IQueryVisitorContextWithAliasResolver;
             if (aliasContext == null)

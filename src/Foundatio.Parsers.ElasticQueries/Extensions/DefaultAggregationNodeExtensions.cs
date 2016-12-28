@@ -34,15 +34,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetAggregationType()) {
                 case AggregationType.DateHistogram:
-                    // TODO: Look into memoizing this lookup
-                    TimeSpan? timezone = node.UnescapedBoost != null ? Exceptionless.DateTimeExtensions.TimeUnit.Parse(node.UnescapedBoost) : (TimeSpan?)null;
-                    return new DateHistogramAggregation("date_" + node.GetOriginalField()) {
-                        Field = field,
-                        Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
-                        Format = "date_optional_time",
-                        TimeZone = timezone.HasValue ? (timezone.Value < TimeSpan.Zero ? "-" : "+") + timezone.Value.ToString("hh\\:mm") : null,
-                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary<string, object> { { "@offset", node.UnescapedBoost } } : null
-                    };
+                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
@@ -95,15 +87,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 case AggregationType.Missing:
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
                 case AggregationType.DateHistogram:
-                    // TODO: Look into memoizing this lookup
-                    TimeSpan? timezone = node.UnescapedBoost != null ? Exceptionless.DateTimeExtensions.TimeUnit.Parse(node.UnescapedBoost) : (TimeSpan?)null;
-                    return new DateHistogramAggregation("date_" + node.GetOriginalField()) {
-                        Field = field,
-                        Interval = new Union<DateInterval, Time>(node.Proximity ?? "1d"),
-                        Format = "date_optional_time",
-                        TimeZone = timezone.HasValue ? (timezone.Value < TimeSpan.Zero ? "-" : "+") + timezone.Value.ToString("hh\\:mm") : null,
-                        Meta = !String.IsNullOrEmpty(node.UnescapedBoost) ? new Dictionary <string, object> { { "@offset", node.UnescapedBoost } } : null
-                    };
+                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
                 case AggregationType.Percentiles:
                     return new PercentilesAggregation("percentiles_" + node.GetOriginalField(), field);
                 case AggregationType.GeoHashGrid:
@@ -125,6 +109,63 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             }
 
             return null;
+        }
+
+        private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
+            var start = GetDate(context, "StartDate");
+            var end = GetDate(context, "EndDate");
+            var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<DateTime> { Minimum = start.Value, Maximum = end.Value } : null;
+
+            // TODO: Look into memoizing this lookup
+            // TODO: Should we validate the interval range.
+            TimeSpan? timezone = boost != null ? Exceptionless.DateTimeExtensions.TimeUnit.Parse(boost) : (TimeSpan?)null;
+            return new DateHistogramAggregation(originalField) {
+                Field = field,
+                MinimumDocumentCount = 0,
+                Interval = new Union<DateInterval, Time>(proximity ?? GetInterval(start, end)),
+                Format = "date_optional_time",
+                TimeZone = timezone.HasValue ? (timezone.Value < TimeSpan.Zero ? "-" : "+") + timezone.Value.ToString("hh\\:mm") : null,
+                Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> {
+                    { "@offset", boost }
+                } : null,
+                ExtendedBounds = bounds
+            };
+        }
+
+        private static DateTime? GetDate(IQueryVisitorContext context, string key) {
+            object value;
+            if (context.Data.TryGetValue(key, out value) && value is DateTime)
+                return (DateTime)value;
+
+            return null;
+        }
+
+        private static string GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {
+            if (!utcStart.HasValue || !utcEnd.HasValue)
+                return "1d";
+
+            var totalTime = utcEnd.Value - utcStart.Value;
+            var timePerBlock = TimeSpan.FromMinutes(totalTime.TotalMinutes / desiredDataPoints);
+            if (timePerBlock.TotalDays > 1) {
+                timePerBlock = timePerBlock.Round(TimeSpan.FromDays(1));
+                return $"{timePerBlock.TotalDays:0}d";
+            }
+
+            if (timePerBlock.TotalHours > 1) {
+                timePerBlock = timePerBlock.Round(TimeSpan.FromHours(1));
+                return $"{timePerBlock.TotalHours:0}h";
+            }
+
+            if (timePerBlock.TotalMinutes > 1) {
+                timePerBlock = timePerBlock.Round(TimeSpan.FromMinutes(1));
+                return $"{timePerBlock.TotalMinutes:0}m";
+            }
+
+            timePerBlock = timePerBlock.Round(TimeSpan.FromSeconds(15));
+            if (timePerBlock.TotalSeconds < 1)
+                timePerBlock = TimeSpan.FromSeconds(15);
+
+            return $"{timePerBlock.TotalSeconds:0}s";
         }
 
         public static int? GetProximityAsInt32(this TermNode node) {

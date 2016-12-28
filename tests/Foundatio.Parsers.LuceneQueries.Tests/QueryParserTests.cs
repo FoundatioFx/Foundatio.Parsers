@@ -261,6 +261,7 @@ namespace Foundatio.Parsers.Tests {
                         d.Field(d2 => d2.Field5)
                             .Interval("1d")
                             .Format("date_optional_time")
+                            .MinimumDocumentCount(0)
                             .TimeZone("-03:00")
                             .Meta(m2 => m2.Add("@offset", "-3h"))
                             .Aggregations(l => l
@@ -298,7 +299,7 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<MyType>(i => i.Index("stuff").Aggregations(f => f
-                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Format("date_optional_time"))
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
             ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");

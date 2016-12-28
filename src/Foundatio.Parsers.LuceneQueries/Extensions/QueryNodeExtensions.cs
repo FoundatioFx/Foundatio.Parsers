@@ -60,7 +60,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
 
             return String.Join(".", parts);
         }
-        
+
         public static string GetParentFullName(this IFieldQueryNode node) {
             var nameParts = node.GetNameParts();
             return String.Join(".", nameParts.Take(nameParts.Length - 1));
@@ -73,7 +73,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         public static bool IsNodeOrGroupedParentNegated(this IFieldQueryNode node) {
             if (!String.IsNullOrEmpty(node.Prefix))
                 return node.IsNodeNegated();
-             
+
             IQueryNode current = node;
             do {
                 var groupNode = current as GroupNode;
@@ -81,7 +81,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
                     current = current.Parent;
                     continue;
                 }
-                
+
                 var fieldQueryNode = current as IFieldQueryNode;
                 if (fieldQueryNode != null
                     && ((fieldQueryNode.IsNegated.HasValue && fieldQueryNode.IsNegated.Value == true)
