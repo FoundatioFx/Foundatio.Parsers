@@ -67,6 +67,40 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
+        [Fact]
+        public async Task ProcessNestedAggregationsWithAliasesAsync() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff").Properties(p => p
+                .GeoPoint(g => g.Name(f => f.Field3))
+                .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
+                    .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
+                        .Text(f3 => f3.Name("identity").Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))))));
+            var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
+            client.Refresh("stuff");
+
+            var aliasMap = new AliasMap { { "user", "data.@user.identity" }, { "alias1", "field1" } };
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").UseAliases(aliasMap));
+            var aggregations = await processor.BuildAggregationsAsync("terms:(alias1 cardinality:user)");
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+                .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@type", "keyword"))
+                    .Aggregations(a1 => a1.Cardinality("cardinality_user", c => c.Field("data.@user.identity.keyword"))))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.True(actualResponse.IsValid);
+            Assert.True(expectedResponse.IsValid);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
 
         [Fact]
         public async Task ProcessAggregationsWithAliasesAsync() {
