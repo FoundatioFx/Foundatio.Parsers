@@ -962,6 +962,35 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
+
+        [Fact(Skip = "This currently isn't supported")]
+        public void CanParseMixedCaseSort() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+            client.CreateIndex("stuff");
+            client.Map<MyType>(
+                d => d.Dynamic(true).Index("stuff").Properties(p => p
+                    .Text(e => e.Name(m => m.MultiWord).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
+                ));
+
+            var res = client.Index(new MyType { MultiWord = "value1" }, i => i.Index("stuff"));
+            client.Refresh("stuff");
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var sort = processor.BuildSortAsync("multiWord -multiword").Result;
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Sort(sort));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff")
+                .Sort(
+                    s => s.Ascending(new Field("multiWord.keyword")).Descending(new Field("multiWord.keyword"))
+                ));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
         [Fact]
         public void GeoRangeQueryProcessor() {
             var client = GetClient();
@@ -1020,6 +1049,7 @@ namespace Foundatio.Parsers.Tests {
         public string Field3 { get; set; }
         public int Field4 { get; set; }
         public DateTime Field5 { get; set; }
+        public string MultiWord { get; set; }
         public Dictionary<string, object> Data { get; set; }
     }
 

@@ -5,6 +5,7 @@ using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Utility;
 using Nest;
 using Xunit;
@@ -57,6 +58,53 @@ namespace Foundatio.Parsers.Tests {
                 .Average("avg_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
                 .Max("max_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
                 .Min("min_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.True(actualResponse.IsValid);
+            Assert.True(expectedResponse.IsValid);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+
+        [Fact]
+        public async Task ProcessAggregationsWithAliasesAsync() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff").Properties(p => p
+                .GeoPoint(g => g.Name(f => f.Field3))
+                .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
+                    .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
+                        .Text(f3 => f3.Name("identity").Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))))));
+            var res = client.IndexMany(new List<MyType> {
+                new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" }
+            }, "stuff");
+            client.Refresh("stuff");
+
+            var aliasMap = new AliasMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990").UseAliases(aliasMap));
+            var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 geogrid:alias3 terms:alias1");
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+                .GeoHash("geogrid_alias3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
+                    .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
+                .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@type", "keyword")))
+                .DateHistogram("date_alias5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
+                .Missing("missing_alias2", t => t.Field("field2.keyword"))
+                .Cardinality("cardinality_user", c => c.Field("data.@user.identity.keyword"))
+                .Percentiles("percentiles_alias4", c => c.Field("field4"))
+                .Sum("sum_alias4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
+                .Average("avg_alias4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
+                .Max("max_alias4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
+                .Min("min_alias4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
