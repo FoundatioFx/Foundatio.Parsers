@@ -8,6 +8,12 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class AliasedQueryVisitor : ChainableQueryVisitor {
+        private readonly bool _useNestedResolvers;
+
+        public AliasedQueryVisitor(bool useNestedResolvers = true) {
+            _useNestedResolvers = useNestedResolvers;
+        }
+
         public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             ApplyAlias(node, context);
 
@@ -39,7 +45,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             if (result == null) {
                 var groupNode = node as GroupNode;
                 if (groupNode != null)
-                    node.SetAliasResolver(GetScopedResolver(resolver, node.Field));
+                    node.SetAliasResolver(_useNestedResolvers ? GetScopedResolver(resolver, node.Field) : resolver);
 
                 return;
             }
@@ -47,7 +53,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             node.SetOriginalField(node.Field);
             node.Field = result.Name;
             if (node is GroupNode)
-                node.SetAliasResolver(result.Resolver);
+                node.SetAliasResolver(_useNestedResolvers ? result.Resolver : resolver);
         }
 
         public static AliasResolver GetScopedResolver(AliasResolver resolver, string scope) {
