@@ -26,19 +26,22 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
 
         public ElasticQueryParserConfiguration UseAliases(int priority = 50) {
-            return AddVisitor(new AliasedQueryVisitor(), priority);
+            return UseAliases((AliasResolver)null, priority);
         }
 
         public ElasticQueryParserConfiguration UseAliases(AliasResolver defaultAliasResolver, int priority = 50) {
             DefaultAliasResolver = defaultAliasResolver;
 
-            return AddVisitor(new AliasedQueryVisitor(), priority);
+            var visitor = new AliasedQueryVisitor();
+            QueryVisitor.AddVisitor(visitor, priority);
+            SortVisitor.AddVisitor(visitor, priority);
+
+            AggregationVisitor.AddVisitor(new AliasedQueryVisitor(false), priority);
+            return this;
         }
 
         public ElasticQueryParserConfiguration UseAliases(AliasMap defaultAliasMap, int priority = 50) {
-            DefaultAliasResolver = defaultAliasMap.Resolve;
-
-            return AddVisitor(new AliasedQueryVisitor(), priority);
+            return UseAliases(defaultAliasMap.Resolve, priority);
         }
 
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
