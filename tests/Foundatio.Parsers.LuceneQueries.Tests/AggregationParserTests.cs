@@ -217,7 +217,6 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-
         [Fact]
         public void CanSpecifyDefaultValuesAggregations() {
             var client = GetClient();
