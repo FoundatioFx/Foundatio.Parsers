@@ -5,7 +5,6 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
-using System.Linq;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultAggregationNodeExtensions {
@@ -77,14 +76,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
                     return geogridAgg;
                 case AggregationType.Terms:
-                    int? size = null;
-                    int parsedSize;
-                    if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
-                        size = parsedSize;
-
                     return new NamedAggregationContainer(
                             "terms_" + node.GetOriginalField(),
-                            new AggregationContainer { Terms = new TermsAggregator { Field = field, Size = size } }
+                            new AggregationContainer { Terms = new TermsAggregator { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32() } }
                         );
             }
 
@@ -179,16 +173,43 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
                     return geogridAgg;
                 case AggregationType.Terms:
-                    int? size = null;
-                    int parsedSize;
-                    if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
-                        size = parsedSize;
-
                     return new NamedAggregationContainer(
                             "terms_" + node.GetOriginalField(),
-                            new AggregationContainer { Terms = new TermsAggregator { Field = field, Size = size } }
+                            new AggregationContainer { Terms = new TermsAggregator { Field = field, Size = node.GetProximityAsInt32() } }
                         );
             }
+
+            return null;
+        }
+
+        public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
+            int parsedSize;
+            if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
+                return parsedSize;
+
+            return null;
+        }
+
+        public static int? GetBoostAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
+            int parsedSize;
+            if (!String.IsNullOrEmpty(node.Boost) && Int32.TryParse(node.Boost, out parsedSize))
+                return parsedSize;
+
+            return null;
+        }
+
+        public static double? GetProximityAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
+            double parsedSize;
+            if (!String.IsNullOrEmpty(node.Proximity) && Double.TryParse(node.Proximity, out parsedSize))
+                return parsedSize;
+
+            return null;
+        }
+
+        public static double? GetBoostAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
+            double parsedSize;
+            if (!String.IsNullOrEmpty(node.Boost) && Double.TryParse(node.Boost, out parsedSize))
+                return parsedSize;
 
             return null;
         }
