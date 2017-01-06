@@ -156,7 +156,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         private GetAliasResult InternalResolve(string[] fieldParts, int index, AliasResolver resolver) {
-            var part = index == 0 ? fieldParts[0] : String.Join(".", fieldParts.Take(index + 1));
+            string part = index == 0 ? fieldParts[0] : String.Join(".", fieldParts.Take(index + 1));
             return InternalResolve(part, resolver);
         }
     }

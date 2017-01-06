@@ -769,7 +769,7 @@ namespace Foundatio.Parsers.Tests {
                     new ElasticQueryVisitorContext { UseScoring = true }).Result;
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));
-            var actualRequest = actualResponse.GetRequest();
+            string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse =
@@ -780,7 +780,7 @@ namespace Foundatio.Parsers.Tests {
                                                                   &&
                                                                   q2.Match(m => m.Field("nested.field3").Query("value3"))))));
 
-            var expectedRequest = expectedResponse.GetRequest();
+            string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);

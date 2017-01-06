@@ -50,12 +50,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         }
                     };
                 case AggregationType.Terms:
-                    int? size = null;
-                    int parsedSize;
-                    if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
-                        size = parsedSize;
-
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = size, Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
             }
 
             return null;
@@ -105,7 +100,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         }
                     };
                 case AggregationType.Terms:
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
             }
 
             return null;
@@ -168,7 +163,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return $"{timePerBlock.TotalSeconds:0}s";
         }
 
-        public static int? GetProximityAsInt32(this TermNode node) {
+        public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
             int parsedSize;
             if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
                 return parsedSize;
@@ -176,9 +171,25 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return null;
         }
 
-        public static double? GetProximityAsDouble(this TermNode node) {
+        public static int? GetBoostAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
+            int parsedSize;
+            if (!String.IsNullOrEmpty(node.Boost) && Int32.TryParse(node.Boost, out parsedSize))
+                return parsedSize;
+
+            return null;
+        }
+
+        public static double? GetProximityAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
             double parsedSize;
             if (!String.IsNullOrEmpty(node.Proximity) && Double.TryParse(node.Proximity, out parsedSize))
+                return parsedSize;
+
+            return null;
+        }
+
+        public static double? GetBoostAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
+            double parsedSize;
+            if (!String.IsNullOrEmpty(node.Boost) && Double.TryParse(node.Boost, out parsedSize))
                 return parsedSize;
 
             return null;

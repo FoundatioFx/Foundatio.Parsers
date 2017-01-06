@@ -4,7 +4,7 @@ using System.Text;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
-    public class GroupNode : QueryNodeBase, IFieldQueryNode {
+    public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
         public IQueryNode Left { get; set; }
         public IQueryNode Right { get; set; }
         public GroupOperator Operator { get; set; } = GroupOperator.Default;
