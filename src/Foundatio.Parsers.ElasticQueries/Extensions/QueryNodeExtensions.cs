@@ -37,24 +37,6 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 node.Data.Remove(QueryKey);
         }
 
-        private const string AggregationTypeKey = "@AggregationType";
-        public static string GetAggregationType(this IQueryNode node) {
-            object value = null;
-            if (!node.Data.TryGetValue(AggregationTypeKey, out value))
-                return null;
-
-            return (string)value;
-        }
-
-        public static void SetAggregationType(this IQueryNode node, string aggregationType) {
-            node.Data[AggregationTypeKey] = aggregationType;
-        }
-
-        public static void RemoveAggregationType(this IQueryNode node) {
-            if (node.Data.ContainsKey(AggregationTypeKey))
-                node.Data.Remove(AggregationTypeKey);
-        }
-
         private const string AggregationKey = "@Aggregation";
         public static AggregationBase GetAggregation(this IQueryNode node, Func<AggregationBase> getDefaultValue = null) {
             object value = null;
@@ -74,6 +56,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private const string SortKey = "@Sort";
+
         public static IFieldSort GetSort(this IQueryNode node, Func<IFieldSort> getDefaultValue = null) {
             object value = null;
             if (!node.Data.TryGetValue(SortKey, out value))

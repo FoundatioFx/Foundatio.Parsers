@@ -32,7 +32,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
             var mapping = elasticContext.GetPropertyMapping(field);
 
-            switch (node.GetAggregationType()) {
+            switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
                     return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
                 case AggregationType.GeoHashGrid:
@@ -64,7 +64,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
             var mapping = elasticContext.GetPropertyMapping(field);
 
-            switch (node.GetAggregationType()) {
+            switch (node.GetOperationType()) {
                 case AggregationType.Min:
                     return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
                 case AggregationType.Max:

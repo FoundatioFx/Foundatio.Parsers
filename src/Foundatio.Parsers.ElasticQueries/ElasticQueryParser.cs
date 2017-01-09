@@ -7,6 +7,7 @@ using Nest;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParser {
@@ -28,14 +29,18 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
+            query.SetQueryType(QueryType.Query);
             context.SetGetPropertyMappingFunc(_config.GetMappingProperty)
                 .SetDefaultField(_config.DefaultField);
 
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
 
-            if (_config.IncludeResolver != null && context.GetIncludeResolver() == null)
-                context.SetIncludeResolver(_config.IncludeResolver);
+            if (_config.DefaultIncludeResolver != null && context.GetIncludeResolver() == null)
+                context.SetIncludeResolver(_config.DefaultIncludeResolver);
+
+            if (_config.DefaultValidator != null && context.GetValidator() == null)
+                context.SetValidator(_config.DefaultValidator);
 
             var queryNode = await _config.QueryVisitor.AcceptAsync(query, context).ConfigureAwait(false);
 
@@ -58,10 +63,14 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
+            aggregations.SetQueryType(QueryType.Aggregation);
             context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
 
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
+
+            if (_config.DefaultValidator != null && context.GetValidator() == null)
+                context.SetValidator(_config.DefaultValidator);
 
             var queryNode = await _config.AggregationVisitor.AcceptAsync(aggregations, context).ConfigureAwait(false);
 
@@ -73,25 +82,26 @@ namespace Foundatio.Parsers.ElasticQueries {
             return BuildSortAsync(result, context);
         }
 
-        public async Task<IEnumerable<IFieldSort>> BuildSortAsync(GroupNode filter, IElasticQueryVisitorContext context = null) {
+        public async Task<IEnumerable<IFieldSort>> BuildSortAsync(GroupNode sort, IElasticQueryVisitorContext context = null) {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
+            sort.SetQueryType(QueryType.Sort);
             context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
 
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
 
-            var sortNode = await _config.SortVisitor.AcceptAsync(filter, context).ConfigureAwait(false);
+            if (_config.DefaultValidator != null && context.GetValidator() == null)
+                context.SetValidator(_config.DefaultValidator);
+
+            var sortNode = await _config.SortVisitor.AcceptAsync(sort, context).ConfigureAwait(false);
 
             return await GetSortFieldsVisitor.RunAsync(sortNode, context).ConfigureAwait(false);
         }
 
-        // parser query, generate filter, generate aggregations
         // want to be able to support things like date macro expansion (now-1d/d), geo query string filters, etc
         // date:"last 30 days"
         // number ranges field:1..
-        // _exists_:field1
-        // automatic field alias management
     }
 }

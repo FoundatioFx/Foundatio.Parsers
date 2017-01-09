@@ -5,7 +5,7 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using System.Collections.Generic;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
-    public class IncludeVisitor: ChainableQueryVisitor {
+    public class IncludeVisitor : ChainableQueryVisitor {
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
 
         public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {

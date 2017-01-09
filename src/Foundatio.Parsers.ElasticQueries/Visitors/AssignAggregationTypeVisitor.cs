@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
@@ -13,7 +14,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     throw new ApplicationException("The first item in an aggregation group must be the name of the target field.");
 
                 if (IsKnownAggregationType(node.Field)) {
-                    node.SetAggregationType(node.Field);
+                    node.SetOperationType(node.Field);
                     node.Field = leftTerm.Term;
                     node.Boost = leftTerm.Boost;
                     node.Proximity = leftTerm.Proximity;
@@ -29,7 +30,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return;
 
             if (IsKnownAggregationType(node.Field)) {
-                node.SetAggregationType(node.Field);
+                node.SetOperationType(node.Field);
                 node.Field = node.Term;
                 node.Term = null;
             }

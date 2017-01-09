@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,7 +20,8 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public string DefaultField { get; private set; } = "_all";
         public AliasResolver DefaultAliasResolver { get; private set; }
-        public Func<string, Task<string>> IncludeResolver { get; private set; }
+        public Func<string, Task<string>> DefaultIncludeResolver { get; private set; }
+        public Func<QueryValidationInfo, Task<bool>> DefaultValidator { get; private set; }
         public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
@@ -53,9 +54,15 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseIncludes(Func<string, Task<string>> includeResolver, int priority = 0) {
-            IncludeResolver = includeResolver;
+            DefaultIncludeResolver = includeResolver;
 
             return AddVisitor(new IncludeVisitor(), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseValidation(Func<QueryValidationInfo, Task<bool>> validator, int priority = 0) {
+            DefaultValidator = validator;
+
+            return AddVisitor(new ValidationVisitor { ShouldThrow = true }, priority);
         }
 
         public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, int priority = 0) {

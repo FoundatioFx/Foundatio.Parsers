@@ -59,6 +59,9 @@
     <Compile Include="Visitors\DebugQueryVisitor.cs" />
     <Compile Include="Visitors\GenerateQueryVisitor.cs" />
     <Compile Include="Visitors\IChainableQueryVisitor.cs" />
+    <Compile Include="Visitors\IQueryVisitorContextWithValidator.cs" />
+    <Compile Include="Visitors\QueryVisitorContextWithValidator.cs" />
+    <Compile Include="Visitors\ValidationVisitor.cs" />
     <Compile Include="Visitors\IncludeVisitor.cs" />
     <Compile Include="Visitors\IQueryNodeVisitor.cs" />
     <Compile Include="Visitors\IQueryNodeVisitorWithResult.cs" />

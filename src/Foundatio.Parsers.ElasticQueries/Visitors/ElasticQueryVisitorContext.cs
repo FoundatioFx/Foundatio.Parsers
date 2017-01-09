@@ -5,13 +5,15 @@ using System.Linq;
 using System.Threading.Tasks;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class ElasticQueryVisitorContext : QueryVisitorContext, IQueryVisitorContextWithIncludeResolver, IQueryVisitorContextWithAliasResolver, IElasticQueryVisitorContext {
+    public class ElasticQueryVisitorContext : QueryVisitorContext, IQueryVisitorContextWithIncludeResolver, IQueryVisitorContextWithAliasResolver, IElasticQueryVisitorContext, IQueryVisitorContextWithValidator {
         public Operator DefaultOperator { get; set; } = Operator.And;
         public bool UseScoring { get; set; }
         public string DefaultField { get; set; }
         public Func<string, IProperty> GetPropertyMappingFunc { get; set; }
         public Func<string, Task<string>> IncludeResolver { get; set; }
         public AliasResolver RootAliasResolver { get; set; }
+        public Func<QueryValidationInfo, Task<bool>> Validator { get; set; }
+        public QueryValidationInfo ValidationInfo { get; set; }
     }
 
     public static class ElasticQueryVisitorContextExtensions {

@@ -39,5 +39,44 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
 
             return context;
         }
+
+        public static Func<QueryValidationInfo, Task<bool>> GetValidator(this IQueryVisitorContext context) {
+            var contextWithValidator = context as IQueryVisitorContextWithValidator;
+            if (contextWithValidator == null)
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidator", nameof(context));
+
+            return contextWithValidator.Validator;
+        }
+
+        public static T SetValidator<T>(this T context, Func<QueryValidationInfo, Task<bool>> validator) where T : IQueryVisitorContext {
+            var contextWithValidator = context as IQueryVisitorContextWithValidator;
+            if (contextWithValidator == null)
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidator", nameof(context));
+
+            contextWithValidator.Validator = validator;
+
+            return context;
+        }
+
+        public static QueryValidationInfo GetValidationInfo(this IQueryVisitorContext context) {
+            var contextWithValidator = context as IQueryVisitorContextWithValidator;
+            if (contextWithValidator == null)
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidator", nameof(context));
+
+            if (contextWithValidator.ValidationInfo == null)
+                contextWithValidator.ValidationInfo = new QueryValidationInfo();
+
+            return contextWithValidator.ValidationInfo;
+        }
+
+        public static T SetValidationInfo<T>(this T context, QueryValidationInfo validationInfo) where T : IQueryVisitorContext {
+            var contextWithValidator = context as IQueryVisitorContextWithValidator;
+            if (contextWithValidator == null)
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithAliasResolver", nameof(context));
+
+            contextWithValidator.ValidationInfo = validationInfo;
+
+            return context;
+        }
     }
 }
