@@ -7,6 +7,8 @@ using System.Linq;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class ValidationVisitor : ChainableQueryVisitor {
+        private static readonly LuceneQueryParser _parser = new LuceneQueryParser();
+
         public bool ShouldThrow { get; set; }
 
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
@@ -94,22 +96,43 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return node;
         }
 
-        public static async Task<bool> RunAsync(GroupNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContext context = null) {
-            await new ValidationVisitor().AcceptAsync(node, context ?? new QueryVisitorContext());
+        public static async Task<QueryValidationInfo> GetInfoAsync(GroupNode node, IQueryVisitorContextWithValidator context = null) {
+            if (context == null)
+                context = new QueryVisitorContextWithValidator();
+            await new ValidationVisitor().AcceptAsync(node, context);
+            return context.GetValidationInfo();
+        }
+
+        public static QueryValidationInfo GetInfo(GroupNode node, IQueryVisitorContextWithValidator context = null) {
+            return GetInfoAsync(node, context).GetAwaiter().GetResult();
+        }
+
+        public static QueryValidationInfo GetInfo(string query, string queryType = null, IQueryVisitorContextWithValidator context = null) {
+            var node = _parser.Parse(query);
+            node.SetQueryType(queryType);
+
+            return GetInfoAsync(node, context).GetAwaiter().GetResult();
+        }
+
+        public static async Task<bool> RunAsync(GroupNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidator context = null) {
+            if (context == null)
+                context = new QueryVisitorContextWithValidator();
+
+            await new ValidationVisitor().AcceptAsync(node, context);
             var validationInfo = context.GetValidationInfo();
 
             return await validator(validationInfo);
         }
 
-        public static bool Run(GroupNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContext context = null) {
+        public static bool Run(GroupNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidator context = null) {
             return RunAsync(node, validator, context).GetAwaiter().GetResult();
         }
 
-        public static bool Run(GroupNode node, Func<QueryValidationInfo, bool> validator, IQueryVisitorContext context = null) {
+        public static bool Run(GroupNode node, Func<QueryValidationInfo, bool> validator, IQueryVisitorContextWithValidator context = null) {
             return RunAsync(node, info => Task.FromResult(validator(info)), context).GetAwaiter().GetResult();
         }
 
-        public static bool Run(GroupNode node, IEnumerable<string> allowedFields, IQueryVisitorContext context = null) {
+        public static bool Run(GroupNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidator context = null) {
             var fieldSet = new HashSet<string>(allowedFields, StringComparer.OrdinalIgnoreCase);
             return Run(node, info => info.ReferencedFields.Any(f => !fieldSet.Contains(f)), context);
         }

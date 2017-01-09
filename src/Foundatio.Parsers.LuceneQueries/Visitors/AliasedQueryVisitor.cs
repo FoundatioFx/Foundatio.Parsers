@@ -62,13 +62,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
         public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
             var rootResolver = context.GetRootAliasResolver();
-            if (rootResolver == null)
-                throw new ArgumentNullException(nameof(context), "Context must have a root alias resolver set.");
-
-            if (node is GroupNode)
-                node.SetAliasResolver(rootResolver);
-            else
-                throw new InvalidOperationException("Node must be GroupNode.");
+            if (rootResolver != null) {
+                if (node is GroupNode)
+                    node.SetAliasResolver(rootResolver);
+                else
+                    throw new InvalidOperationException("Node must be GroupNode.");
+            }
 
             await node.AcceptAsync(this, context).ConfigureAwait(false);
 
