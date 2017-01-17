@@ -107,11 +107,15 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return GetInfoAsync(node, context).GetAwaiter().GetResult();
         }
 
-        public static QueryValidationInfo GetInfo(string query, string queryType = null, IQueryVisitorContextWithValidator context = null) {
+        public static Task<QueryValidationInfo> GetInfoAsync(string query, string queryType = null, IQueryVisitorContextWithValidator context = null) {
             var node = _parser.Parse(query);
             node.SetQueryType(queryType);
 
-            return GetInfoAsync(node, context).GetAwaiter().GetResult();
+            return GetInfoAsync(node, context);
+        }
+
+        public static QueryValidationInfo GetInfo(string query, string queryType = null, IQueryVisitorContextWithValidator context = null) {
+            return GetInfoAsync(query, queryType, context).GetAwaiter().GetResult();
         }
 
         public static async Task<bool> RunAsync(GroupNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidator context = null) {
