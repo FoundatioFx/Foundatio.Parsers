@@ -45,6 +45,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 case AggregationType.Cardinality:
                 case AggregationType.Missing:
                 case AggregationType.DateHistogram:
+                case AggregationType.Histogram:
                 case AggregationType.Percentiles:
                 case AggregationType.GeoHashGrid:
                 case AggregationType.Terms:
@@ -65,6 +66,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public const string Cardinality = "cardinality";
         public const string Missing = "missing";
         public const string DateHistogram = "date";
+        public const string Histogram = "histogram";
         public const string Percentiles = "percentiles";
         public const string GeoHashGrid = "geogrid";
         public const string Terms = "terms";
