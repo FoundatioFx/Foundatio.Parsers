@@ -7,12 +7,9 @@ using Nest;
 using System;
 using System.Collections.Generic;
 
-namespace Foundatio.Parsers.ElasticQueries.Extensions
-{
-    public static class DefaultAggregationNodeExtensions
-    {
-        public static AggregationBase GetDefaultAggregation(this IQueryNode node, IQueryVisitorContext context)
-        {
+namespace Foundatio.Parsers.ElasticQueries.Extensions {
+    public static class DefaultAggregationNodeExtensions {
+        public static AggregationBase GetDefaultAggregation(this IQueryNode node, IQueryVisitorContext context) {
             var groupNode = node as GroupNode;
             if (groupNode != null)
                 return groupNode.GetDefaultAggregation(context);
@@ -24,8 +21,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return null;
         }
 
-        public static AggregationBase GetDefaultAggregation(this GroupNode node, IQueryVisitorContext context)
-        {
+        public static AggregationBase GetDefaultAggregation(this GroupNode node, IQueryVisitorContext context) {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -36,8 +32,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
             var mapping = elasticContext.GetPropertyMapping(field);
 
-            switch (node.GetOperationType())
-            {
+            switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
                     return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
                 case AggregationType.Histogram:
@@ -47,19 +42,15 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
-                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField())
-                    {
+                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
                         Field = field,
                         Precision = precision,
-                        Aggregations = new AverageAggregation("avg_lat", null)
-                        {
+                        Aggregations = new AverageAggregation("avg_lat", null) {
                             Script = new InlineScript($"doc['{node.Field}'].lat")
-                        } && new AverageAggregation("avg_lon", null)
-                        {
+                        } && new AverageAggregation("avg_lon", null) {
                             Script = new InlineScript($"doc['{node.Field}'].lon")
                         }
                     };
-
                 case AggregationType.Terms:
                     return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
             }
@@ -67,8 +58,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return null;
         }
 
-        public static AggregationBase GetDefaultAggregation(this TermNode node, IQueryVisitorContext context)
-        {
+        public static AggregationBase GetDefaultAggregation(this TermNode node, IQueryVisitorContext context) {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -76,59 +66,43 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
             var mapping = elasticContext.GetPropertyMapping(field);
 
-            switch (node.GetOperationType())
-            {
+            switch (node.GetOperationType()) {
                 case AggregationType.Min:
                     return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
-
                 case AggregationType.Max:
                     return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
-
                 case AggregationType.Avg:
                     return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
-
                 case AggregationType.Sum:
                     return new SumAggregation("sum_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
-
                 case AggregationType.Stats:
                     return new StatsAggregation("stats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
-
                 case AggregationType.ExtendedStats:
                     return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
-
                 case AggregationType.Cardinality:
                     return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
-
                 case AggregationType.Missing:
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
-
                 case AggregationType.DateHistogram:
                     return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
-
                 case AggregationType.Histogram:
                     return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
-
                 case AggregationType.Percentiles:
-                    return new PercentilesAggregation("percentiles_" + node.GetOriginalField(), field);
-
+                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);                    
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
-                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField())
-                    {
+                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
                         Field = field,
                         Precision = precision,
-                        Aggregations = new AverageAggregation("avg_lat", null)
-                        {
+                        Aggregations = new AverageAggregation("avg_lat", null) {
                             Script = new InlineScript($"doc['{node.Field}'].lat")
-                        } && new AverageAggregation("avg_lon", null)
-                        {
+                        } && new AverageAggregation("avg_lon", null) {
                             Script = new InlineScript($"doc['{node.Field}'].lon")
                         }
                     };
-
                 case AggregationType.Terms:
                     return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
             }
@@ -136,8 +110,24 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return null;
         }
 
-        private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
-        {
+        private static AggregationBase GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
+            List<double> percents = null;
+            if (!string.IsNullOrWhiteSpace(proximity)) {
+                var percentStrings = proximity.Split(',');
+                percents = new List<double>();
+                foreach  (var ps in percentStrings) {
+                    double outPerc;
+                    if (double.TryParse(ps, out outPerc))
+                        percents.Add(outPerc);
+                }
+            }
+
+            return new PercentilesAggregation(originalField, field) {
+                Percents = percents
+            };
+        }
+
+        private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
             var start = GetDouble(context, "Start");
             var end = GetDouble(context, "End");
 
@@ -148,8 +138,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
 
             var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<double> { Minimum = start.Value, Maximum = end.Value } : null;
 
-            return new HistogramAggregation(originalField)
-            {
+            return new HistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
                 Interval = interval,
@@ -160,8 +149,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             };
         }
 
-        private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
-        {
+        private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
             var start = GetDate(context, "StartDate");
             var end = GetDate(context, "EndDate");
             var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<DateTime> { Minimum = start.Value, Maximum = end.Value } : null;
@@ -169,8 +157,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             // TODO: Look into memoizing this lookup
             // TODO: Should we validate the interval range.
             TimeSpan? timezone = boost != null ? Exceptionless.DateTimeExtensions.TimeUnit.Parse(boost) : (TimeSpan?)null;
-            return new DateHistogramAggregation(originalField)
-            {
+            return new DateHistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
                 Interval = new Union<DateInterval, Time>(proximity ?? GetInterval(start, end)),
@@ -180,12 +167,10 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
                     { "@offset", boost }
                 } : null,
                 ExtendedBounds = bounds
-
             };
         }
 
-        private static double? GetDouble(IQueryVisitorContext context, string key)
-        {
+        private static double? GetDouble(IQueryVisitorContext context, string key) {
             object value;
             if (context.Data.TryGetValue(key, out value) && value is double)
                 return (double)value;
@@ -193,8 +178,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return null;
         }
 
-        private static DateTime? GetDate(IQueryVisitorContext context, string key)
-        {
+        private static DateTime? GetDate(IQueryVisitorContext context, string key) {
             object value;
             if (context.Data.TryGetValue(key, out value) && value is DateTime)
                 return (DateTime)value;
@@ -202,27 +186,23 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return null;
         }
 
-        private static string GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100)
-        {
+        private static string GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {
             if (!utcStart.HasValue || !utcEnd.HasValue)
                 return "1d";
 
             var totalTime = utcEnd.Value - utcStart.Value;
             var timePerBlock = TimeSpan.FromMinutes(totalTime.TotalMinutes / desiredDataPoints);
-            if (timePerBlock.TotalDays > 1)
-            {
+            if (timePerBlock.TotalDays > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromDays(1));
                 return $"{timePerBlock.TotalDays:0}d";
             }
 
-            if (timePerBlock.TotalHours > 1)
-            {
+            if (timePerBlock.TotalHours > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromHours(1));
                 return $"{timePerBlock.TotalHours:0}h";
             }
 
-            if (timePerBlock.TotalMinutes > 1)
-            {
+            if (timePerBlock.TotalMinutes > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromMinutes(1));
                 return $"{timePerBlock.TotalMinutes:0}m";
             }
@@ -234,8 +214,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return $"{timePerBlock.TotalSeconds:0}s";
         }
 
-        public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node)
-        {
+        public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
             int parsedSize;
             if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
                 return parsedSize;
@@ -243,8 +222,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return null;
         }
 
-        public static int? GetBoostAsInt32(this IFieldQueryWithProximityAndBoostNode node)
-        {
+        public static int? GetBoostAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
             int parsedSize;
             if (!String.IsNullOrEmpty(node.Boost) && Int32.TryParse(node.Boost, out parsedSize))
                 return parsedSize;
@@ -252,8 +230,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return null;
         }
 
-        public static double? GetProximityAsDouble(this IFieldQueryWithProximityAndBoostNode node)
-        {
+        public static double? GetProximityAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
             double parsedSize;
             if (!String.IsNullOrEmpty(node.Proximity) && Double.TryParse(node.Proximity, out parsedSize))
                 return parsedSize;
@@ -261,8 +238,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return null;
         }
 
-        public static double? GetBoostAsDouble(this IFieldQueryWithProximityAndBoostNode node)
-        {
+        public static double? GetBoostAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
             double parsedSize;
             if (!String.IsNullOrEmpty(node.Boost) && Double.TryParse(node.Boost, out parsedSize))
                 return parsedSize;

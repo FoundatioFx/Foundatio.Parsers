@@ -40,7 +40,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990"));
-            var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
+            var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4~50,100 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
@@ -54,7 +54,7 @@ namespace Foundatio.Parsers.Tests {
                 .DateHistogram("date_field5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
                 .Missing("missing_field2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_field4", c => c.Field("field4"))
-                .Percentiles("percentiles_field4", c => c.Field("field4"))
+                .Percentiles("percentiles_field4", c => c.Field("field4").Percents(50,100))
                 .Sum("sum_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
                 .Average("avg_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
                 .Max("max_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
