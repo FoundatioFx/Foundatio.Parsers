@@ -40,7 +40,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990"));
-            var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4 cardinality:field4 missing:field2 date:field5 geogrid:field3 terms:field1");
+            var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4~50,100 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
@@ -50,10 +50,11 @@ namespace Foundatio.Parsers.Tests {
                 .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
                     .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
                 .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@type", "keyword")))
+                .Histogram("histogram_field4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
                 .DateHistogram("date_field5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
                 .Missing("missing_field2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_field4", c => c.Field("field4"))
-                .Percentiles("percentiles_field4", c => c.Field("field4"))
+                .Percentiles("percentiles_field4", c => c.Field("field4").Percents(50,100))
                 .Sum("sum_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
                 .Average("avg_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
                 .Max("max_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
@@ -121,7 +122,7 @@ namespace Foundatio.Parsers.Tests {
 
             var aliasMap = new AliasMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990").UseAliases(aliasMap));
-            var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 geogrid:alias3 terms:alias1");
+            var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 histogram:alias4 geogrid:alias3 terms:alias1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
@@ -131,6 +132,7 @@ namespace Foundatio.Parsers.Tests {
                 .GeoHash("geogrid_alias3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
                     .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
                 .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@type", "keyword")))
+                .Histogram("histogram_alias4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
                 .DateHistogram("date_alias5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
                 .Missing("missing_alias2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_user", c => c.Field("data.@user.identity.keyword"))

@@ -1,11 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using Exceptionless.DateTimeExtensions;
+﻿using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using System;
+using System.Collections.Generic;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultAggregationNodeExtensions {
@@ -35,6 +35,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
                     return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                case AggregationType.Histogram:
+                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
@@ -83,8 +85,10 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
                 case AggregationType.DateHistogram:
                     return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                case AggregationType.Histogram:
+                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
                 case AggregationType.Percentiles:
-                    return new PercentilesAggregation("percentiles_" + node.GetOriginalField(), field);
+                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);                    
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
@@ -106,6 +110,45 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return null;
         }
 
+        private static AggregationBase GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
+            List<double> percents = null;
+            if (!string.IsNullOrWhiteSpace(proximity)) {
+                var percentStrings = proximity.Split(',');
+                percents = new List<double>();
+                foreach  (var ps in percentStrings) {
+                    double outPerc;
+                    if (double.TryParse(ps, out outPerc))
+                        percents.Add(outPerc);
+                }
+            }
+
+            return new PercentilesAggregation(originalField, field) {
+                Percents = percents
+            };
+        }
+
+        private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
+            var start = GetDouble(context, "Start");
+            var end = GetDouble(context, "End");
+
+            int prox;
+            int interval = 50;
+            if (int.TryParse(proximity, out prox))
+                interval = prox;
+
+            var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<double> { Minimum = start.Value, Maximum = end.Value } : null;
+
+            return new HistogramAggregation(originalField) {
+                Field = field,
+                MinimumDocumentCount = 0,
+                Interval = interval,
+                Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> {
+                    { "@offset", boost }
+                } : null,
+                ExtendedBounds = bounds
+            };
+        }
+
         private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
             var start = GetDate(context, "StartDate");
             var end = GetDate(context, "EndDate");
@@ -125,6 +168,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 } : null,
                 ExtendedBounds = bounds
             };
+        }
+
+        private static double? GetDouble(IQueryVisitorContext context, string key) {
+            object value;
+            if (context.Data.TryGetValue(key, out value) && value is double)
+                return (double)value;
+
+            return null;
         }
 
         private static DateTime? GetDate(IQueryVisitorContext context, string key) {
