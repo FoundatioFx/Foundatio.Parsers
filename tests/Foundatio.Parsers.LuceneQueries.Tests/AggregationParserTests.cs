@@ -231,7 +231,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var aggregations = processor.BuildAggregationsAsync("date:(field5 @missing:\"0001-01-01T00:00:00\")").Result;
+            var aggregations = processor.BuildAggregationsAsync("date:(field5^1h @missing:\"0001-01-01T00:00:00\" min:field5^1h max:field5^1h)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
@@ -239,16 +239,20 @@ namespace Foundatio.Parsers.Tests {
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .DateHistogram("date_field5", d1 => d1
-                    .Field("field5")
+                    .Field("field5").Meta(m => m.Add("@offset", "1h"))
                     .Interval("1d")
                     .Format("date_optional_time")
                     .MinimumDocumentCount(0)
-                    .Missing(DateTime.MinValue))));
+                    .TimeZone("+01:00")
+                    .Missing(DateTime.MinValue)
+                    .Aggregations(a1 => a1
+                        .Min("min_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@type", "date").Add("@offset", "1h")))
+                        .Max("max_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@type", "date").Add("@offset", "1h")))))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
-            Assert.True(actualResponse.IsValid);
+            Assert.True(actualResponse.IsValid, actualResponse.DebugInformation);
             Assert.True(expectedResponse.IsValid);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
