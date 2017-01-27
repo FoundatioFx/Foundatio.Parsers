@@ -20,7 +20,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             if (String.IsNullOrEmpty(includedQuery))
                 return;
 
-            var result = _parser.Parse(includedQuery);
+            GroupNode result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
             result.HasParens = true;
             await VisitAsync(result, context).ConfigureAwait(false);
 
@@ -34,20 +34,24 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 parent.Right = result;
         }
 
-        public static Task<IQueryNode> RunAsync(GroupNode node, Func<string, Task<string>> includeResolver, IQueryVisitorContextWithIncludeResolver context = null) {
+        public static Task<IQueryNode> RunAsync(IQueryNode node, Func<string, Task<string>> includeResolver, IQueryVisitorContextWithIncludeResolver context = null) {
             return new IncludeVisitor().AcceptAsync(node, context ?? new QueryVisitorContextWithIncludeResolver { IncludeResolver = includeResolver });
         }
 
-        public static IQueryNode Run(GroupNode node, Func<string, Task<string>> includeResolver, IQueryVisitorContextWithIncludeResolver context = null) {
+        public static IQueryNode Run(IQueryNode node, Func<string, Task<string>> includeResolver, IQueryVisitorContextWithIncludeResolver context = null) {
             return RunAsync(node, includeResolver, context).GetAwaiter().GetResult();
         }
 
-        public static IQueryNode Run(GroupNode node, Func<string, string> includeResolver, IQueryVisitorContextWithIncludeResolver context = null) {
+        public static IQueryNode Run(IQueryNode node, Func<string, string> includeResolver, IQueryVisitorContextWithIncludeResolver context = null) {
             return RunAsync(node, name => Task.FromResult(includeResolver(name)), context).GetAwaiter().GetResult();
         }
 
-        public static IQueryNode Run(GroupNode node, IDictionary<string, string> includes, IQueryVisitorContextWithIncludeResolver context = null) {
-            return Run(node, name => includes.ContainsKey(name) ? includes[name] : null, context);
+        public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> includes, IQueryVisitorContextWithIncludeResolver context = null) {
+            return RunAsync(node, name => Task.FromResult(includes.ContainsKey(name) ? includes[name] : null), context);
+        }
+
+        public static IQueryNode Run(IQueryNode node, IDictionary<string, string> includes, IQueryVisitorContextWithIncludeResolver context = null) {
+            return RunAsync(node, includes, context).GetAwaiter().GetResult();
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -16,74 +17,77 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             if (validationInfo.QueryType == null)
                 validationInfo.QueryType = node.GetQueryType();
 
+            string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
-                validationInfo.ReferencedFields.Add(node.GetFullName());
-                validationInfo.OperationCount++;
+                field = node.GetFullName();
+                validationInfo.ReferencedFields.Add(field);
 
                 if (node.HasParens)
                     validationInfo.CurrentNodeDepth++;
             }
 
-            string operationType = node.GetOperationType();
-            if (!String.IsNullOrEmpty(operationType))
-                validationInfo.OperationTypes.Add(operationType);
-
+            AddOperation(validationInfo, node.GetOperationType(), field);
             await base.VisitAsync(node, context).ConfigureAwait(false);
-
             if (!String.IsNullOrEmpty(node.Field) && node.HasParens)
                 validationInfo.CurrentNodeDepth--;
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
             var validationInfo = context.GetValidationInfo();
+            string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
-                validationInfo.ReferencedFields.Add(node.GetFullName());
+                field = node.GetFullName();
+                validationInfo.ReferencedFields.Add(field);
             } else {
+                if (String.Equals(validationInfo.QueryType, QueryType.Aggregation))
+                    validationInfo.IsValid = false;
+
                 var nameParts = node.GetNameParts();
                 if (nameParts.Length == 0)
                     validationInfo.ReferencedFields.Add("_all");
             }
 
-            string operationType = node.GetOperationType();
-            if (!String.IsNullOrEmpty(operationType))
-                validationInfo.OperationTypes.Add(operationType);
-
-            validationInfo.OperationCount++;
+            AddOperation(validationInfo, node.GetOperationType(), field);
         }
 
         public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
             var validationInfo = context.GetValidationInfo();
+            string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
-                validationInfo.ReferencedFields.Add(node.GetFullName());
+                field = node.GetFullName();
+                validationInfo.ReferencedFields.Add(field);
             } else {
+                if (String.Equals(validationInfo.QueryType, QueryType.Aggregation))
+                    validationInfo.IsValid = false;
+
                 var nameParts = node.GetNameParts();
                 if (nameParts.Length == 0)
                     validationInfo.ReferencedFields.Add("_all");
             }
 
-            string operationType = node.GetOperationType();
-            if (!String.IsNullOrEmpty(operationType))
-                validationInfo.OperationTypes.Add(operationType);
-
-            validationInfo.OperationCount++;
+            AddOperation(validationInfo, node.GetOperationType(), field);
         }
 
         public override void Visit(ExistsNode node, IQueryVisitorContext context) {
             var validationInfo = context.GetValidationInfo();
-            if (!String.IsNullOrEmpty(node.Field))
-                validationInfo.ReferencedFields.Add(node.GetFullName());
+            string field = null;
+            if (!String.IsNullOrEmpty(node.Field)) {
+                field = node.GetFullName();
+                validationInfo.ReferencedFields.Add(field);
+            }
 
-            validationInfo.OperationTypes.Add("exists");
-            validationInfo.OperationCount++;
+            AddOperation(validationInfo, "exists", field);
         }
 
         public override void Visit(MissingNode node, IQueryVisitorContext context) {
             var validationInfo = context.GetValidationInfo();
-            if (!String.IsNullOrEmpty(node.Field))
-                validationInfo.ReferencedFields.Add(node.GetFullName());
+            string field = null;
+            if (!String.IsNullOrEmpty(node.Field)) {
+                field = node.GetFullName();
+                validationInfo.ReferencedFields.Add(field);
+            }
 
-            validationInfo.OperationTypes.Add("missing");
-            validationInfo.OperationCount++;
+            AddOperation(validationInfo, "missing", field);
         }
 
         public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
@@ -96,29 +100,37 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return node;
         }
 
-        public static async Task<QueryValidationInfo> GetInfoAsync(GroupNode node, IQueryVisitorContextWithValidator context = null) {
+        private void AddOperation(QueryValidationInfo info, string operation, string field) {
+            if (String.IsNullOrEmpty(operation))
+                return;
+
+            if (String.IsNullOrEmpty(field) || String.Equals(field, "_all")) {
+                info.IsValid = false;
+                return;
+            }
+
+            info.Operations.AddOrUpdate(operation,
+                op => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { field },
+                (op, collection) => {
+                    collection.Add(field);
+                    return collection;
+                }
+            );
+        }
+
+        public static async Task<QueryValidationInfo> RunAsync(IQueryNode node, IQueryVisitorContextWithValidator context = null) {
             if (context == null)
                 context = new QueryVisitorContextWithValidator();
+
             await new ValidationVisitor().AcceptAsync(node, context);
             return context.GetValidationInfo();
         }
 
-        public static QueryValidationInfo GetInfo(GroupNode node, IQueryVisitorContextWithValidator context = null) {
-            return GetInfoAsync(node, context).GetAwaiter().GetResult();
+        public static QueryValidationInfo Run(IQueryNode node, IQueryVisitorContextWithValidator context = null) {
+            return RunAsync(node, context).GetAwaiter().GetResult();
         }
 
-        public static Task<QueryValidationInfo> GetInfoAsync(string query, string queryType = null, IQueryVisitorContextWithValidator context = null) {
-            var node = _parser.Parse(query);
-            node.SetQueryType(queryType);
-
-            return GetInfoAsync(node, context);
-        }
-
-        public static QueryValidationInfo GetInfo(string query, string queryType = null, IQueryVisitorContextWithValidator context = null) {
-            return GetInfoAsync(query, queryType, context).GetAwaiter().GetResult();
-        }
-
-        public static async Task<bool> RunAsync(GroupNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidator context = null) {
+        public static async Task<bool> RunAsync(IQueryNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidator context = null) {
             if (context == null)
                 context = new QueryVisitorContextWithValidator();
 
@@ -128,26 +140,26 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return await validator(validationInfo);
         }
 
-        public static bool Run(GroupNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidator context = null) {
+        public static bool Run(IQueryNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidator context = null) {
             return RunAsync(node, validator, context).GetAwaiter().GetResult();
         }
 
-        public static bool Run(GroupNode node, Func<QueryValidationInfo, bool> validator, IQueryVisitorContextWithValidator context = null) {
-            return RunAsync(node, info => Task.FromResult(validator(info)), context).GetAwaiter().GetResult();
+        public static Task<bool> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidator context = null) {
+            var fieldSet = new HashSet<string>(allowedFields, StringComparer.OrdinalIgnoreCase);
+            return RunAsync(node, info => Task.FromResult(info.ReferencedFields.Any(f => !fieldSet.Contains(f))), context);
         }
 
-        public static bool Run(GroupNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidator context = null) {
-            var fieldSet = new HashSet<string>(allowedFields, StringComparer.OrdinalIgnoreCase);
-            return Run(node, info => info.ReferencedFields.Any(f => !fieldSet.Contains(f)), context);
+        public static bool Run(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidator context = null) {
+            return RunAsync(node, allowedFields, context).GetAwaiter().GetResult();
         }
     }
 
     public class QueryValidationInfo {
         public string QueryType { get; set; }
+        public bool IsValid { get; set; } = true;
         public ICollection<string> ReferencedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public int MaxNodeDepth { get; set; } = 1;
-        public int OperationCount { get; set; }
-        public ICollection<string> OperationTypes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public ConcurrentDictionary<string, ICollection<string>> Operations { get; } = new ConcurrentDictionary<string, ICollection<string>>(StringComparer.OrdinalIgnoreCase);
 
         private int _currentNodeDepth = 1;
         internal int CurrentNodeDepth {

@@ -104,31 +104,31 @@ namespace Foundatio.Parsers.Tests {
         [InlineData(@"updated:2016-09-02T15\:41\:43.3385286Z", @"updated:2016-09-02T15\:41\:43.3385286Z", true)]
         [InlineData(@"updated:>2016-09-02T15\:41\:43.3385286Z", @"updated:>2016-09-02T15\:41\:43.3385286Z", true)]
         [InlineData(@"field1:""\""value1\""""", @"field1:""\""value1\""""", true)]
-        public void CanGenerateQuery(string query, string expected, bool isValid) {
+        public async Task CanGenerateQueryAsync(string query, string expected, bool isValid) {
             var parser = new LuceneQueryParser();
 
             IQueryNode result;
             try {
-                result = parser.Parse(query);
+                result = await parser.ParseAsync(query);
             } catch (Exception ex) {
                 Assert.False(isValid, ex.Message);
                 return;
             }
 
-            _logger.Info(DebugQueryVisitor.Run(result));
-            var generatedQuery = GenerateQueryVisitor.Run(result);
+            _logger.Info(await DebugQueryVisitor.RunAsync(result));
+            var generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(expected, generatedQuery);
         }
 
         [Fact]
-        public async Task CanGenerateSingleQuery() {
+        public async Task CanGenerateSingleQueryAsync() {
             string query = "datehistogram:(date~2^-5\\:30 min:date max:date)";
             var parser = new LuceneQueryParser();
 
-            IQueryNode result = parser.Parse(query);
+            IQueryNode result = await parser.ParseAsync(query);
 
-            _logger.Info(DebugQueryVisitor.Run(result));
-            var generatedQuery = GenerateQueryVisitor.Run(result);
+            _logger.Info(await DebugQueryVisitor.RunAsync(result));
+            var generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
 
             await new AssignAggregationTypeVisitor().AcceptAsync(result, null);

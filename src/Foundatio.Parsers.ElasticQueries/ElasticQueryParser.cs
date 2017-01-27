@@ -10,8 +10,7 @@ using System.Collections.Generic;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.ElasticQueries {
-    public class ElasticQueryParser {
-        private readonly LuceneQueryParser _parser = new LuceneQueryParser();
+    public class ElasticQueryParser : LuceneQueryParser {
         private readonly ElasticQueryParserConfiguration _config;
 
         public ElasticQueryParser(Action<ElasticQueryParserConfiguration> configure = null) {
@@ -20,84 +19,97 @@ namespace Foundatio.Parsers.ElasticQueries {
             _config = config;
         }
 
-        public Task<QueryContainer> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null) {
-            var result = _parser.Parse(query);
-            return BuildQueryAsync(result, context);
-        }
+        public override async Task<IQueryNode> ParseAsync(string query, string queryType = QueryType.Query, IQueryVisitorContext context = null) {
+            if (String.IsNullOrEmpty(query))
+                throw new ArgumentNullException(nameof(query));
 
-        public async Task<QueryContainer> BuildQueryAsync(GroupNode query, IElasticQueryVisitorContext context = null) {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
-            query.SetQueryType(QueryType.Query);
-            context.SetGetPropertyMappingFunc(_config.GetMappingProperty)
-                .SetDefaultField(_config.DefaultField);
+            var elasticContext = context as ElasticQueryVisitorContext;
+            if (elasticContext == null)
+                throw new ArgumentException($"Context must be of type {nameof(ElasticQueryVisitorContext)}", nameof(context));
 
+            var result = await base.ParseAsync(query, queryType, context).ConfigureAwait(false);
+
+            SetupQueryVisitorContextDefaults(elasticContext);
+            switch (queryType) {
+                case QueryType.Aggregation:
+                    context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
+                    result = await _config.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    break;
+                case QueryType.Query:
+                    context.SetGetPropertyMappingFunc(_config.GetMappingProperty).SetDefaultField(_config.DefaultField);
+                    if (_config.DefaultIncludeResolver != null && context.GetIncludeResolver() == null)
+                        context.SetIncludeResolver(_config.DefaultIncludeResolver);
+
+                    result = await _config.QueryVisitor.AcceptAsync(result, elasticContext).ConfigureAwait(false);
+                    break;
+                case QueryType.Sort:
+                    context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
+                    result = await _config.SortVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    break;
+            }
+
+            return result;
+        }
+
+        private void SetupQueryVisitorContextDefaults(IElasticQueryVisitorContext context) {
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
 
-            if (_config.DefaultIncludeResolver != null && context.GetIncludeResolver() == null)
-                context.SetIncludeResolver(_config.DefaultIncludeResolver);
-
             if (_config.DefaultValidator != null && context.GetValidator() == null)
                 context.SetValidator(_config.DefaultValidator);
+        }
 
-            var queryNode = await _config.QueryVisitor.AcceptAsync(query, context).ConfigureAwait(false);
+        public async Task<QueryContainer> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null) {
+            if (context == null)
+                context = new ElasticQueryVisitorContext();
 
-            var q = queryNode?.GetQuery() ?? new MatchAllQuery();
-            if (!context.UseScoring) {
+            var result = await ParseAsync(query, QueryType.Query, context).ConfigureAwait(false);
+            return await BuildQueryAsync(result, context).ConfigureAwait(false);
+        }
+
+
+        public Task<QueryContainer> BuildQueryAsync(IQueryNode query, IElasticQueryVisitorContext context = null) {
+            if (context == null)
+                context = new ElasticQueryVisitorContext();
+
+            var q = query.GetQuery() ?? new MatchAllQuery();
+            if (context?.UseScoring == false) {
                 q = new BoolQuery {
                     Filter = new QueryContainer[] { q }
                 };
             }
 
-            return q;
+            return Task.FromResult<QueryContainer>(q);
         }
 
-        public Task<AggregationContainer> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null) {
-            var result = _parser.Parse(aggregations);
-            return BuildAggregationsAsync(result, context);
-        }
-
-        public async Task<AggregationContainer> BuildAggregationsAsync(GroupNode aggregations, IElasticQueryVisitorContext context = null) {
+        public async Task<AggregationContainer> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null) {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
-            aggregations.SetQueryType(QueryType.Aggregation);
-            context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
-
-            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
-                context.SetRootAliasResolver(_config.DefaultAliasResolver);
-
-            if (_config.DefaultValidator != null && context.GetValidator() == null)
-                context.SetValidator(_config.DefaultValidator);
-
-            var queryNode = await _config.AggregationVisitor.AcceptAsync(aggregations, context).ConfigureAwait(false);
-
-            return queryNode?.GetAggregation();
+            var result = await ParseAsync(aggregations, QueryType.Aggregation, context).ConfigureAwait(false);
+            return await BuildAggregationsAsync(result, context).ConfigureAwait(false);
         }
 
-        public Task<IEnumerable<IFieldSort>> BuildSortAsync(string sort, IElasticQueryVisitorContext context = null) {
-            var result = _parser.Parse(sort);
-            return BuildSortAsync(result, context);
+        public Task<AggregationContainer> BuildAggregationsAsync(IQueryNode aggregations, IElasticQueryVisitorContext context = null) {
+            return Task.FromResult<AggregationContainer>(aggregations?.GetAggregation());
         }
 
-        public async Task<IEnumerable<IFieldSort>> BuildSortAsync(GroupNode sort, IElasticQueryVisitorContext context = null) {
+        public async Task<IEnumerable<IFieldSort>> BuildSortAsync(string sort, IElasticQueryVisitorContext context = null) {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
-            sort.SetQueryType(QueryType.Sort);
-            context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
+            var result = await ParseAsync(sort, QueryType.Sort, context).ConfigureAwait(false);
+            return await BuildSortAsync(result, context).ConfigureAwait(false);
+        }
 
-            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
-                context.SetRootAliasResolver(_config.DefaultAliasResolver);
+        public Task<IEnumerable<IFieldSort>> BuildSortAsync(IQueryNode sort, IElasticQueryVisitorContext context = null) {
+            if (context == null)
+                context = new ElasticQueryVisitorContext();
 
-            if (_config.DefaultValidator != null && context.GetValidator() == null)
-                context.SetValidator(_config.DefaultValidator);
-
-            var sortNode = await _config.SortVisitor.AcceptAsync(sort, context).ConfigureAwait(false);
-
-            return await GetSortFieldsVisitor.RunAsync(sortNode, context).ConfigureAwait(false);
+            return GetSortFieldsVisitor.RunAsync(sort, context);
         }
 
         // want to be able to support things like date macro expansion (now-1d/d), geo query string filters, etc

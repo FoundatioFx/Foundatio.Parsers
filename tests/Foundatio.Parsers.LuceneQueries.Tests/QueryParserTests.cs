@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
@@ -25,9 +26,9 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
-        public void CanParseQuery() {
+        public async Task CanParseQueryAsync() {
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("criteria");
+            var result = (GroupNode)await parser.ParseAsync("criteria");
             Assert.NotNull(result);
             Assert.NotNull(result.Left);
             Assert.IsType<TermNode>(result.Left);

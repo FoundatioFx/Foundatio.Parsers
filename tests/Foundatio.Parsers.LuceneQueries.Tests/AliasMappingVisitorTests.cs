@@ -24,7 +24,7 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
-        public void VerifySimpleAlias() {
+        public async Task VerifySimpleAliasAsync() {
             var client = GetClient();
             var visitor = new AliasMappingVisitor(client.Infer);
             var walker = new MappingWalker(visitor);
@@ -38,13 +38,13 @@ namespace Foundatio.Parsers.Tests {
             Assert.False(map["employee_id"].HasChildMappings);
 
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("employee_id:1234");
-            var aliased = AliasedQueryVisitor.Run(result, map);
+            var result = await parser.ParseAsync("employee_id:1234");
+            var aliased = await AliasedQueryVisitor.RunAsync(result, map);
             Assert.Equal("id:1234", aliased.ToString());
         }
 
         [Fact]
-        public void VerifyNestedAlias() {
+        public async Task VerifyNestedAliasAsync() {
             var client = GetClient();
             var visitor = new AliasMappingVisitor(client.Infer);
             var walker = new MappingWalker(visitor);
@@ -68,13 +68,13 @@ namespace Foundatio.Parsers.Tests {
             Assert.False(map["data"].ChildMap["url"].HasChildMappings);
 
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("employee_id:1234 data.url:test");
-            var aliased = AliasedQueryVisitor.Run(result, map);
+            var result = await parser.ParseAsync("employee_id:1234 data.url:test");
+            var aliased = await AliasedQueryVisitor.RunAsync(result, map);
             Assert.Equal("id:1234 data.Profile_URL:test", aliased.ToString());
         }
 
         [Fact]
-        public void VerifyRootNestedAlias() {
+        public async Task VerifyRootNestedAliasAsync() {
             var client = GetClient();
             var visitor = new AliasMappingVisitor(client.Infer);
             var walker = new MappingWalker(visitor);
@@ -93,13 +93,13 @@ namespace Foundatio.Parsers.Tests {
             Assert.False(map["data"].HasChildMappings);
 
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("url:test");
-            var aliased = AliasedQueryVisitor.Run(result, map);
+            var result = await parser.ParseAsync("url:test");
+            var aliased = await AliasedQueryVisitor.RunAsync(result, map);
             Assert.Equal("data.Profile_URL:test", aliased.ToString());
         }
 
         [Fact]
-        public void VerifyComplexNestedAlias() {
+        public async Task VerifyComplexNestedAliasAsync() {
             var client = GetClient();
             var visitor = new AliasMappingVisitor(client.Infer);
             var walker = new MappingWalker(visitor);
@@ -131,13 +131,13 @@ namespace Foundatio.Parsers.Tests {
             Assert.True(map["data"].HasChildMappings);
 
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("useragent:test browser.major:10 bot:true");
-            var aliased = AliasedQueryVisitor.Run(result, map);
+            var result = await parser.ParseAsync("useragent:test browser.major:10 bot:true");
+            var aliased = await AliasedQueryVisitor.RunAsync(result, map);
             Assert.Equal("data.@request_info.user_agent:test data.@request_info.@browser_major_version:10 data.@request_info.data.@is_bot:true", aliased.ToString());
         }
 
         [Fact]
-        public async Task CanQueryByAliasAsync() {
+        public async Task CanQueryByAliasAsyncAsync() {
             string index = nameof(Employee).ToLower();
 
             var client = GetClient();
@@ -163,7 +163,7 @@ namespace Foundatio.Parsers.Tests {
             var visitor = new AliasMappingVisitor(client.Infer);
             var walker = new MappingWalker(visitor);
             walker.Accept(mapping);
-            
+
             var processor = new ElasticQueryParser(c => c.UseAliases(visitor.RootAliasMap).UseMappings<Employee>(m => mapping, () => client.GetMapping(new GetMappingRequest(index, index)).Mapping));
             var result = await processor.BuildQueryAsync("employee_id:ex-001 url:\"/u/ex-001/profile.png\" data.code:1234567890");
             var actualResponse = client.Search<Employee>(d => d.Index(index).Query(q => result));

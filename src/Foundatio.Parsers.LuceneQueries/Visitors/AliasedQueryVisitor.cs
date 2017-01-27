@@ -74,19 +74,19 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return node;
         }
 
-        public static Task<IQueryNode> RunAsync(GroupNode node, AliasResolver resolver, IQueryVisitorContextWithAliasResolver context = null) {
+        public static Task<IQueryNode> RunAsync(IQueryNode node, AliasResolver resolver, IQueryVisitorContextWithAliasResolver context = null) {
             return new AliasedQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContextWithAliasResolver { RootAliasResolver = resolver });
         }
 
-        public static IQueryNode Run(GroupNode node, AliasResolver resolver, IQueryVisitorContextWithAliasResolver context = null) {
+        public static IQueryNode Run(IQueryNode node, AliasResolver resolver, IQueryVisitorContextWithAliasResolver context = null) {
             return RunAsync(node, resolver, context).GetAwaiter().GetResult();
         }
 
-        public static Task<IQueryNode> RunAsync(GroupNode node, AliasMap aliasMap, IQueryVisitorContextWithAliasResolver context = null) {
+        public static Task<IQueryNode> RunAsync(IQueryNode node, AliasMap aliasMap, IQueryVisitorContextWithAliasResolver context = null) {
             return new AliasedQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContextWithAliasResolver { RootAliasResolver = aliasMap.Resolve });
         }
 
-        public static IQueryNode Run(GroupNode node, AliasMap aliasMap, IQueryVisitorContextWithAliasResolver context = null) {
+        public static IQueryNode Run(IQueryNode node, AliasMap aliasMap, IQueryVisitorContextWithAliasResolver context = null) {
             return RunAsync(node, aliasMap, context).GetAwaiter().GetResult();
         }
     }

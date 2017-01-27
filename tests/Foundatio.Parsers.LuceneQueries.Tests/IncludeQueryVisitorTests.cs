@@ -16,51 +16,51 @@ namespace Foundatio.Parsers.Tests {
         public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output) { }
 
         [Fact]
-        public void CanExpandIncludes() {
+        public async Task CanExpandIncludesAsync() {
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("@include:other");
+            var result = await parser.ParseAsync("@include:other");
             var includes = new Dictionary<string, string> { { "other", "field:value" } };
-            var resolved = IncludeVisitor.Run(result, includes);
+            var resolved = await IncludeVisitor.RunAsync(result, includes);
             Assert.Equal("(field:value)", resolved.ToString());
         }
 
         [Fact]
-        public void CanExpandIncludesWithOtherCriteria() {
+        public async Task CanExpandIncludesWithOtherCriteriaAsync() {
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("field1:value1 @include:other");
+            var result = await parser.ParseAsync("field1:value1 @include:other");
             var includes = new Dictionary<string, string> { { "other", "field:value" } };
-            var resolved = IncludeVisitor.Run(result, includes);
+            var resolved = await IncludeVisitor.RunAsync(result, includes);
             Assert.Equal("field1:value1 (field:value)", resolved.ToString());
         }
 
         [Fact]
-        public void CanExpandIncludesWithOtherCriteriaAndGrouping() {
+        public async Task CanExpandIncludesWithOtherCriteriaAndGroupingAsync() {
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("field1:value1 OR (@include:other field2:value2)");
+            var result = await parser.ParseAsync("field1:value1 OR (@include:other field2:value2)");
             var includes = new Dictionary<string, string> { { "other", "field:value" } };
-            var resolved = IncludeVisitor.Run(result, includes);
+            var resolved = await IncludeVisitor.RunAsync(result, includes);
             Assert.Equal("field1:value1 OR ((field:value) field2:value2)", resolved.ToString());
         }
 
         [Fact]
-        public void CanExpandNestedIncludes() {
+        public async Task CanExpandNestedIncludesAsync() {
             var parser = new LuceneQueryParser();
-            var result = parser.Parse("@include:other");
+            var result = await parser.ParseAsync("@include:other");
             var includes = new Dictionary<string, string> {
                 { "other", "@include:other2" },
                 { "other2", "field2:value2" }
             };
-            var resolved = IncludeVisitor.Run(result, includes);
+            var resolved = await IncludeVisitor.RunAsync(result, includes);
             Assert.Equal("((field2:value2))", resolved.ToString());
         }
 
         [Fact]
-        public void CanExpandElasticIncludes() {
+        public async Task CanExpandElasticIncludesAsync() {
             var client = new ElasticClient(new ConnectionSettings().DisableDirectStreaming().PrettyJson());
             var aliases = new AliasMap { { "field", "aliased" }, { "included", "aliasedincluded" } };
 
-            var processor = new ElasticQueryParser(c => c.UseIncludes(i => GetInclude(i)).UseAliases(aliases));
-            var result = processor.BuildQueryAsync("@include:other").Result;
+            var processor = new ElasticQueryParser(c => c.UseIncludes(i => GetIncludeAsync(i)).UseAliases(aliases));
+            var result = await processor.BuildQueryAsync("@include:other");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -72,7 +72,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            result = processor.BuildQueryAsync("@include:other").Result;
+            result = await processor.BuildQueryAsync("@include:other");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -82,7 +82,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-        private async Task<string> GetInclude(string name) {
+        private async Task<string> GetIncludeAsync(string name) {
             await Task.Delay(150);
             return "included:value";
         }
