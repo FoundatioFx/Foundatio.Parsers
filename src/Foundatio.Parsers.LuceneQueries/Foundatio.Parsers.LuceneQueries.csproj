@@ -55,7 +55,6 @@
     <Compile Include="Nodes\TermRangeNode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Visitors\ChainedQueryVisitor.cs" />
-    <Compile Include="Visitors\DynamicFieldQueryVisitor.cs" />
     <Compile Include="Visitors\GetReferencedFieldsQueryVisitor.cs" />
     <Compile Include="Visitors\AliasedQueryVisitor.cs" />
     <Compile Include="Visitors\DebugQueryVisitor.cs" />

@@ -107,7 +107,6 @@
     <Otherwise />
   </Choose>
   <ItemGroup>
-    <Compile Include="DynamicFieldQueryVisitorTests.cs" />
     <Compile Include="QueryValidationVisitorTests.cs" />
     <Compile Include="IncludeQueryVisitorTests.cs" />
     <Compile Include="AliasedQueryVisitorTests.cs" />
