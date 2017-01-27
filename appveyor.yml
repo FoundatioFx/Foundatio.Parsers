@@ -16,7 +16,7 @@ init:
 
 install:
   - choco install gitlink
-  - ps: .\build\Start-ElasticSearch.ps1 -Version 5.1.1 -StartKibana $false
+  - ps: .\build\Start-ElasticSearch.ps1 -Version 5.1.2 -StartKibana $false
 
 assembly_info:
   patch: true
