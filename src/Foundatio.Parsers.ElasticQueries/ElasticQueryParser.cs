@@ -112,8 +112,8 @@ namespace Foundatio.Parsers.ElasticQueries {
             return GetSortFieldsVisitor.RunAsync(sort, context);
         }
 
-        // want to be able to support things like date macro expansion (now-1d/d), geo query string filters, etc
-        // date:"last 30 days"
-        // number ranges field:1..
+        // TODO: want to be able to support things like date macro expansion (now-1d/d), geo query string filters, etc
+        // TODO: date:"last 30 days"
+        // TODO: number ranges field:1..
     }
 }

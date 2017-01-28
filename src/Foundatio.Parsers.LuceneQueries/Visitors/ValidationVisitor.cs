@@ -19,7 +19,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
-                field = node.GetFullName();
+                field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
                 validationInfo.ReferencedFields.Add(field);
 
                 if (node.HasParens)
@@ -36,7 +36,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             var validationInfo = context.GetValidationInfo();
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
-                field = node.GetFullName();
+                field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
                 validationInfo.ReferencedFields.Add(field);
             } else {
                 if (String.Equals(validationInfo.QueryType, QueryType.Aggregation))
@@ -54,7 +54,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             var validationInfo = context.GetValidationInfo();
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
-                field = node.GetFullName();
+                field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
                 validationInfo.ReferencedFields.Add(field);
             } else {
                 if (String.Equals(validationInfo.QueryType, QueryType.Aggregation))
@@ -72,7 +72,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             var validationInfo = context.GetValidationInfo();
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
-                field = node.GetFullName();
+                field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
                 validationInfo.ReferencedFields.Add(field);
             }
 
@@ -83,7 +83,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             var validationInfo = context.GetValidationInfo();
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
-                field = node.GetFullName();
+                field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
                 validationInfo.ReferencedFields.Add(field);
             }
 
