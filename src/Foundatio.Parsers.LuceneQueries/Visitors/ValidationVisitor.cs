@@ -20,7 +20,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
                 field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
-                validationInfo.ReferencedFields.Add(field);
+                if (!field.StartsWith("@"))
+                    validationInfo.ReferencedFields.Add(field);
 
                 if (node.HasParens)
                     validationInfo.CurrentNodeDepth++;
@@ -37,7 +38,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
                 field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
-                validationInfo.ReferencedFields.Add(field);
+                if (!field.StartsWith("@"))
+                    validationInfo.ReferencedFields.Add(field);
             } else {
                 if (String.Equals(validationInfo.QueryType, QueryType.Aggregation))
                     validationInfo.IsValid = false;
@@ -55,7 +57,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
                 field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
-                validationInfo.ReferencedFields.Add(field);
+                if (!field.StartsWith("@"))
+                    validationInfo.ReferencedFields.Add(field);
             } else {
                 if (String.Equals(validationInfo.QueryType, QueryType.Aggregation))
                     validationInfo.IsValid = false;
@@ -73,7 +76,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
                 field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
-                validationInfo.ReferencedFields.Add(field);
+                if (!field.StartsWith("@"))
+                    validationInfo.ReferencedFields.Add(field);
             }
 
             AddOperation(validationInfo, "exists", field);
@@ -84,7 +88,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             string field = null;
             if (!String.IsNullOrEmpty(node.Field)) {
                 field = String.Equals(validationInfo.QueryType, QueryType.Query) ? node.GetFullName() : node.Field;
-                validationInfo.ReferencedFields.Add(field);
+                if (!field.StartsWith("@"))
+                    validationInfo.ReferencedFields.Add(field);
             }
 
             AddOperation(validationInfo, "missing", field);
