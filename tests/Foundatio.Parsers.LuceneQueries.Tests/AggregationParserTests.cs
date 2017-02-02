@@ -180,8 +180,6 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);
-            Assert.True(actualResponse.IsValid);
-            Assert.True(expectedResponse.IsValid);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
