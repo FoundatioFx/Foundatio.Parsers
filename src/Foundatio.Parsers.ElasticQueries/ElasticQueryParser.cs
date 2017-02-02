@@ -26,13 +26,8 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
-            var elasticContext = context as ElasticQueryVisitorContext;
-            if (elasticContext == null)
-                throw new ArgumentException($"Context must be of type {nameof(ElasticQueryVisitorContext)}", nameof(context));
-
             var result = await base.ParseAsync(query, queryType, context).ConfigureAwait(false);
-
-            SetupQueryVisitorContextDefaults(elasticContext);
+            SetupQueryVisitorContextDefaults(context);
             switch (queryType) {
                 case QueryType.Aggregation:
                     context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
@@ -43,7 +38,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                     if (_config.DefaultIncludeResolver != null && context.GetIncludeResolver() == null)
                         context.SetIncludeResolver(_config.DefaultIncludeResolver);
 
-                    result = await _config.QueryVisitor.AcceptAsync(result, elasticContext).ConfigureAwait(false);
+                    result = await _config.QueryVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
                 case QueryType.Sort:
                     context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
@@ -54,7 +49,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             return result;
         }
 
-        private void SetupQueryVisitorContextDefaults(IElasticQueryVisitorContext context) {
+        private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context) {
             if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
                 context.SetRootAliasResolver(_config.DefaultAliasResolver);
 
