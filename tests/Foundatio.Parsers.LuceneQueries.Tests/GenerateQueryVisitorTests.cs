@@ -106,6 +106,7 @@ namespace Foundatio.Parsers.Tests {
         [InlineData(@"field1:""\""value1\""""", @"field1:""\""value1\""""", true)]
         public async Task CanGenerateQueryAsync(string query, string expected, bool isValid) {
             var parser = new LuceneQueryParser();
+            Log.MinimumLevel = LogLevel.Information;
 
             IQueryNode result;
             try {
@@ -115,7 +116,8 @@ namespace Foundatio.Parsers.Tests {
                 return;
             }
 
-            _logger.Info(await DebugQueryVisitor.RunAsync(result));
+            var nodes = await DebugQueryVisitor.RunAsync(result);
+            _logger.Info(nodes);
             var generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(expected, generatedQuery);
         }

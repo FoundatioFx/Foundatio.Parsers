@@ -111,9 +111,9 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.Indent--;
         }
 
-        public override Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
-            node.AcceptAsync(this, context);
-            return Task.FromResult(_builder.ToString());
+        public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+            await node.AcceptAsync(this, context);
+            return _builder.ToString();
         }
 
         public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext context = null) {
