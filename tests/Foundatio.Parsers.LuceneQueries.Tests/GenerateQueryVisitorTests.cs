@@ -60,6 +60,7 @@ namespace Foundatio.Parsers.Tests {
         [InlineData("criter~", "criter~", true)]
         [InlineData("criter~1", "criter~1", true)]
         [InlineData("roam~0.8", "roam~0.8", true)]
+        [InlineData(@"date^""America/Chicago_Other""", @"date^America/Chicago_Other", true)]
         [InlineData("criter^2", "criter^2", true)]
         [InlineData("\"blah criter\"~1", "\"blah criter\"~1", true)]
         [InlineData("count:>1", "count:>1", true)]

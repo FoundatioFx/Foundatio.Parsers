@@ -191,7 +191,7 @@ quoted_term
     }
 
 boost_modifier<string>
-  = '^' boost:unquoted_term
+  = '^' boost:(quoted_term / unquoted_term)
     {
         boost
     }
