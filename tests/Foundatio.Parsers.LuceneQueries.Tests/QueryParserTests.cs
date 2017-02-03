@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
@@ -26,9 +25,9 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
-        public async Task CanParseQueryAsync() {
+        public void CanParseQuery() {
             var parser = new LuceneQueryParser();
-            var result = (GroupNode)await parser.ParseAsync("criteria");
+            var result = parser.Parse("criteria");
             Assert.NotNull(result);
             Assert.NotNull(result.Left);
             Assert.IsType<TermNode>(result.Left);
@@ -250,7 +249,7 @@ namespace Foundatio.Parsers.Tests {
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
             var result =
                 processor.BuildAggregationsAsync(
-                    "min:field2 max:field2 date:(field5~1d^-3h min:field2 max:field2 min:field1)").Result;
+                    "min:field2 max:field2 date:(field5~1d^\"America/Chicago\" min:field2 max:field2 min:field1)").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -263,8 +262,8 @@ namespace Foundatio.Parsers.Tests {
                             .Interval("1d")
                             .Format("date_optional_time")
                             .MinimumDocumentCount(0)
-                            .TimeZone("-03:00")
-                            .Meta(m2 => m2.Add("@offset", "-3h"))
+                            .TimeZone("America/Chicago")
+                            .Meta(m2 => m2.Add("@timezone", "America/Chicago"))
                             .Aggregations(l => l
                                 .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
                                 .Min("min_field1", m => m.Field("field1.keyword").Meta(m2 => m2.Add("@type", "keyword")))
