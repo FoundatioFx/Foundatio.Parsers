@@ -249,7 +249,7 @@ namespace Foundatio.Parsers.Tests {
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
             var result =
                 processor.BuildAggregationsAsync(
-                    "min:field2 max:field2 date:(field5~1d^\"America/Chicago\" min:field2 max:field2 min:field1)").Result;
+                    "min:field2 max:field2 date:(field5~1d^\"America/Chicago\" min:field2 max:field2 min:field1 @offset:-6h)").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -263,10 +263,11 @@ namespace Foundatio.Parsers.Tests {
                             .Format("date_optional_time")
                             .MinimumDocumentCount(0)
                             .TimeZone("America/Chicago")
+                            .Offset("-6h")
                             .Meta(m2 => m2.Add("@timezone", "America/Chicago"))
                             .Aggregations(l => l
-                                .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
                                 .Min("min_field1", m => m.Field("field1.keyword").Meta(m2 => m2.Add("@type", "keyword")))
+                                .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
                                 .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
                             ))
                 .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))

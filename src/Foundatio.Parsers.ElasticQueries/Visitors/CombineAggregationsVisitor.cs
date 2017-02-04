@@ -59,6 +59,10 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
                             dateHistogramAggregation.Missing = missingValue;
                         }
+                        if (termNode.Field == "@offset")
+                        {                            
+                            dateHistogramAggregation.Offset = termNode.IsNodeNegated() ? "-" + termNode.Term : termNode.Term;
+                        }
                     }
 
                     continue;
