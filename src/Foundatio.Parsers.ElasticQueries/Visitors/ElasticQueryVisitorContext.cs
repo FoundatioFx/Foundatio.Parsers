@@ -108,5 +108,13 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             var mapping = context.GetPropertyMapping(field) as IBooleanProperty;
             return mapping != null;
         }
+
+        public static bool IsDatePropertyType(this IElasticQueryVisitorContext context, string field) {
+            if (String.IsNullOrEmpty(field))
+                return false;
+
+            var mapping = context.GetPropertyMapping(field) as IDateProperty;
+            return mapping != null;
+        }
     }
 }

@@ -889,6 +889,47 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void DateRangeQueryProcessor() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
+            client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
+            client.Refresh("stuff");
+
+            var ctx = new ElasticQueryVisitorContext { UseScoring = true };
+            ctx.Data["TimeZone"] = "America/Chicago";
+
+            var processor = new ElasticQueryParser(c => c
+                .UseMappings<MyType>(client, "stuff"));
+
+            var result =
+                processor.BuildQueryAsync("field5:[2017-01-01 TO 2017-01-31} OR field1:value1", ctx).Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse =
+                client.Search<MyType>(
+                    d =>
+                        d.Index("stuff")
+                            .Query(
+                                f =>
+                                    f.DateRange(m => m.Field(f2 => f2.Field5).GreaterThanOrEquals("2017-01-01").LessThan("2017-01-31").TimeZone("America/Chicago")) ||
+                                    f.Match(e => e.Field(m => m.Field1).Query("value1"))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void SimpleGeoRangeQuery() {
             var client = GetClient();
             client.DeleteIndex("stuff");
