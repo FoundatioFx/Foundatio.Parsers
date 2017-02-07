@@ -179,7 +179,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return new DateHistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
-                Interval = new Union<DateInterval, Time>(proximity ?? GetInterval(start, end)),
+                Interval = GetInterval(proximity, start, end),
                 Format = "date_optional_time",
                 TimeZone = timezoneOffset.HasValue ? (timezoneOffset.Value < TimeSpan.Zero ? "-" : "+") + timezoneOffset.Value.ToString("hh\\:mm") : timezone,
                 Meta = !string.IsNullOrWhiteSpace(boost) ? new Dictionary<string, object> {
@@ -189,12 +189,30 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             };
         }
 
-        private static double? GetDouble(IQueryVisitorContext context, string key) {
-            object value;
-            if (context.Data.TryGetValue(key, out value) && value is double)
-                return (double)value;
+        private static Union<DateInterval, Time> GetInterval(string proximity, DateTime? start, DateTime? end) {
+            if (String.IsNullOrEmpty(proximity))
+                return new Union<DateInterval, Time>(GetInterval(start, end));
 
-            return null;
+            switch (proximity.ToLower().Trim()) {
+                case "second":
+                    return DateInterval.Second;
+                case "minute":
+                    return DateInterval.Minute;
+                case "hour":
+                    return DateInterval.Hour;
+                case "day":
+                    return DateInterval.Day;
+                case "week":
+                    return DateInterval.Week;
+                case "month":
+                    return DateInterval.Month;
+                case "quarter":
+                    return DateInterval.Quarter;
+                case "year":
+                    return DateInterval.Year;
+                default:
+                    return new Union<DateInterval, Time>(proximity);
+            }
         }
 
         private static DateTime? GetDate(IQueryVisitorContext context, string key) {
@@ -205,8 +223,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
             return null;
         }
 
-        private static string GetString(IQueryVisitorContext context, string key)
-        {
+        private static string GetString(IQueryVisitorContext context, string key) {
             object value;
             if (context.Data.TryGetValue(key, out value) && value is string)
                 return (string)value;
