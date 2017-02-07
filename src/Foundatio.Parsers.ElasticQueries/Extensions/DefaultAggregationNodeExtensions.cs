@@ -7,8 +7,7 @@ using Nest;
 using System;
 using System.Collections.Generic;
 
-namespace Foundatio.Parsers.ElasticQueries.Extensions
-{
+namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultAggregationNodeExtensions {
 
         public static AggregationBase GetDefaultAggregation(this IQueryNode node, IQueryVisitorContext context) {
@@ -70,7 +69,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
             var mapping = elasticContext.GetPropertyMapping(field);
-            var timezone = !string.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: GetString(context, "TimeZone");
+            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: GetString(context, "TimeZone");
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:
@@ -130,7 +129,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
 
         private static AggregationBase GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
             List<double> percents = null;
-            if (!string.IsNullOrWhiteSpace(proximity)) {
+            if (!String.IsNullOrWhiteSpace(proximity)) {
                 var percentStrings = proximity.Split(',');
                 percents = new List<double>();
                 foreach  (var ps in percentStrings) {
@@ -161,32 +160,29 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions
         private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
             var start = GetDate(context, "StartDate");
             var end = GetDate(context, "EndDate");
-            var timezone = GetString(context, "TimeZone");
-
             var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<DateTime> { Minimum = start.Value, Maximum = end.Value } : null;
 
             // TODO: Look into memoizing this lookup
             // TODO: Should we validate the interval range.
-
-            TimeSpan? timezoneOffset = null;
-            if (boost != null)
-            {
-                //assume if it doesn't parse as time, that it's Olson time
-                if (!Exceptionless.DateTimeExtensions.TimeUnit.TryParse(boost, out timezoneOffset))
-                    timezone = boost;
-            }
-
             return new DateHistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
-                Interval = GetInterval(proximity, start, end),
                 Format = "date_optional_time",
-                TimeZone = timezoneOffset.HasValue ? (timezoneOffset.Value < TimeSpan.Zero ? "-" : "+") + timezoneOffset.Value.ToString("hh\\:mm") : timezone,
-                Meta = !string.IsNullOrWhiteSpace(boost) ? new Dictionary<string, object> {
-                    { "@timezone", boost }
-                } : null,
+                Interval = GetInterval(proximity, start, end),
+                TimeZone = GetTimeZone(boost, context),
+                Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
                 ExtendedBounds = bounds
             };
+        }
+
+        private static string GetTimeZone(string boost, IQueryVisitorContext context) {
+            TimeSpan? timezoneOffset = null;
+            if (boost != null && !Exceptionless.DateTimeExtensions.TimeUnit.TryParse(boost, out timezoneOffset)) {
+                // assume if it doesn't parse as time, that it's Olson time
+                return boost;
+            }
+
+            return timezoneOffset.HasValue ? (timezoneOffset.Value < TimeSpan.Zero ? "-" : "+") + timezoneOffset.Value.ToString("hh\\:mm") : GetString(context, "TimeZone");
         }
 
         private static Union<DateInterval, Time> GetInterval(string proximity, DateTime? start, DateTime? end) {
