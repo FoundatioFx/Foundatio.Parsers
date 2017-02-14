@@ -1,12 +1,15 @@
-﻿using System;
+﻿using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using System;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
+
     public static class DefaultQueryNodeExtensions {
+
         public static QueryBase GetDefaultQuery(this IQueryNode node, IQueryVisitorContext context) {
             var termNode = node as TermNode;
             if (termNode != null)
@@ -19,7 +22,6 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             var existsNode = node as ExistsNode;
             if (existsNode != null)
                 return existsNode.GetDefaultQuery(context);
-
 
             var missingNode = node as MissingNode;
             if (missingNode != null)
@@ -69,23 +71,46 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static QueryBase GetDefaultQuery(this TermRangeNode node, IQueryVisitorContext context) {
-            var range = new TermRangeQuery { Field = node.GetFullName() };
-            if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
-                if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
-                    range.GreaterThan = node.UnescapedMin;
-                else
-                    range.GreaterThanOrEqualTo = node.UnescapedMin;
+            var elasticContext = context as IElasticQueryVisitorContext;
+            if (elasticContext == null)
+                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+            if (elasticContext.IsDatePropertyType(node.GetFullName())) {
+                var timezone = GetString(context, "TimeZone");
+                var range = new DateRangeQuery { Field = node.GetFullName(), TimeZone = timezone };
+                if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
+                    if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
+                        range.GreaterThan = node.UnescapedMin;
+                    else
+                        range.GreaterThanOrEqualTo = node.UnescapedMin;
+                }
+
+                if (!String.IsNullOrWhiteSpace(node.UnescapedMax)) {
+                    if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
+                        range.LessThan = node.UnescapedMax;
+                    else
+                        range.LessThanOrEqualTo = node.UnescapedMax;
+                }
+
+                return range;
+            } else {
+                var range = new TermRangeQuery { Field = node.GetFullName() };
+                if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
+                    if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
+                        range.GreaterThan = node.UnescapedMin;
+                    else
+                        range.GreaterThanOrEqualTo = node.UnescapedMin;
+                }
+
+                if (!String.IsNullOrWhiteSpace(node.UnescapedMax)) {
+                    if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
+                        range.LessThan = node.UnescapedMax;
+                    else
+                        range.LessThanOrEqualTo = node.UnescapedMax;
+                }
+
+                return range;
             }
-
-            if (!String.IsNullOrWhiteSpace(node.UnescapedMax)) {
-                if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
-                    range.LessThan = node.UnescapedMax;
-                else
-                    range.LessThanOrEqualTo = node.UnescapedMax;
-            }
-
-
-            return range;
         }
 
         public static QueryBase GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context) {
@@ -100,6 +125,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     }
                 }
             };
+        }
+
+        private static string GetString(IQueryVisitorContext context, string key) {
+            object value;
+            if (context.Data.TryGetValue(key, out value) && value is string)
+                return (string)value;
+
+            return null;
         }
     }
 }

@@ -9,6 +9,7 @@ using System.Collections.Generic;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultAggregationNodeExtensions {
+
         public static AggregationBase GetDefaultAggregation(this IQueryNode node, IQueryVisitorContext context) {
             var groupNode = node as GroupNode;
             if (groupNode != null)
@@ -35,8 +36,10 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
                     return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+
                 case AggregationType.Histogram:
                     return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
@@ -51,6 +54,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             Script = new InlineScript($"doc['{node.Field}'].lon")
                         }
                     };
+
                 case AggregationType.Terms:
                     return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
             }
@@ -65,30 +69,42 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
             var mapping = elasticContext.GetPropertyMapping(field);
+            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: GetString(context, "TimeZone");
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
+                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@timezone", timezone } } };
+
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@offset", node.UnescapedBoost } } };
+                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() }, { "@timezone", timezone } } };
+
                 case AggregationType.Avg:
                     return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+
                 case AggregationType.Sum:
                     return new SumAggregation("sum_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+
                 case AggregationType.Stats:
                     return new StatsAggregation("stats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+
                 case AggregationType.ExtendedStats:
                     return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
+
                 case AggregationType.Cardinality:
                     return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
+
                 case AggregationType.Missing:
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
+
                 case AggregationType.DateHistogram:
                     return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+
                 case AggregationType.Histogram:
                     return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+
                 case AggregationType.Percentiles:
-                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);                    
+                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
@@ -103,6 +119,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             Script = new InlineScript($"doc['{node.Field}'].lon")
                         }
                     };
+
                 case AggregationType.Terms:
                     return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@type", mapping?.Type?.ToString() } } };
             }
@@ -112,7 +129,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
         private static AggregationBase GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
             List<double> percents = null;
-            if (!string.IsNullOrWhiteSpace(proximity)) {
+            if (!String.IsNullOrWhiteSpace(proximity)) {
                 var percentStrings = proximity.Split(',');
                 percents = new List<double>();
                 foreach  (var ps in percentStrings) {
@@ -128,24 +145,15 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
-            var start = GetDouble(context, "Start");
-            var end = GetDouble(context, "End");
-
             int prox;
             int interval = 50;
             if (int.TryParse(proximity, out prox))
                 interval = prox;
 
-            var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<double> { Minimum = start.Value, Maximum = end.Value } : null;
-
             return new HistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
                 Interval = interval,
-                Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> {
-                    { "@offset", boost }
-                } : null,
-                ExtendedBounds = bounds
             };
         }
 
@@ -156,32 +164,65 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             // TODO: Look into memoizing this lookup
             // TODO: Should we validate the interval range.
-            TimeSpan? timezone = boost != null ? Exceptionless.DateTimeExtensions.TimeUnit.Parse(boost) : (TimeSpan?)null;
             return new DateHistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
-                Interval = new Union<DateInterval, Time>(proximity ?? GetInterval(start, end)),
                 Format = "date_optional_time",
-                TimeZone = timezone.HasValue ? (timezone.Value < TimeSpan.Zero ? "-" : "+") + timezone.Value.ToString("hh\\:mm") : null,
-                Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> {
-                    { "@offset", boost }
-                } : null,
+                Interval = GetInterval(proximity, start, end),
+                TimeZone = GetTimeZone(boost, context),
+                Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
                 ExtendedBounds = bounds
             };
         }
 
-        private static double? GetDouble(IQueryVisitorContext context, string key) {
-            object value;
-            if (context.Data.TryGetValue(key, out value) && value is double)
-                return (double)value;
+        private static string GetTimeZone(string boost, IQueryVisitorContext context) {
+            TimeSpan? timezoneOffset = null;
+            if (boost != null && !Exceptionless.DateTimeExtensions.TimeUnit.TryParse(boost, out timezoneOffset)) {
+                // assume if it doesn't parse as time, that it's Olson time
+                return boost;
+            }
 
-            return null;
+            return timezoneOffset.HasValue ? (timezoneOffset.Value < TimeSpan.Zero ? "-" : "+") + timezoneOffset.Value.ToString("hh\\:mm") : GetString(context, "TimeZone");
+        }
+
+        private static Union<DateInterval, Time> GetInterval(string proximity, DateTime? start, DateTime? end) {
+            if (String.IsNullOrEmpty(proximity))
+                return new Union<DateInterval, Time>(GetInterval(start, end));
+
+            switch (proximity.ToLower().Trim()) {
+                case "second":
+                    return DateInterval.Second;
+                case "minute":
+                    return DateInterval.Minute;
+                case "hour":
+                    return DateInterval.Hour;
+                case "day":
+                    return DateInterval.Day;
+                case "week":
+                    return DateInterval.Week;
+                case "month":
+                    return DateInterval.Month;
+                case "quarter":
+                    return DateInterval.Quarter;
+                case "year":
+                    return DateInterval.Year;
+                default:
+                    return new Union<DateInterval, Time>(proximity);
+            }
         }
 
         private static DateTime? GetDate(IQueryVisitorContext context, string key) {
             object value;
             if (context.Data.TryGetValue(key, out value) && value is DateTime)
                 return (DateTime)value;
+
+            return null;
+        }
+
+        private static string GetString(IQueryVisitorContext context, string key) {
+            object value;
+            if (context.Data.TryGetValue(key, out value) && value is string)
+                return (string)value;
 
             return null;
         }

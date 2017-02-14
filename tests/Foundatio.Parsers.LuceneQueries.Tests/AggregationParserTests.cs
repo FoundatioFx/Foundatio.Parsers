@@ -237,15 +237,15 @@ namespace Foundatio.Parsers.Tests {
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .DateHistogram("date_field5", d1 => d1
-                    .Field("field5").Meta(m => m.Add("@offset", "1h"))
+                    .Field("field5").Meta(m => m.Add("@timezone", "1h"))
                     .Interval("1d")
                     .Format("date_optional_time")
                     .MinimumDocumentCount(0)
                     .TimeZone("+01:00")
                     .Missing(DateTime.MinValue)
                     .Aggregations(a1 => a1
-                        .Min("min_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@type", "date").Add("@offset", "1h")))
-                        .Max("max_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@type", "date").Add("@offset", "1h")))))));
+                        .Min("min_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@type", "date").Add("@timezone", "1h")))
+                        .Max("max_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@type", "date").Add("@timezone", "1h")))))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 

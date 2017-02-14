@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
@@ -26,9 +25,9 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
-        public async Task CanParseQueryAsync() {
+        public void CanParseQuery() {
             var parser = new LuceneQueryParser();
-            var result = (GroupNode)await parser.ParseAsync("criteria");
+            var result = parser.Parse("criteria");
             Assert.NotNull(result);
             Assert.NotNull(result.Left);
             Assert.IsType<TermNode>(result.Left);
@@ -250,7 +249,7 @@ namespace Foundatio.Parsers.Tests {
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
             var result =
                 processor.BuildAggregationsAsync(
-                    "min:field2 max:field2 date:(field5~1d^-3h min:field2 max:field2 min:field1)").Result;
+                    "min:field2 max:field2 date:(field5~1d^\"America/Chicago\" min:field2 max:field2 min:field1 @offset:-6h)").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(result));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -263,11 +262,12 @@ namespace Foundatio.Parsers.Tests {
                             .Interval("1d")
                             .Format("date_optional_time")
                             .MinimumDocumentCount(0)
-                            .TimeZone("-03:00")
-                            .Meta(m2 => m2.Add("@offset", "-3h"))
+                            .TimeZone("America/Chicago")
+                            .Offset("-6h")
+                            .Meta(m2 => m2.Add("@timezone", "America/Chicago"))
                             .Aggregations(l => l
-                                .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
                                 .Min("min_field1", m => m.Field("field1.keyword").Meta(m2 => m2.Add("@type", "keyword")))
+                                .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
                                 .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
                             ))
                 .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@type", "keyword")))
@@ -881,6 +881,47 @@ namespace Foundatio.Parsers.Tests {
                                 f =>
                                     f.TermRange(m => m.Field(f2 => f2.Field4).GreaterThanOrEquals("1").LessThan("2")) ||
                                     f.Term(m => m.Field1, "value1")));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void DateRangeQueryProcessor() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
+            client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
+            client.Refresh("stuff");
+
+            var ctx = new ElasticQueryVisitorContext { UseScoring = true };
+            ctx.Data["TimeZone"] = "America/Chicago";
+
+            var processor = new ElasticQueryParser(c => c
+                .UseMappings<MyType>(client, "stuff"));
+
+            var result =
+                processor.BuildQueryAsync("field5:[2017-01-01 TO 2017-01-31} OR field1:value1", ctx).Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse =
+                client.Search<MyType>(
+                    d =>
+                        d.Index("stuff")
+                            .Query(
+                                f =>
+                                    f.DateRange(m => m.Field(f2 => f2.Field5).GreaterThanOrEquals("2017-01-01").LessThan("2017-01-31").TimeZone("America/Chicago")) ||
+                                    f.Match(e => e.Field(m => m.Field1).Query("value1"))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
