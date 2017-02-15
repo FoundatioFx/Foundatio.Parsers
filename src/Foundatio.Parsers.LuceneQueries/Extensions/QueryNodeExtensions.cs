@@ -88,7 +88,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
                         || (!String.IsNullOrEmpty(fieldQueryNode.Prefix) && fieldQueryNode.Prefix == "-")))
                     return true;
 
-                current = node.Parent;
+                current = current.Parent;
             } while (current.Parent != null);
 
             return false;

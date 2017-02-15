@@ -985,7 +985,7 @@ namespace Foundatio.Parsers.Tests {
             var processor = new ElasticQueryParser(c => c
                 .UseMappings<MyType>(client, "stuff")
                 .UseAliases(aliasMap));
-            var sort = processor.BuildSortAsync("geo -field1 -(field2 field3 +field4)").Result;
+            var sort = processor.BuildSortAsync("geo -field1 -(field2 field3 +field4) (field5 field3)").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Sort(sort));
             string actualRequest = actualResponse.GetRequest();
             _logger.Info($"Actual: {actualRequest}");
@@ -997,12 +997,15 @@ namespace Foundatio.Parsers.Tests {
                             .Descending(new Field("field2"))
                             .Descending(new Field("field3"))
                             .Ascending(new Field("field4"))
+                            .Ascending(new Field("field5"))
+                            .Ascending(new Field("field3"))
                 ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
+
 
 
         [Fact(Skip = "This currently isn't supported")]
