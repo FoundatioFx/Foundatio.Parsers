@@ -48,14 +48,16 @@ For ($i = 1; $i -le $NodeCount; $i++) {
 
     $attempts = 0
     Do {
+        If ($attempts -gt 0) {
+            Start-Sleep -s 2
+        }
+        
         Write-Host "Waiting for Elasticsearch $Version node $i to respond..."
         $res = $null
         
         Try {
             $res = Invoke-WebRequest http://localhost:$nodePort -UseBasicParsing
-        } Catch {
-            Start-Sleep -s 2
-        }
+        } Catch {}
         $attempts = $attempts + 1
     } Until ($res -ne $null -And $res.StatusCode -eq 200 -And $attempts -lt 25)
 }
@@ -82,14 +84,16 @@ If ($StartKibana -eq $true) {
     Start-Process "$(Get-Location)\kibana-$Version\bin\kibana.bat"
     $attempts = 0
     Do {
+        If ($attempts -gt 0) {
+            Start-Sleep -s 2
+        }
+        
         Write-Host "Waiting for Kibana $Version to respond..."
         $res = $null
         
         Try {
             $res = Invoke-WebRequest http://localhost:5601 -UseBasicParsing
-        } Catch {
-            Start-Sleep -s 2
-        }
+        } Catch {}
         $attempts = $attempts + 1
     } Until ($res -ne $null -And $res.StatusCode -eq 200 -And $attempts -lt 25)
 
