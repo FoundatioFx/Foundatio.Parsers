@@ -1,5 +1,5 @@
 ﻿Param(
-  [string]$Version = "1.7.5",
+  [string]$Version = "1.7.6",
   [int]$NodeCount = 1,
   [int]$StartPort = 9200,
   [bool]$InstallPlugins = $true,
@@ -53,18 +53,19 @@ For ($i = 1; $i -le $NodeCount; $i++) {
 
 	Start-Process "$(Get-Location)\elasticsearch-$Version-node$i\bin\elasticsearch.bat"
 
-    $retries = 0
+    $attempts = 0
     Do {
+        If ($attempts -gt 0) {
+            Start-Sleep -s 2
+        }
         Write-Host "Waiting for Elasticsearch $Version node $i to respond..."
         $res = $null
         
         Try {
             $res = Invoke-WebRequest http://localhost:$nodePort -UseBasicParsing
-        } Catch {
-            $retries = $retries + 1
-            Start-Sleep -s 1
-        }
-    } Until ($res -ne $null -And $res.StatusCode -eq 200 -And $retries -lt 10)
+        } Catch {}
+		$attempts = $attempts + 1
+    } Until ($res -ne $null -And $res.StatusCode -eq 200 -And $retries -lt 25)
 }
 
 If ($OpenSense) {
