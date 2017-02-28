@@ -5,6 +5,8 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
@@ -27,6 +29,25 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (missingNode != null)
                 return missingNode.GetDefaultQuery(context);
 
+            var groupNode = node as GroupNode;
+            if (groupNode != null)
+                return groupNode.GetDefaultQuery(context);
+            return null;
+        }
+
+        public static QueryBase GetDefaultQuery(this GroupNode node, IQueryVisitorContext context) {
+            var elasticContext = context as IElasticQueryVisitorContext;
+            if (elasticContext == null)
+                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+            if ((node.Parent == null || node.HasParens) && node is IFieldQueryNode) {
+                if (node.Data.ContainsKey("match_terms")) {
+                    return new MatchQuery() {
+                        Field = node.GetFullName() ?? (node.Children.First() as IFieldQueryNode).GetFullName() ?? elasticContext.DefaultField,
+                        Query = string.Join(" ", ((List<TermNode>)node.Data["match_terms"]).Select(t => t.UnescapedTerm))
+                    };
+                }
+            }
             return null;
         }
 

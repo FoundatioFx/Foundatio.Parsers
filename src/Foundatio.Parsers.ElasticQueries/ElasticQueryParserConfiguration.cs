@@ -26,6 +26,11 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
 
+        public ElasticQueryParserConfiguration SetDefaultField(string field) {
+            DefaultField = field;
+            return this;
+        }
+
         public ElasticQueryParserConfiguration UseAliases(int priority = 50) {
             return UseAliases((AliasResolver)null, priority);
         }

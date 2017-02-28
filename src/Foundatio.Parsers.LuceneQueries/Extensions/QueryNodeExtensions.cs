@@ -94,6 +94,19 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return false;
         }
 
+        public static IQueryNode GetScopedNode(this IFieldQueryNode node) {
+            IQueryNode current = node;
+            do {
+                var groupNode = current as GroupNode;
+                
+                if (groupNode != null && groupNode.HasParens) return groupNode;
+
+                current = current.Parent;
+            } while (current.Parent != null);
+
+            return current;
+        }
+
         private const string AliasResolverKey = "@AliasResolver";
         public static AliasResolver GetAliasResolver(this IQueryNode node, IQueryVisitorContext context) {
             object value = null;
