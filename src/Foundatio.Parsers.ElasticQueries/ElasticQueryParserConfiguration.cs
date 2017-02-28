@@ -18,7 +18,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
         }
 
-        public string DefaultField { get; private set; } = "_all";
+        public string[] DefaultFields { get; private set; } = new[] { "_all" };
         public AliasResolver DefaultAliasResolver { get; private set; }
         public Func<string, Task<string>> DefaultIncludeResolver { get; private set; }
         public Func<QueryValidationInfo, Task<bool>> DefaultValidator { get; private set; }
@@ -26,8 +26,8 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
 
-        public ElasticQueryParserConfiguration SetDefaultField(string field) {
-            DefaultField = field;
+        public ElasticQueryParserConfiguration SetDefaultFields(string[] fields) {
+            DefaultFields = fields;
             return this;
         }
 

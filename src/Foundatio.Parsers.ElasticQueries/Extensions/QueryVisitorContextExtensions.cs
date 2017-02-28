@@ -35,12 +35,12 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return context;
         }
 
-        public static T SetDefaultField<T>(this T context, string defaultField) where T : IQueryVisitorContext {
+        public static T SetDefaultFields<T>(this T context, string[] defaultFields) where T : IQueryVisitorContext {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            elasticContext.DefaultField = defaultField;
+            elasticContext.DefaultFields = defaultFields;
 
             return context;
         }

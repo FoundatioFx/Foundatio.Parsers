@@ -34,7 +34,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                     result = await _config.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
                 case QueryType.Query:
-                    context.SetGetPropertyMappingFunc(_config.GetMappingProperty).SetDefaultField(_config.DefaultField);
+                    context.SetGetPropertyMappingFunc(_config.GetMappingProperty).SetDefaultFields(_config.DefaultFields);
                     if (_config.DefaultIncludeResolver != null && context.GetIncludeResolver() == null)
                         context.SetIncludeResolver(_config.DefaultIncludeResolver);
 

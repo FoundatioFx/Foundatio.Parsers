@@ -147,7 +147,7 @@ namespace Foundatio.Parsers.Tests {
                 i => i.Index("stuff"));
             client.Refresh("stuff");
 
-            var processor = new ElasticQueryParser(c => c.SetDefaultField("field1").UseMappings<MyType>(client, "stuff"));
+            var processor = new ElasticQueryParser(c => c.SetDefaultFields(new[] { "field1" }).UseMappings<MyType>(client, "stuff"));
 
             var result = processor.BuildQueryAsync("field1:(value1 abc def ghi) field2:(value2 jhk)",
                     new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
@@ -172,6 +172,23 @@ namespace Foundatio.Parsers.Tests {
 
             expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f =>
                 f.Match(m => m.Field(mf => mf.Field1).Query("value1 abc def ghi"))));
+
+            expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+
+            //multi-match on multiple default fields
+            processor = new ElasticQueryParser(c => c.SetDefaultFields(new[] { "field1", "field2" }).UseMappings<MyType>(client, "stuff"));
+            result = processor.BuildQueryAsync("value1 abc def ghi",
+                    new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
+            actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
+            actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f =>
+                f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("value1 abc def ghi").Type(TextQueryType.BestFields))));
 
             expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");

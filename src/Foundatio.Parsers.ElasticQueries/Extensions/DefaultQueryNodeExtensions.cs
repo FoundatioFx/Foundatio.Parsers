@@ -1,5 +1,4 @@
-﻿using Exceptionless.DateTimeExtensions;
-using Foundatio.Parsers.ElasticQueries.Visitors;
+﻿using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -42,10 +41,20 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             if ((node.Parent == null || node.HasParens) && node is IFieldQueryNode) {
                 if (node.Data.ContainsKey("match_terms")) {
-                    return new MatchQuery() {
-                        Field = node.GetFullName() ?? (node.Children.First() as IFieldQueryNode).GetFullName() ?? elasticContext.DefaultField,
-                        Query = string.Join(" ", ((List<TermNode>)node.Data["match_terms"]).Select(t => t.UnescapedTerm))
-                    };
+                    var fields = !string.IsNullOrEmpty(node.GetFullName()) ? new[] { node.GetFullName() } : elasticContext.DefaultFields;
+                    var values = string.Join(" ", ((List<TermNode>)node.Data["match_terms"]).Select(t => t.UnescapedTerm));
+                    if (fields.Length == 1) {
+                        return new MatchQuery {
+                            Field = fields[0],
+                            Query = values
+                        };
+                    } else {
+                        return new MultiMatchQuery() {
+                            Fields = fields,
+                            Query = values,
+                            Type = TextQueryType.BestFields
+                        };
+                    }
                 }
             }
             return null;
@@ -58,28 +67,36 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             QueryBase query = null;
             if (elasticContext.IsPropertyAnalyzed(node.GetFullName())) {
+                var fields = !string.IsNullOrEmpty(node.GetFullName()) ? new[] { node.GetFullName() } : elasticContext.DefaultFields;
+
                 if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
                     query = new QueryStringQuery {
-                        DefaultField = node.GetFullName() ?? elasticContext.DefaultField,
+                        Fields = fields,
                         AllowLeadingWildcard = false,
                         AnalyzeWildcard = true,
                         Query = node.UnescapedTerm
                     };
                 } else {
-                    QueryBase q;
-                    if (node.IsQuotedTerm) {
-                        q = new MatchPhraseQuery {
-                            Field = node.GetFullName() ?? elasticContext.DefaultField,
-                            Query = node.UnescapedTerm
-                        };
+                    if (fields.Length == 1) {
+                        if (node.IsQuotedTerm) {
+                            query = new MatchPhraseQuery {
+                                Field = fields[0],
+                                Query = node.UnescapedTerm
+                            };
+                        } else {
+                            query = new MatchQuery {
+                                Field = fields[0],
+                                Query = node.UnescapedTerm
+                            };
+                        }
                     } else {
-                        q = new MatchQuery {
-                            Field = node.GetFullName() ?? elasticContext.DefaultField,
+                        query = new MultiMatchQuery() {
+                            Fields = fields,
                             Query = node.UnescapedTerm
                         };
+                        if (node.IsQuotedTerm)
+                            (query as MultiMatchQuery).Type = TextQueryType.Phrase;
                     }
-
-                    query = q;
                 }
             } else {
                 query = new TermQuery {
