@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Foundatio.Logging;
+﻿using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
@@ -10,12 +7,18 @@ using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.Tests {
+
     public class QueryParserTests : TestWithLoggingBase {
-        public QueryParserTests(ITestOutputHelper output) : base(output) { }
+
+        public QueryParserTests(ITestOutputHelper output) : base(output) {
+        }
 
         private IElasticClient GetClient(ConnectionSettings settings = null) {
             if (settings == null)
@@ -130,6 +133,54 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void ShouldMergeTermsIntoMatchQueryForAnalyzedFields() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+            client.CreateIndex("stuff");
+            client.Map<MyType>(
+                d => d.Dynamic(true).Index("stuff").Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))
+                    .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
+                    .Keyword(e => e.Name(m => m.Field2))
+                ));
+            var response = client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" },
+                i => i.Index("stuff"));
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.SetDefaultField("field1").UseMappings<MyType>(client, "stuff"));
+
+            var result = processor.BuildQueryAsync("field1:(value1 abc def ghi) field2:(value2 jhk)",
+                    new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f =>
+                f.Match(m => m.Field(mf => mf.Field1).Query("value1 abc def ghi")) || f.Term(m => m.Field2, "value2") || f.Term(m => m.Field2, "jhk")));
+
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+
+            result = processor.BuildQueryAsync("value1 abc def ghi",
+                    new ElasticQueryVisitorContext {  DefaultOperator = Operator.Or, UseScoring = true }).Result;
+            actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
+            actualRequest = actualResponse.GetRequest();
+            _logger.Info($"Actual: {actualRequest}");
+
+            expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f =>
+                f.Match(m => m.Field(mf => mf.Field1).Query("value1 abc def ghi"))));
+
+            expectedRequest = expectedResponse.GetRequest();
+            _logger.Info($"Expected: {expectedRequest}");
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void EscapeFilterProcessor() {
             var client = GetClient();
             client.DeleteIndex("stuff");
@@ -159,7 +210,7 @@ namespace Foundatio.Parsers.Tests {
                                         b =>
                                             b.Filter(
                                                 f =>
-                                                    f.MatchPhrase(m => m.Field(w => w.Field1).Query("hey \"you there\""))))));
+                                                    f.MatchPhrase(m => m.Query("hey \"you there\"").Field(w => w.Field1))))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -1006,8 +1057,6 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-
-
         [Fact(Skip = "This currently isn't supported")]
         public void CanParseMixedCaseSort() {
             var client = GetClient();
@@ -1084,7 +1133,6 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Expected: {expectedRequest}");
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
-
         }
     }
 
@@ -1107,6 +1155,7 @@ namespace Foundatio.Parsers.Tests {
     }
 
     public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryVisitor {
+
         public override void Visit(TermNode node, IQueryVisitorContext context) {
             if (!String.Equals(node.Field, "fixed", StringComparison.OrdinalIgnoreCase))
                 return;
