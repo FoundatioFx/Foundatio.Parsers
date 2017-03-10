@@ -16,6 +16,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <WarningsAsErrors>true</WarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageOutputPath>$(SolutionDir)\artifacts\</PackageOutputPath>
 
     <PackageReleaseNotes>https://github.com/exceptionless/Foundatio.Parsers/releases</PackageReleaseNotes>
     <PackageIconUrl>https://be.exceptionless.io/img/exceptionless-32.png</PackageIconUrl>

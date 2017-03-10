@@ -18,7 +18,6 @@ namespace Foundatio.Parsers.Tests {
         [InlineData(":", null, false)]
         [InlineData("\":\"", "\":\"", true)]
         [InlineData("  \t", "", true)]
-        [InlineData(" - ", "", true)]
         [InlineData("string\"", "string\"", true)]
         [InlineData("\"quoted string\"", "\"quoted string\"", true)]
         [InlineData("criteria", "criteria", true)]
