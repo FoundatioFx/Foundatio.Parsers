@@ -21,7 +21,7 @@ before_build:
   - ps: |
       [xml]$versionXml = Get-Content .\build\version.props
       $versionXml.Project.PropertyGroup.VersionPrefix = "$($env:APPVEYOR_BUILD_VERSION)"
-      $versionXml.Project.PropertyGroup.VersionSuffix = "$($env:VERSION_SUFFIX) $(GIT_HASH)"
+      $versionXml.Project.PropertyGroup.VersionSuffix = "$($env:VERSION_SUFFIX) $(env:GIT_HASH)"
       $versionXml.Save("$pwd\build\version.props")
   - appveyor-retry dotnet restore -v Minimal
 
