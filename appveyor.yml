@@ -26,7 +26,7 @@ before_build:
   - appveyor-retry dotnet restore -v Minimal
 
 build_script:
-  - ps: dotnet build -c Release
+  - ps: msbuild /p:Configuration=Release
   - ps: dotnet pack -c Release
 
 #on_failure:
