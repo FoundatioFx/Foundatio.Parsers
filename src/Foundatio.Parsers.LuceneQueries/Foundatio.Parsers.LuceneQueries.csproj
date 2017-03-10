@@ -1,105 +1,14 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\build\common.props" />
   <PropertyGroup>
-    <MinimumVisualStudioVersion>11.0</MinimumVisualStudioVersion>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{F759E45D-C914-4546-947D-B9F0854D22E9}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Foundatio.Parsers.LuceneQueries</RootNamespace>
-    <AssemblyName>Foundatio.Parsers.LuceneQueries</AssemblyName>
-    <DefaultLanguage>en-US</DefaultLanguage>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
-    <TargetFrameworkProfile />
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+    <TargetFramework>net46</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <!-- A reference to the entire .NET Framework is automatically included -->
+    <PackageReference Include="AsyncFixer" Version="1.1.5" PrivateAssets="All" />
+    <PackageReference Include="Pegasus" Version="4.0.0" />
+  </ItemGroup>
+  <ItemGroup>
     <PegGrammar Include="LuceneQueryParser.peg" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Extensions\QueryNodeExtensions.cs" />
-    <Compile Include="Extensions\QueryVisitorContextExtensions.cs" />
-    <Compile Include="Extensions\StringExtensions.cs" />
-    <Compile Include="Extensions\TextWriterExtensions.cs" />
-    <Compile Include="LuceneQueryParser.cs" />
-    <Compile Include="Nodes\MissingNode.cs" />
-    <Compile Include="Nodes\ExistsNode.cs" />
-    <Compile Include="Nodes\IQueryNode.cs" />
-    <Compile Include="Nodes\TermNode.cs" />
-    <Compile Include="Nodes\GroupNode.cs" />
-    <Compile Include="Nodes\QueryNodeBase.cs" />
-    <Compile Include="Nodes\TermRangeNode.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Visitors\ChainedQueryVisitor.cs" />
-    <Compile Include="Visitors\GetReferencedFieldsQueryVisitor.cs" />
-    <Compile Include="Visitors\AliasedQueryVisitor.cs" />
-    <Compile Include="Visitors\DebugQueryVisitor.cs" />
-    <Compile Include="Visitors\GenerateQueryVisitor.cs" />
-    <Compile Include="Visitors\IChainableQueryVisitor.cs" />
-    <Compile Include="Visitors\IQueryVisitorContextWithValidator.cs" />
-    <Compile Include="Visitors\QueryVisitorContextWithValidator.cs" />
-    <Compile Include="Visitors\ValidationVisitor.cs" />
-    <Compile Include="Visitors\IncludeVisitor.cs" />
-    <Compile Include="Visitors\IQueryNodeVisitor.cs" />
-    <Compile Include="Visitors\IQueryNodeVisitorWithResult.cs" />
-    <Compile Include="Visitors\IQueryVisitorContext.cs" />
-    <Compile Include="Visitors\IQueryVisitorContextWithAliasResolver.cs" />
-    <Compile Include="Visitors\IQueryVisitorContextWithIncludeResolver.cs" />
-    <Compile Include="Visitors\QueryNodeVisitorBase.cs" />
-    <Compile Include="Visitors\QueryNodeVisitorWithResultBase.cs" />
-    <Compile Include="Visitors\QueryVisitorContext.cs" />
-    <Compile Include="Visitors\QueryVisitorContextWithAliasResolver.cs" />
-    <Compile Include="Visitors\QueryVisitorContextWithIncludeResolver.cs" />
-    <Compile Include="Visitors\TermToFieldVisitor.cs" />
-    <Compile Include="Visitors\VisitorWithPriority.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Foundatio.Parsers.LuceneQueries.nuspec" />
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <Reference Include="Pegasus.Common, Version=4.0.0.0, Culture=neutral, PublicKeyToken=28c69b6c6d100f4a, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Pegasus.4.0.0\lib\net40\Pegasus.Common.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-  </ItemGroup>
-  <ItemGroup>
-    <Analyzer Include="..\..\packages\AsyncFixer.1.1.5\analyzers\dotnet\cs\AsyncFixer.dll" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\..\packages\Pegasus.4.0.0\build\Pegasus.targets" Condition="Exists('..\..\packages\Pegasus.4.0.0\build\Pegasus.targets')" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('..\..\packages\Pegasus.4.0.0\build\Pegasus.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Pegasus.4.0.0\build\Pegasus.targets'))" />
-  </Target>
 </Project>
