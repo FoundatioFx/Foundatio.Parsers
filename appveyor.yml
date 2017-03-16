@@ -14,6 +14,7 @@ init:
   - ps: $env:GIT_HASH=$env:APPVEYOR_REPO_COMMIT.Substring(0, 10)
   - ps: If ("$env:APPVEYOR_REPO_BRANCH" -ne "master") { $env:VERSION_SUFFIX="pre" }
   - ps: 'Write-Output "Version: $($env:APPVEYOR_BUILD_VERSION)-$($env:VERSION_SUFFIX)"'
+  - nuget sources add -name Exceptionless -source https://ci.appveyor.com/nuget/exceptionless
 
 install:
   - ps: .\build\Start-ElasticSearch.ps1 -StartKibana $false
@@ -34,7 +35,6 @@ artifacts:
     name: ReleaseArtifacts
 
 nuget:
-  account_feed: true
   project_feed: true
   disable_publish_on_pr: true
 
