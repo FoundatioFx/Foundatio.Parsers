@@ -19,6 +19,8 @@ namespace Foundatio.Parsers.ElasticQueries {
             _config = config;
         }
 
+        public ElasticQueryParserConfiguration Configuration => _config;
+
         public override async Task<IQueryNode> ParseAsync(string query, string queryType = QueryType.Query, IQueryVisitorContext context = null) {
             if (String.IsNullOrEmpty(query))
                 throw new ArgumentNullException(nameof(query));
