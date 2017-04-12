@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Exceptionless.DateTimeExtensions" Version="3.2.65" />
-    <PackageReference Include="NEST" Version="5.3.0" />
+    <PackageReference Include="NEST" Version="5.3.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj" />
