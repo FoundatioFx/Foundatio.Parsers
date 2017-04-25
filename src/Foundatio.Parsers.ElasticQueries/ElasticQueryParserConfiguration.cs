@@ -9,7 +9,8 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParserConfiguration {
-        private ITypeMapping _mapping;
+        private ITypeMapping _serverMapping;
+        private ITypeMapping _codeMapping;
 
         public ElasticQueryParserConfiguration() {
             AddQueryVisitor(new CombineQueriesVisitor(), 10000);
@@ -234,11 +235,14 @@ namespace Foundatio.Parsers.ElasticQueries {
         #endregion
 
         public IProperty GetMappingProperty(string field) {
-            if (String.IsNullOrEmpty(field) || _mapping == null)
+            if (_serverMapping == null)
+                GetServerMapping();
+
+            if (String.IsNullOrEmpty(field) || _serverMapping == null)
                 return null;
 
             string[] fieldParts = field.Split('.');
-            IProperties currentProperties = _mapping.Properties;
+            IProperties currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
 
             for (int depth = 0; depth < fieldParts.Length; depth++) {
                 string fieldPart = fieldParts[depth];
@@ -250,10 +254,10 @@ namespace Foundatio.Parsers.ElasticQueries {
                             .Select(m => m.Value)
                             .FirstOrDefault(m => m.Name == fieldPart);
 
-                    if (fieldMapping == null && UpdateMapping()) {
+                    if (fieldMapping == null && GetServerMapping()) {
                         // we have updated mapping, start over from the top
                         depth = -1;
-                        currentProperties = _mapping.Properties;
+                        currentProperties = MergeProperties(_codeMapping.Properties, _serverMapping.Properties);
                         continue;
                     }
 
@@ -280,26 +284,70 @@ namespace Foundatio.Parsers.ElasticQueries {
             return null;
         }
 
-        private Func<ITypeMapping> UpdateMappingFunc { get; set; }
+        private IProperties MergeProperties(IProperties codeProperties, IProperties serverProperties) {
+            if (codeProperties == null || serverProperties == null)
+                return codeProperties ?? serverProperties;
+
+            IProperties properties = new Properties();
+            foreach (var serverProperty in serverProperties) {
+                var merged = serverProperty.Value;
+                IProperty codeProperty = null;
+                if (codeProperties.TryGetValue(serverProperty.Key, out codeProperty))
+                    merged.LocalMetadata = codeProperty.LocalMetadata;
+
+                switch (merged) {
+                    case IObjectProperty objectProperty:
+                        var codeObjectProperty = codeProperty as IObjectProperty;
+                        objectProperty.Properties =
+                            MergeProperties(codeObjectProperty?.Properties, objectProperty.Properties);
+                        break;
+                    case ITextProperty textProperty:
+                        var codeTextProperty = codeProperty as ITextProperty;
+                        textProperty.Fields = MergeProperties(codeTextProperty?.Fields, textProperty.Fields);
+                        break;
+                }
+
+                properties.Add(serverProperty.Key, merged);
+            }
+
+            foreach (var codeProperty in codeProperties) {
+                if (properties.TryGetValue(codeProperty.Key, out _))
+                    continue;
+
+                properties.Add(codeProperty.Key, codeProperty.Value);
+            }
+
+            return properties;
+        }
+
+        private Func<ITypeMapping> GetServerMappingFunc { get; set; }
         private DateTime? _lastMappingUpdate = null;
-        private bool UpdateMapping() {
-            if (UpdateMappingFunc == null)
-                throw new InvalidOperationException("UseMappings must be called first.");
+        private bool GetServerMapping() {
+            if (GetServerMappingFunc == null)
+                return false;
 
             if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.Now.SubtractMinutes(1))
                 return false;
 
-            _mapping = UpdateMappingFunc();
-            _lastMappingUpdate = DateTime.Now;
+            try {
+                _serverMapping = GetServerMappingFunc();
+                _lastMappingUpdate = DateTime.Now;
 
-            return true;
+                return true;
+            } catch (Exception) {
+                return false;
+            }
+        }
+
+        public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class {
+            return UseMappings(mappingBuilder, () => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Mapping);
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Func<ITypeMapping> getMapping) where T : class {
             var descriptor = new TypeMappingDescriptor<T>();
             descriptor = mappingBuilder(descriptor);
-            _mapping = descriptor;
-            UpdateMappingFunc = getMapping;
+            _codeMapping = descriptor;
+            GetServerMappingFunc = getMapping;
 
             return this;
         }
@@ -317,8 +365,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping) {
-            _mapping = getMapping();
-            UpdateMappingFunc = getMapping;
+            GetServerMappingFunc = getMapping;
 
             return this;
         }

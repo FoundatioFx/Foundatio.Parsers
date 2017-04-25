@@ -868,7 +868,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var result = processor.BuildQueryAsync("field1:test", new ElasticQueryVisitorContext().UseScoring()).Result;
+            var result = processor.BuildQueryAsync("field1:test", new ElasticQueryVisitorContext().UseScoring()).GetAwaiter().GetResult();
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => result));
             string actualRequest = actualResponse.GetRequest();
