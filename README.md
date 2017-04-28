@@ -3,7 +3,7 @@
 [![NuGet Version](http://img.shields.io/nuget/v/Foundatio.Parsers.LuceneQueries.svg?style=flat)](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) 
 [![Slack Status](https://slack.exceptionless.com/badge.svg)](https://slack.exceptionless.com)
 
-A lucene style query parser that is extensible and allows additional syntax features.
+A lucene style query parser that is extensible and allows additional syntax features. Also includes an Elasticsearch query_string query replacement that greatly enhances its capabilities for dynamic queries.
 
 ## Getting Started (Development)
 
@@ -47,11 +47,30 @@ System.Diagnostics.Debug.Assert(query == generatedQuery);
 
 ## Features
 - Lucene Query Syntax Parser
+  - Visitors for extensibility
 - Field Aliases
 - Query Includes
+  - Define stored queries that can be included inside other queries as macros that will be expanded
+- Validation
+  - Validate query syntax
+  - Restrict access to specific fields
+  - Restrict the number of operations allowed
+  - Restrict nesting depth
 - Elasticsearch
-  - Query
-  - Aggregation
-  - Sort
-  - Geo Queries
-  - Nested Mapping
+  - Elastic query string query replacement on steriods
+  - Dynamic search and filter expressions
+  - Dynamic aggregation expressions
+    - Supported bucket aggregations: terms, geo grid, date histogram, numeric histogram
+      - Bucket aggregations allow nesting other dynamic aggregations inside
+    - Supported metric aggregations: min, max, avg, sum, stats, extended stats, cardinality, missing, percentiles
+  - Dynamic sort expressions
+  - Dynamic expressions can be exposed to end users to allow for custom searches, filters, sorting and aggregations
+    - Enables allowing users to build custom views, charts and dashboards
+    - Enables powerful APIs that allow users to do things you never thought of
+  - Supports geo queries (proximity and radius)
+    - mygeo:75044~75mi
+      - Returns all documents that have a value in the mygeo field that is within a 75 mile radius of the 75044 zip code
+  - Supports nested document mappings
+  - Automatically resolves non-analyzed keyword sub-fields for sorting and aggregations
+  - Aliases can be defined right on your NEST mappings
+    - Supports both root and inner field name aliases
