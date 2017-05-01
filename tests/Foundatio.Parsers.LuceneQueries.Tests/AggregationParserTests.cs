@@ -5,6 +5,7 @@ using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Utility;
 using Nest;
@@ -286,6 +287,31 @@ namespace Foundatio.Parsers.Tests {
             Assert.True(actualResponse.IsValid);
             Assert.True(expectedResponse.IsValid);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+        
+        [Fact]
+        public async Task GeoGridDoesNotResolveLocationForAggregation() {
+            string index = nameof(MyType).ToLower();
+
+            var client = GetClient();
+            await client.DeleteIndexAsync(index);
+            await client.RefreshAsync(index);
+            
+            var mapping = new TypeMappingDescriptor<MyType>()
+                .Properties(p => p.GeoPoint(g => g.Name(f => f.Field1).RootAlias("geo")));
+
+            var visitor = new AliasMappingVisitor(client.Infer);
+            var walker = new MappingWalker(visitor);
+            walker.Accept(mapping);
+
+            var processor = new ElasticQueryParser(
+                c => c
+                    .UseGeo(l => "someinvalidvaluehere")
+                    .UseAliases(visitor.RootAliasMap)
+                    .UseMappings<MyType>(m => mapping, () => client.GetMapping(new GetMappingRequest(index, index)).Mapping));
+            
+            await processor.BuildAggregationsAsync("geogrid:geo~3");
+
         }
     }
 }
