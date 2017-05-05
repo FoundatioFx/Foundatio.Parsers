@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
@@ -15,7 +16,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
         public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
             var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null || !elasticContext.IsGeoPropertyType(node.Field))
+            if (elasticContext == null || !elasticContext.IsGeoPropertyType(node.Field) || node.GetQueryType() != QueryType.Query)
                 return;
 
             string location = _resolveGeoLocation != null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;
