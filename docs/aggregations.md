@@ -125,6 +125,8 @@ Modifiers:
 - `~` Sets the interval. Available expressions are: `year`, `quarter`, `month`, `week`, `day`, `hour`, `minute`, `second`
   - Time values can also be specified via abbreviations. `d` = days, `h` = hours, `m` = minutes, `s` = seconds, `ms` = milliseconds. Examples: `90m`, `1d`
 - `^` Sets the time zone. Time zones may either be specified as an ISO 8601 UTC offset (e.g. `+01:00` or `-08:00`) or as a timezone id, an identifier used in the TZ database like `America/Los_Angeles`.
+- `@missing` Value to use when documents are missing a value for the field.
+- `@offset` The offset parameter is used to change the start value of each bucket by the specified positive (+) or negative offset (-) duration, such as `1h` for an hour, or `1d` for a day.
 
 Examples:
 - Basic: `date:field`
@@ -153,10 +155,15 @@ A multi-bucket value source based aggregation where buckets are dynamically buil
 Modifiers:
 - `~` Sets the size to define how many term buckets should be returned out of the overall terms list.
 - `^` Sets the minimum number of matching documents that must exist for the term to be included.
+- `@include` Terms that match this pattern will be included in the result.
+- `@exclude` Terms that match this pattern will be excluded from the result.
+- `@missing` Value to use when documents are missing a value for the field.
+- `@min` Sets the minimum number of matching documents that must exist for the term to be included.
 
 Examples:
 - Basic: `terms:field`
 - Return top 5 terms: `terms:field~5`
+- Return terms excluding `value`: `terms:(field @exclude:value)`
 
 ## `missing`
 A field data based single bucket aggregation, that creates a bucket of all documents in the current document set context that are missing a field value (effectively, missing a field or having the configured NULL value set). This aggregator will often be used in conjunction with other field data bucket aggregators (such as ranges) to return information for all the documents that could not be placed in any of the other buckets due to missing field data values.
