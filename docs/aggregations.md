@@ -116,7 +116,7 @@ Modifiers:
 
 Examples:
 - Basic: `histogram:field`
-- Custom percentile buckets: `histogram:field~5`
+- Interval of 5: `histogram:field~5`
 
 ## `date`
 A multi-bucket aggregation similar to the histogram except it can only be applied on date values. 
@@ -128,7 +128,10 @@ Modifiers:
 
 Examples:
 - Basic: `date:field`
-- Custom percentile buckets: `date:field~5`
+- 1 hour interval: `date:field~1h`
+- Year interval: `date:field~year`
+- 2h timezone: `date:field^2h`
+- 1 hour interval and -5h timezone: `date:field~year^-5h`
 
 ## `geogrid`
 A multi-bucket aggregation that works on geo fields and groups points into buckets that represent cells in a grid. The resulting grid can be sparse and only contains cells that have matching data. Each cell is labeled using a geohash which is of user-definable precision.
@@ -137,8 +140,26 @@ High precision geohashes have a long string length and represent cells that cove
 Low precision geohashes have a short string length and represent cells that each cover a large area.
 Geohashes used in this aggregation can have a choice of precision between 1 and 12.
 
+Modifiers:
+- `~` Sets the precision. Must be a number between 1 and 12.
+
+Examples:
+- Basic: `geogrid:field`
+- Precision of 5: `geogrid:field~5`
+
 ## `terms`
 A multi-bucket value source based aggregation where buckets are dynamically built - one per unique value.
 
+Modifiers:
+- `~` Sets the size to define how many term buckets should be returned out of the overall terms list.
+- `^` Sets the minimum number of matching documents that must exist for the term to be included.
+
+Examples:
+- Basic: `terms:field`
+- Return top 5 terms: `terms:field~5`
+
 ## `missing`
 A field data based single bucket aggregation, that creates a bucket of all documents in the current document set context that are missing a field value (effectively, missing a field or having the configured NULL value set). This aggregator will often be used in conjunction with other field data bucket aggregators (such as ranges) to return information for all the documents that could not be placed in any of the other buckets due to missing field data values.
+
+Examples:
+- Basic: `missing:field`
