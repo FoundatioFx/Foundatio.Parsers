@@ -45,6 +45,8 @@ var generatedQuery = GenerateQueryVisitor.Run(result);
 System.Diagnostics.Debug.Assert(query == generatedQuery);
 ```
 
+## [Aggregation Syntax](docs/aggregations.md)
+
 ## Features
 - Lucene Query Syntax Parser
   - Visitors for extensibility
