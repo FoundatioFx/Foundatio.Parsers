@@ -4,7 +4,38 @@ Examples:
 - Single metric: `min:field`
 - Multiple metric: `min:field max:field`
 - Nested bucketed: `terms:(field min:field max:field)`
-- Multiple levels nested: `terms:(field1 min:field max:field terms:(field2 min:field max:field))`
+  - Example result:
+    ```json
+    {
+      "aggregations": {
+        "terms_field1": {
+          "buckets": [
+            {
+              "key": "value1",
+              "doc_count": 102,
+              "min_field2": {
+                "value": 2
+              },
+              "max_field2": {
+                "value": 30
+              }
+            },
+            {
+              "key": "value2",
+              "doc_count": 76,
+              "min_field2": {
+                "value": 0
+              },
+              "max_field2": {
+                "value": 87
+              }
+            }
+        }
+      }
+    }
+    ```
+- Multiple levels nested: `terms:(field1 min:field2 max:field2 terms:(field2 min:field2 max:field2))`
+- Terms sorted by nested max: `terms:(field min:field +max:field)`
 
 # Metric Aggregations
 The aggregations in this family compute metrics based on values extracted in one way or another from the documents that are being aggregated.
@@ -166,6 +197,7 @@ Examples:
 - Basic: `terms:field`
 - Return top 5 terms: `terms:field~5`
 - Return terms excluding "value": `terms:(field @exclude:value)`
+- Sorted descending by nested max: `terms:(field -max:field)`
 
 ## `missing`
 A field data based single bucket aggregation, that creates a bucket of all documents in the current document set context that are missing a field value (effectively, missing a field or having the configured NULL value set). This aggregator will often be used in conjunction with other field data bucket aggregators (such as ranges) to return information for all the documents that could not be placed in any of the other buckets due to missing field data values.
