@@ -4,6 +4,7 @@ Examples:
 - Single metric: `min:field`
 - Multiple metric: `min:field max:field`
 - Nested bucketed: `terms:(field min:field max:field)`
+- Multiple levels nested: `terms:(field1 min:field max:field terms:(field2 min:field max:field))`
 
 # Metric Aggregations
 The aggregations in this family compute metrics based on values extracted in one way or another from the documents that are being aggregated.
@@ -134,6 +135,7 @@ Examples:
 - Year interval: `date:field~year`
 - 2h timezone: `date:field^2h`
 - 1 hour interval and -5h timezone: `date:field~year^-5h`
+- 1 hour offset: `date:(field @offset:1h)`
 
 ## `geogrid`
 A multi-bucket aggregation that works on geo fields and groups points into buckets that represent cells in a grid. The resulting grid can be sparse and only contains cells that have matching data. Each cell is labeled using a geohash which is of user-definable precision.
@@ -163,7 +165,7 @@ Modifiers:
 Examples:
 - Basic: `terms:field`
 - Return top 5 terms: `terms:field~5`
-- Return terms excluding `value`: `terms:(field @exclude:value)`
+- Return terms excluding "value": `terms:(field @exclude:value)`
 
 ## `missing`
 A field data based single bucket aggregation, that creates a bucket of all documents in the current document set context that are missing a field value (effectively, missing a field or having the configured NULL value set). This aggregator will often be used in conjunction with other field data bucket aggregators (such as ranges) to return information for all the documents that could not be placed in any of the other buckets due to missing field data values.
