@@ -6,7 +6,7 @@ The query syntax is the same as Lucene and Elasticsearch.
 
 # Geo Proximity Queries
 
-Geo proximity queries allow filtering data by documents that have a geo field value located within a given proximity of a geo coordinate. 
+Geo proximity queries allow filtering data by documents that have a geo field value located within a given proximity of a geo coordinate. Locations can be resolved using a provided geo coding function that can translate something like "Dallas, TX" into a geo coordinate. 
 
 Examples:
   - Within 75 miles of abc geohash: geofield:abc~75mi
@@ -20,3 +20,5 @@ Examples:
   - Within coordinates rectangle: geofield:[geohash1..geohash2]
 
 # Nested Document Queries
+
+Elasticsearch does not support querying nested documents using the query_string query, but when using this library queries on those fields should work automatically.
