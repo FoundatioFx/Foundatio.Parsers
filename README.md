@@ -1,5 +1,6 @@
-# Foundatio.Parsers
-[![Build status](https://ci.appveyor.com/api/projects/status/05lsubm8sjvpoenx/branch/master?svg=true)](https://ci.appveyor.com/project/Exceptionless/foundatio-parsers/branch/master)
+![Foundatio](https://raw.githubusercontent.com/FoundatioFx/Foundatio/master/media/foundatio.png "Foundatio")
+
+[![Build status](https://ci.appveyor.com/api/projects/status/kkq6y70nt41ekc5r?svg=true)](https://ci.appveyor.com/project/Exceptionless/foundatio-parsers)
 [![NuGet Version](http://img.shields.io/nuget/v/Foundatio.Parsers.LuceneQueries.svg?style=flat)](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) 
 [![Slack Status](https://slack.exceptionless.com/badge.svg)](https://slack.exceptionless.com)
 
@@ -9,7 +10,7 @@ A lucene style query parser that is extensible and allows additional syntax feat
 
 [This package](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) can be installed via the [NuGet package manager](https://docs.nuget.org/consume/Package-Manager-Dialog). If you need help, please contact us via in-app support or [open an issue](https://github.com/exceptionless/Foundatio.Parsers/issues/new). We’re always here to help if you have any questions!
 
-1. You will need to have [Visual Studio 2015](http://www.visualstudio.com/products/visual-studio-community-vs) installed.
+1. You will need to have [Visual Studio 2017](http://www.visualstudio.com/products/visual-studio-community-vs) installed.
 2. Open the `Foundatio.Parsers.sln` Visual Studio solution file.
 
 ## Using LuceneQueryParser
@@ -44,6 +45,8 @@ Finally, lets translate the parse result back into the original query.
 var generatedQuery = GenerateQueryVisitor.Run(result);
 System.Diagnostics.Debug.Assert(query == generatedQuery);
 ```
+
+## [Aggregation Syntax](docs/aggregations.md)
 
 ## Features
 - Lucene Query Syntax Parser
