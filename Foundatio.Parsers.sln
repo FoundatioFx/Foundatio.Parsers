@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26228.9
+VisualStudioVersion = 15.0.26730.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Foundatio.Parsers.LuceneQueries", "src\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj", "{F759E45D-C914-4546-947D-B9F0854D22E9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Parsers.LuceneQueries", "src\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj", "{F759E45D-C914-4546-947D-B9F0854D22E9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Foundatio.Parsers.ElasticQueries", "src\Foundatio.Parsers.ElasticQueries\Foundatio.Parsers.ElasticQueries.csproj", "{9F6F9CC3-2544-44EB-8829-209187271A4E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Parsers.ElasticQueries", "src\Foundatio.Parsers.ElasticQueries\Foundatio.Parsers.ElasticQueries.csproj", "{9F6F9CC3-2544-44EB-8829-209187271A4E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Foundatio.Parsers.LuceneQueries.Tests", "tests\Foundatio.Parsers.LuceneQueries.Tests\Foundatio.Parsers.LuceneQueries.Tests.csproj", "{DDFFC095-C821-41DA-8DFF-2AD37A56106F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Parsers.LuceneQueries.Tests", "tests\Foundatio.Parsers.LuceneQueries.Tests\Foundatio.Parsers.LuceneQueries.Tests.csproj", "{DDFFC095-C821-41DA-8DFF-2AD37A56106F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{400D08AA-50A4-4D74-A3AD-F74AAB8FC706}"
 	ProjectSection(SolutionItems) = preProject
@@ -18,7 +18,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 		build\sourcelink.props = build\sourcelink.props
 		build\Start-ElasticSearch.ps1 = build\Start-ElasticSearch.ps1
-		build\test.props = build\test.props
 	EndProjectSection
 EndProject
 Global
@@ -42,5 +41,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {37B59D3F-7772-4404-9BF3-F2FFE79C47D0}
 	EndGlobalSection
 EndGlobal

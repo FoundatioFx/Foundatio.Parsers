@@ -32,7 +32,7 @@ namespace Foundatio.Parsers.Tests {
                 .Keyword(f => f.Name(e => e.Id).Alias("employee_id"))));
 
             var map = visitor.RootAliasMap;
-            Assert.Equal(1, map.Count);
+            Assert.Single(map);
             Assert.True(map.ContainsKey("employee_id"));
             Assert.Equal("id", map["employee_id"].Name);
             Assert.False(map["employee_id"].HasChildMappings);
@@ -62,7 +62,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.True(map.ContainsKey("data"));
             Assert.Equal("data", map["data"].Name);
             Assert.True(map["data"].HasChildMappings);
-            Assert.Equal(1, map["data"].ChildMap.Count);
+            Assert.Single(map["data"].ChildMap);
             Assert.True(map["data"].ChildMap.ContainsKey("url"));
             Assert.Equal("Profile_URL", map["data"].ChildMap["url"].Name);
             Assert.False(map["data"].ChildMap["url"].HasChildMappings);
