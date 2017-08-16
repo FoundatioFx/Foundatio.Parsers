@@ -33,6 +33,9 @@ build_script:
 before_test:
   - ps: .\build\Start-ElasticSearch.ps1 -StartKibana $false
 
+test_script:
+  - ps: dotnet test
+
 after_test:
   - ps: dotnet pack -c Release
 
