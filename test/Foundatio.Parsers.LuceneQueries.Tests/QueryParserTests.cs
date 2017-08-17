@@ -214,7 +214,7 @@ namespace Foundatio.Parsers.Tests {
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
             var result = processor.BuildQueryAsync("field1:\"hey \\\"you there\\\"\"").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
-            string actualRequest = actualResponse.GetRequest();
+            string actualRequest = actualResponse.GetRequest(true);
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse =
@@ -228,7 +228,7 @@ namespace Foundatio.Parsers.Tests {
                                             b.Filter(
                                                 f =>
                                                     f.MatchPhrase(m => m.Query("hey \"you there\"").Field(w => w.Field1))))));
-            string expectedRequest = expectedResponse.GetRequest();
+            string expectedRequest = expectedResponse.GetRequest(true);
             _logger.Info($"Expected: {expectedRequest}");
 
             Assert.Equal(expectedRequest, actualRequest);

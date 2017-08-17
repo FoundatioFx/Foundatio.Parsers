@@ -3,6 +3,8 @@ using System.Linq;
 using System.Text;
 using Elasticsearch.Net;
 using Nest;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class ElasticExtensions {
@@ -45,17 +47,63 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return sb.ToString();
         }
 
-        public static string GetRequest(this IApiCallDetails response) {
+        public static string GetRequest(this IApiCallDetails response, bool normalize = false) {
             if (response == null)
                 return String.Empty;
 
-            return response.RequestBodyInBytes != null ?
-                $"{response.HttpMethod} {response.Uri.PathAndQuery}\r\n{Encoding.UTF8.GetString(response.RequestBodyInBytes)}\r\n"
-                : $"{response.HttpMethod} {response.Uri.PathAndQuery}\r\n";
+            if (response.RequestBodyInBytes != null) {
+                string body = Encoding.UTF8.GetString(response.RequestBodyInBytes);
+                if (normalize)
+                    body = JsonUtility.NormalizeJsonString(body);
+                return $"{response.HttpMethod} {response.Uri.PathAndQuery}\r\n{body}\r\n";
+            } else {
+                return $"{response.HttpMethod} {response.Uri.PathAndQuery}\r\n";
+            }
         }
 
-        public static string GetRequest(this IResponse response) {
-            return GetRequest(response?.ApiCall);
+        public static string GetRequest(this IResponse response, bool normalize = false) {
+            return GetRequest(response?.ApiCall, normalize);
+        }
+    }
+
+    internal class JsonUtility {
+        public static string NormalizeJsonString(string json) {
+            var parsedObject = JObject.Parse(json);
+            var normalizedObject = SortPropertiesAlphabetically(parsedObject);
+            return JsonConvert.SerializeObject(normalizedObject, Formatting.Indented);
+        }
+
+        private static JObject SortPropertiesAlphabetically(JObject original) {
+            var result = new JObject();
+
+            foreach (var property in original.Properties().ToList().OrderBy(p => p.Name)) {
+                if (property.Value is JObject value) {
+                    value = SortPropertiesAlphabetically(value);
+                    result.Add(property.Name, value);
+                } else if (property.Value is JArray array) {
+                    array = SortArrayAlphabetically(array);
+                    result.Add(property.Name, array);
+                } else {
+                    result.Add(property.Name, property.Value);
+                }
+            }
+
+            return result;
+        }
+
+        private static JArray SortArrayAlphabetically(JArray original) {
+            var result = new JArray();
+
+            foreach (var item in original) {
+                if (item is JObject value)
+                    result.Add(SortPropertiesAlphabetically(value));
+                else if (item is JArray array)
+                    result.Add(SortArrayAlphabetically(array));
+                else
+                    result.Add(item);
+            }
+
+            return result;
         }
     }
 }
