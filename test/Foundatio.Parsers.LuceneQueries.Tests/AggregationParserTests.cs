@@ -50,16 +50,16 @@ namespace Foundatio.Parsers.Tests {
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
                     .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
-                .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@type", "keyword")))
+                .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword")))
                 .Histogram("histogram_field4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
                 .DateHistogram("date_field5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
                 .Missing("missing_field2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_field4", c => c.Field("field4"))
                 .Percentiles("percentiles_field4", c => c.Field("field4").Percents(50,100))
-                .Sum("sum_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
-                .Average("avg_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
-                .Max("max_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
-                .Min("min_field4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))));
+                .Sum("sum_field4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
+                .Average("avg_field4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
+                .Max("max_field4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
+                .Min("min_field4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -93,7 +93,7 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
-                .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@type", "keyword"))
+                .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword"))
                     .Aggregations(a1 => a1.Cardinality("cardinality_user", c => c.Field("data.@user.identity.keyword"))))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
@@ -132,16 +132,16 @@ namespace Foundatio.Parsers.Tests {
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .GeoHash("geogrid_alias3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
                     .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
-                .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@type", "keyword")))
+                .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword")))
                 .Histogram("histogram_alias4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
                 .DateHistogram("date_alias5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
                 .Missing("missing_alias2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_user", c => c.Field("data.@user.identity.keyword"))
                 .Percentiles("percentiles_alias4", c => c.Field("field4"))
-                .Sum("sum_alias4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
-                .Average("avg_alias4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
-                .Max("max_alias4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))
-                .Min("min_alias4", c => c.Field("field4").Meta(m => m.Add("@type", "long")))));
+                .Sum("sum_alias4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
+                .Average("avg_alias4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
+                .Max("max_alias4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
+                .Min("min_alias4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -176,7 +176,7 @@ namespace Foundatio.Parsers.Tests {
                     .Include("myinclude")
                     .Exclude("myexclude")
                     .Missing("mymissing")
-                    .Meta(m => m.Add("@type", "keyword")))));
+                    .Meta(m => m.Add("@field_type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -208,7 +208,7 @@ namespace Foundatio.Parsers.Tests {
                     .OrderDescending("cardinality_field4")
                     .Aggregations(a2 => a2
                         .Cardinality("cardinality_field4", c => c.Field("field4")))
-                    .Meta(m => m.Add("@type", "keyword")))));
+                    .Meta(m => m.Add("@field_type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -245,8 +245,8 @@ namespace Foundatio.Parsers.Tests {
                     .TimeZone("+01:00")
                     .Missing(DateTime.MinValue)
                     .Aggregations(a1 => a1
-                        .Min("min_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@type", "date").Add("@timezone", "1h")))
-                        .Max("max_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@type", "date").Add("@timezone", "1h")))))));
+                        .Min("min_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))
+                        .Max("max_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
@@ -275,11 +275,11 @@ namespace Foundatio.Parsers.Tests {
             _logger.Info($"Actual: {actualRequest}");
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
-                .Sum("sum_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@type", "long")))
+                .Sum("sum_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))
                 .Cardinality("cardinality_field4", c => c.Field("field4").Missing(0))
-                .Average("avg_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@type", "long")))
-                .Max("max_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@type", "long")))
-                .Min("min_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@type", "long")))));
+                .Average("avg_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))
+                .Max("max_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))
+                .Min("min_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.Info($"Expected: {expectedRequest}");
 
