@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -90,7 +90,7 @@ namespace Foundatio.Parsers.Tests {
             try {
                 queryNode = await parser.ParseAsync(query, QueryType.Aggregation);
             } catch (Exception ex) {
-                _logger.Error(ex, $"Error parsing query: {ex.Message}");
+                _logger.LogError(ex, "Error parsing query: {Message}", ex.Message);
                 if (isValid)
                     throw;
 

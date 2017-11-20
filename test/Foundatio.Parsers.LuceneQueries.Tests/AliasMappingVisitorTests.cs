@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
@@ -11,6 +10,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Microsoft.Extensions.Logging;
 
 namespace Foundatio.Parsers.Tests {
     public sealed class AliasMappingVisitorTests : TestWithLoggingBase {
@@ -168,7 +168,7 @@ namespace Foundatio.Parsers.Tests {
             var result = await processor.BuildQueryAsync("employee_id:ex-001 url:\"/u/ex-001/profile.png\" data.code:1234567890");
             var actualResponse = client.Search<Employee>(d => d.Index(index).Query(q => result));
             string actualRequest = actualResponse.GetRequest();
-            _logger.Info($"Actual: {actualRequest}");
+            _logger.LogInformation("Actual: {Request}", actualResponse);
 
             var expectedResponse = client.Search<Employee>(d => d.Index(index).Type(index).Query(q => q
                 .Bool(b => b.Filter(
@@ -178,7 +178,7 @@ namespace Foundatio.Parsers.Tests {
                 ));
 
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.Info($"Expected: {expectedRequest}");
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);

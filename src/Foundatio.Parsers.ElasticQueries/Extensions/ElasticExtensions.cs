@@ -17,8 +17,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (response.ServerError != null)
                 sb.AppendLine($"Server: ({response.ServerError.Status}) {response.ServerError.Error}");
 
-            var bulkResponse = response as IBulkResponse;
-            if (bulkResponse != null)
+            if (response is IBulkResponse bulkResponse)
                 sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
 
             if (sb.Length == 0)
@@ -37,8 +36,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (response.ServerError != null)
                 sb.AppendLine($"Server: ({response.ServerError.Status}) {response.ServerError.Error}");
 
-            var bulkResponse = response as IBulkResponse;
-            if (bulkResponse != null)
+            if (response is IBulkResponse bulkResponse)
                 sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
 
             if (sb.Length == 0)

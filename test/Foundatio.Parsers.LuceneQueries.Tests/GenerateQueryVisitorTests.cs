@@ -6,6 +6,7 @@ using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -117,9 +118,9 @@ namespace Foundatio.Parsers.Tests {
                 return;
             }
 
-            var nodes = await DebugQueryVisitor.RunAsync(result);
-            _logger.Info(nodes);
-            var generatedQuery = await GenerateQueryVisitor.RunAsync(result);
+            string nodes = await DebugQueryVisitor.RunAsync(result);
+            _logger.LogInformation(nodes);
+            string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(expected, generatedQuery);
         }
 
@@ -128,14 +129,14 @@ namespace Foundatio.Parsers.Tests {
             string query = "datehistogram:(date~2^-5\\:30 min:date max:date)";
             var parser = new LuceneQueryParser();
 
-            IQueryNode result = await parser.ParseAsync(query);
+            var result = await parser.ParseAsync(query);
 
-            _logger.Info(await DebugQueryVisitor.RunAsync(result));
-            var generatedQuery = await GenerateQueryVisitor.RunAsync(result);
+            _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+            string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
 
             await new AssignAggregationTypeVisitor().AcceptAsync(result, null);
-            _logger.Info(DebugQueryVisitor.Run(result));
+            _logger.LogInformation(DebugQueryVisitor.Run(result));
         }
     }
 }

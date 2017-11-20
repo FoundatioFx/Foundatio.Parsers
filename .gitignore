@@ -151,3 +151,4 @@ UpgradeLog*.htm
 FakesAssemblies/
 build/elasticsearch-*
 build/kibana-*
+\.vs/Foundatio\.Parsers/v15/Server/sqlite3/

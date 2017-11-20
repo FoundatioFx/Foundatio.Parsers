@@ -11,12 +11,10 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultAggregationNodeExtensions {
 
         public static AggregationBase GetDefaultAggregation(this IQueryNode node, IQueryVisitorContext context) {
-            var groupNode = node as GroupNode;
-            if (groupNode != null)
+            if (node is GroupNode groupNode)
                 return groupNode.GetDefaultAggregation(context);
 
-            var termNode = node as TermNode;
-            if (termNode != null)
+            if (node is TermNode termNode)
                 return termNode.GetDefaultAggregation(context);
 
             return null;

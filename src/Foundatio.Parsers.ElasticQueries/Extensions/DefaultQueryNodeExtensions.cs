@@ -12,24 +12,19 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultQueryNodeExtensions {
 
         public static QueryBase GetDefaultQuery(this IQueryNode node, IQueryVisitorContext context) {
-            var termNode = node as TermNode;
-            if (termNode != null)
+            if (node is TermNode termNode)
                 return termNode.GetDefaultQuery(context);
 
-            var termRangeNode = node as TermRangeNode;
-            if (termRangeNode != null)
+            if (node is TermRangeNode termRangeNode)
                 return termRangeNode.GetDefaultQuery(context);
 
-            var existsNode = node as ExistsNode;
-            if (existsNode != null)
+            if (node is ExistsNode existsNode)
                 return existsNode.GetDefaultQuery(context);
 
-            var missingNode = node as MissingNode;
-            if (missingNode != null)
+            if (node is MissingNode missingNode)
                 return missingNode.GetDefaultQuery(context);
 
-            var groupNode = node as GroupNode;
-            if (groupNode != null)
+            if (node is GroupNode groupNode)
                 return groupNode.GetDefaultQuery(context);
             return null;
         }
@@ -41,8 +36,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             if ((node.Parent == null || node.HasParens) && node is IFieldQueryNode) {
                 if (node.Data.ContainsKey("match_terms")) {
-                    var fields = !string.IsNullOrEmpty(node.GetFullName()) ? new[] { node.GetFullName() } : elasticContext.DefaultFields;
-                    var values = string.Join(" ", ((List<TermNode>)node.Data["match_terms"]).Select(t => t.UnescapedTerm));
+                    var fields = !String.IsNullOrEmpty(node.GetFullName()) ? new[] { node.GetFullName() } : elasticContext.DefaultFields;
+                    string values = String.Join(" ", ((List<TermNode>)node.Data["match_terms"]).Select(t => t.UnescapedTerm));
                     if (fields.Length == 1) {
                         return new MatchQuery {
                             Field = fields[0],
@@ -67,7 +62,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             QueryBase query = null;
             if (elasticContext.IsPropertyAnalyzed(node.GetFullName())) {
-                var fields = !string.IsNullOrEmpty(node.GetFullName()) ? new[] { node.GetFullName() } : elasticContext.DefaultFields;
+                var fields = !String.IsNullOrEmpty(node.GetFullName()) ? new[] { node.GetFullName() } : elasticContext.DefaultFields;
 
                 if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
                     query = new QueryStringQuery {
@@ -114,7 +109,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             if (elasticContext.IsDatePropertyType(node.GetFullName())) {
-                var timezone = GetString(context, "TimeZone");
+                string timezone = GetString(context, "TimeZone");
                 var range = new DateRangeQuery { Field = node.GetFullName(), TimeZone = timezone };
                 if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                     if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
@@ -166,8 +161,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static string GetString(IQueryVisitorContext context, string key) {
-            object value;
-            if (context.Data.TryGetValue(key, out value) && value is string)
+            if (context.Data.TryGetValue(key, out var value) && value is string)
                 return (string)value;
 
             return null;

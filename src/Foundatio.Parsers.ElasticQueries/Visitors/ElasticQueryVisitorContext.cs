@@ -64,13 +64,11 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public static bool IsPropertyAnalyzed(this IElasticQueryVisitorContext context, IProperty property) {
-            var textProperty = property as ITextProperty;
-            if (textProperty != null)
+            if (property is ITextProperty textProperty)
                 return !textProperty.Index.HasValue || textProperty.Index.Value;
 
 #pragma warning disable 618
-            var stringMapping = property as IStringProperty;
-            if (stringMapping != null)
+            if (property is IStringProperty stringMapping)
                 return stringMapping.Index == FieldIndexOption.Analyzed || stringMapping.Index == null;
 #pragma warning restore 618
 

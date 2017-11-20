@@ -58,8 +58,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            var scopedNode = node.GetScopedNode() as IFieldQueryNode;
-            if (scopedNode != null && node.Field == null && 
+            if (node.GetScopedNode() is IFieldQueryNode scopedNode && node.Field == null &&
                 (node.GetQuery(() => node.GetDefaultQuery(context)) is MatchQuery || node.GetQuery(() => node.GetDefaultQuery(context)) is MultiMatchQuery)) {
                 if (!scopedNode.Data.ContainsKey("match_terms")) {
                     scopedNode.Data["match_terms"] = new List<TermNode>();

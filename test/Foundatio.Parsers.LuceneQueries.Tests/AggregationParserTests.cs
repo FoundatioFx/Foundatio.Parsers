@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Utility;
+using Microsoft.Extensions.Logging;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;
@@ -45,7 +45,7 @@ namespace Foundatio.Parsers.Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.Info($"Actual: {actualRequest}");
+            _logger.LogInformation("Actual: {Request}", actualResponse);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
@@ -61,7 +61,7 @@ namespace Foundatio.Parsers.Tests {
                 .Max("max_field4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
                 .Min("min_field4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.Info($"Expected: {expectedRequest}");
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);
@@ -90,13 +90,13 @@ namespace Foundatio.Parsers.Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.Info($"Actual: {actualRequest}");
+            _logger.LogInformation("Actual: {Request}", actualResponse);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword"))
                     .Aggregations(a1 => a1.Cardinality("cardinality_user", c => c.Field("data.@user.identity.keyword"))))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.Info($"Expected: {expectedRequest}");
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);
@@ -127,7 +127,7 @@ namespace Foundatio.Parsers.Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.Info($"Actual: {actualRequest}");
+            _logger.LogInformation("Actual: {Request}", actualResponse);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .GeoHash("geogrid_alias3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
@@ -143,7 +143,7 @@ namespace Foundatio.Parsers.Tests {
                 .Max("max_alias4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
                 .Min("min_alias4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.Info($"Expected: {expectedRequest}");
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);
@@ -167,7 +167,7 @@ namespace Foundatio.Parsers.Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.Info($"Actual: {actualRequest}");
+            _logger.LogInformation("Actual: {Request}", actualResponse);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Terms("terms_field1", t => t
@@ -178,7 +178,7 @@ namespace Foundatio.Parsers.Tests {
                     .Missing("mymissing")
                     .Meta(m => m.Add("@field_type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.Info($"Expected: {expectedRequest}");
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -200,7 +200,7 @@ namespace Foundatio.Parsers.Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.Info($"Actual: {actualRequest}");
+            _logger.LogInformation("Actual: {Request}", actualResponse);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Terms("terms_field1", t => t
@@ -210,7 +210,7 @@ namespace Foundatio.Parsers.Tests {
                         .Cardinality("cardinality_field4", c => c.Field("field4")))
                     .Meta(m => m.Add("@field_type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.Info($"Expected: {expectedRequest}");
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);
@@ -234,7 +234,7 @@ namespace Foundatio.Parsers.Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.Info($"Actual: {actualRequest}");
+            _logger.LogInformation("Actual: {Request}", actualResponse);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .DateHistogram("date_field5", d1 => d1
@@ -248,7 +248,7 @@ namespace Foundatio.Parsers.Tests {
                         .Min("min_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))
                         .Max("max_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.Info($"Expected: {expectedRequest}");
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid, actualResponse.DebugInformation);
@@ -272,7 +272,7 @@ namespace Foundatio.Parsers.Tests {
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.Info($"Actual: {actualRequest}");
+            _logger.LogInformation("Actual: {Request}", actualResponse);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Sum("sum_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))
@@ -281,7 +281,7 @@ namespace Foundatio.Parsers.Tests {
                 .Max("max_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))
                 .Min("min_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.Info($"Expected: {expectedRequest}");
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);

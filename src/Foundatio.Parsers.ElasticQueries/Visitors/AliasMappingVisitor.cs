@@ -61,8 +61,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     map.Add(alias.Value.Key, amv);
             }
 
-            var objectProperty = property as IObjectProperty;
-            if (objectProperty != null) {
+            if (property is IObjectProperty objectProperty) {
                 if (!alias.HasValue || !String.Equals(name, alias.Value.Key, StringComparison.OrdinalIgnoreCase))
                     map.Add(name, amv);
 
