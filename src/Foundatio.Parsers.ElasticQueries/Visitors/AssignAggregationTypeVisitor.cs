@@ -8,8 +8,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class AssignAggregationTypeVisitor: ChainableQueryVisitor {
         public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             if (!String.IsNullOrEmpty(node.Field)) {
-                var leftTerm = node.Left as TermNode;
-                if (leftTerm == null || !String.IsNullOrEmpty(leftTerm.Field))
+                if (!(node.Left is TermNode leftTerm) || !String.IsNullOrEmpty(leftTerm.Field))
                     throw new ApplicationException("The first item in an aggregation group must be the name of the target field.");
 
                 if (IsKnownAggregationType(node.Field)) {

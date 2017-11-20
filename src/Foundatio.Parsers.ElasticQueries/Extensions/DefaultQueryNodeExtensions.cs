@@ -1,11 +1,11 @@
-﻿using Foundatio.Parsers.ElasticQueries.Visitors;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
@@ -30,8 +30,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static QueryBase GetDefaultQuery(this GroupNode node, IQueryVisitorContext context) {
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null)
+            if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             if ((node.Parent == null || node.HasParens) && node is IFieldQueryNode) {
@@ -43,26 +42,26 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             Field = fields[0],
                             Query = values
                         };
-                    } else {
-                        return new MultiMatchQuery() {
-                            Fields = fields,
-                            Query = values,
-                            Type = TextQueryType.BestFields
-                        };
                     }
+
+                    return new MultiMatchQuery {
+                        Fields = fields,
+                        Query = values,
+                        Type = TextQueryType.BestFields
+                    };
                 }
             }
             return null;
         }
 
         public static QueryBase GetDefaultQuery(this TermNode node, IQueryVisitorContext context) {
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null)
+            if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            QueryBase query = null;
-            if (elasticContext.IsPropertyAnalyzed(node.GetFullName())) {
-                var fields = !String.IsNullOrEmpty(node.GetFullName()) ? new[] { node.GetFullName() } : elasticContext.DefaultFields;
+            QueryBase query;
+            string nodeFullName = node.GetFullName();
+            if (elasticContext.IsPropertyAnalyzed(nodeFullName)) {
+                var fields = !String.IsNullOrEmpty(nodeFullName) ? new[] { nodeFullName } : elasticContext.DefaultFields;
 
                 if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
                     query = new QueryStringQuery {
@@ -85,7 +84,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             };
                         }
                     } else {
-                        query = new MultiMatchQuery() {
+                        query = new MultiMatchQuery {
                             Fields = fields,
                             Query = node.UnescapedTerm
                         };
@@ -95,7 +94,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 }
             } else {
                 query = new TermQuery {
-                    Field = node.GetFullName(),
+                    Field = nodeFullName,
                     Value = node.UnescapedTerm
                 };
             }
@@ -104,13 +103,13 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static QueryBase GetDefaultQuery(this TermRangeNode node, IQueryVisitorContext context) {
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null)
+            if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            if (elasticContext.IsDatePropertyType(node.GetFullName())) {
+            string nodeFullName = node.GetFullName();
+            if (elasticContext.IsDatePropertyType(nodeFullName)) {
                 string timezone = GetString(context, "TimeZone");
-                var range = new DateRangeQuery { Field = node.GetFullName(), TimeZone = timezone };
+                var range = new DateRangeQuery { Field = nodeFullName, TimeZone = timezone };
                 if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                     if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                         range.GreaterThan = node.UnescapedMin;
@@ -127,7 +126,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
                 return range;
             } else {
-                var range = new TermRangeQuery { Field = node.GetFullName() };
+                var range = new TermRangeQuery { Field = nodeFullName };
                 if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
                     if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                         range.GreaterThan = node.UnescapedMin;

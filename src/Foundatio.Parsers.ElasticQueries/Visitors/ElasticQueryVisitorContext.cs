@@ -79,40 +79,35 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = context.GetPropertyMapping(field) as INestedProperty;
-            return mapping != null;
+            return context.GetPropertyMapping(field) is INestedProperty;
         }
 
         public static bool IsGeoPropertyType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = context.GetPropertyMapping(field) as IGeoPointProperty;
-            return mapping != null;
+            return context.GetPropertyMapping(field) is IGeoPointProperty;
         }
 
         public static bool IsNumericPropertyType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = context.GetPropertyMapping(field) as INumberProperty;
-            return mapping != null;
+            return context.GetPropertyMapping(field) is INumberProperty;
         }
 
         public static bool IsBooleanPropertyType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = context.GetPropertyMapping(field) as IBooleanProperty;
-            return mapping != null;
+            return context.GetPropertyMapping(field) is IBooleanProperty;
         }
 
         public static bool IsDatePropertyType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            var mapping = context.GetPropertyMapping(field) as IDateProperty;
-            return mapping != null;
+            return context.GetPropertyMapping(field) is IDateProperty;
         }
     }
 }

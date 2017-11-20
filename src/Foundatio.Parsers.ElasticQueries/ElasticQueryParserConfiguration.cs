@@ -288,8 +288,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             IProperties properties = new Properties();
             foreach (var serverProperty in serverProperties) {
                 var merged = serverProperty.Value;
-                IProperty codeProperty = null;
-                if (codeProperties.TryGetValue(serverProperty.Key, out codeProperty))
+                if (codeProperties.TryGetValue(serverProperty.Key, out var codeProperty))
                     merged.LocalMetadata = codeProperty.LocalMetadata;
 
                 switch (merged) {

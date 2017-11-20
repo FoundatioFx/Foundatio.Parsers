@@ -15,8 +15,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             await base.VisitAsync(node, context).ConfigureAwait(false);
 
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null)
+            if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             QueryBase query = node.GetQuery(() => node.GetDefaultQuery(context));
@@ -28,7 +27,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 var childQuery = child.GetQuery(() => child.GetDefaultQuery(context));
                 if (childQuery == null) continue;
-                
+
                 var op = node.GetOperator(elasticContext.DefaultOperator);
                 if (child.IsNodeNegated())
                     childQuery = !childQuery;
@@ -54,8 +53,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
             await base.VisitAsync(node, context).ConfigureAwait(false);
 
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null)
+            if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             if (node.GetScopedNode() is IFieldQueryNode scopedNode && node.Field == null &&

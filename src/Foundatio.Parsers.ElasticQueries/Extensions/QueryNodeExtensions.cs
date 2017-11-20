@@ -21,8 +21,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
         private const string QueryKey = "@Query";
         public static QueryBase GetQuery(this IQueryNode node, Func<QueryBase> getDefaultValue = null) {
-            object value = null;
-            if (!node.Data.TryGetValue(QueryKey, out value))
+            if (!node.Data.TryGetValue(QueryKey, out object value))
                 return getDefaultValue?.Invoke();
 
             return value as QueryBase;
@@ -39,8 +38,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
         private const string AggregationKey = "@Aggregation";
         public static AggregationBase GetAggregation(this IQueryNode node, Func<AggregationBase> getDefaultValue = null) {
-            object value = null;
-            if (!node.Data.TryGetValue(AggregationKey, out value))
+            if (!node.Data.TryGetValue(AggregationKey, out object value))
                 return getDefaultValue?.Invoke();
 
             return value as AggregationBase;
@@ -58,8 +56,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         private const string SortKey = "@Sort";
 
         public static IFieldSort GetSort(this IQueryNode node, Func<IFieldSort> getDefaultValue = null) {
-            object value = null;
-            if (!node.Data.TryGetValue(SortKey, out value))
+            if (!node.Data.TryGetValue(SortKey, out object value))
                 return getDefaultValue?.Invoke();
 
             return value as IFieldSort;

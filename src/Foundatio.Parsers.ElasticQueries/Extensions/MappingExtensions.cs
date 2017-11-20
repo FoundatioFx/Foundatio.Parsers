@@ -43,8 +43,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (property.LocalMetadata == null)
                 return null;
 
-            object alias;
-            if (property.LocalMetadata.TryGetValue(ALIAS_KEY, out alias))
+            if (property.LocalMetadata.TryGetValue(ALIAS_KEY, out object alias))
                 return (KeyValuePair<string, bool>)alias;
 
             return null;

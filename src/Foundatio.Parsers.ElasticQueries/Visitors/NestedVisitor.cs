@@ -24,9 +24,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         private bool IsNestedPropertyType(string[] nameParts, IQueryVisitorContext context) {
-            var elasticContext = context as IElasticQueryVisitorContext;
-
-            if (nameParts == null || elasticContext == null || nameParts.Length == 0)
+            if (nameParts == null || !(context is IElasticQueryVisitorContext elasticContext) || nameParts.Length == 0)
                 return false;
 
             string fieldName = String.Empty;

@@ -13,8 +13,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             await base.VisitAsync(node, context).ConfigureAwait(false);
 
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null)
+            if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             var container = GetParentContainer(node, context);
@@ -42,8 +41,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                             termsAggregation.Missing = termNode.UnescapedTerm;
                         } else if (termNode.Field == "@min") {
                             int? minCount = null;
-                            int parsedMinCount;
-                            if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out parsedMinCount))
+                            if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
                                 minCount = parsedMinCount;
 
                             termsAggregation.MinimumDocumentCount = minCount;
@@ -53,8 +51,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     if (termNode != null && dateHistogramAggregation != null) {
                         if (termNode.Field == "@missing") {
                             DateTime? missingValue = null;
-                            DateTime parsedMissingDate;
-                            if (!String.IsNullOrEmpty(termNode.Term) && DateTime.TryParse(termNode.Term, out parsedMissingDate))
+                            if (!String.IsNullOrEmpty(termNode.Term) && DateTime.TryParse(termNode.Term, out var parsedMissingDate))
                                 missingValue = parsedMissingDate;
 
                             dateHistogramAggregation.Missing = missingValue;

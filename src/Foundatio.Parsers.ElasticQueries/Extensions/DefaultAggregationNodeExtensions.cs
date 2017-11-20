@@ -131,8 +131,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 var percentStrings = proximity.Split(',');
                 percents = new List<double>();
                 foreach  (var ps in percentStrings) {
-                    double outPerc;
-                    if (double.TryParse(ps, out outPerc))
+                    if (double.TryParse(ps, out double outPerc))
                         percents.Add(outPerc);
                 }
             }
@@ -143,9 +142,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
-            int prox;
             int interval = 50;
-            if (int.TryParse(proximity, out prox))
+            if (int.TryParse(proximity, out int prox))
                 interval = prox;
 
             return new HistogramAggregation(originalField) {
@@ -210,16 +208,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static DateTime? GetDate(IQueryVisitorContext context, string key) {
-            object value;
-            if (context.Data.TryGetValue(key, out value) && value is DateTime)
+            if (context.Data.TryGetValue(key, out object value) && value is DateTime)
                 return (DateTime)value;
 
             return null;
         }
 
         private static string GetString(IQueryVisitorContext context, string key) {
-            object value;
-            if (context.Data.TryGetValue(key, out value) && value is string)
+            if (context.Data.TryGetValue(key, out object value) && value is string)
                 return (string)value;
 
             return null;
@@ -254,32 +250,28 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
-            int parsedSize;
-            if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out parsedSize))
+            if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out int parsedSize))
                 return parsedSize;
 
             return null;
         }
 
         public static int? GetBoostAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
-            int parsedSize;
-            if (!String.IsNullOrEmpty(node.Boost) && Int32.TryParse(node.Boost, out parsedSize))
+            if (!String.IsNullOrEmpty(node.Boost) && Int32.TryParse(node.Boost, out int parsedSize))
                 return parsedSize;
 
             return null;
         }
 
         public static double? GetProximityAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
-            double parsedSize;
-            if (!String.IsNullOrEmpty(node.Proximity) && Double.TryParse(node.Proximity, out parsedSize))
+            if (!String.IsNullOrEmpty(node.Proximity) && Double.TryParse(node.Proximity, out double parsedSize))
                 return parsedSize;
 
             return null;
         }
 
         public static double? GetBoostAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
-            double parsedSize;
-            if (!String.IsNullOrEmpty(node.Boost) && Double.TryParse(node.Boost, out parsedSize))
+            if (!String.IsNullOrEmpty(node.Boost) && Double.TryParse(node.Boost, out double parsedSize))
                 return parsedSize;
 
             return null;
