@@ -322,17 +322,25 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (GetServerMappingFunc == null)
                 return false;
 
-            if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.Now.SubtractMinutes(1))
+            if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.UtcNow.SubtractMinutes(1))
                 return false;
 
             try {
                 _serverMapping = GetServerMappingFunc();
-                _lastMappingUpdate = DateTime.Now;
+                _lastMappingUpdate = DateTime.UtcNow;
 
                 return true;
             } catch (Exception) {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Allows you to refresh server side mapping. This should be used only in unit tests.
+        /// </summary>
+        public void RefreshMapping() {
+            _serverMapping = null;
+            _lastMappingUpdate = null;
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class {

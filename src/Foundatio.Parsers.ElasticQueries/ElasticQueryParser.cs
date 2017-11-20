@@ -67,7 +67,6 @@ namespace Foundatio.Parsers.ElasticQueries {
             return await BuildQueryAsync(result, context).ConfigureAwait(false);
         }
 
-
         public Task<QueryContainer> BuildQueryAsync(IQueryNode query, IElasticQueryVisitorContext context = null) {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
