@@ -35,8 +35,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
         public override void Visit(IGeoShapeProperty property) => AddAlias(property);
 
-        public override void Visit(IAttachmentProperty property) => AddAlias(property);
-
         public override void Visit(INumberProperty property) => AddAlias(property);
 
         public override void Visit(ICompletionProperty property) => AddAlias(property);
@@ -44,6 +42,8 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override void Visit(IMurmur3HashProperty property) => AddAlias(property);
 
         public override void Visit(ITokenCountProperty property) => AddAlias(property);
+
+        // TODO Add support for more overloads. string will be removed in 6.0
 
         private void AddAlias(IProperty property) {
             while (Depth < _stack.Count)

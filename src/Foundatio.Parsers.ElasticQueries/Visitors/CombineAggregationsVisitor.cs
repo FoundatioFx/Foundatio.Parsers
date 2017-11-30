@@ -29,16 +29,17 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                         // TODO: Move these to the default aggs method using a visitor to walk down the tree to gather them but not going into any sub groups
                         if (termNode.Field == "@exclude") {
                             if (termsProperty is ITextProperty || termsProperty is IKeywordProperty)
-                                termsAggregation.Exclude = new TermsIncludeExclude { Pattern = termNode.UnescapedTerm };
+                                termsAggregation.Exclude = new TermsExclude(termNode.UnescapedTerm);
                             else
-                                termsAggregation.Exclude = new TermsIncludeExclude { Values = new List<string> { termNode.UnescapedTerm } };
+                                termsAggregation.Exclude = new TermsExclude(new List<string> { termNode.UnescapedTerm });
                         } else if (termNode.Field == "@include") {
                             if (termsProperty is ITextProperty || termsProperty is IKeywordProperty)
-                                termsAggregation.Include = new TermsIncludeExclude { Pattern = termNode.UnescapedTerm };
+                                termsAggregation.Include = new TermsInclude(termNode.UnescapedTerm);
                             else
-                                termsAggregation.Include = new TermsIncludeExclude { Values = new List<string> { termNode.UnescapedTerm } };
+                                termsAggregation.Include = new TermsInclude(new List<string> { termNode.UnescapedTerm });
                         } else if (termNode.Field == "@missing") {
-                            termsAggregation.Missing = termNode.UnescapedTerm;
+                            // NOTE: Fixed in nightly
+                            // termsAggregation.Missing = termNode.UnescapedTerm;
                         } else if (termNode.Field == "@min") {
                             int? minCount = null;
                             if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
