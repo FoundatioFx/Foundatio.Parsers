@@ -15,19 +15,19 @@
   <PropertyGroup>
     <Product>Foundatio.Parsers</Product>
     <Description>A lucene style query parser that is extensible and allows additional syntax features.</Description>
-    <Copyright>Copyright (c) 2017 Exceptionless.  All rights reserved.</Copyright>
-    <Authors>bniemyjski;ejsmith</Authors>
+    <Copyright>Copyright (c) 2017 Foundatio.  All rights reserved.</Copyright>
+    <Authors>FoundatioFx</Authors>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <WarningsAsErrors>true</WarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageOutputPath>$(SolutionDir)artifacts\</PackageOutputPath>
 
-    <PackageReleaseNotes>https://github.com/exceptionless/Foundatio.Parsers/releases</PackageReleaseNotes>
-    <PackageIconUrl>https://be.exceptionless.io/img/exceptionless-32.png</PackageIconUrl>
-    <PackageProjectUrl>https://github.com/exceptionless/Foundatio.Parsers</PackageProjectUrl>
+    <PackageReleaseNotes>https://github.com/FoundatioFx/Foundatio.Parsers/releases</PackageReleaseNotes>
+    <PackageIconUrl>https://raw.githubusercontent.com/FoundatioFx/Foundatio.Parsers/master/media/foundatio-icon.png</PackageIconUrl>
+    <PackageProjectUrl>https://github.com/FoundatioFx/Foundatio.Parsers</PackageProjectUrl>
     <PackageLicenseUrl>http://www.apache.org/licenses/LICENSE-2.0</PackageLicenseUrl>
     <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/exceptionless/Foundatio.Parsers</RepositoryUrl>
+    <RepositoryUrl>https://github.com/FoundatioFx/Foundatio.Parsers</RepositoryUrl>
     <VersionSuffix Condition="'$(VersionSuffix)' != '' AND '$(BuildNumber)' != ''">$(VersionSuffix)-$(BuildNumber)</VersionSuffix>
   </PropertyGroup>
 </Project>
