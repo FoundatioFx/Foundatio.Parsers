@@ -23,7 +23,7 @@
     <PackageOutputPath>$(SolutionDir)artifacts\</PackageOutputPath>
 
     <PackageReleaseNotes>https://github.com/FoundatioFx/Foundatio.Parsers/releases</PackageReleaseNotes>
-    <PackageIconUrl>https://raw.githubusercontent.com/FoundatioFx/Foundatio.Parsers/master/media/foundatio-icon.png</PackageIconUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/FoundatioFx/Foundatio/master/media/foundatio-icon.png</PackageIconUrl>
     <PackageProjectUrl>https://github.com/FoundatioFx/Foundatio.Parsers</PackageProjectUrl>
     <PackageLicenseUrl>http://www.apache.org/licenses/LICENSE-2.0</PackageLicenseUrl>
     <RepositoryType>git</RepositoryType>
