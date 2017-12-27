@@ -156,7 +156,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
             var start = GetDate(context, "StartDate");
             var end = GetDate(context, "EndDate");
-            var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<DateTime> { Minimum = start.Value, Maximum = end.Value } : null;
+            var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
 
             // TODO: Look into memoizing this lookup
             // TODO: Should we validate the interval range.
@@ -167,7 +167,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 Interval = GetInterval(proximity, start, end),
                 TimeZone = GetTimeZone(boost, context),
                 Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
-                ExtendedBounds = bounds
+                ExtendedBoundsDateMath = bounds
             };
         }
 
