@@ -1178,7 +1178,7 @@ namespace Foundatio.Parsers.Tests {
             if (!String.Equals(node.Field, "fixed", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            if (!Boolean.TryParse(node.Term, out bool isFixed))
+            if (!Boolean.TryParse(node.Term, out var isFixed))
                 return;
 
             var query = new ExistsQuery { Field = "date_fixed" };
