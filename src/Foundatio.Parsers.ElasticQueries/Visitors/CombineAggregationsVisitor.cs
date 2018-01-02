@@ -38,8 +38,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                             else
                                 termsAggregation.Include = new TermsInclude(new List<string> { termNode.UnescapedTerm });
                         } else if (termNode.Field == "@missing") {
-                            // NOTE: Fixed in nightly
-                            // termsAggregation.Missing = termNode.UnescapedTerm;
+                            termsAggregation.Missing = termNode.UnescapedTerm;
                         } else if (termNode.Field == "@min") {
                             int? minCount = null;
                             if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))

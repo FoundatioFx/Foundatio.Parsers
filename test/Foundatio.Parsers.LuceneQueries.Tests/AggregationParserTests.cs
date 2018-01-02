@@ -205,7 +205,7 @@ namespace Foundatio.Parsers.Tests {
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Terms("terms_field1", t => t
                     .Field("field1.keyword")
-                    .OrderDescending("cardinality_field4")
+                    .Order(o => o.Descending("cardinality_field4"))
                     .Aggregations(a2 => a2
                         .Cardinality("cardinality_field4", c => c.Field("field4")))
                     .Meta(m => m.Add("@field_type", "keyword")))));
@@ -308,7 +308,7 @@ namespace Foundatio.Parsers.Tests {
                 c => c
                     .UseGeo(l => "someinvalidvaluehere")
                     .UseAliases(visitor.RootAliasMap)
-                    .UseMappings<MyType>(m => mapping, () => client.GetMapping(new GetMappingRequest(index, index)).Mapping));
+                    .UseMappings<MyType>(m => mapping, () => client.GetMapping(new GetMappingRequest(index, index)).Indices[index][index]));
             
             await processor.BuildAggregationsAsync("geogrid:geo~3");
 

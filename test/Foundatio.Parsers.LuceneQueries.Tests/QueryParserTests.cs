@@ -710,11 +710,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void NestedFilterProcessor() {
-            var client = GetClient(new ConnectionSettings()
-                .MapDefaultTypeNames(t => t
-                    .Add(typeof(MyNestedType), "things"))
-                .MapDefaultTypeIndices(d => d
-                    .Add(typeof(MyNestedType), "stuff")));
+            var client = GetClient(new ConnectionSettings().InferMappingFor<MyNestedType>(t => t.IndexName("things").TypeName("stuff")));
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
 
@@ -801,11 +797,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void NestedFilterProcessor2() {
-            var client = GetClient(new ConnectionSettings()
-                .MapDefaultTypeNames(t => t
-                    .Add(typeof(MyNestedType), "things"))
-                .MapDefaultTypeIndices(d => d
-                    .Add(typeof(MyNestedType), "stuff")));
+            var client = GetClient(new ConnectionSettings().InferMappingFor<MyNestedType>(t => t.IndexName("stuff").TypeName("things")));
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
 

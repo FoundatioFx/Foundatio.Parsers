@@ -14,9 +14,6 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (response.OriginalException != null)
                 sb.AppendLine($"Original: ({response.HttpStatusCode} - {response.OriginalException.GetType().Name}) {response.OriginalException.Message}");
 
-            if (response.ServerError != null)
-                sb.AppendLine($"Server: ({response.ServerError.Status}) {response.ServerError.Error}");
-
             if (response is IBulkResponse bulkResponse)
                 sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
 

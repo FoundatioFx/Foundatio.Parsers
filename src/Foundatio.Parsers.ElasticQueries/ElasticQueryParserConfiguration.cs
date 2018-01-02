@@ -344,7 +344,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class {
-            return UseMappings(mappingBuilder, () => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Mapping);
+            return UseMappings(mappingBuilder, () => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Indices[index]?[Types.Type<T>()]);
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Func<ITypeMapping> getMapping) where T : class {
@@ -357,15 +357,15 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(Indices.Index<T>(), Types.Type<T>())).Mapping);
+            return UseMappings(() => client.GetMapping(new GetMappingRequest(Indices.Index<T>(), Types.Type<T>())).Indices[Indices.Index<T>()]?[Types.Type<T>()]);
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client, string index) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Mapping);
+            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Indices[index]?[Types.Type<T>()]);
         }
 
         public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index, string type) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, type)).Mapping);
+            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, type)).Indices[index]?[type]);
         }
 
         public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping) {

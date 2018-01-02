@@ -164,7 +164,7 @@ namespace Foundatio.Parsers.Tests {
             var walker = new MappingWalker(visitor);
             walker.Accept(mapping);
 
-            var processor = new ElasticQueryParser(c => c.UseAliases(visitor.RootAliasMap).UseMappings<Employee>(m => mapping, () => client.GetMapping(new GetMappingRequest(index, index)).Mapping));
+            var processor = new ElasticQueryParser(c => c.UseAliases(visitor.RootAliasMap).UseMappings<Employee>(m => mapping, () => client.GetMapping(new GetMappingRequest(index, index)).Indices[index][index]));
             var result = await processor.BuildQueryAsync("employee_id:ex-001 url:\"/u/ex-001/profile.png\" data.code:1234567890");
             var actualResponse = client.Search<Employee>(d => d.Index(index).Query(q => result));
             string actualRequest = actualResponse.GetRequest();
