@@ -49,7 +49,7 @@ namespace Foundatio.Parsers.Tests {
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
-                    .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
+                    .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Source("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Source("doc['field3'].lon")))))
                 .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword")))
                 .Histogram("histogram_field4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
                 .DateHistogram("date_field5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
@@ -131,7 +131,7 @@ namespace Foundatio.Parsers.Tests {
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .GeoHash("geogrid_alias3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
-                    .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Inline("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Inline("doc['field3'].lon")))))
+                    .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Source("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Source("doc['field3'].lon")))))
                 .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword")))
                 .Histogram("histogram_alias4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
                 .DateHistogram("date_alias5", d1 => d1.Field("field5").Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))

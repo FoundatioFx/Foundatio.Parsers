@@ -710,7 +710,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void NestedFilterProcessor() {
-            var client = GetClient(new ConnectionSettings().InferMappingFor<MyNestedType>(t => t.IndexName("things").TypeName("stuff")));
+            var client = GetClient(new ConnectionSettings().InferMappingFor<MyNestedType>(t => t.IndexName("stuff").TypeName("things")));
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
 
@@ -736,7 +736,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyNestedType {Field1 = "value2", Field2 = "value2"},
                 new MyNestedType {Field1 = "value1", Field2 = "value4"}
             });
-            client.Refresh("stuff");
+            client.Refresh(Indices.Index<MyNestedType>());
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyNestedType>(client).UseNested());
             var result =
@@ -761,7 +761,7 @@ namespace Foundatio.Parsers.Tests {
                                                                                               .Query("value1"))))));
 
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);

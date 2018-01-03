@@ -43,7 +43,19 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
         public override void Visit(ITokenCountProperty property) => AddAlias(property);
 
-        // TODO Add support for more overloads. string will be removed in 6.0
+        public override void Visit(IDateRangeProperty property) => AddAlias(property);
+
+        public override void Visit(IDoubleRangeProperty property) => AddAlias(property);
+
+        public override void Visit(IFloatRangeProperty property) => AddAlias(property);
+
+        public override void Visit(IIntegerRangeProperty property) => AddAlias(property);
+
+        public override void Visit(ILongRangeProperty property) => AddAlias(property);
+
+        public override void Visit(IJoinProperty property) => AddAlias(property);
+
+        public override void Visit(IPercolatorProperty property) => AddAlias(property);
 
         private void AddAlias(IProperty property) {
             while (Depth < _stack.Count)

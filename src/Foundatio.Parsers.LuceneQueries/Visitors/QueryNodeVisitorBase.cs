@@ -37,24 +37,19 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public virtual Task VisitAsync(IQueryNode node, IQueryVisitorContext context) {
-            var groupNode = node as GroupNode;
-            if (groupNode != null)
+            if (node is GroupNode groupNode)
                 return VisitAsync(groupNode, context);
 
-            var termNode = node as TermNode;
-            if (termNode != null)
+            if (node is TermNode termNode)
                 return VisitAsync(termNode, context);
 
-            var termRangeNode = node as TermRangeNode;
-            if (termRangeNode != null)
+            if (node is TermRangeNode termRangeNode)
                 return VisitAsync(termRangeNode, context);
 
-            var missingNode = node as MissingNode;
-            if (missingNode != null)
+            if (node is MissingNode missingNode)
                 return VisitAsync(missingNode, context);
 
-            var existsNode = node as ExistsNode;
-            if (existsNode != null)
+            if (node is ExistsNode existsNode)
                 return VisitAsync(existsNode, context);
 
             return Task.CompletedTask;
