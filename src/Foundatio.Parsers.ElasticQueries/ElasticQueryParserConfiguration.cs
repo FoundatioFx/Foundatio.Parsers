@@ -241,8 +241,8 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (String.IsNullOrEmpty(field) || _serverMapping == null)
                 return null;
 
-            string[] fieldParts = field.Split('.');
-            IProperties currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
+            var fieldParts = field.Split('.');
+            var currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
 
             for (int depth = 0; depth < fieldParts.Length; depth++) {
                 string fieldPart = fieldParts[depth];

@@ -167,7 +167,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 Interval = GetInterval(proximity, start, end),
                 TimeZone = GetTimeZone(boost, context),
                 Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
-                ExtendedBounds = bounds
+                ExtendedBoundsDateMath = bounds
             };
         }
 
