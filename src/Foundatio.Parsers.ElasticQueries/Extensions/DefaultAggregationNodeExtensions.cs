@@ -55,6 +55,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
                 case AggregationType.Terms:
                     return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+
+                case AggregationType.TopHits:
+                    return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
             }
 
             return null;
@@ -90,6 +93,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
                 case AggregationType.Cardinality:
                     return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
+
+                case AggregationType.TopHits:
+                    return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
 
                 case AggregationType.Missing:
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
