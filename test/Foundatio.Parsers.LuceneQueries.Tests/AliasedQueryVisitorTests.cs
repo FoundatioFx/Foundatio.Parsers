@@ -67,6 +67,28 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public async Task AliasMapShouldBeAppliedToAllLevels7Async() {
+            var parser = new LuceneQueryParser();
+            var result = await parser.ParseAsync("field1.nested.childproperty:value");
+            var aliasMap = new AliasMap {
+                { "field1", new AliasMapValue { Name = "field2", ChildMap = { { "nested", "other" } } } }
+            };
+            var aliased = await AliasedQueryVisitor.RunAsync(result, aliasMap);
+            Assert.Equal("field2.other.childproperty:value", aliased.ToString());
+        }
+
+        [Fact]
+        public async Task AliasMapShouldBeAppliedToAllLevels8Async() {
+            var parser = new LuceneQueryParser();
+            var result = await parser.ParseAsync("field1:(nested.childproperty:value)");
+            var aliasMap = new AliasMap {
+                { "field1", new AliasMapValue { Name = "field2", ChildMap = { { "nested", "other" } } } }
+            };
+            var aliased = await AliasedQueryVisitor.RunAsync(result, aliasMap);
+            Assert.Equal("field2:(other.childproperty:value)", aliased.ToString());
+        }
+
+        [Fact]
         public async Task AliasMapShouldBeAppliedToAllLevels6Async() {
             var parser = new LuceneQueryParser();
             var result = await parser.ParseAsync("field1.nested:(hey:value)");
