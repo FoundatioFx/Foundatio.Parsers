@@ -1,6 +1,6 @@
 ﻿<Project ToolsVersion="15.0">
   <Import Project="version.props" />
-  
+
   <PropertyGroup>
     <ProjectParentDirectory>$([System.IO.Path]::GetDirectoryName('$(MSBuildProjectDirectory)'))</ProjectParentDirectory>
     <ProjectParentDirectoryName>$([System.IO.Path]::GetFileName('$(ProjectParentDirectory)'))</ProjectParentDirectoryName>
@@ -11,7 +11,7 @@
   <ItemGroup>
     <PackageReference Include="AsyncFixer" Version="1.1.6" PrivateAssets="All" />
   </ItemGroup>
-  
+
   <PropertyGroup>
     <Product>Foundatio.Parsers</Product>
     <Description>A lucene style query parser that is extensible and allows additional syntax features.</Description>
@@ -19,6 +19,7 @@
     <Authors>FoundatioFx</Authors>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <WarningsAsErrors>true</WarningsAsErrors>
+    <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageOutputPath>$(SolutionDir)artifacts\</PackageOutputPath>
 
