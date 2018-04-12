@@ -3,6 +3,7 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/kkq6y70nt41ekc5r?svg=true)](https://ci.appveyor.com/project/Exceptionless/foundatio-parsers)
 [![NuGet Version](http://img.shields.io/nuget/v/Foundatio.Parsers.LuceneQueries.svg?style=flat)](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) 
 [![Slack Status](https://slack.exceptionless.com/badge.svg)](https://slack.exceptionless.com)
+[![Help Contribute to Open Source](https://www.codetriage.com/foundatiofx/foundatio.parsers/badges/users.svg)](https://www.codetriage.com/foundatiofx/foundatio.parsers)
 
 A lucene style query parser that is extensible and allows additional syntax features. Also includes an Elasticsearch query_string query replacement that greatly enhances its capabilities for dynamic queries.
 
