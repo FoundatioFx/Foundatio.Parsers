@@ -24,7 +24,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             return context.GetPropertyMappingFunc?.Invoke(field);
         }
 
-        public static string GetNonAnalyzedFieldName(this IElasticQueryVisitorContext context, string field) {
+        public static string GetNonAnalyzedFieldName(this IElasticQueryVisitorContext context, string field, string preferredSubField = null) {
             if (String.IsNullOrEmpty(field))
                 return field;
 
@@ -35,8 +35,8 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             var multiFieldProperty = property as ICoreProperty;
             if (multiFieldProperty?.Fields == null)
                 return field;
-
-            var nonAnalyzedProperty = multiFieldProperty.Fields.FirstOrDefault(kvp => {
+            
+            var nonAnalyzedProperty = multiFieldProperty.Fields.OrderByDescending(kvp => kvp.Key.Name == preferredSubField).FirstOrDefault(kvp => {
                 if (kvp.Value is IKeywordProperty)
                     return true;
 
