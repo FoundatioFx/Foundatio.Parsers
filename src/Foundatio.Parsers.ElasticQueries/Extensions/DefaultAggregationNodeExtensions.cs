@@ -28,7 +28,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left != null)
                 return null;
 
-            string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+            string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "keyword");
             var mapping = elasticContext.GetPropertyMapping(field);
 
             switch (node.GetOperationType()) {
@@ -68,7 +68,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+            string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "keyword");
             var mapping = elasticContext.GetPropertyMapping(field);
             string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: GetString(context, "TimeZone");
 
