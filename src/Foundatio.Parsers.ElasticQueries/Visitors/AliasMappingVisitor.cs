@@ -35,8 +35,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
         public override void Visit(IGeoShapeProperty property) => AddAlias(property);
 
-        public override void Visit(IAttachmentProperty property) => AddAlias(property);
-
         public override void Visit(INumberProperty property) => AddAlias(property);
 
         public override void Visit(ICompletionProperty property) => AddAlias(property);
