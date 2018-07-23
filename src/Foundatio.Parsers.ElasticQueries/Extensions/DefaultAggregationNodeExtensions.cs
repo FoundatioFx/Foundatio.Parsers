@@ -148,8 +148,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
-            int interval = 50;
-            if (int.TryParse(proximity, out int prox))
+            double interval = 50;
+            if (double.TryParse(proximity, out double prox))
                 interval = prox;
 
             return new HistogramAggregation(originalField) {

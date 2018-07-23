@@ -185,6 +185,37 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void ProcessHistogramIntervalAggregations() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var aggregations = processor.BuildAggregationsAsync("histogram:(field1~0.1)").Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualResponse);
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+                .Histogram("histogram_field1", t => t
+                    .Field("field1.keyword")
+                    .Interval(0.1)
+                    .MinimumDocumentCount(0)
+                    )));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void ProcessTermTopHitsAggregations() {
             var client = GetClient();
             client.DeleteIndex("stuff");
