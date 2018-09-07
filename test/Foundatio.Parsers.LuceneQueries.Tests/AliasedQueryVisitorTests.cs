@@ -20,7 +20,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public async Task CanUseAliasMapForTopLevelAlias2Async() {
-            var filter = "program:postgrad";
+            string filter = "program:postgrad";
             var aliasMap = new AliasMap {
                { "program", "programName" }
             };
