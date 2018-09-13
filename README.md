@@ -50,6 +50,7 @@ System.Diagnostics.Debug.Assert(query == generatedQuery);
 
 ## Features
 - Lucene Query Syntax Parser
+  - Parsers fairly standardized syntax from [Lucene](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/query-dsl-query-string-query.html).
   - Visitors for extensibility
 - Field Aliases
 - Query Includes
