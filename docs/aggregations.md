@@ -30,6 +30,7 @@ Examples:
                 "value": 87
               }
             }
+          ]
         }
       }
     }
