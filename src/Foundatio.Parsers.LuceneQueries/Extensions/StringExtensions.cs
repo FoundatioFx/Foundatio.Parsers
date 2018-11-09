@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
-    internal static class StringExtensions {
+    public static class StringExtensions {
         public static string Unescape(this string input) {
             if (input == null)
                 return null;

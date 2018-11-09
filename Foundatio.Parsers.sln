@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Parsers.LuceneQue
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Parsers.ElasticQueries", "src\Foundatio.Parsers.ElasticQueries\Foundatio.Parsers.ElasticQueries.csproj", "{9F6F9CC3-2544-44EB-8829-209187271A4E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Parsers.LuceneQueries.Tests", "test\Foundatio.Parsers.LuceneQueries.Tests\Foundatio.Parsers.LuceneQueries.Tests.csproj", "{DDFFC095-C821-41DA-8DFF-2AD37A56106F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Parsers.LuceneQueries.Tests", "tests\Foundatio.Parsers.LuceneQueries.Tests\Foundatio.Parsers.LuceneQueries.Tests.csproj", "{DDFFC095-C821-41DA-8DFF-2AD37A56106F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{400D08AA-50A4-4D74-A3AD-F74AAB8FC706}"
 	ProjectSection(SolutionItems) = preProject
