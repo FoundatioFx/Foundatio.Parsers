@@ -163,7 +163,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
-            var aggregations = processor.BuildAggregationsAsync("terms:(field1 @exclude:myexclude @include:myinclude @missing:mymissing @min:1)").Result;
+            var aggregations = processor.BuildAggregationsAsync("terms:(field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
@@ -173,9 +173,72 @@ namespace Foundatio.Parsers.Tests {
                 .Terms("terms_field1", t => t
                     .Field("field1.keyword")
                     .MinimumDocumentCount(1)
-                    .Include("myinclude")
-                    .Exclude("myexclude")
+                    .Include(new[] { "otherinclude", "myinclude" })
+                    .Exclude(new[] { "otherexclude", "myexclude" })
                     .Missing("mymissing")
+                    .Meta(m => m.Add("@field_type", "keyword")))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void ProcessHistogramIntervalAggregations() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var aggregations = processor.BuildAggregationsAsync("histogram:(field1~0.1)").Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualResponse);
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+                .Histogram("histogram_field1", t => t
+                    .Field("field1.keyword")
+                    .Interval(0.1)
+                    .MinimumDocumentCount(0)
+                    )));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void ProcessTermTopHitsAggregations() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
+            client.Refresh("stuff");
+
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var aggregations = processor.BuildAggregationsAsync("terms:(field1~1000^2 tophits:(_~1000 @include:myinclude))").Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualResponse);
+
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+                .Terms("terms_field1", t => t
+                    .Field("field1.keyword")
+                    .Size(1000)
+                    .MinimumDocumentCount(2)
+                    .Aggregations(a1 => a1.TopHits("tophits", t2 => t2.Size(1000).Source(s => s.Includes(i => i.Field("myinclude")))))
                     .Meta(m => m.Add("@field_type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", expectedRequest);

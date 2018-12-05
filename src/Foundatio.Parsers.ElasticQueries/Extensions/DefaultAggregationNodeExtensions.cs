@@ -28,7 +28,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left != null)
                 return null;
 
-            string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+            string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "keyword");
             var mapping = elasticContext.GetPropertyMapping(field);
 
             switch (node.GetOperationType()) {
@@ -55,6 +55,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
                 case AggregationType.Terms:
                     return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+
+                case AggregationType.TopHits:
+                    return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
             }
 
             return null;
@@ -65,7 +68,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            string field = elasticContext.GetNonAnalyzedFieldName(node.Field);
+            string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "keyword");
             var mapping = elasticContext.GetPropertyMapping(field);
             string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: GetString(context, "TimeZone");
 
@@ -90,6 +93,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
                 case AggregationType.Cardinality:
                     return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
+
+                case AggregationType.TopHits:
+                    return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
 
                 case AggregationType.Missing:
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
@@ -142,8 +148,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
-            int interval = 50;
-            if (Int32.TryParse(proximity, out var prox))
+            double interval = 50;
+            if (double.TryParse(proximity, out double prox))
                 interval = prox;
 
             return new HistogramAggregation(originalField) {

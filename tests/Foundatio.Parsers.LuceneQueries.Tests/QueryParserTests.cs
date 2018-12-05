@@ -710,7 +710,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void NestedFilterProcessor() {
-            var client = GetClient(new ConnectionSettings().InferMappingFor<MyNestedType>(t => t.IndexName("stuff").TypeName("things")));
+            var client = GetClient(new ConnectionSettings().DefaultMappingFor<MyNestedType>(t => t.IndexName("stuff").TypeName("things")));
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
 
@@ -797,7 +797,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void NestedFilterProcessor2() {
-            var client = GetClient(new ConnectionSettings().InferMappingFor<MyNestedType>(t => t.IndexName("stuff").TypeName("things")));
+            var client = GetClient(new ConnectionSettings().DefaultMappingFor<MyNestedType>(t => t.IndexName("stuff").TypeName("things")));
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
 
@@ -1035,7 +1035,7 @@ namespace Foundatio.Parsers.Tests {
             client.Map<MyType>(
                 d => d.Dynamic(true).Index("stuff").Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))
                     .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
-                    .Text(e => e.Name(m => m.Field2))
+                    .Text(e => e.Name(m => m.Field2).Fields(f2 => f2.Keyword(e1 => e1.Name("keyword")).Keyword(e2 => e2.Name("sort"))))
                 ));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" },
                 i => i.Index("stuff"));
@@ -1055,7 +1055,7 @@ namespace Foundatio.Parsers.Tests {
                     s =>
                         s.Ascending(new Field("field3"))
                             .Descending(new Field("field1.keyword"))
-                            .Descending(new Field("field2"))
+                            .Descending(new Field("field2.sort"))
                             .Descending(new Field("field3"))
                             .Ascending(new Field("field4"))
                             .Ascending(new Field("field5"))

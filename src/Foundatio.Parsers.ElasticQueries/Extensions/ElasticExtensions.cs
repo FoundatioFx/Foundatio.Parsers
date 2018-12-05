@@ -23,6 +23,26 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return sb.ToString();
         }
 
+        public static TermsInclude AddValue(this TermsInclude include, string value) {
+            if (include?.Values == null)
+                return new TermsInclude(new[] { value });
+
+            var values = include.Values.ToList();
+            values.Add(value);
+
+            return new TermsInclude(values);
+        } 
+
+        public static TermsExclude AddValue(this TermsExclude exclude, string value) {
+            if (exclude?.Values == null)
+                return new TermsExclude(new[] { value });
+
+            var values = exclude.Values.ToList();
+            values.Add(value);
+            
+            return new TermsExclude(values);
+        } 
+
         // TODO: Handle IFailureReason/BulkIndexByScrollFailure and other bulk response types.
         public static string GetErrorMessage(this IResponse response) {
             var sb = new StringBuilder();

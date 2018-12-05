@@ -43,8 +43,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             var resolver = node.Parent.GetAliasResolver(context);
             var result = resolver != null && node.Field != null ? resolver(node.Field) : null;
             if (result == null) {
-                var groupNode = node as GroupNode;
-                if (groupNode != null)
+                if (node is GroupNode groupNode)
                     node.SetAliasResolver(_useNestedResolvers ? GetScopedResolver(resolver, node.Field) : resolver);
 
                 return;
@@ -109,11 +108,11 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 return null;
 
             var currentResolver = InternalResolve(this);
-            GetAliasResult result = InternalResolve(field, currentResolver);
+            var result = InternalResolve(field, currentResolver);
             if (result != null)
                 return result;
 
-            var fieldParts = field.Split('.');
+            string[] fieldParts = field.Split('.');
             for (int i = 0; i < fieldParts.Length; i++) {
                 var currentResult = InternalResolve(fieldParts, i, currentResolver);
                 if (currentResult == null)
@@ -137,8 +136,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
         private AliasResolver InternalResolve(AliasMap aliasMap) {
             return field => {
-                AliasMapValue aliasMapValue;
-                if (aliasMap.TryGetValue(field, out aliasMapValue))
+                if (aliasMap.TryGetValue(field, out var aliasMapValue))
                     return new GetAliasResult {
                         Name = aliasMapValue.Name,
                         Resolver = f => aliasMapValue.HasChildMappings ? aliasMapValue.ChildMap.Resolve(f) : null

@@ -20,6 +20,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             var termsAggregation = container as ITermsAggregation;
             var termsProperty = elasticContext.GetPropertyMapping(node.GetFullName());
             var dateHistogramAggregation = container as IDateHistogramAggregation;
+            var topHitsAggregation = container as ITopHitsAggregation;
 
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
                 var aggregation = child.GetAggregation(() => child.GetDefaultAggregation(context));
@@ -28,15 +29,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     if (termNode != null && termsAggregation != null) {
                         // TODO: Move these to the default aggs method using a visitor to walk down the tree to gather them but not going into any sub groups
                         if (termNode.Field == "@exclude") {
-                            if (termsProperty is ITextProperty || termsProperty is IKeywordProperty)
-                                termsAggregation.Exclude = new TermsExclude(termNode.UnescapedTerm);
-                            else
-                                termsAggregation.Exclude = new TermsExclude(new List<string> { termNode.UnescapedTerm });
+                            termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm);
                         } else if (termNode.Field == "@include") {
-                            if (termsProperty is ITextProperty || termsProperty is IKeywordProperty)
-                                termsAggregation.Include = new TermsInclude(termNode.UnescapedTerm);
-                            else
-                                termsAggregation.Include = new TermsInclude(new List<string> { termNode.UnescapedTerm });
+                            termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm);
                         } else if (termNode.Field == "@missing") {
                             termsAggregation.Missing = termNode.UnescapedTerm;
                         } else if (termNode.Field == "@min") {
@@ -46,6 +41,22 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
                             termsAggregation.MinimumDocumentCount = minCount;
                         }
+                    }
+
+                    if (termNode != null && topHitsAggregation != null) {
+                        var filter = node.GetSourceFilter(() => new SourceFilter());
+                        if (termNode.Field == "@exclude") {
+                            if (filter.Excludes == null)
+                                filter.Excludes = termNode.UnescapedTerm;
+                            else
+                                filter.Excludes.And(termNode.UnescapedTerm);
+                        } else if (termNode.Field == "@include") {
+                            if (filter.Includes == null)
+                                filter.Includes = termNode.UnescapedTerm;
+                            else
+                                filter.Includes.And(termNode.UnescapedTerm);
+                        }
+                        topHitsAggregation.Source = filter;
                     }
 
                     if (termNode != null && dateHistogramAggregation != null) {
@@ -63,10 +74,13 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     continue;
                 }
 
-                if (container.Aggregations == null)
-                    container.Aggregations = new AggregationDictionary();
+                if (container is BucketAggregationBase bucketContainer) {
+                    if (bucketContainer.Aggregations == null)
+                        bucketContainer.Aggregations = new AggregationDictionary();
+                    
+                    bucketContainer.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                }
 
-                container.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
                 if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+")) {
                     if (termsAggregation.Order == null)
                         termsAggregation.Order = new List<TermsOrder>();
@@ -82,8 +96,8 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 node.SetAggregation(container);
         }
 
-        private BucketAggregationBase GetParentContainer(IQueryNode node, IQueryVisitorContext context) {
-            BucketAggregationBase container = null;
+        private AggregationBase GetParentContainer(IQueryNode node, IQueryVisitorContext context) {
+            AggregationBase container = null;
             var currentNode = node;
             while (container == null && currentNode != null) {
                 IQueryNode n = currentNode;
@@ -93,7 +107,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                         n.SetAggregation(result);
 
                     return result;
-                }) as BucketAggregationBase;
+                }) as AggregationBase;
 
                 if (currentNode.Parent != null)
                     currentNode = currentNode.Parent;

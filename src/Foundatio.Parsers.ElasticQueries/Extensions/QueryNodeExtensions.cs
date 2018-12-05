@@ -27,6 +27,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return value as QueryBase;
         }
 
+        private const string SourceFilterKey = "@SourceFilter";
+        public static SourceFilter GetSourceFilter(this IQueryNode node, Func<SourceFilter> getDefaultValue = null) {
+            if (!node.Data.TryGetValue(SourceFilterKey, out object value))
+                return getDefaultValue?.Invoke();
+
+            return value as SourceFilter;
+        }
+
         public static void SetQuery(this IQueryNode node, QueryBase container) {
             node.Data[QueryKey] = container;
         }

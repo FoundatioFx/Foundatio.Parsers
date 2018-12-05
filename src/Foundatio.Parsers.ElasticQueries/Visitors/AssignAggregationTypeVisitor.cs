@@ -48,6 +48,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 case AggregationType.GeoHashGrid:
                 case AggregationType.Terms:
                 case AggregationType.Stats:
+                case AggregationType.TopHits:
                 case AggregationType.ExtendedStats:
                     return true;
                 default:
@@ -69,6 +70,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public const string GeoHashGrid = "geogrid";
         public const string Terms = "terms";
         public const string Stats = "stats";
+        public const string TopHits = "tophits";
         public const string ExtendedStats = "exstats";
     }
 }

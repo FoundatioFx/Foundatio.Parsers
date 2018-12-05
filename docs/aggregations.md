@@ -30,6 +30,7 @@ Examples:
                 "value": 87
               }
             }
+          ]
         }
       }
     }
@@ -204,3 +205,17 @@ A field data based single bucket aggregation, that creates a bucket of all docum
 
 Examples:
 - Basic: `missing:field`
+
+# Other Aggregations
+
+## `tophits`
+Returns a list of the top hits for the parent aggregation. Since a field name is not used with this aggregation, the specified field name (`tophits:_`) will be ignored.
+
+Modifiers:
+- `~` Sets the size to define how many term buckets should be returned out of the overall terms list.
+- `@include` Will include the specified field in the resulting top hits document.
+- `@exclude` Will exclude the specified field in the resulting top hits document.
+
+Examples:
+- Basic: `terms:(field tophits:_)`
+- Return terms excluding "value": `terms:(field tophits:(_ @exclude:value))`
