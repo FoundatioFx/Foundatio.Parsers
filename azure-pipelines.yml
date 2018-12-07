@@ -1,23 +1,25 @@
-trigger:
-- master
-
 pool:
-  vmImage: 'Ubuntu-16.04'
-
-variables:
-  imageName: 'your-container-image-name:$(build.buildId)'
+  vmImage: 'ubuntu-16.04'
 
 steps:
-- bash: |
+- script: |
     VERSION_PREFIX=$(sed -n 's/.*<VersionPrefix>\([^<]*\)<\/VersionPrefix>.*/\1/p' <<< cat ./build/common.props)
-    VERSION_SUFFIX=$APPVEYOR_BUILD_NUMBER
-    VERSION="$VERSION_PREFIX.$VERSION_SUFFIX"
-    echo "Version: $VERSION Tag: $APPVEYOR_REPO_TAG_NAME"
-  displayName: 'get version'
-
-- bash: |
-    docker build --target testrunner -t foundatio:test --build-arg VERSION_SUFFIX=${VERSION_SUFFIX} .
+    if [ $APPVEYOR_REPO_TAG != "true" ]; then
+      VERSION_SUFFIX="$BUILD_BUILDID-pre"
+      VERSION="$VERSION_PREFIX.$VERSION_SUFFIX"
+      echo "Version: $VERSION"
+    else
+      VERSION_SUFFIX=$BUILD_BUILDID
+      VERSION="$VERSION_PREFIX.$VERSION_SUFFIX"
+      echo "Version: $VERSION Tag: $BUILD_SOURCEBRANCEHNAME"
+    fi
+    docker build --target testrunner -t foundatio:$VERSION_SUFFIX --build-arg VERSION_SUFFIX=${VERSION_SUFFIX} .
     docker run -d -m 1g -p 9200:9200 -p 9300:9300 -e discovery.type=single-node -e ES_JAVA_OPTS='-Xms512m -Xmx512m' docker.elastic.co/elasticsearch/elasticsearch:6.5.1
-    docker run -e APPVEYOR_API_URL --net=host -v $(pwd)/artifacts:/app/artifacts foundatio:test
-  displayName: 'docker build'
+    docker run --name testrunner --net=host --rm -d foundatio:$VERSION_SUFFIX
+    docker cp testrunner:app/artifacts $(System.DefaultWorkingDirectory)
+    docker stop testrunner
 
+- task: PublishTestResults@2
+  inputs:
+    testRunner: VSTest
+    testResultsFiles: '**/*.trx'
