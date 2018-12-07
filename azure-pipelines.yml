@@ -13,11 +13,15 @@ steps:
       VERSION="$VERSION_PREFIX.$VERSION_SUFFIX"
       echo "Version: $VERSION Tag: $BUILD_SOURCEBRANCEHNAME"
     fi
-    docker build --target testrunner -t foundatio:$VERSION_SUFFIX --build-arg VERSION_SUFFIX=${VERSION_SUFFIX} .
+    docker build --target testrunner -t foundatio:test-$VERSION_SUFFIX --build-arg VERSION_SUFFIX=${VERSION_SUFFIX} .
     docker run -d -m 1g -p 9200:9200 -p 9300:9300 -e discovery.type=single-node -e ES_JAVA_OPTS='-Xms512m -Xmx512m' docker.elastic.co/elasticsearch/elasticsearch:6.5.1
-    docker run --name testrunner --net=host --rm -d foundatio:$VERSION_SUFFIX
-    docker cp testrunner:app/artifacts $(System.DefaultWorkingDirectory)
+    docker run --name testrunner --net=host --rm -d foundatio:test-$VERSION_SUFFIX
+    docker cp testrunner:/app/artifacts $(System.DefaultWorkingDirectory)
     docker stop testrunner
+    docker build --target pack -t foundatio:pack-$VERSION_SUFFIX --build-arg VERSION_SUFFIX=${VERSION_SUFFIX} .
+    docker run  --name pack --net=host --rm -d foundatio:pack-$VERSION_SUFFIX
+    docker cp pack:/app/artifacts $(System.DefaultWorkingDirectory)
+    docker stop pack
 
 - task: PublishTestResults@2
   inputs:
