@@ -364,10 +364,6 @@ namespace Foundatio.Parsers.ElasticQueries {
             return UseMappings(() => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Indices[index]?[Types.Type<T>()]);
         }
 
-        public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index, string type) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, type)).Indices[index]?[type]);
-        }
-
         public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping) {
             GetServerMappingFunc = getMapping;
 

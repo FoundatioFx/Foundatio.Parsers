@@ -1051,15 +1051,14 @@ namespace Foundatio.Parsers.Tests {
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualResponse);
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff")
-                .Sort(
-                    s =>
-                        s.Ascending(new Field("field3"))
-                            .Descending(new Field("field1.keyword"))
-                            .Descending(new Field("field2.sort"))
-                            .Descending(new Field("field3"))
-                            .Ascending(new Field("field4"))
-                            .Ascending(new Field("field5"))
-                            .Ascending(new Field("field3"))
+                .Sort(s => s
+                    .Ascending(new Field("field3"))
+                    .Descending(new Field("field1.keyword"))
+                    .Descending(new Field("field2.sort"))
+                    .Descending(new Field("field3"))
+                    .Ascending(new Field("field4"))
+                    .Ascending(new Field("field5"))
+                    .Ascending(new Field("field3"))
                 ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", expectedRequest);
