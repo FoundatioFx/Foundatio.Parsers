@@ -27,7 +27,7 @@ before_build:
 
 build_script:
   - docker build --target testrunner -t foundatio:test --build-arg VERSION_SUFFIX=${VERSION_SUFFIX} .
-  - docker run -d -m 1g -p 9200:9200 -p 9300:9300 -e discovery.type=single-node -e ES_JAVA_OPTS='-Xms512m -Xmx512m' docker.elastic.co/elasticsearch/elasticsearch:6.5.1
+  - docker run -d -m 1g -p 9200:9200 -p 9300:9300 -e discovery.type=single-node -e ES_JAVA_OPTS='-Xms512m -Xmx512m' docker.elastic.co/elasticsearch/elasticsearch:6.5.2
   - docker run -e APPVEYOR_API_URL --net=host -v $(pwd)/artifacts:/app/artifacts foundatio:test
 
 after_build:
