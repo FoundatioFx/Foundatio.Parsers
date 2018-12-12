@@ -25,7 +25,7 @@ namespace Foundatio.Parsers.Tests {
             if (settings == null)
                 settings = new ConnectionSettings();
 
-            return new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
+            return new ElasticClient(settings.DisableDirectStreaming().DefaultTypeName("_doc").PrettyJson());
         }
 
         [Fact]
@@ -710,7 +710,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void NestedFilterProcessor() {
-            var client = GetClient(new ConnectionSettings().DefaultMappingFor<MyNestedType>(t => t.IndexName("stuff").TypeName("things")));
+            var client = GetClient(new ConnectionSettings().DefaultMappingFor<MyNestedType>(t => t.IndexName("stuff")));
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
 
@@ -797,7 +797,7 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void NestedFilterProcessor2() {
-            var client = GetClient(new ConnectionSettings().DefaultMappingFor<MyNestedType>(t => t.IndexName("stuff").TypeName("things")));
+            var client = GetClient(new ConnectionSettings().DefaultMappingFor<MyNestedType>(t => t.IndexName("stuff")));
             client.DeleteIndex("stuff");
             client.Refresh("stuff");
 
@@ -965,24 +965,20 @@ namespace Foundatio.Parsers.Tests {
             var ctx = new ElasticQueryVisitorContext { UseScoring = true };
             ctx.Data["TimeZone"] = "America/Chicago";
 
-            var processor = new ElasticQueryParser(c => c
-                .UseMappings<MyType>(client, "stuff"));
-
-            var result =
-                processor.BuildQueryAsync("field5:[2017-01-01 TO 2017-01-31} OR field1:value1", ctx).Result;
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").SetLoggerFactory(Log));
+            var result = processor.BuildQueryAsync("field5:[2017-01-01 TO 2017-01-31} OR field1:value1", ctx).Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualResponse);
 
             var expectedResponse =
-                client.Search<MyType>(
-                    d =>
-                        d.Index("stuff")
-                            .Query(
-                                f =>
-                                    f.DateRange(m => m.Field(f2 => f2.Field5).GreaterThanOrEquals("2017-01-01").LessThan("2017-01-31").TimeZone("America/Chicago")) ||
-                                    f.Match(e => e.Field(m => m.Field1).Query("value1"))));
+                client.Search<MyType>(d => d
+                    .Index("stuff")
+                    .Query(f => f
+                        .DateRange(m => m
+                            .Field(f2 => f2.Field5).GreaterThanOrEquals("2017-01-01").LessThan("2017-01-31").TimeZone("America/Chicago"))
+                                || f.Match(e => e.Field(m => m.Field1).Query("value1"))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", expectedRequest);
 

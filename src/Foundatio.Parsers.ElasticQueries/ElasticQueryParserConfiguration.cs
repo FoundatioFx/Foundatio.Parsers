@@ -3,14 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Exceptionless.DateTimeExtensions;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParserConfiguration {
         private ITypeMapping _serverMapping;
         private ITypeMapping _codeMapping;
+        private ILogger _logger = NullLogger.Instance;
 
         public ElasticQueryParserConfiguration() {
             AddQueryVisitor(new CombineQueriesVisitor(), 10000);
@@ -19,6 +23,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
         }
 
+        public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
         public string[] DefaultFields { get; private set; } = new[] { "_all" };
         public AliasResolver DefaultAliasResolver { get; private set; }
         public Func<string, Task<string>> DefaultIncludeResolver { get; private set; }
@@ -26,6 +31,13 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
+
+        public ElasticQueryParserConfiguration SetLoggerFactory(ILoggerFactory loggerFactory) {
+            LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
+            _logger = loggerFactory.CreateLogger<ElasticQueryParserConfiguration>();
+            
+            return this;
+        }
 
         public ElasticQueryParserConfiguration SetDefaultFields(string[] fields) {
             DefaultFields = fields;
@@ -330,7 +342,8 @@ namespace Foundatio.Parsers.ElasticQueries {
                 _lastMappingUpdate = DateTime.UtcNow;
 
                 return true;
-            } catch (Exception) {
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Error getting server mapping: " + ex.Message);
                 return false;
             }
         }
@@ -344,7 +357,11 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class {
-            return UseMappings(mappingBuilder, () => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Indices[index]?[Types.Type<T>()]);
+            return UseMappings(mappingBuilder, () => {
+                var response = client.GetMapping(new GetMappingRequest(Indices.Index(index)));
+                _logger.LogTrace("GetMapping: {Request}", response.GetRequest());
+                return response.GetMappingFor(index);
+            });
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Func<ITypeMapping> getMapping) where T : class {
@@ -357,11 +374,19 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(Indices.Index<T>(), Types.Type<T>())).Indices[Indices.Index<T>()]?[Types.Type<T>()]);
+            return UseMappings(() => {
+                var response = client.GetMapping(new GetMappingRequest(Indices.Index<T>()));
+                _logger.LogTrace("GetMapping: {Request}", response.GetRequest());
+                return response.GetMappingFor(Indices.Index<T>());
+            });
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client, string index) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Indices[index]?[Types.Type<T>()]);
+            return UseMappings(() => {
+                var response = client.GetMapping(new GetMappingRequest(Indices.Index(index)));
+                _logger.LogTrace("GetMapping: {Request}", response.GetRequest());
+                return response.GetMappingFor(index);
+            });
         }
 
         public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping) {
