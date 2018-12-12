@@ -2,7 +2,7 @@ version: '2'
 
 services:
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:6.5.2
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.5.3
     environment:
       discovery.type: single-node
       xpack.security.enabled: 'false'
@@ -10,3 +10,18 @@ services:
     ports:
       - 9200:9200
       - 9300:9300
+    networks:
+      - foundatio
+
+  kibana:
+    depends_on:
+      - elasticsearch
+    image: docker.elastic.co/kibana/kibana:6.5.3
+    ports:
+      - 5601:5601
+    networks:
+      - foundatio
+
+networks:
+  foundatio:
+    driver: bridge
