@@ -40,12 +40,12 @@ namespace Foundatio.Parsers.Tests {
             }, "stuff");
             client.Refresh("stuff");
 
-            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990"));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990"));
             var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4~50,100 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
@@ -85,12 +85,12 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var aliasMap = new AliasMap { { "user", "data.@user.identity" }, { "alias1", "field1" } };
-            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").UseAliases(aliasMap));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff").UseAliases(aliasMap));
             var aggregations = await processor.BuildAggregationsAsync("terms:(alias1 cardinality:user)");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword"))
@@ -122,12 +122,12 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh("stuff");
 
             var aliasMap = new AliasMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
-            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990").UseAliases(aliasMap));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990").UseAliases(aliasMap));
             var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 histogram:alias4 geogrid:alias3 terms:alias1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .GeoHash("geogrid_alias3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
@@ -162,12 +162,12 @@ namespace Foundatio.Parsers.Tests {
             var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
             client.Refresh("stuff");
 
-            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff"));
             var aggregations = processor.BuildAggregationsAsync("terms:(field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Terms("terms_field1", t => t
@@ -195,12 +195,12 @@ namespace Foundatio.Parsers.Tests {
             var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
             client.Refresh("stuff");
 
-            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff"));
             var aggregations = processor.BuildAggregationsAsync("histogram:(field1~0.1)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Histogram("histogram_field1", t => t
@@ -226,12 +226,12 @@ namespace Foundatio.Parsers.Tests {
             var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
             client.Refresh("stuff");
 
-            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff"));
             var aggregations = processor.BuildAggregationsAsync("terms:(field1~1000^2 tophits:(_~1000 @include:myinclude))").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Terms("terms_field1", t => t
@@ -258,12 +258,12 @@ namespace Foundatio.Parsers.Tests {
             var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
             client.Refresh("stuff");
 
-            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff"));
             var aggregations = processor.BuildAggregationsAsync("terms:(field1 -cardinality:field4)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Terms("terms_field1", t => t
@@ -292,12 +292,12 @@ namespace Foundatio.Parsers.Tests {
             var res = client.IndexMany(new List<MyType> { new MyType { Field5 = SystemClock.UtcNow } }, "stuff");
             client.Refresh("stuff");
 
-            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff"));
             var aggregations = processor.BuildAggregationsAsync("date:(field5^1h @missing:\"0001-01-01T00:00:00\" min:field5^1h max:field5^1h)").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .DateHistogram("date_field5", d1 => d1
@@ -330,12 +330,12 @@ namespace Foundatio.Parsers.Tests {
             var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "test" }, new MyType { Field4 = 1 } }, "stuff");
             client.Refresh("stuff");
 
-            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff"));
             var aggregations = processor.BuildAggregationsAsync("min:field4~0 max:field4~0 avg:field4~0 sum:field4~0 cardinality:field4~0").Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
                 .Sum("sum_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))

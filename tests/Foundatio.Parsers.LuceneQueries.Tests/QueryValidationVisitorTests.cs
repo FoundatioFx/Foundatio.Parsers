@@ -14,9 +14,11 @@ using Xunit.Abstractions;
 namespace Foundatio.Parsers.Tests {
     public class QueryValidationVisitorTests : TestWithLoggingBase {
         private readonly IQueryParser _luceneQueryParser = new LuceneQueryParser();
-        private readonly IQueryParser _elasticQueryParser = new ElasticQueryParser();
+        private readonly IQueryParser _elasticQueryParser;
 
-        public QueryValidationVisitorTests(ITestOutputHelper output) : base(output) {}
+        public QueryValidationVisitorTests(ITestOutputHelper output) : base(output) {
+            _elasticQueryParser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+        }
 
         [Fact]
         public Task GetLuceneQueryInfoAsync() {

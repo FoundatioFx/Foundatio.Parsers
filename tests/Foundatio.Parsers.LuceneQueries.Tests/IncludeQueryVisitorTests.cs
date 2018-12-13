@@ -60,11 +60,11 @@ namespace Foundatio.Parsers.Tests {
             var client = new ElasticClient(new ConnectionSettings().DisableDirectStreaming().PrettyJson());
             var aliases = new AliasMap { { "field", "aliased" }, { "included", "aliasedincluded" } };
 
-            var processor = new ElasticQueryParser(c => c.UseIncludes(i => GetIncludeAsync(i)).UseAliases(aliases));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(i => GetIncludeAsync(i)).UseAliases(aliases));
             var result = await processor.BuildQueryAsync("@include:other");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => f.Bool(b => b.Filter(f1 => f1.Term("aliasedincluded", "value")))));
             string expectedRequest = expectedResponse.GetRequest();
@@ -76,7 +76,7 @@ namespace Foundatio.Parsers.Tests {
             result = await processor.BuildQueryAsync("@include:other");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
             _logger.LogInformation("Actual: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
