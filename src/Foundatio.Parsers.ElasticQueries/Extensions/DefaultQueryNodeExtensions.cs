@@ -110,14 +110,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (elasticContext.IsDatePropertyType(nodeFullName)) {
                 string timezone = GetString(context, "TimeZone");
                 var range = new DateRangeQuery { Field = nodeFullName, TimeZone = timezone };
-                if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
+                if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*") {
                     if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                         range.GreaterThan = node.UnescapedMin;
                     else
                         range.GreaterThanOrEqualTo = node.UnescapedMin;
                 }
 
-                if (!String.IsNullOrWhiteSpace(node.UnescapedMax)) {
+                if (!String.IsNullOrWhiteSpace(node.UnescapedMax) && node.UnescapedMax != "*") {
                     if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
                         range.LessThan = node.UnescapedMax;
                     else
@@ -127,14 +127,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 return range;
             } else {
                 var range = new TermRangeQuery { Field = nodeFullName };
-                if (!String.IsNullOrWhiteSpace(node.UnescapedMin)) {
+                if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*") {
                     if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                         range.GreaterThan = node.UnescapedMin;
                     else
                         range.GreaterThanOrEqualTo = node.UnescapedMin;
                 }
 
-                if (!String.IsNullOrWhiteSpace(node.UnescapedMax)) {
+                if (!String.IsNullOrWhiteSpace(node.UnescapedMax) && node.UnescapedMax != "*") {
                     if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
                         range.LessThan = node.UnescapedMax;
                     else
