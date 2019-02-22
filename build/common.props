@@ -12,9 +12,8 @@
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <Product>Foundatio.Parsers</Product>
     <Description>A lucene style query parser that is extensible and allows additional syntax features.</Description>
-    <PackageProjectUrl>https://github.com/FoundatioFx/Foundatio.Redis</PackageProjectUrl>
-    <PackageReleaseNotes>https://github.com/FoundatioFx/Foundatio.Redis/releases</PackageReleaseNotes>
-    <PackageTags>Queue;Messaging;Message;Bus;ServiceBus;Locking;Lock;Distributed;File;Storage;Blob;Jobs;Metrics;Stats;Azure;Redis;StatsD;Amazon;AWS;S3;broker;Logging;Log</PackageTags>
+    <PackageProjectUrl>https://github.com/FoundatioFx/Foundatio.Parsers</PackageProjectUrl>
+    <PackageReleaseNotes>https://github.com/FoundatioFx/Foundatio.Parsers/releases</PackageReleaseNotes>
 
     <Copyright>Copyright (c) 2019 Foundatio.  All rights reserved.</Copyright>
     <Authors>FoundatioFx</Authors>
