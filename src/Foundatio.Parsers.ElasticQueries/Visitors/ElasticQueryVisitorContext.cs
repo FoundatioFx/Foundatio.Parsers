@@ -116,6 +116,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return FieldType.None;
 
             var mapping = context.GetPropertyMapping(field);
+
+            if (mapping?.Type == null)
+                return FieldType.None;
             
             switch (mapping.Type.Name) {
                 case "geo_point":
