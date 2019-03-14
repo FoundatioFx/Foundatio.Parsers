@@ -1139,20 +1139,19 @@ namespace Foundatio.Parsers.Tests {
                 .UseAliases(aliasMap));
             var sort = processor.BuildSortAsync("geo -field1 -(field2 field3 +field4) (field5 field3)").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Sort(sort));
-            string actualRequest = actualResponse.GetRequest();
+            string actualRequest = actualResponse.GetRequest(true);
             _logger.LogInformation("Actual: {Request}", actualResponse);
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff")
                 .Sort(
-                    s =>
-                        s.Ascending(new Field("field3"))
-                            .Descending(new Field("field1.keyword"))
-                            .Descending(new Field("field2.sort"))
-                            .Descending(new Field("field3"))
-                            .Ascending(new Field("field4"))
-                            .Ascending(new Field("field5"))
-                            .Ascending(new Field("field3"))
+                    s => s.Field(f => f.Field(new Field("field3")).Ascending().UnmappedType(FieldType.GeoPoint))
+                        .Field(f => f.Field(new Field("field1.keyword")).Descending().UnmappedType(FieldType.Keyword))
+                        .Field(f => f.Field(new Field("field2.sort")).Descending().UnmappedType(FieldType.Keyword))
+                        .Field(f => f.Field(new Field("field3")).Descending().UnmappedType(FieldType.GeoPoint))
+                        .Field(f => f.Field(new Field("field4")).Ascending().UnmappedType(FieldType.Long))
+                        .Field(f => f.Field(new Field("field5")).Ascending().UnmappedType(FieldType.Date))
+                        .Field(f => f.Field(new Field("field3")).Ascending().UnmappedType(FieldType.GeoPoint))
                 ));
-            string expectedRequest = expectedResponse.GetRequest();
+            string expectedRequest = expectedResponse.GetRequest(true);
             _logger.LogInformation("Actual: {Request}", expectedRequest);
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -1216,13 +1215,12 @@ namespace Foundatio.Parsers.Tests {
                     new ElasticQueryVisitorContext { UseScoring = true }).Result;
             var sort = processor.BuildSortAsync("geo -field1").Result;
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result).Sort(sort));
-            string actualRequest = actualResponse.GetRequest();
+            string actualRequest = actualResponse.GetRequest(true);
             _logger.LogInformation("Actual: {Request}", actualResponse);
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff")
                 .Sort(
-                    s => s
-                        .Ascending("field3")
-                        .Descending(new Field("field1.keyword"))
+                    s => s.Field(f => f.Field(new Field("field3")).Ascending().UnmappedType(FieldType.GeoPoint))
+                        .Field(f => f.Field(new Field("field1.keyword")).Descending().UnmappedType(FieldType.Keyword))
                 )
                 .Query(q =>
                     q.GeoBoundingBox(
@@ -1230,7 +1228,7 @@ namespace Foundatio.Parsers.Tests {
                     || q.Match(y => y.Field(e => e.Field1).Query("value1"))
                     || q.TermRange(m => m.Field(g => g.Field2).GreaterThanOrEquals("1").LessThanOrEquals("4"))
                     || !q.GeoDistance(m => m.Field(p => p.Field3).Location("51.5032520,-0.1278990").Distance("75mi"))));
-            string expectedRequest = expectedResponse.GetRequest();
+            string expectedRequest = expectedResponse.GetRequest(true);
             _logger.LogInformation("Actual: {Request}", expectedRequest);
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);

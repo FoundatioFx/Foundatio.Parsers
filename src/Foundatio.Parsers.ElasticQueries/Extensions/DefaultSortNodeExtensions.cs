@@ -14,7 +14,11 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "sort");
 
-            var sort = new SortField { Field = field };
+            var sort = new SortField {
+                Field = field,
+                UnmappedType = elasticContext.GetFieldType(field)
+            };
+            
             if (node.IsNodeOrGroupedParentNegated())
                 sort.Order = SortOrder.Descending;
             else
