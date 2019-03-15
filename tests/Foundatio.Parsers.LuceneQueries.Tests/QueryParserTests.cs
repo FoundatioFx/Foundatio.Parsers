@@ -1118,6 +1118,33 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void CanSortByUnmappedField() {
+            var client = GetClient();
+            client.DeleteIndex("stuff");
+            client.Refresh("stuff");
+            client.CreateIndex("stuff");
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            
+            var processor = new ElasticQueryParser(c => c.UseMappings<MyType>(client, "stuff"));
+            var sort = processor.BuildSortAsync("-field1").Result;
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Sort(sort));
+            
+            Assert.True(actualResponse.IsValid);
+            
+            string actualRequest = actualResponse.GetRequest(true);
+            _logger.LogInformation("Actual: {Request}", actualResponse);
+            var expectedResponse = client.Search<MyType>(d => d.Index("stuff")
+                .Sort(
+                    s => s.Field(f => f.Field(new Field("field1")).Descending().UnmappedType(FieldType.Keyword))
+                ));
+            string expectedRequest = expectedResponse.GetRequest(true);
+            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+        
+        [Fact]
         public void CanParseSort() {
             var client = GetClient();
             client.DeleteIndex("stuff");

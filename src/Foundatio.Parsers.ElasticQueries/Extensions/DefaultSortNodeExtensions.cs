@@ -13,16 +13,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "sort");
+            var fieldType = elasticContext.GetFieldType(field);
 
             var sort = new SortField {
                 Field = field,
-                UnmappedType = elasticContext.GetFieldType(field)
+                UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType
             };
-            
-            if (node.IsNodeOrGroupedParentNegated())
-                sort.Order = SortOrder.Descending;
-            else
-                sort.Order = SortOrder.Ascending;
+
+            sort.Order = node.IsNodeOrGroupedParentNegated() ? SortOrder.Descending : SortOrder.Ascending;
 
             return sort;
         }
