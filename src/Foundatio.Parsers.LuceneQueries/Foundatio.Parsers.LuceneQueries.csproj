@@ -2,5 +2,13 @@
   <Import Project="..\..\build\common.props" />
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
+    <PackageReference Include="Pegasus" Version="4.1.0-alpha0152" />
   </ItemGroup>
+  <Target Name="CompilePegGrammar" BeforeTargets="BeforeBuild"  >
+    <CompilePegGrammar InputFiles=".\LuceneQueryParser.peg" OutputFiles=".\LuceneQueryParser.g.cs" ></CompilePegGrammar>
+    <ItemGroup>
+      <Compile Remove="LuceneQueryParser.g.cs" />
+      <Compile Include="LuceneQueryParser.g.cs" DependentUpon="LuceneQueryParser.peg" />
+    </ItemGroup>
+  </Target>
 </Project>
