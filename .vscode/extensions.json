@@ -5,8 +5,5 @@
     "streetsidesoftware.code-spell-checker",
     "editorconfig.editorconfig",
     "tintoy.msbuild-project-tools"
-	],
-	"unwantedRecommendations": [
-		
 	]
 }
