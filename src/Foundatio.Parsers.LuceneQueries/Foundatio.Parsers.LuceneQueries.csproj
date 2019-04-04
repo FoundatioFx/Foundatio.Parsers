@@ -2,7 +2,7 @@
   <Import Project="..\..\build\common.props" />
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
-    <PackageReference Include="Pegasus" Version="4.1.0-alpha0155" />
+    <PackageReference Include="Pegasus" Version="4.1.0" />
   </ItemGroup>
   <ItemGroup>
     <PegGrammar Include="LuceneQueryParser.peg" />
