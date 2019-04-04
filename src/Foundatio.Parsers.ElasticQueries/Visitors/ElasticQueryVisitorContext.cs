@@ -3,6 +3,7 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 using System.Linq;
 using System.Threading.Tasks;
+using Elasticsearch.Net;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class ElasticQueryVisitorContext : QueryVisitorContext, IQueryVisitorContextWithIncludeResolver, IQueryVisitorContextWithAliasResolver, IElasticQueryVisitorContext, IQueryVisitorContextWithValidator {
@@ -103,6 +104,81 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return false;
 
             return context.GetPropertyMapping(field) is IDateProperty;
+        }
+
+        public static FieldType GetFieldType(this IElasticQueryVisitorContext context, string field) {
+            if (String.IsNullOrWhiteSpace(field))
+                return FieldType.None;
+
+            var mapping = context.GetPropertyMapping(field);
+
+            if (mapping?.Type == null)
+                return FieldType.None;
+            
+            switch (mapping.Type.Name) {
+                case "geo_point":
+                    return FieldType.GeoPoint;
+                case "geo_shape":
+                    return FieldType.GeoShape;
+                case "attachment":
+                    return FieldType.Attachment;
+                case "ip":
+                    return FieldType.Ip;
+                case "binary":
+                    return FieldType.Binary;
+                case "string":
+                    return FieldType.String;
+                case "keyword":
+                    return FieldType.Keyword;
+                case "text":
+                    return FieldType.Text;
+                case "date":
+                    return FieldType.Date;
+                case "boolean":
+                    return FieldType.Boolean;
+                case "completion":
+                    return FieldType.Completion;
+                case "nested":
+                    return FieldType.Nested;
+                case "object":
+                    return FieldType.Object;
+                case "murmur3":
+                    return FieldType.Murmur3Hash;
+                case "token_count":
+                    return FieldType.TokenCount;
+                case "percolator":
+                    return FieldType.Percolator;
+                case "integer":
+                    return FieldType.Integer;
+                case "long":
+                    return FieldType.Long;
+                case "short":
+                    return FieldType.Short;
+                case "byte":
+                    return FieldType.Byte;
+                case "float":
+                    return FieldType.Float;
+                case "half_float":
+                    return FieldType.HalfFloat;
+                case "scaled_float":
+                    return FieldType.ScaledFloat;
+                case "double":
+                    return FieldType.Double;
+                case "integer_range":
+                    return FieldType.IntegerRange;
+                case "float_range":
+                    return FieldType.FloatRange;
+                case "long_range":
+                    return FieldType.LongRange;
+                case "double_range":
+                    return FieldType.DoubleRange;
+                case "date_range":
+                    return FieldType.DateRange;
+                case "ip_range":
+                    return FieldType.IpRange;
+                default:
+                    return FieldType.None;
+            }
         }
     }
 }

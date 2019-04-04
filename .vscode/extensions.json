@@ -1,0 +1,9 @@
+{
+	"recommendations": [
+    "theaustinseven.pegs",
+    "ms-vscode.csharp",
+    "streetsidesoftware.code-spell-checker",
+    "editorconfig.editorconfig",
+    "tintoy.msbuild-project-tools"
+	]
+}

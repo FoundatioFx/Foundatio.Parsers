@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,6 +15,7 @@ namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParserConfiguration {
         private ITypeMapping _serverMapping;
         private ITypeMapping _codeMapping;
+        private readonly ConcurrentDictionary<string, IProperty> _propertyCache = new ConcurrentDictionary<string, IProperty>();
         private ILogger _logger = NullLogger.Instance;
 
         public ElasticQueryParserConfiguration() {
@@ -247,6 +249,9 @@ namespace Foundatio.Parsers.ElasticQueries {
         #endregion
 
         public IProperty GetMappingProperty(string field) {
+            if (_propertyCache.TryGetValue(field, out var propertyType))
+                return propertyType;
+            
             if (_serverMapping == null)
                 GetServerMapping();
 
@@ -277,8 +282,10 @@ namespace Foundatio.Parsers.ElasticQueries {
                         return null;
                 }
 
-                if (depth == fieldParts.Length - 1)
+                if (depth == fieldParts.Length - 1) {
+                    _propertyCache.TryAdd(field, fieldMapping);
                     return fieldMapping;
+                }
 
                 if (fieldMapping is IObjectProperty objectProperty)
                     currentProperties = objectProperty.Properties;
