@@ -115,21 +115,18 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (mapping?.Type == null)
                 return FieldType.None;
             
-            switch (mapping.Type.Name) {
+            switch (mapping.Type) {
                 case "geo_point":
                     return FieldType.GeoPoint;
                 case "geo_shape":
                     return FieldType.GeoShape;
-                case "attachment":
-                    return FieldType.Attachment;
                 case "ip":
                     return FieldType.Ip;
                 case "binary":
                     return FieldType.Binary;
-                case "string":
-                    return FieldType.String;
                 case "keyword":
                     return FieldType.Keyword;
+                case "string":
                 case "text":
                     return FieldType.Text;
                 case "date":
