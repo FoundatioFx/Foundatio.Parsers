@@ -13,7 +13,6 @@ pull_requests:
 
 init:
   - git config --global core.autocrlf input
-  - curl -sflL 'https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-ssh.sh' | bash -e -
 
 before_build:
   - |
@@ -30,10 +29,11 @@ before_build:
     if [ -z $APPVEYOR_PULL_REQUEST_NUMBER ]; then
       appveyor UpdateBuild -Version $VERSION
     fi
+    curl -sflL 'https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-ssh.sh' | bash -e -
 
 build_script:
   - docker build --target testrunner -t foundatio:test --build-arg VERSION_SUFFIX=${VERSION_SUFFIX} .
-  - MACHINE_IP=$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
+  - MACHINE_IP=$(hostname -I | awk '{ print $1 }')
   - export ELASTICSEARCH_URL="http://$MACHINE_IP:9200"
   - echo $ELASTICSEARCH_URL
   - docker run -d -m 1g -p 9200:9200 -e discovery.type=single-node -e ES_JAVA_OPTS='-Xms512m -Xmx512m' docker.elastic.co/elasticsearch/elasticsearch:6.7.1
