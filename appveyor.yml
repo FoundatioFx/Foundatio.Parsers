@@ -5,6 +5,9 @@ clone_depth: 2
 services:
   - docker
 
+environment:
+  APPVEYOR_SSH_BLOCK: true
+
 pull_requests:
   do_not_increment_build_number: true
 
