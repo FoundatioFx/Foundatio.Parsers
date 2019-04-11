@@ -22,11 +22,10 @@ namespace Foundatio.Parsers.Tests {
             Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
         }
 
-        private IElasticClient GetClient(ConnectionSettings settings = null) {
-            if (settings == null) {
-                var elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
-                settings = new ConnectionSettings(new Uri(elasticsearchUrl));
-            }
+        private IElasticClient GetClient(Action<ConnectionSettings> configure = null) {
+            var elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
+            var settings = new ConnectionSettings(new Uri(elasticsearchUrl));
+            configure?.Invoke(settings);
 
             return new ElasticClient(settings.DisableDirectStreaming().DefaultTypeName("_doc").PrettyJson());
         }
@@ -656,7 +655,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void NestedFilterProcessor() {
             var index = Guid.NewGuid().ToString("N");
-            var client = GetClient(new ConnectionSettings().DefaultMappingFor<MyNestedType>(t => t.IndexName(index)));
+            var client = GetClient(s => s.DefaultMappingFor<MyNestedType>(t => t.IndexName(index)));
             client.CreateIndex(index, i => i.Mappings(m => m.Map<MyNestedType>(d => d.Properties(p => p
                 .Text(e => e.Name(n => n.Field1).Index())
                 .Text(e => e.Name(n => n.Field2).Index())
@@ -741,7 +740,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void NestedFilterProcessor2() {
             var index = Guid.NewGuid().ToString("N");
-            var client = GetClient(new ConnectionSettings().DefaultMappingFor<MyNestedType>(t => t.IndexName(index)));
+            var client = GetClient(s => s.DefaultMappingFor<MyNestedType>(t => t.IndexName(index)));
             client.CreateIndex(index, i => i.Mappings(m => m.Map<MyNestedType>(d => d.Properties(p => p
                 .Text(e => e.Name(n => n.Field1).Index())
                 .Text(e => e.Name(n => n.Field2).Index())

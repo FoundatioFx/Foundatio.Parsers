@@ -17,12 +17,10 @@ namespace Foundatio.Parsers.Tests {
         public AliasMappingVisitorTests(ITestOutputHelper output) : base(output) {
             Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
         }
-
-        private IElasticClient GetClient(ConnectionSettings settings = null) {
-            if (settings == null) {
-                var elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
-                settings = new ConnectionSettings(new Uri(elasticsearchUrl));
-            }
+        private IElasticClient GetClient(Action<ConnectionSettings> configure = null) {
+            var elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
+            var settings = new ConnectionSettings(new Uri(elasticsearchUrl));
+            configure?.Invoke(settings);
 
             return new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
         }
