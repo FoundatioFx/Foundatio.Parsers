@@ -17,8 +17,10 @@ namespace Foundatio.Parsers.Tests {
         public AliasMappingVisitorTests(ITestOutputHelper output) : base(output) {}
 
         private IElasticClient GetClient(ConnectionSettings settings = null) {
-            if (settings == null)
-                settings = new ConnectionSettings();
+            if (settings == null) {
+                var elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
+                settings = new ConnectionSettings(new Uri(elasticsearchUrl));
+            }
 
             return new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
         }

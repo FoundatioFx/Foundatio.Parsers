@@ -22,8 +22,10 @@ namespace Foundatio.Parsers.Tests {
         }
 
         private IElasticClient GetClient(ConnectionSettings settings = null) {
-            if (settings == null)
-                settings = new ConnectionSettings(new Uri("http://elasticsearch:9200"));
+            if (settings == null) {
+                var elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
+                settings = new ConnectionSettings(new Uri(elasticsearchUrl));
+            }
 
             return new ElasticClient(settings.DisableDirectStreaming().DefaultTypeName("_doc").PrettyJson());
         }
