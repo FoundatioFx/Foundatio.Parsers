@@ -23,7 +23,7 @@ namespace Foundatio.Parsers.Tests {
 
         private IElasticClient GetClient(ConnectionSettings settings = null) {
             if (settings == null)
-                settings = new ConnectionSettings();
+                settings = new ConnectionSettings(new Uri("http://elasticsearch:9200"));
 
             return new ElasticClient(settings.DisableDirectStreaming().DefaultTypeName("_doc").PrettyJson());
         }

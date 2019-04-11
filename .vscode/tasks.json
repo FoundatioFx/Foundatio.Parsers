@@ -46,9 +46,9 @@
     },
     {
       "label": "docker: test",
-      "command": "docker build --target testrunner -t foundatio:test . && docker run -it --net host -v $(pwd)/artifacts:/app/artifacts foundatio:test",
+      "command": "docker build --target testrunner -t foundatio:test . && docker run -it --network foundatio -v $(pwd)/artifacts:/app/artifacts foundatio:test",
       "windows": {
-        "command": "docker build --target testrunner -t foundatio:test . ; docker run -it --net host foundatio:test"
+        "command": "docker build --target testrunner -t foundatio:test . ; docker run -it --network foundatio foundatio:test"
       },
       "type": "shell",
       "group": "build",

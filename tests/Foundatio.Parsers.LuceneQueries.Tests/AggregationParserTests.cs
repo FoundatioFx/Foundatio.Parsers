@@ -14,11 +14,13 @@ using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.Tests {
     public class AggregationParserTests : TestWithLoggingBase {
-        public AggregationParserTests(ITestOutputHelper output) : base(output) { }
+        public AggregationParserTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        }
 
         private IElasticClient GetClient(ConnectionSettings settings = null) {
             if (settings == null)
-                settings = new ConnectionSettings();
+                settings = new ConnectionSettings(new Uri("http://elasticsearch:9200"));
 
             return new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
         }
@@ -178,7 +180,7 @@ namespace Foundatio.Parsers.Tests {
                     .Missing("mymissing")
                     .Meta(m => m.Add("@field_type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);

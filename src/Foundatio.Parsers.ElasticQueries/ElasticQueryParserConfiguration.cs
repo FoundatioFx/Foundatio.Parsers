@@ -249,14 +249,21 @@ namespace Foundatio.Parsers.ElasticQueries {
         #endregion
 
         public IProperty GetMappingProperty(string field) {
-            if (_propertyCache.TryGetValue(field, out var propertyType))
+            if (String.IsNullOrEmpty(field))
+                return null;
+            
+            if (_propertyCache.TryGetValue(field, out var propertyType)) {
+                _logger.LogTrace("Returning cached property mapping for {field} = {type}", field, propertyType);
                 return propertyType;
+            }
             
             if (_serverMapping == null)
                 GetServerMapping();
 
-            if (String.IsNullOrEmpty(field) || _serverMapping == null)
+            if (_serverMapping == null) {
+                _logger.LogTrace("Server mapping is null");
                 return null;
+            }
 
             var fieldParts = field.Split('.');
             var currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
@@ -270,9 +277,10 @@ namespace Foundatio.Parsers.ElasticQueries {
                         fieldMapping = currentProperties
                             .Select(m => m.Value)
                             .FirstOrDefault(m => m.Name == fieldPart);
-
+                    
+                    // no mapping found, call GetServerMapping again in case it hasn't been called recently and there are possibly new mappings
                     if (fieldMapping == null && GetServerMapping()) {
-                        // we have updated mapping, start over from the top
+                        // we got updated mapping, start over from the top
                         depth = -1;
                         currentProperties = MergeProperties(_codeMapping.Properties, _serverMapping.Properties);
                         continue;
@@ -284,12 +292,13 @@ namespace Foundatio.Parsers.ElasticQueries {
 
                 if (depth == fieldParts.Length - 1) {
                     _propertyCache.TryAdd(field, fieldMapping);
+                    _logger.LogTrace("Returning property mapping for {field} = {fieldMapping}", field, fieldMapping);
                     return fieldMapping;
                 }
 
-                if (fieldMapping is IObjectProperty objectProperty)
+                if (fieldMapping is IObjectProperty objectProperty) {
                     currentProperties = objectProperty.Properties;
-                else {
+                } else {
                     if (fieldMapping is ITextProperty textProperty)
                         currentProperties = textProperty.Fields;
                     else
@@ -297,6 +306,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 }
             }
 
+            _logger.LogTrace("Did not find property mapping for {field}", field);
             return null;
         }
 
@@ -346,6 +356,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             try {
                 _serverMapping = GetServerMappingFunc();
+                _logger.LogTrace("Got server mapping {mapping}", _serverMapping);
                 _lastMappingUpdate = DateTime.UtcNow;
 
                 return true;
@@ -391,7 +402,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client, string index) {
             return UseMappings(() => {
                 var response = client.GetMapping(new GetMappingRequest(Indices.Index(index)));
-                _logger.LogInformation("GetMapping: {Request}", response.GetRequest());
+                _logger.LogInformation("GetMapping: {Request}", response.GetRequest(true, true));
                 return response.GetMappingFor(index);
             });
         }

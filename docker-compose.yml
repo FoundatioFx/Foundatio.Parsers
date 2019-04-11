@@ -1,4 +1,4 @@
-version: '2'
+version: '3.5'
 
 services:
   elasticsearch:
@@ -12,7 +12,7 @@ services:
       - 9300:9300
     networks:
       - foundatio
-
+  
   kibana:
     depends_on:
       - elasticsearch
@@ -25,3 +25,4 @@ services:
 networks:
   foundatio:
     driver: bridge
+    name: foundatio

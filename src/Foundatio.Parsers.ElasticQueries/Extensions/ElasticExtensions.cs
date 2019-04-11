@@ -62,22 +62,42 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return sb.ToString();
         }
 
-        public static string GetRequest(this IApiCallDetails response, bool normalize = false) {
+        public static string GetRequest(this IApiCallDetails response, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false) {
             if (response == null)
                 return String.Empty;
 
+            var sb = new StringBuilder();
+            if (includeDebugInformation && response.DebugInformation != null)
+                sb.AppendLine(response.DebugInformation);
+            if (response.HttpStatusCode.HasValue) {
+                sb.Append(response.HttpStatusCode);
+                sb.Append(" ");
+            }
+            sb.Append(response.HttpMethod);
+            sb.Append(" ");
+            sb.AppendLine(response.Uri.PathAndQuery);
+
             if (response.RequestBodyInBytes != null) {
                 string body = Encoding.UTF8.GetString(response.RequestBodyInBytes);
+                
                 if (normalize)
                     body = JsonUtility.NormalizeJsonString(body);
-                return $"{response.HttpMethod} {response.Uri.PathAndQuery}\r\n{body}\r\n";
-            } else {
-                return $"{response.HttpMethod} {response.Uri.PathAndQuery}\r\n";
+                
+                sb.AppendLine(body);
             }
+
+            if (includeResponse && response.ResponseBodyInBytes != null && response.ResponseBodyInBytes.Length < 20000) {
+                string responseData = Encoding.UTF8.GetString(response.ResponseBodyInBytes);
+                
+                sb.AppendLine("----- Response -----");
+                sb.AppendLine(responseData);
+            }
+
+            return sb.ToString();
         }
 
-        public static string GetRequest(this IResponse response, bool normalize = false) {
-            return GetRequest(response?.ApiCall, normalize);
+        public static string GetRequest(this IResponse response, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false) {
+            return GetRequest(response?.ApiCall, normalize, includeResponse, includeDebugInformation);
         }
     }
 
