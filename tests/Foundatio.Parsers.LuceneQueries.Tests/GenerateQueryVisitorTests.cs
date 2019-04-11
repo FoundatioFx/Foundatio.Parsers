@@ -12,7 +12,9 @@ using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.Tests {
     public class GenerateQueryVisitorTests : TestWithLoggingBase {
-        public GenerateQueryVisitorTests(ITestOutputHelper output) : base(output) {}
+        public GenerateQueryVisitorTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        }
 
         [Theory]
         [InlineData(null, null, false)]

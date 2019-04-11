@@ -14,7 +14,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Foundatio.Parsers.Tests {
     public sealed class AliasMappingVisitorTests : TestWithLoggingBase {
-        public AliasMappingVisitorTests(ITestOutputHelper output) : base(output) {}
+        public AliasMappingVisitorTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        }
 
         private IElasticClient GetClient(ConnectionSettings settings = null) {
             if (settings == null) {

@@ -17,6 +17,7 @@ namespace Foundatio.Parsers.Tests {
         private readonly IQueryParser _elasticQueryParser;
 
         public QueryValidationVisitorTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
             _elasticQueryParser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         }
 

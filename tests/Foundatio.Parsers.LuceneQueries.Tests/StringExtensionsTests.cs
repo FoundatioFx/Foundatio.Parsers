@@ -6,7 +6,9 @@ using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.Tests {
     public sealed class StringExtensionsTests : TestWithLoggingBase {
-        public StringExtensionsTests(ITestOutputHelper output) : base(output) { }
+        public StringExtensionsTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        }
 
         [Theory]
         [InlineData("", "")]

@@ -14,7 +14,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Foundatio.Parsers.Tests {
     public class IncludeQueryVisitorTests : TestWithLoggingBase {
-        public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output) { }
+        public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        }
 
         [Fact]
         public async Task CanExpandIncludesAsync() {

@@ -19,6 +19,7 @@ namespace Foundatio.Parsers.Tests {
     public class QueryParserTests : TestWithLoggingBase {
 
         public QueryParserTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
         }
 
         private IElasticClient GetClient(ConnectionSettings settings = null) {
