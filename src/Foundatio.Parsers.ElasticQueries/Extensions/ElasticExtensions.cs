@@ -75,7 +75,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             }
             sb.Append(response.HttpMethod);
             sb.Append(" ");
-            sb.AppendLine(response.Uri.PathAndQuery);
+            sb.AppendLine(response.Uri.ToString());
 
             if (response.RequestBodyInBytes != null) {
                 string body = Encoding.UTF8.GetString(response.RequestBodyInBytes)?.Trim();
