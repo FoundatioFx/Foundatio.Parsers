@@ -78,17 +78,17 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             sb.AppendLine(response.Uri.PathAndQuery);
 
             if (response.RequestBodyInBytes != null) {
-                string body = Encoding.UTF8.GetString(response.RequestBodyInBytes).Trim();
+                string body = Encoding.UTF8.GetString(response.RequestBodyInBytes)?.Trim();
                 
                 if (normalize)
-                    body = JsonUtility.NormalizeJsonString(body).Trim();
+                    body = JsonUtility.NormalizeJsonString(body)?.Trim();
                 
                 if (!String.IsNullOrWhiteSpace(body))
                     sb.AppendLine(body);
             }
 
-            if (includeResponse && response.ResponseBodyInBytes != null && response.RequestBodyInBytes.Length > 0 && response.ResponseBodyInBytes.Length < 20000) {
-                string responseData = Encoding.UTF8.GetString(response.ResponseBodyInBytes).Trim();
+            if (includeResponse && response.ResponseBodyInBytes != null && response.ResponseBodyInBytes.Length > 0 && response.ResponseBodyInBytes.Length < 20000) {
+                string responseData = Encoding.UTF8.GetString(response.ResponseBodyInBytes)?.Trim();
                 
                 if (!String.IsNullOrWhiteSpace(responseData)) {
                     sb.AppendLine("##### Response #####");
