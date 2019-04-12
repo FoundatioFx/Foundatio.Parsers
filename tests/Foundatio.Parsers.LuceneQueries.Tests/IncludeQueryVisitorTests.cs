@@ -70,7 +70,7 @@ namespace Foundatio.Parsers.Tests {
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => f.Bool(b => b.Filter(f1 => f1.Term("aliasedincluded", "value")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -79,7 +79,7 @@ namespace Foundatio.Parsers.Tests {
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);

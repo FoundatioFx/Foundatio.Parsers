@@ -37,7 +37,6 @@ build_script:
   - export ELASTICSEARCH_URL="http://$MACHINE_IP:9200"
   - echo $ELASTICSEARCH_URL
   - docker run -d -m 1g -p 9200:9200 -e discovery.type=single-node -e ES_JAVA_OPTS='-Xms512m -Xmx512m' docker.elastic.co/elasticsearch/elasticsearch:6.7.1
-  - while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:9200)" != "200" ]]; do sleep 5; done
   - docker run -e APPVEYOR_API_URL -e ELASTICSEARCH_URL --network host -v $(pwd)/artifacts:/app/artifacts foundatio:test
 
 after_build:

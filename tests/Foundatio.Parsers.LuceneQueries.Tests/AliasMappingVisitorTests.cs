@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
+using System.Threading;
 
 namespace Foundatio.Parsers.Tests {
     public sealed class AliasMappingVisitorTests : TestWithLoggingBase {
@@ -22,7 +23,11 @@ namespace Foundatio.Parsers.Tests {
             var settings = new ConnectionSettings(new Uri(elasticsearchUrl));
             configure?.Invoke(settings);
 
-            return new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
+            var client = new ElasticClient(settings.DisableDirectStreaming().DefaultTypeName("_doc").PrettyJson());
+            if (!client.WaitForReady(new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token, _logger))
+                throw new ApplicationException("Unable to connect to Elasticsearch.");
+
+            return client;
         }
 
         [Fact]
@@ -153,7 +158,7 @@ namespace Foundatio.Parsers.Tests {
                         .Keyword(f => f.Name("Profile_URL").RootAlias("url"))
                         .Keyword(f => f.Name("Security_Access_Code").Alias("code")))));
 
-            await client.CreateIndexAsync(index, d => d.Mappings(m => m.Map<Employee>(index, md => mapping)));
+            await client.CreateIndexAsync(index, d => d.Mappings(m => m.Map<Employee>(md => mapping)));
             var response = client.IndexMany(new List<Employee> {
                 new Employee { Id = "ex-001", Data = new Dictionary<string, object> {
                     { "Profile_URL", "/u/ex-001/profile.png" },
@@ -172,7 +177,7 @@ namespace Foundatio.Parsers.Tests {
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
-            var expectedResponse = client.Search<Employee>(d => d.Index(index).Type(index).Query(q => q
+            var expectedResponse = client.Search<Employee>(d => d.Index(index).Query(q => q
                 .Bool(b => b.Filter(
                     Query<Employee>.Term(f1 => f1.Id, "ex-001") &&
                     Query<Employee>.Term(f1 => f1.Data["Profile_URL"], "/u/ex-001/profile.png") &&
@@ -180,7 +185,7 @@ namespace Foundatio.Parsers.Tests {
                 ));
 
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);

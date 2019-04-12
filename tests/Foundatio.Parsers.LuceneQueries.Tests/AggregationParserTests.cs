@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
@@ -23,7 +24,11 @@ namespace Foundatio.Parsers.Tests {
             var settings = new ConnectionSettings(new Uri(elasticsearchUrl));
             configure?.Invoke(settings);
 
-            return new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
+            var client = new ElasticClient(settings.DisableDirectStreaming().DefaultTypeName("_doc").PrettyJson());
+            if (!client.WaitForReady(new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token, _logger))
+                throw new ApplicationException("Unable to connect to Elasticsearch.");
+
+            return client;
         }
 
         [Fact]
@@ -64,7 +69,7 @@ namespace Foundatio.Parsers.Tests {
                 .Max("max_field4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
                 .Min("min_field4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);
@@ -99,7 +104,7 @@ namespace Foundatio.Parsers.Tests {
                 .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword"))
                     .Aggregations(a1 => a1.Cardinality("cardinality_user", c => c.Field("data.@user.identity.keyword"))))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);
@@ -146,7 +151,7 @@ namespace Foundatio.Parsers.Tests {
                 .Max("max_alias4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))
                 .Min("min_alias4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);
@@ -212,7 +217,7 @@ namespace Foundatio.Parsers.Tests {
                     .MinimumDocumentCount(0)
                     )));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -244,7 +249,7 @@ namespace Foundatio.Parsers.Tests {
                     .Aggregations(a1 => a1.TopHits("tophits", t2 => t2.Size(1000).Source(s => s.Includes(i => i.Field("myinclude")))))
                     .Meta(m => m.Add("@field_type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -276,7 +281,7 @@ namespace Foundatio.Parsers.Tests {
                         .Cardinality("cardinality_field4", c => c.Field("field4")))
                     .Meta(m => m.Add("@field_type", "keyword")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);
@@ -314,7 +319,7 @@ namespace Foundatio.Parsers.Tests {
                         .Min("min_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))
                         .Max("max_field5", s => s.Field(f => f.Field5).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid, actualResponse.DebugInformation);
@@ -347,7 +352,7 @@ namespace Foundatio.Parsers.Tests {
                 .Max("max_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))
                 .Min("min_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.True(actualResponse.IsValid);

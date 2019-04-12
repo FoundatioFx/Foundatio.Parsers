@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Elasticsearch.Net;
+using Microsoft.Extensions.Logging;
 using Nest;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -101,6 +103,27 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
         public static string GetRequest(this IResponse response, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false) {
             return GetRequest(response?.ApiCall, normalize, includeResponse, includeDebugInformation);
+        }
+
+        public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null) {
+            var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
+            var startTime = DateTime.UtcNow;
+
+            while (!cancellationToken.IsCancellationRequested) {
+                var pingResponse = client.Ping();
+                if (pingResponse.IsValid)
+                    return true;
+
+                if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
+                    logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+
+                Thread.Sleep(1000);
+            }
+
+            if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+                logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+
+            return false;
         }
     }
 
