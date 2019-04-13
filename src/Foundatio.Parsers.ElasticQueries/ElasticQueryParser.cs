@@ -37,8 +37,8 @@ namespace Foundatio.Parsers.ElasticQueries {
                     break;
                 case QueryType.Query:
                     context.SetGetPropertyMappingFunc(_config.GetMappingProperty).SetDefaultFields(_config.DefaultFields);
-                    if (_config.DefaultIncludeResolver != null && context.GetIncludeResolver() == null)
-                        context.SetIncludeResolver(_config.DefaultIncludeResolver);
+                    if (_config.IncludeResolver != null && context.GetIncludeResolver() == null)
+                        context.SetIncludeResolver(_config.IncludeResolver);
 
                     result = await _config.QueryVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
@@ -52,11 +52,11 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context) {
-            if (_config.DefaultAliasResolver != null && context.GetRootAliasResolver() == null)
-                context.SetRootAliasResolver(_config.DefaultAliasResolver);
+            if (_config.FieldResolver != null && context.GetDynamicFieldResolver() == null)
+                context.SetDynamicFieldResolver(_config.FieldResolver);
 
-            if (_config.DefaultValidator != null && context.GetValidator() == null)
-                context.SetValidator(_config.DefaultValidator);
+            if (_config.Validator != null && context.GetValidator() == null)
+                context.SetValidator(_config.Validator);
         }
 
         public async Task<QueryContainer> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null) {

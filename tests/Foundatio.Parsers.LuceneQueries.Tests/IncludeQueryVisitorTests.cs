@@ -60,9 +60,9 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task CanExpandElasticIncludesAsync() {
             var client = new ElasticClient(new ConnectionSettings().DisableDirectStreaming().PrettyJson());
-            var aliases = new AliasMap { { "field", "aliased" }, { "included", "aliasedincluded" } };
+            var aliases = new FieldMap { { "field", "aliased" }, { "included", "aliasedincluded" } };
 
-            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(i => GetIncludeAsync(i)).UseAliases(aliases));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(i => GetIncludeAsync(i)).UseFieldMap(aliases));
             var result = await processor.BuildQueryAsync("@include:other");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();

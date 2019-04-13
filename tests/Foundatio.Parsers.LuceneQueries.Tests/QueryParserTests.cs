@@ -828,24 +828,22 @@ namespace Foundatio.Parsers.Tests {
 
             var mapping = new TypeMappingDescriptor<MyType>().Properties(p => p
                 .Object<Dictionary<string, object>>(f => f.Name(e => e.Data).Properties(p2 => p2
-                    .Text(e => e.Name("@browser").RootAlias("browser"))
-                    .Text(e => e.Name("@browser_version").RootAlias("browser.version")))));
+                    .Text(e => e.Name("@browser"))
+                    .FieldAlias(a => a.Name("browser").Path("data.@browser"))
+                    .Text(e => e.Name("@browser_version"))
+                    .FieldAlias(a => a.Name("browser.version").Path("data.@browser_version")))));
 
             client.CreateIndex(index, i => i.Mappings(m => m.Map<MyType>(d => mapping)));
             client.Refresh(index);
 
-            var visitor = new AliasMappingVisitor(client.Infer);
-            var walker = new MappingWalker(visitor);
-            walker.Accept(mapping);
-
-            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseAliases(visitor.RootAliasMap));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync("browser.version:1", new ElasticQueryVisitorContext().UseScoring()).Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index(index).Query(f => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
-            var expectedResponse = client.Search<MyType>(d => d.Index(index).Query(q => q.Term(m => m.Field(e => e.Data["@browser_version"]).Value("1"))));
+            var expectedResponse = client.Search<MyType>(d => d.Index(index).Query(q => q.Term(m => m.Field("browser.version").Value("1"))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1082,10 +1080,10 @@ namespace Foundatio.Parsers.Tests {
             client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
             client.Refresh(index);
-            var aliasMap = new AliasMap { { "geo", "field3" } };
+            var aliasMap = new FieldMap { { "geo", "field3" } };
             var processor = new ElasticQueryParser(c => c
                 .UseMappings<MyType>(client, index)
-                .UseAliases(aliasMap));
+                .UseFieldMap(aliasMap));
             var sort = processor.BuildSortAsync("geo -field1 -(field2 field3 +field4) (field5 field3)").Result;
             var actualResponse = client.Search<MyType>(d => d.Index(index).Sort(sort));
             string actualRequest = actualResponse.GetRequest(true);
@@ -1151,13 +1149,12 @@ namespace Foundatio.Parsers.Tests {
             client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
             client.Refresh(index);
-            var aliasMap = new AliasMap { { "geo", "field3" } };
+            var aliasMap = new FieldMap { { "geo", "field3" } };
             var processor = new ElasticQueryParser(c => c
                 .UseMappings<MyType>(client, index)
                 .UseGeo(l => "51.5032520,-0.1278990")
-                .UseAliases(aliasMap));
-            var result =
-                processor.BuildQueryAsync(
+                .UseFieldMap(aliasMap));
+            var result = processor.BuildQueryAsync(
                     "geo:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi",
                     new ElasticQueryVisitorContext { UseScoring = true }).Result;
             var sort = processor.BuildSortAsync("geo -field1").Result;

@@ -107,22 +107,6 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return current;
         }
 
-        private const string AliasResolverKey = "@AliasResolver";
-        public static AliasResolver GetAliasResolver(this IQueryNode node, IQueryVisitorContext context) {
-            object value = null;
-            if (node.Data.TryGetValue(AliasResolverKey, out value))
-                return value as AliasResolver;
-
-            if (node.Parent == null)
-                return context.GetRootAliasResolver();
-
-            return null;
-        }
-
-        public static void SetAliasResolver(this IQueryNode node, AliasResolver resolver) {
-            node.Data[AliasResolverKey] = resolver;
-        }
-
         private const string OriginalFieldKey = "@OriginalField";
         public static string GetOriginalField(this IFieldQueryNode node) {
             object value = null;

@@ -27,9 +27,9 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
         public string[] DefaultFields { get; private set; } = new[] { "_all" };
-        public AliasResolver DefaultAliasResolver { get; private set; }
-        public Func<string, Task<string>> DefaultIncludeResolver { get; private set; }
-        public Func<QueryValidationInfo, Task<bool>> DefaultValidator { get; private set; }
+        public QueryFieldResolver FieldResolver { get; private set; }
+        public Func<string, Task<string>> IncludeResolver { get; private set; }
+        public Func<QueryValidationInfo, Task<bool>> Validator { get; private set; }
         public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
@@ -46,23 +46,19 @@ namespace Foundatio.Parsers.ElasticQueries {
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseAliases(int priority = 50) {
-            return UseAliases((AliasResolver)null, priority);
-        }
+        public ElasticQueryParserConfiguration UseFieldResolver(QueryFieldResolver resolver, int priority = 50) {
+            FieldResolver = resolver;
 
-        public ElasticQueryParserConfiguration UseAliases(AliasResolver defaultAliasResolver, int priority = 50) {
-            DefaultAliasResolver = defaultAliasResolver;
-
-            var visitor = new AliasedQueryVisitor();
+            var visitor = new FieldResolverQueryVisitor();
             QueryVisitor.AddVisitor(visitor, priority);
             SortVisitor.AddVisitor(visitor, priority);
 
-            AggregationVisitor.AddVisitor(new AliasedQueryVisitor(false), priority);
+            AggregationVisitor.AddVisitor(new FieldResolverQueryVisitor(), priority);
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseAliases(AliasMap defaultAliasMap, int priority = 50) {
-            return UseAliases(defaultAliasMap.Resolve, priority);
+        public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string> fields, int priority = 50) {
+            return UseFieldResolver(f => fields.GetValueOrNull(f), priority);
         }
 
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
@@ -74,13 +70,13 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseIncludes(Func<string, Task<string>> includeResolver, int priority = 0) {
-            DefaultIncludeResolver = includeResolver;
+            IncludeResolver = includeResolver;
 
             return AddVisitor(new IncludeVisitor(), priority);
         }
 
         public ElasticQueryParserConfiguration UseValidation(Func<QueryValidationInfo, Task<bool>> validator, int priority = 0) {
-            DefaultValidator = validator;
+            Validator = validator;
 
             return AddVisitor(new ValidationVisitor { ShouldThrow = true }, priority);
         }

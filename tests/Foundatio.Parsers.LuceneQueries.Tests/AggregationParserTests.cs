@@ -92,8 +92,8 @@ namespace Foundatio.Parsers.Tests {
             var res = client.IndexMany(new List<MyType> { new MyType { Field1 = "value1" } }, "stuff");
             client.Refresh("stuff");
 
-            var aliasMap = new AliasMap { { "user", "data.@user.identity" }, { "alias1", "field1" } };
-            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff").UseAliases(aliasMap));
+            var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" } };
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff").UseFieldMap(aliasMap));
             var aggregations = await processor.BuildAggregationsAsync("terms:(alias1 cardinality:user)");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
@@ -129,8 +129,8 @@ namespace Foundatio.Parsers.Tests {
             }, "stuff");
             client.Refresh("stuff");
 
-            var aliasMap = new AliasMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
-            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990").UseAliases(aliasMap));
+            var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
             var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 histogram:alias4 geogrid:alias3 terms:alias1");
 
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
@@ -369,16 +369,13 @@ namespace Foundatio.Parsers.Tests {
             await client.RefreshAsync(index);
             
             var mapping = new TypeMappingDescriptor<MyType>()
-                .Properties(p => p.GeoPoint(g => g.Name(f => f.Field1).RootAlias("geo")));
-
-            var visitor = new AliasMappingVisitor(client.Infer);
-            var walker = new MappingWalker(visitor);
-            walker.Accept(mapping);
+                .Properties(p => p
+                    .GeoPoint(g => g.Name(f => f.Field1))
+                    .FieldAlias(a => a.Name("geo").Path(f => f.Field1)));
 
             var processor = new ElasticQueryParser(
                 c => c
                     .UseGeo(l => "someinvalidvaluehere")
-                    .UseAliases(visitor.RootAliasMap)
                     .UseMappings<MyType>(m => mapping, () => client.GetMapping(new GetMappingRequest(index, index)).Indices[index][index]));
             
             await processor.BuildAggregationsAsync("geogrid:geo~3");

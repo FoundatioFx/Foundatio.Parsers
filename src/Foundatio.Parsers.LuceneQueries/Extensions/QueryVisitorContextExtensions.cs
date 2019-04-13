@@ -4,20 +4,20 @@ using System.Threading.Tasks;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class QueryVisitorContextExtensions {
-         public static AliasResolver GetRootAliasResolver(this IQueryVisitorContext context) {
-            var aliasContext = context as IQueryVisitorContextWithAliasResolver;
+         public static QueryFieldResolver GetDynamicFieldResolver(this IQueryVisitorContext context) {
+            var aliasContext = context as IQueryVisitorContextWithFieldResolver;
             if (aliasContext == null)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithAliasResolver", nameof(context));
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithDynamicFields", nameof(context));
 
-            return aliasContext.RootAliasResolver;
+            return aliasContext.FieldResolver;
         }
 
-        public static T SetRootAliasResolver<T>(this T context, AliasResolver aliasResolver) where T: IQueryVisitorContext {
-            var aliasContext = context as IQueryVisitorContextWithAliasResolver;
+        public static T SetDynamicFieldResolver<T>(this T context, QueryFieldResolver resolver) where T: IQueryVisitorContext {
+            var aliasContext = context as IQueryVisitorContextWithFieldResolver;
             if (aliasContext == null)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithAliasResolver", nameof(context));
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithDynamicFields", nameof(context));
 
-            aliasContext.RootAliasResolver = aliasResolver;
+            aliasContext.FieldResolver = resolver;
 
             return context;
         }
