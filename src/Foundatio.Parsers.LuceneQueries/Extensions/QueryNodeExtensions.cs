@@ -6,24 +6,6 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class QueryNodeExtensions {
-        public static string GetDefaultField(this IFieldQueryNode node, string defaultField) {
-            string field = node.Field;
-
-            if (!String.IsNullOrEmpty(field))
-                return field;
-
-            IQueryNode current = node;
-            while (current != null) {
-                var groupNode = node as GroupNode;
-                if (groupNode != null && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field))
-                    return groupNode.Field;
-
-                current = current.Parent;
-            }
-
-            return defaultField;
-        }
-
         public static string[] GetNameParts(this IFieldQueryNode node) {
             var nameParts = new List<string>();
             var current = node;
@@ -40,30 +22,12 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return nameParts.ToArray();
         }
 
-        public static IFieldQueryNode[] GetFieldNodes(this IFieldQueryNode node) {
-            var nodes = new List<IFieldQueryNode>();
-            var current = node;
-            while (current != null) {
-                nodes.Add(current);
-                current = current.Parent as IFieldQueryNode;
-            }
-
-            nodes.Reverse();
-
-            return nodes.ToArray();
-        }
-
         public static string GetFullName(this IFieldQueryNode node) {
             var parts = node.GetNameParts();
             if (parts.Length == 0)
                 return null;
 
             return String.Join(".", parts);
-        }
-
-        public static string GetParentFullName(this IFieldQueryNode node) {
-            var nameParts = node.GetNameParts();
-            return String.Join(".", nameParts.Take(nameParts.Length - 1));
         }
 
         public static bool IsNodeNegated(this IFieldQueryNode node) {
@@ -107,17 +71,17 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return current;
         }
 
-        private const string OriginalFieldKey = "@OriginalField";
-        public static string GetOriginalField(this IFieldQueryNode node) {
+        private const string ResolvedFieldKey = "@ResolvedField";
+        public static string GetResolvedField(this IFieldQueryNode node) {
             object value = null;
-            if (!node.Data.TryGetValue(OriginalFieldKey, out value))
-                return node.Field;
+            if (!node.Data.TryGetValue(ResolvedFieldKey, out value))
+                return node.GetFullName();
 
             return value as string;
         }
 
-        public static void SetOriginalField(this IFieldQueryNode node, string field) {
-            node.Data[OriginalFieldKey] = field;
+        public static void SetResolvedField(this IFieldQueryNode node, string field) {
+            node.Data[ResolvedFieldKey] = field;
         }
 
         private const string OperationTypeKey = "@OperationType";

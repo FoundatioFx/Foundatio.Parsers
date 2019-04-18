@@ -4,5 +4,6 @@
         "Niemyjski",
         "Xunit",
         "aggs"
-    ]
+    ],
+    "msbuildProjectTools.nuget.includePreRelease": true
 }

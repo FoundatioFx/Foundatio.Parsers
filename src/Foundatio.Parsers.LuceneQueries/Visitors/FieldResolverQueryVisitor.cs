@@ -9,43 +9,37 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class FieldResolverQueryVisitor : ChainableQueryVisitor {
         public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-            ApplyAlias(node, context);
+            ResolveField(node, context);
 
             return base.VisitAsync(node, context);
         }
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
-            ApplyAlias(node, context);
+            ResolveField(node, context);
         }
 
         public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
-            ApplyAlias(node, context);
+            ResolveField(node, context);
         }
 
         public override void Visit(ExistsNode node, IQueryVisitorContext context) {
-            ApplyAlias(node, context);
+            ResolveField(node, context);
         }
 
         public override void Visit(MissingNode node, IQueryVisitorContext context) {
-            ApplyAlias(node, context);
+            ResolveField(node, context);
         }
 
-        private void ApplyAlias(IFieldQueryNode node, IQueryVisitorContext context) {
+        private void ResolveField(IFieldQueryNode node, IQueryVisitorContext context) {
             if (node.Parent == null)
                 return;
 
             var resolver = context.GetDynamicFieldResolver();
-            var result = resolver != null && node.Field != null ? resolver(node.GetFullName()) : null;
-            if (result == null)
-                return;
-
-            node.SetOriginalField(node.Field);
-            // TODO: What to do about this. Result is full path and we are expecting just the ending.
-            node.Field = result;
-        }
-
-        public static QueryFieldResolver GetScopedResolver(QueryFieldResolver resolver, string scope) {
-            return f => resolver(!String.IsNullOrEmpty(scope) ? scope + "." + f : f);
+            if (resolver != null && node.Field != null) {
+                var resolvedField = resolver(node.GetFullName());
+                if (resolvedField != null)
+                    node.SetResolvedField(resolvedField);
+            }
         }
 
         public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {

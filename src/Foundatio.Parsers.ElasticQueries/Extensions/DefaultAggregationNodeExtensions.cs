@@ -33,17 +33,17 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetDateHistogramAggregation("date_" + node.GetResolvedField(), field, node.Proximity, node.UnescapedBoost, context);
 
                 case AggregationType.Histogram:
-                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetHistogramAggregation("histogram_" + node.GetResolvedField(), field, node.Proximity, node.UnescapedBoost, context);
 
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
-                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
+                    return new GeoHashGridAggregation("geogrid_" + node.GetResolvedField()) {
                         Field = field,
                         Precision = precision,
                         Aggregations = new AverageAggregation("avg_lat", null) {
@@ -54,7 +54,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     };
 
                 case AggregationType.Terms:
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new TermsAggregation("terms_" + node.GetResolvedField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
 
                 case AggregationType.TopHits:
                     return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
@@ -74,47 +74,47 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() }, { "@timezone", timezone } } };
+                    return new MinAggregation("min_" + node.GetResolvedField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() }, { "@timezone", timezone } } };
 
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() }, { "@timezone", timezone } } };
+                    return new MaxAggregation("max_" + node.GetResolvedField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() }, { "@timezone", timezone } } };
 
                 case AggregationType.Avg:
-                    return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new AverageAggregation("avg_" + node.GetResolvedField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
 
                 case AggregationType.Sum:
-                    return new SumAggregation("sum_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new SumAggregation("sum_" + node.GetResolvedField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
 
                 case AggregationType.Stats:
-                    return new StatsAggregation("stats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new StatsAggregation("stats_" + node.GetResolvedField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
 
                 case AggregationType.ExtendedStats:
-                    return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new ExtendedStatsAggregation("exstats_" + node.GetResolvedField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
 
                 case AggregationType.Cardinality:
-                    return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
+                    return new CardinalityAggregation("cardinality_" + node.GetResolvedField(), field) { Missing = node.GetProximityAsDouble() };
 
                 case AggregationType.TopHits:
                     return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
 
                 case AggregationType.Missing:
-                    return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
+                    return new MissingAggregation("missing_" + node.GetResolvedField()) { Field = field };
 
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetDateHistogramAggregation("date_" + node.GetResolvedField(), field, node.Proximity, node.UnescapedBoost, context);
 
                 case AggregationType.Histogram:
-                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetHistogramAggregation("histogram_" + node.GetResolvedField(), field, node.Proximity, node.UnescapedBoost, context);
 
                 case AggregationType.Percentiles:
-                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetPercentilesAggregation("percentiles_" + node.GetResolvedField(), field, node.Proximity, node.UnescapedBoost, context);
 
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.Proximity))
                         Enum.TryParse(node.Proximity, out precision);
 
-                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
+                    return new GeoHashGridAggregation("geogrid_" + node.GetResolvedField()) {
                         Field = field,
                         Precision = precision,
                         Aggregations = new AverageAggregation("avg_lat", null) {
@@ -125,7 +125,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     };
 
                 case AggregationType.Terms:
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new TermsAggregation("terms_" + node.GetResolvedField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
             }
 
             return null;

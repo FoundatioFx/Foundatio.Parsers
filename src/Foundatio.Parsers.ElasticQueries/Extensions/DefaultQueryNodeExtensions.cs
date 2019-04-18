@@ -59,7 +59,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             QueryBase query;
-            string nodeFullName = node.GetFullName();
+            string nodeFullName = node.GetResolvedField();
             if (elasticContext.IsPropertyAnalyzed(nodeFullName)) {
                 var fields = !String.IsNullOrEmpty(nodeFullName) ? new[] { nodeFullName } : elasticContext.DefaultFields;
 
@@ -106,7 +106,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            string nodeFullName = node.GetFullName();
+            string nodeFullName = node.GetResolvedField();
             if (elasticContext.IsDatePropertyType(nodeFullName)) {
                 string timezone = GetString(context, "TimeZone");
                 var range = new DateRangeQuery { Field = nodeFullName, TimeZone = timezone };
@@ -146,14 +146,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static QueryBase GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context) {
-            return new ExistsQuery { Field = node.GetFullName() };
+            return new ExistsQuery { Field = node.GetResolvedField() };
         }
 
         public static QueryBase GetDefaultQuery(this MissingNode node, IQueryVisitorContext context) {
             return new BoolQuery {
                 MustNot = new QueryContainer[] {
                     new ExistsQuery {
-                        Field =  node.GetFullName()
+                        Field =  node.GetResolvedField()
                     }
                 }
             };

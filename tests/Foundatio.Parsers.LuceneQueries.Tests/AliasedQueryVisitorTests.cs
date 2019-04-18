@@ -86,7 +86,7 @@ namespace Foundatio.Parsers.Tests {
                 { "field1.nested.childproperty", "field2.other.childproperty" }
             };
             var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
-            Assert.Equal("field2:(other.childproperty:value)", aliased.ToString());
+            Assert.Equal("(field2.other.childproperty:value)", aliased.ToString());
         }
 
         [Fact]
@@ -97,7 +97,7 @@ namespace Foundatio.Parsers.Tests {
                 { "field1.nested.hey", "field2.other.blah" }
             };
             var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
-            Assert.Equal("field2.other:(blah:value)", aliased.ToString());
+            Assert.Equal("(field2.other.blah:value)", aliased.ToString());
         }
 
         [Fact]
@@ -108,7 +108,7 @@ namespace Foundatio.Parsers.Tests {
                 { "field1.nested", "field2.other" }
             };
             var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
-            Assert.Equal("field2:(other:value another:blah)", aliased.ToString());
+            Assert.Equal("(field2.other:value field1.another:blah)", aliased.ToString());
         }
 
         [Fact]
@@ -119,7 +119,7 @@ namespace Foundatio.Parsers.Tests {
                 { "level1.level2.level3.level4", "alias1.alias2.level3.level4" }
             };
             var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
-            Assert.Equal("alias1.alias2.level3:(level4:value)", aliased.ToString());
+            Assert.Equal("(alias1.alias2.level3.level4:value)", aliased.ToString());
         }
 
         [Fact]
@@ -153,7 +153,7 @@ namespace Foundatio.Parsers.Tests {
                 { "field1.thing", "field2.nice" }
             };
             var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
-            Assert.Equal("field2:(other:value OR nice:yep) another:works", aliased.ToString());
+            Assert.Equal("(field2.other:value OR field2.nice:yep) another:works", aliased.ToString());
         }
 
         [Fact]

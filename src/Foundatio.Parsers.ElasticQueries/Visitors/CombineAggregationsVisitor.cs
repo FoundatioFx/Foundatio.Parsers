@@ -18,7 +18,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
             var container = GetParentContainer(node, context);
             var termsAggregation = container as ITermsAggregation;
-            var termsProperty = elasticContext.GetPropertyMapping(node.GetFullName());
             var dateHistogramAggregation = container as IDateHistogramAggregation;
             var topHitsAggregation = container as ITopHitsAggregation;
 

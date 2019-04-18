@@ -28,7 +28,7 @@ namespace Foundatio.Parsers.Tests {
             var settings = new ConnectionSettings(new Uri(elasticsearchUrl));
             configure?.Invoke(settings);
 
-            var client = new ElasticClient(settings.DisableDirectStreaming().DefaultTypeName("_doc").PrettyJson());
+            var client = new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
             if (!client.WaitForReady(new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token, _logger))
                 throw new ApplicationException("Unable to connect to Elasticsearch.");
 
@@ -365,9 +365,9 @@ namespace Foundatio.Parsers.Tests {
         public void SimpleQueryProcessor() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();
-            client.CreateIndex(index, i => i.Mappings(m => m.Map<MyType>(t => t
+            client.CreateIndex(index, i => i.Map<MyType>(t => t
                 .Properties(p => p
-                    .Text(e => e.Name(n => n.Field3).Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))));
+                    .Text(e => e.Name(n => n.Field3).Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256)))))));
             var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2" }, i => i.Index(index));
             client.Index(new MyType { Field1 = "value2", Field2 = "value2" }, i => i.Index(index));
             client.Index(new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now" }, i => i.Index(index));
@@ -661,7 +661,7 @@ namespace Foundatio.Parsers.Tests {
         public void NestedFilterProcessor() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient(s => s.DefaultMappingFor<MyNestedType>(t => t.IndexName(index)));
-            client.CreateIndex(index, i => i.Mappings(m => m.Map<MyNestedType>(d => d.Properties(p => p
+            client.CreateIndex(index, m => m.Map<MyNestedType>(d => d.Properties(p => p
                 .Text(e => e.Name(n => n.Field1).Index())
                 .Text(e => e.Name(n => n.Field2).Index())
                 .Text(e => e.Name(n => n.Field3).Index())
@@ -672,7 +672,7 @@ namespace Foundatio.Parsers.Tests {
                     .Text(e => e.Name(n => n.Field3).Index())
                     .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
                 ))
-            ))));
+            )));
 
             var res = client.IndexManyAsync(new[] {
                 new MyNestedType {
@@ -686,26 +686,20 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh(Indices.Index<MyNestedType>());
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(client).UseNested());
-            var result =
-                processor.BuildQueryAsync("field1:value1 nested.field1:value1",
-                    new ElasticQueryVisitorContext().UseScoring()).Result;
+            var result = processor.BuildQueryAsync("field1:value1 nested.field1:value1", new ElasticQueryVisitorContext().UseScoring()).Result;
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(f => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
-            var expectedResponse =
-                client.Search<MyNestedType>(d => d.Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
-                                                              &&
-                                                              q.Nested(
-                                                                  n =>
-                                                                      n.Path(p => p.Nested)
-                                                                          .Query(
-                                                                              q2 =>
-                                                                                  q2.Match(
-                                                                                      m =>
-                                                                                          m.Field("nested.field1")
-                                                                                              .Query("value1"))))));
+            var expectedResponse = client.Search<MyNestedType>(d => d
+                .Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
+                    && q.Nested(n => n
+                        .Path(p => p.Nested)
+                        .Query(q2 => q2
+                            .Match(m => m
+                                .Field("nested.field1")
+                                .Query("value1"))))));
 
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -713,27 +707,21 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            result =
-                processor.BuildQueryAsync("field1:value1 nested:(field1:value1 field4:4)",
-                    new ElasticQueryVisitorContext { UseScoring = true }).Result;
+            result = processor.BuildQueryAsync("field1:value1 nested:(field1:value1 field4:4)", new ElasticQueryVisitorContext { UseScoring = true }).Result;
 
             actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));
             actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
-            expectedResponse =
-                client.Search<MyNestedType>(d => d.Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
-                                                              &&
-                                                              q.Nested(
-                                                                  n =>
-                                                                      n.Path(p => p.Nested)
-                                                                          .Query(
-                                                                              q2 =>
-                                                                                  q2.Match(
-                                                                                      m =>
-                                                                                          m.Field("nested.field1")
-                                                                                              .Query("value1"))
-                                                                                  && q2.Term("nested.field4", "4")))));
+            expectedResponse = client.Search<MyNestedType>(d => d
+                .Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
+                    && q.Nested(n => n
+                        .Path(p => p.Nested)
+                        .Query(q2 => q2
+                            .Match(m => m
+                                .Field("nested.field1")
+                                .Query("value1"))
+                                    && q2.Term("nested.field4", "4")))));
 
             expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -746,7 +734,7 @@ namespace Foundatio.Parsers.Tests {
         public void NestedFilterProcessor2() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient(s => s.DefaultMappingFor<MyNestedType>(t => t.IndexName(index)));
-            client.CreateIndex(index, i => i.Mappings(m => m.Map<MyNestedType>(d => d.Properties(p => p
+            client.CreateIndex(index, m => m.Map<MyNestedType>(d => d.Properties(p => p
                 .Text(e => e.Name(n => n.Field1).Index())
                 .Text(e => e.Name(n => n.Field2).Index())
                 .Text(e => e.Name(n => n.Field3).Index())
@@ -757,7 +745,7 @@ namespace Foundatio.Parsers.Tests {
                     .Text(e => e.Name(n => n.Field3).Index())
                     .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
                 ))
-            ))));
+            )));
 
             var res = client.IndexMany(new[] {
                 new MyNestedType {
@@ -779,13 +767,11 @@ namespace Foundatio.Parsers.Tests {
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
-            var expectedResponse =
-                client.Search<MyNestedType>(d => d.Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
-                                                              && q.Nested(n => n.Path(p => p.Nested).Query(q2 =>
-                                                                  q2.Match(m => m.Field("nested.field1").Query("value1"))
-                                                                  && q2.Term("nested.field4", "4")
-                                                                  &&
-                                                                  q2.Match(m => m.Field("nested.field3").Query("value3"))))));
+            var expectedResponse = client.Search<MyNestedType>(d => d.Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
+                && q.Nested(n => n.Path(p => p.Nested).Query(q2 =>
+                    q2.Match(m => m.Field("nested.field1").Query("value1"))
+                    && q2.Term("nested.field4", "4")
+                    && q2.Match(m => m.Field("nested.field3").Query("value3"))))));
 
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -801,7 +787,7 @@ namespace Foundatio.Parsers.Tests {
             var mapping = new TypeMappingDescriptor<MyType>().Properties(p => p
                 .Text(f => f.Name(e => e.Field1).Fields(f1 => f1.Keyword(k => k.Name("keyword").IgnoreAbove(256)))));
 
-            client.CreateIndex(index, i => i.Mappings(m => m.Map("mytype", d => mapping)));
+            client.CreateIndex(index, m => m.Map(d => mapping));
             client.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, index));
@@ -833,7 +819,7 @@ namespace Foundatio.Parsers.Tests {
                     .Text(e => e.Name("@browser_version"))
                     .FieldAlias(a => a.Name("browser.version").Path("data.@browser_version")))));
 
-            client.CreateIndex(index, i => i.Mappings(m => m.Map<MyType>(d => mapping)));
+            client.CreateIndex(index, m => m.Map<MyType>(d => mapping));
             client.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));

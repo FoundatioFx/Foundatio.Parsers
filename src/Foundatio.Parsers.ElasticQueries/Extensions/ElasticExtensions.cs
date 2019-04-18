@@ -12,7 +12,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class ElasticExtensions {
         public static string GetErrorMessage(this IApiCallDetails response) {
             var sb = new StringBuilder();
-
+            
             if (response.OriginalException != null)
                 sb.AppendLine($"Original: ({response.HttpStatusCode} - {response.OriginalException.GetType().Name}) {response.OriginalException.Message}");
 

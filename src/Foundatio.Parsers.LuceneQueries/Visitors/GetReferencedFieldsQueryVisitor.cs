@@ -8,47 +8,28 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorWithResultBase<ISet<string>> {
         private readonly HashSet<string> _fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-            if (!String.IsNullOrEmpty(node.Field))
-                AddField(node);
-
-            return base.VisitAsync(node, context);
-        }
-
         public override void Visit(TermNode node, IQueryVisitorContext context) {
-            if (!String.IsNullOrEmpty(node.Field)) {
-                AddField(node);
-            } else {
-                var nameParts = node.GetNameParts();
-                if (nameParts.Length == 0)
-                    _fields.Add("_all");
-            }
+            AddField(node, context);
         }
 
         public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
-            if (!String.IsNullOrEmpty(node.Field)) {
-                AddField(node);
-            } else {
-                var nameParts = node.GetNameParts();
-                if (nameParts.Length == 0)
-                    _fields.Add("_all");
-            }
+            AddField(node, context);
         }
 
         public override void Visit(ExistsNode node, IQueryVisitorContext context) {
-            if (!String.IsNullOrEmpty(node.Field))
-                AddField(node);
+            AddField(node, context);
         }
 
         public override void Visit(MissingNode node, IQueryVisitorContext context) {
-            if (!String.IsNullOrEmpty(node.Field))
-                AddField(node);
+            AddField(node, context);
         }
 
-        private void AddField(IFieldQueryNode node) {
-            string field = String.Equals(node.GetQueryType(), QueryType.Query) ? node.GetFullName() : node.Field;
-            if (!field.StartsWith("@"))
+        private void AddField(IFieldQueryNode node, IQueryVisitorContext context) {
+            string field = node.GetResolvedField();
+            if (field != null)
                 _fields.Add(field);
+            else
+                _fields.Add("_all"); // TODO: Change this to add all default fields
         }
 
         public override Task<ISet<string>> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {

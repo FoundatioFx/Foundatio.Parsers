@@ -3,7 +3,7 @@
   <ItemGroup>
     <PackageReference Include="Exceptionless.DateTimeExtensions" Version="3.3.96" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
-    <PackageReference Include="NEST" Version="6.6.0" />
+    <PackageReference Include="NEST" Version="7.0.0-alpha1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="2.2.0" />
   </ItemGroup>
   <ItemGroup>

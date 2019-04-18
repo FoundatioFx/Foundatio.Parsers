@@ -58,7 +58,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string> fields, int priority = 50) {
-            return UseFieldResolver(f => fields.GetValueOrNull(f), priority);
+            return UseFieldResolver(fields.GetValueOrNull, priority);
         }
 
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public class MissingNode : QueryNodeBase, IFieldQueryNode {
@@ -33,7 +34,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             builder.Append(Prefix);
             builder.Append("_missing_");
             builder.Append(":");
-            builder.Append(Field);
+            builder.Append(this.GetResolvedField());
 
             return builder.ToString();
         }

@@ -24,7 +24,7 @@ namespace Foundatio.Parsers.Tests {
             var settings = new ConnectionSettings(new Uri(elasticsearchUrl));
             configure?.Invoke(settings);
 
-            var client = new ElasticClient(settings.DisableDirectStreaming().DefaultTypeName("_doc").PrettyJson());
+            var client = new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
             if (!client.WaitForReady(new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token, _logger))
                 throw new ApplicationException("Unable to connect to Elasticsearch.");
 
@@ -367,7 +367,7 @@ namespace Foundatio.Parsers.Tests {
             var client = GetClient();
             await client.DeleteIndexAsync(index);
             await client.RefreshAsync(index);
-            
+
             var mapping = new TypeMappingDescriptor<MyType>()
                 .Properties(p => p
                     .GeoPoint(g => g.Name(f => f.Field1))
@@ -376,7 +376,7 @@ namespace Foundatio.Parsers.Tests {
             var processor = new ElasticQueryParser(
                 c => c
                     .UseGeo(l => "someinvalidvaluehere")
-                    .UseMappings<MyType>(m => mapping, () => client.GetMapping(new GetMappingRequest(index, index)).Indices[index][index]));
+                    .UseMappings<MyType>(m => mapping, () => client.GetMapping(new GetMappingRequest(index)).Indices[index].Mappings));
             
             await processor.BuildAggregationsAsync("geogrid:geo~3");
 
