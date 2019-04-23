@@ -34,7 +34,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             builder.Append(Prefix);
             builder.Append("_exists_");
             builder.Append(":");
-            builder.Append(this.GetResolvedField());
+            builder.Append(this.Field);
 
             return builder.ToString();
         }

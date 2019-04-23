@@ -33,20 +33,17 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         private void ResolveField(IFieldQueryNode node, IQueryVisitorContext context) {
             if (node.Parent == null)
                 return;
-
-            var resolver = context.GetDynamicFieldResolver();
-            if (resolver != null && node.Field != null) {
-                var resolvedField = resolver(node.GetFullName());
-                if (resolvedField != null)
-                    node.SetResolvedField(resolvedField);
+            
+            var resolver = context.GetFieldResolver();
+            var resolvedField = resolver?.Invoke(node.Field) ?? node.Field;
+            if (resolvedField != null && !resolvedField.Equals(node.Field, StringComparison.OrdinalIgnoreCase)) {
+                node.SetOriginalField(node.Field);
+                node.Field = resolvedField;
             }
         }
 
         public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
-            var resolver = context.GetDynamicFieldResolver();
-
             await node.AcceptAsync(this, context).ConfigureAwait(false);
-
             return node;
         }
 
@@ -73,7 +70,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
     public static class FieldMapExtensions {
         public static string GetValueOrNull(this IDictionary<string, string> map, string field) {
-            if (map == null)
+            if (map == null || field == null)
                 return null;
             
             if (map.TryGetValue(field, out string value))

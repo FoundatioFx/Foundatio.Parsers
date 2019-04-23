@@ -9,7 +9,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class ElasticQueryVisitorContext : QueryVisitorContext, IQueryVisitorContextWithIncludeResolver, IQueryVisitorContextWithFieldResolver, IElasticQueryVisitorContext, IQueryVisitorContextWithValidator {
         public Operator DefaultOperator { get; set; } = Operator.And;
         public bool UseScoring { get; set; }
-        public string[] DefaultFields { get; set; }
         public Func<string, IProperty> GetPropertyMappingFunc { get; set; }
         public Func<string, Task<string>> IncludeResolver { get; set; }
         public QueryFieldResolver FieldResolver { get; set; }

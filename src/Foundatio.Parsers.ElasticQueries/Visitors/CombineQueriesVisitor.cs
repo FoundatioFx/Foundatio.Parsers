@@ -29,10 +29,10 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (childQuery == null) continue;
 
                 var op = node.GetOperator(elasticContext.DefaultOperator);
-                if (child.IsNodeNegated())
+                if (child.IsExcluded())
                     childQuery = !childQuery;
 
-                if (op == Operator.Or && !String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+")
+                if (op == Operator.Or && node.IsRequired())
                     op = Operator.And;
 
                 if (op == Operator.And) {
@@ -56,7 +56,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            if (node.GetScopedNode() is IFieldQueryNode scopedNode && node.Field == null &&
+            if (node.GetGroupedParentNode() is IFieldQueryNode scopedNode && node.Field == null &&
                 (node.GetQuery(() => node.GetDefaultQuery(context)) is MatchQuery || node.GetQuery(() => node.GetDefaultQuery(context)) is MultiMatchQuery)) {
                 if (!scopedNode.Data.ContainsKey("match_terms")) {
                     scopedNode.Data["match_terms"] = new List<TermNode>();

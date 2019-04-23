@@ -138,7 +138,7 @@ namespace Foundatio.Parsers.Tests {
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(expected, generatedQuery);
 
-            await new AssignAggregationTypeVisitor().AcceptAsync(result, null);
+            await new AssignOperationTypeVisitor().AcceptAsync(result, null);
             _logger.LogInformation(DebugQueryVisitor.Run(result));
         }
     }

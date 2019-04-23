@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Foundatio.Parsers.Tests {
-    public class IncludeQueryVisitorTests : TestWithLoggingBase {
+    public class IncludeQueryVisitorTests : ElasticsearchTestBase {
         public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output) {
             Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
         }

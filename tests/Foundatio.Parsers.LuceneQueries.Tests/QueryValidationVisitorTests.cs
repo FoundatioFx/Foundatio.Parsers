@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -91,7 +92,7 @@ namespace Foundatio.Parsers.Tests {
         private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations) {
             IQueryNode queryNode;
             try {
-                queryNode = await parser.ParseAsync(query, QueryType.Aggregation);
+                queryNode = await parser.ParseAsync(query, new ElasticQueryVisitorContext { QueryType = QueryType.Aggregation });
             } catch (Exception ex) {
                 _logger.LogError(ex, "Error parsing query: {Message}", ex.Message);
                 if (isValid)

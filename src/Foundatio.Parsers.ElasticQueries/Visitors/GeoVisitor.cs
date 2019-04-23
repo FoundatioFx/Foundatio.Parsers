@@ -15,11 +15,11 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
-            if (!(context is IElasticQueryVisitorContext elasticContext) || !elasticContext.IsGeoPropertyType(node.GetResolvedField()) || node.GetQueryType() != QueryType.Query)
+            if (context.QueryType != QueryType.Query || !(context is IElasticQueryVisitorContext elasticContext) || !elasticContext.IsGeoPropertyType(node.Field))
                 return;
 
             string location = _resolveGeoLocation != null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;
-            var query = new GeoDistanceQuery { Field = node.GetResolvedField(), Location = location, Distance = node.Proximity ?? Distance.Miles(10) };
+            var query = new GeoDistanceQuery { Field = node.Field, Location = location, Distance = node.Proximity ?? Distance.Miles(10) };
             node.SetQuery(query);
         }
 
@@ -28,7 +28,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return;
 
             var box = new BoundingBox { TopLeft = node.Min, BottomRight = node.Max };
-            var query = new GeoBoundingBoxQuery { BoundingBox = box, Field = node.GetResolvedField() };
+            var query = new GeoBoundingBoxQuery { BoundingBox = box, Field = node.Field };
             node.SetQuery(query);
         }
     }

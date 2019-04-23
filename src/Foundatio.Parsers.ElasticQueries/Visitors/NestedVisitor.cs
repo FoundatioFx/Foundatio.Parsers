@@ -10,7 +10,7 @@ using Nest;
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class NestedVisitor: ChainableQueryVisitor {
         public override void Visit(TermNode node, IQueryVisitorContext context) {
-            var nestedProperty = GetNestedProperty(node.GetResolvedField(), context);
+            var nestedProperty = GetNestedProperty(node.Field, context);
             if (nestedProperty == null)
                 return;
 

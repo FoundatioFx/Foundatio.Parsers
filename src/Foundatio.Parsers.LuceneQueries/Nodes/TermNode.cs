@@ -50,8 +50,8 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
 
             builder.Append(Prefix);
 
-            if (!String.IsNullOrEmpty(this.GetResolvedField())) {
-                builder.Append(this.GetResolvedField());
+            if (!String.IsNullOrEmpty(Field)) {
+                builder.Append(Field);
                 builder.Append(":");
             }
 

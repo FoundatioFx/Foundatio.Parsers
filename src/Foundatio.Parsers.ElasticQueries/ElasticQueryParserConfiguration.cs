@@ -21,12 +21,13 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration() {
             AddQueryVisitor(new CombineQueriesVisitor(), 10000);
             AddSortVisitor(new TermToFieldVisitor(), 0);
-            AddAggregationVisitor(new AssignAggregationTypeVisitor(), 0);
+            AddAggregationVisitor(new AssignOperationTypeVisitor(), 0);
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
+            AddVisitor(new FieldResolverQueryVisitor(), 10);
         }
 
         public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
-        public string[] DefaultFields { get; private set; } = new[] { "_all" };
+        public string[] DefaultFields { get; private set; }
         public QueryFieldResolver FieldResolver { get; private set; }
         public Func<string, Task<string>> IncludeResolver { get; private set; }
         public Func<QueryValidationInfo, Task<bool>> Validator { get; private set; }
@@ -49,11 +50,8 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration UseFieldResolver(QueryFieldResolver resolver, int priority = 50) {
             FieldResolver = resolver;
 
-            var visitor = new FieldResolverQueryVisitor();
-            QueryVisitor.AddVisitor(visitor, priority);
-            SortVisitor.AddVisitor(visitor, priority);
+            ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(), priority);
 
-            AggregationVisitor.AddVisitor(new FieldResolverQueryVisitor(), priority);
             return this;
         }
 
