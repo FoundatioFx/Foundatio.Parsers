@@ -43,7 +43,7 @@ namespace Foundatio.Parsers.Tests {
                 "_all",
                 "hey",
                 "nested",
-                "nested.stuff"
+                "stuff"
             }, info.ReferencedFields);
         }
 
@@ -91,8 +91,9 @@ namespace Foundatio.Parsers.Tests {
 
         private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations) {
             IQueryNode queryNode;
+            var context = new ElasticQueryVisitorContext { QueryType = QueryType.Aggregation };
             try {
-                queryNode = await parser.ParseAsync(query, new ElasticQueryVisitorContext { QueryType = QueryType.Aggregation });
+                queryNode = await parser.ParseAsync(query, context);
             } catch (Exception ex) {
                 _logger.LogError(ex, "Error parsing query: {Message}", ex.Message);
                 if (isValid)
@@ -101,7 +102,7 @@ namespace Foundatio.Parsers.Tests {
                 return;
             }
 
-            var info = await ValidationVisitor.RunAsync(queryNode);
+            var info = await ValidationVisitor.RunAsync(queryNode, context);
             Assert.Equal(QueryType.Aggregation, info.QueryType);
             Assert.Equal(isValid, info.IsValid);
             Assert.Equal(maxNodeDepth, info.MaxNodeDepth);

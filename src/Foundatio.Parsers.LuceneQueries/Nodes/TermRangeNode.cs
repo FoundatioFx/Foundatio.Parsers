@@ -59,7 +59,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
                 builder.Append("NOT ");
 
             builder.Append(Prefix);
-
+            
             if (!String.IsNullOrEmpty(Field))
             {
                 builder.Append(Field);

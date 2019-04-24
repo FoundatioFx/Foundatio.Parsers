@@ -20,7 +20,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType
             };
 
-            sort.Order = node.IsNodeOrGroupedParentNegated() ? SortOrder.Descending : SortOrder.Ascending;
+            sort.Order = node.IsNodeOrGroupNegated() ? SortOrder.Descending : SortOrder.Ascending;
 
             return sort;
         }

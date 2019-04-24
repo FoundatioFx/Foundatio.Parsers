@@ -20,18 +20,18 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return !String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+";
         }
         
-        public static bool IsNodeOrGroupedParentNegated(this IFieldQueryNode node) {
+        public static bool IsNodeOrGroupNegated(this IFieldQueryNode node) {
             if (node.IsRequired())
                 return false;
             
-            return node.IsExcluded() || node.GetGroupedParentNode().IsExcluded();
+            return node.IsExcluded() || node.GetGroupNode().IsExcluded();
         }
 
-        public static GroupNode GetGroupedParentNode(this IQueryNode node) {
-            if (node.Parent == null)
+        public static GroupNode GetGroupNode(this IQueryNode node) {
+            if (node == null)
                 return null;
             
-            var current = node.Parent;
+            var current = node;
             do {
                 if (current is GroupNode groupNode && groupNode.HasParens)
                     return groupNode;
@@ -67,8 +67,8 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
         
         public static string[] GetDefaultFields(this IQueryNode node, string[] rootDefaultFields) {
-            var scopedNode = GetGroupedParentNode(node);
-            return !String.IsNullOrEmpty(scopedNode?.Field) ? new[] { scopedNode.Field } : rootDefaultFields;
+            var scopedNode = GetGroupNode(node);
+            return !String.IsNullOrEmpty(scopedNode?.Field) ? new[] { scopedNode.Field } : rootDefaultFields ?? new[] { "_all" };
         }
     }
 }

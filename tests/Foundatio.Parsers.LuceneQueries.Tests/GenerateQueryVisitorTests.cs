@@ -40,9 +40,9 @@ namespace Foundatio.Parsers.Tests {
         [InlineData("field:[1 TO 2]", "field:[1 TO 2]", true)]
         [InlineData("field:{1 TO 2}", "field:{1 TO 2}", true)]
         [InlineData("field:[1 TO 2}", "field:[1 TO 2}", true)]
-        [InlineData("field:(criteria1 criteria2)", "(field:criteria1 field:criteria2)", true)]
-        [InlineData("data.field:(now criteria2)", "(data.field:now data.field:criteria2)", true)]
-        [InlineData("field:(criteria1 OR criteria2)", "(field:criteria1 OR field:criteria2)", true)]
+        [InlineData("field:(criteria1 criteria2)", "field:(criteria1 criteria2)", true)]
+        [InlineData("data.field:(now criteria2)", "data.field:(now criteria2)", true)]
+        [InlineData("field:(criteria1 OR criteria2)", "field:(criteria1 OR criteria2)", true)]
         [InlineData("field:*cr", "field:*cr", true)] // TODO lucene doesn't support wildcards at the beginning.
         [InlineData("field:c*r", "field:c*r", true)]
         [InlineData("field:cr*", "field:cr*", true)]
@@ -51,7 +51,7 @@ namespace Foundatio.Parsers.Tests {
         [InlineData("date:<now", "date:<now", true)]
         [InlineData("_exists_:title", "_exists_:title", true)]
         [InlineData("_missing_:title", "_missing_:title", true)]
-        [InlineData("book.\\*:(quick brown)", "(book.\\*:quick book.\\*:brown)", true)]
+        [InlineData("book.\\*:(quick brown)", "book.\\*:(quick brown)", true)]
         [InlineData("date:[now/d-4d TO now/d+1d}", @"date:[now/d-4d TO now/d+1d}", true)]
         [InlineData("(date:[now/d-4d TO now/d+1d})", @"(date:[now/d-4d TO now/d+1d})", true)]
         [InlineData("data.date:>now", "data.date:>now", true)]
@@ -74,26 +74,26 @@ namespace Foundatio.Parsers.Tests {
         [InlineData("count:a:a", null, false)]
         [InlineData(@"count:a\:a more:stuff", @"count:a\:a more:stuff", true)]
         [InlineData("data.count:[1..5}", "data.count:[1..5}", true)]
-        [InlineData("age:(>=10 AND < 20)", "(age:>=10 AND age:<20)", true)]
+        [InlineData("age:(>=10 AND < 20)", "age:(>=10 AND <20)", true)]
         [InlineData("age : >= 10", "age:>=10", true)]
         [InlineData("age:[1 TO 2]", "age:[1 TO 2]", true)]
         [InlineData("data.Windows-identity:ejsmith", "data.Windows-identity:ejsmith", true)]
-        [InlineData("data.age:(>30 AND <=40)", "(data.age:>30 AND data.age:<=40)", true)]
+        [InlineData("data.age:(>30 AND <=40)", "data.age:(>30 AND <=40)", true)]
         [InlineData("+>=10", "+>=10", true)]
         [InlineData(">=10", ">=10", true)]
-        [InlineData("age:(+>=10)", "(+age:>=10)", true)]
-        [InlineData("data.age:(+>=10 AND < 20)", "(+data.age:>=10 AND data.age:<20)", true)]
-        [InlineData("data.age:(+>=10 +<20)", "(+data.age:>=10 +data.age:<20)", true)]
-        [InlineData("data.age:(->=10 AND < 20)", "(-data.age:>=10 AND data.age:<20)", true)]
+        [InlineData("age:(+>=10)", "age:(+>=10)", true)]
+        [InlineData("data.age:(+>=10 AND < 20)", "data.age:(+>=10 AND <20)", true)]
+        [InlineData("data.age:(+>=10 +<20)", "data.age:(+>=10 +<20)", true)]
+        [InlineData("data.age:(->=10 AND < 20)", "data.age:(->=10 AND <20)", true)]
         [InlineData("data.age:[10 TO *]", "data.age:[10 TO *]", true)]
-        [InlineData("title:(full text search)^2", "(title:full title:text title:search)^2", true)]
+        [InlineData("title:(full text search)^2", "title:(full text search)^2", true)]
         [InlineData("data.age:[* TO 10]", "data.age:[* TO 10]", true)]
-        [InlineData("hidden:true AND data.age:(>30 AND <=40)", "hidden:true AND (data.age:>30 AND data.age:<=40)", true)]
+        [InlineData("hidden:true AND data.age:(>30 AND <=40)", "hidden:true AND data.age:(>30 AND <=40)", true)]
         [InlineData("hidden:true", "hidden:true", true)]
         [InlineData("geo:\"Dallas, TX\"~75m", "geo:\"Dallas, TX\"~75m", true)]
         [InlineData("geo:\"Dallas, TX\"~75 m", "geo:\"Dallas, TX\"~75 m", true)]
-        [InlineData("min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", "min:price geogrid:geo~6 (count:category count.count:subcategory count.avg:price count.min:price)", true)]
-        [InlineData("datehistogram:(date~2^-5\\:30 min:date)", "(datehistogram:date~2^-5\\:30 datehistogram.min:date)", true)]
+        [InlineData("min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", "min:price geogrid:geo~6 count:(category count:subcategory avg:price min:price)", true)]
+        [InlineData("datehistogram:(date~2^-5\\:30 min:date)", "datehistogram:(date~2^-5\\:30 min:date)", true)]
         [InlineData("-type:404", "-type:404", true)]
         [InlineData("type:test?s", "type:test?s", true)]
         [InlineData("NOT Test", "NOT Test", true)]
@@ -101,7 +101,7 @@ namespace Foundatio.Parsers.Tests {
         [InlineData("type:?", "type:?", false)]
         // TODO: We don't yet support this.
         //[InlineData(@"type:\(1\+1\)\:2", @"type:\(1\+1\)\:2", true)] // https://lucene.apache.org/core/2_9_4/queryparsersyntax.html#Escaping%20Special%20Characters
-        [InlineData("title:(+return +\"pink panther\")", "(+title:return +title:\"pink panther\")", true)]
+        [InlineData("title:(+return +\"pink panther\")", "title:(+return +\"pink panther\")", true)]
         [InlineData("\"jakarta apache\" -\"Apache Lucene\"", "\"jakarta apache\" -\"Apache Lucene\"", true)]
         [InlineData("\"jakarta apache\"^4 \"Apache Lucene\"", "\"jakarta apache\"^4 \"Apache Lucene\"", true)]
         [InlineData("NOT \"jakarta apache\"", "NOT \"jakarta apache\"", true)]
@@ -129,7 +129,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task CanGenerateSingleQueryAsync() {
             string query = "datehistogram:(date~2^-5\\:30 min:date max:date)";
-            string expected = "(datehistogram:date~2^-5\\:30 datehistogram.min:date datehistogram.max:date)";
+            string expected = "datehistogram:(date~2^-5\\:30 min:date max:date)";
             var parser = new LuceneQueryParser();
 
             var result = await parser.ParseAsync(query);
