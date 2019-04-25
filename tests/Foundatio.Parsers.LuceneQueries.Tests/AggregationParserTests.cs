@@ -292,14 +292,14 @@ namespace Foundatio.Parsers.Tests {
             client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
             client.Refresh(index);
 
-            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff"));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, index));
             var aggregations = processor.BuildAggregationsAsync("terms:(field1~1000^2 tophits:(_~1000 @include:myinclude))").Result;
 
-            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(aggregations));
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Aggregations(a => a
+            var expectedResponse = client.Search<MyType>(d => d.Index(index).Aggregations(a => a
                 .Terms("terms_field1", t => t
                     .Field("field1.keyword")
                     .Size(1000)
