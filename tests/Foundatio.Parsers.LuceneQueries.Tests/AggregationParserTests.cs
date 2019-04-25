@@ -80,7 +80,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-        [Fact]
+        [Fact(Skip = "Waiting for https://github.com/elastic/elasticsearch-net/issues/3695")]
         public async Task ProcessAggregationsAsync() {
             var client = GetClient();
             var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3)))));
@@ -156,6 +156,36 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public async Task ProcessSingleAggregationWithAlias() {
+            var client = GetClient();
+            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            
+            client.IndexMany(new[] {
+                new MyType { Field2 = "field2" }
+            }, index);
+            client.Refresh(index);
+
+            var aliasMap = new FieldMap { { "alias2", "field2" } };
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, index).UseFieldMap(aliasMap));
+            var aggregations = await processor.BuildAggregationsAsync("missing:alias2");
+
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+
+            var expectedResponse = client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+                .Missing("missing_alias2", t => t.Field("field2.keyword"))));
+            
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.True(actualResponse.IsValid);
+            Assert.True(expectedResponse.IsValid);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public async Task ProcessAggregationsWithAliasesAsync() {
             var client = GetClient();
             var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p
@@ -170,7 +200,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh(index);
 
             var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
-            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, "stuff").UseGeo(l => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyType>(client, index).UseGeo(l => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
             var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 histogram:alias4 geogrid:alias3 terms:alias1");
 
             var actualResponse = client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));

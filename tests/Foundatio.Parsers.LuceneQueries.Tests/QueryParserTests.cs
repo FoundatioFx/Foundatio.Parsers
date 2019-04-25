@@ -115,6 +115,31 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void ShouldMergeMultipleAnalyzedFieldTermsIntoSingleMatchQuery() {
+            var client = GetClient();
+            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p
+                .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword")))))));
+            
+            client.Index(new MyType { Field1 = "value1" }, i => i.Index(index));
+            client.Refresh(index);
+
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).SetDefaultFields(new[] { "field1" }).UseMappings<MyType>(client, index));
+            var result = processor.BuildQueryAsync("value1 value2", new ElasticQueryVisitorContext {  DefaultOperator = Operator.Or, UseScoring = true }).Result;
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
+            var actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+
+            var expectedResponse = client.Search<MyType>(d => d.Index(index).Query(f =>
+                f.Match(m => m.Field(mf => mf.Field1).Query("value1 value2"))));
+
+            var expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void ShouldMergeTermsIntoMatchQueryForAnalyzedFields() {
             var client = GetClient();
             var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d
@@ -142,8 +167,8 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            result = processor.BuildQueryAsync("value1 abc def ghi",
-                    new ElasticQueryVisitorContext {  DefaultOperator = Operator.Or, UseScoring = true }).Result;
+            processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).SetDefaultFields(new[] { "field1" }).UseMappings<MyType>(client, index));
+            result = processor.BuildQueryAsync("value1 abc def ghi", new ElasticQueryVisitorContext {  DefaultOperator = Operator.Or, UseScoring = true }).Result;
             actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
             actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -157,10 +182,9 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            //multi-match on multiple default fields
+            // multi-match on multiple default fields
             processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).SetDefaultFields(new[] { "field1", "field2" }).UseMappings<MyType>(client, index));
-            result = processor.BuildQueryAsync("value1 abc def ghi",
-                    new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
+            result = processor.BuildQueryAsync("value1 abc def ghi", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
             actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
             actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -303,7 +327,21 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-        [Fact]
+        [Fact(Skip = "Waiting for https://github.com/elastic/elasticsearch-net/issues/3695")]
+        public void CanDoNestDateHistogram() {
+            var client = GetClient();
+            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            client.IndexMany(new[] { new MyType { Field5 = DateTime.Now } }, index);
+            client.Refresh(index);
+
+            var response = client.Search<MyType>(i => i.Index(index).Aggregations(f => f
+                .DateHistogram("myagg", d => d.Field(d2 => d2.Field5).Interval("1d"))
+            ));
+
+            Assert.True(response.IsValid);
+        }
+
+        [Fact(Skip = "Waiting for https://github.com/elastic/elasticsearch-net/issues/3695")]
         public void DateAggregation() {
             var client = GetClient();
             var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
@@ -627,7 +665,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(client).UseNested());
-            var result = processor.BuildQueryAsync("field1:value1 nested.field1:value1", new ElasticQueryVisitorContext().UseScoring()).Result;
+            var result = processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1)", new ElasticQueryVisitorContext().UseScoring()).Result;
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(f => result));
             string actualRequest = actualResponse.GetRequest();
@@ -648,7 +686,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            result = processor.BuildQueryAsync("field1:value1 nested:(field1:value1 field4:4)", new ElasticQueryVisitorContext { UseScoring = true }).Result;
+            result = processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1 nested.field4:4)", new ElasticQueryVisitorContext { UseScoring = true }).Result;
 
             actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));
             actualRequest = actualResponse.GetRequest();
@@ -662,7 +700,7 @@ namespace Foundatio.Parsers.Tests {
                             .Match(m => m
                                 .Field("nested.field1")
                                 .Query("value1"))
-                                    && q2.Term("nested.field4", "4")))));
+                            && q2.Term("nested.field4", "4")))));
 
             expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -673,9 +711,8 @@ namespace Foundatio.Parsers.Tests {
 
         [Fact]
         public void NestedFilterProcessor2() {
-            var index = Guid.NewGuid().ToString("N");
-            var client = GetClient(s => s.DefaultMappingFor<MyNestedType>(t => t.IndexName(index)));
-            client.CreateIndex(index, m => m.Map<MyNestedType>(d => d.Properties(p => p
+            var client = GetClient();
+            var index = CreateRandomIndex(m => m.Map<MyNestedType>(d => d.Properties(p => p
                 .Text(e => e.Name(n => n.Field1).Index())
                 .Text(e => e.Name(n => n.Field2).Index())
                 .Text(e => e.Name(n => n.Field3).Index())
@@ -687,8 +724,9 @@ namespace Foundatio.Parsers.Tests {
                     .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
                 ))
             )));
+            client.ConnectionSettings.DefaultIndices.Add(typeof(MyNestedType), index);
 
-            var res = client.IndexMany(new[] {
+            client.IndexMany(new[] {
                 new MyNestedType {
                     Field1 = "value1",
                     Field2 = "value2",
@@ -700,8 +738,7 @@ namespace Foundatio.Parsers.Tests {
             client.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(client).UseNested());
-            var result =
-                processor.BuildQueryAsync("field1:value1 nested:(field1:value1 field4:4 field3:value3)",
+            var result = processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1 nested.field4:4 nested.field3:value3)",
                     new ElasticQueryVisitorContext { UseScoring = true }).Result;
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));

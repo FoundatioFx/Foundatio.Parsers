@@ -9,6 +9,7 @@ using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
+using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -101,7 +102,7 @@ namespace Foundatio.Parsers.Tests {
 
                 return;
             }
-
+            
             var info = await ValidationVisitor.RunAsync(queryNode, context);
             Assert.Equal(QueryType.Aggregation, info.QueryType);
             Assert.Equal(isValid, info.IsValid);

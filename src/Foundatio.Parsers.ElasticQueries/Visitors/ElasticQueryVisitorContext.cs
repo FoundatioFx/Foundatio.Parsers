@@ -53,6 +53,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public static bool IsPropertyAnalyzed(this IElasticQueryVisitorContext context, string field) {
+            // assume default is analyzed
             if (String.IsNullOrEmpty(field))
                 return true;
 

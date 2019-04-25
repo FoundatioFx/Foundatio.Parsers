@@ -9,12 +9,17 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class NestedVisitor: ChainableQueryVisitor {
-        public override void Visit(TermNode node, IQueryVisitorContext context) {
+        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+            if (String.IsNullOrEmpty(node.Field))
+                return base.VisitAsync(node, context);
+            
             var nestedProperty = GetNestedProperty(node.Field, context);
             if (nestedProperty == null)
-                return;
+                return base.VisitAsync(node, context);
 
-            node.SetQuery(new NestedQuery { Path = nestedProperty, Query = node.GetQuery(() => node.GetDefaultQuery(context)) });
+            node.SetQuery(new NestedQuery { Path = nestedProperty });
+            
+            return base.VisitAsync(node, context);
         }
 
         private string GetNestedProperty(string fullName, IQueryVisitorContext context) {

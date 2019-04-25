@@ -4,7 +4,7 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
-namespace Foundatio.Parsers.ElasticQueries.Visitors {
+namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class AssignOperationTypeVisitor: ChainableQueryVisitor {
         public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             if (String.IsNullOrEmpty(node.Field))
@@ -12,6 +12,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             
             if (!(node.Left is TermNode leftTerm) || !String.IsNullOrEmpty(leftTerm.Field))
                 throw new ApplicationException("The first item in an aggregation group must be the name of the target field.");
+
+            if (!IsKnownAggregationType(node.Field))
+                return base.VisitAsync(node, context);
             
             node.SetOperationType(node.Field);
             node.Field = leftTerm.Term;
@@ -25,10 +28,35 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override void Visit(TermNode node, IQueryVisitorContext context) {
             if (String.IsNullOrEmpty(node.Term))
                 return;
+
+            if (!IsKnownAggregationType(node.Field))
+                return;
             
             node.SetOperationType(node.Field);
             node.Field = node.Term;
             node.Term = null;
+        }
+        
+        private bool IsKnownAggregationType(string type) {
+            switch (type) {
+                case AggregationType.Min:
+                case AggregationType.Max:
+                case AggregationType.Avg:
+                case AggregationType.Sum:
+                case AggregationType.Cardinality:
+                case AggregationType.Missing:
+                case AggregationType.DateHistogram:
+                case AggregationType.Histogram:
+                case AggregationType.Percentiles:
+                case AggregationType.GeoHashGrid:
+                case AggregationType.Terms:
+                case AggregationType.Stats:
+                case AggregationType.TopHits:
+                case AggregationType.ExtendedStats:
+                    return true;
+                default:
+                    return false;
+            }
         }
     }
 

@@ -14,6 +14,11 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             await base.VisitAsync(node, context).ConfigureAwait(false);
+            
+            // TODO: Only stop on scoped group nodes (parens). Gather all child queries (including scoped groups) and then combine them.
+            // Combining only happens at the scoped group level though.
+            // Merge all non-field terms together into a single match or multi-match query
+            // Merge all nested queries for the same nested field together
 
             if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));

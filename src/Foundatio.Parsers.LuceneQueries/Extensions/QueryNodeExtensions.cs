@@ -33,9 +33,9 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             
             var current = node;
             do {
-                if (current is GroupNode groupNode && groupNode.HasParens)
+                if (current is GroupNode groupNode && (groupNode.HasParens || groupNode.Parent == null))
                     return groupNode;
-
+                
                 current = current.Parent;
             } while (current != null);
 
