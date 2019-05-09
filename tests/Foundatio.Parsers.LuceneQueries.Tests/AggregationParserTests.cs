@@ -80,7 +80,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-        [Fact(Skip = "Waiting for https://github.com/elastic/elasticsearch-net/issues/3695")]
+        [Fact]
         public async Task ProcessAggregationsAsync() {
             var client = GetClient();
             var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3)))));

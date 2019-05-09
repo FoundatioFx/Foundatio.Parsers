@@ -327,7 +327,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-        [Fact(Skip = "Waiting for https://github.com/elastic/elasticsearch-net/issues/3695")]
+        [Fact]
         public void CanDoNestDateHistogram() {
             var client = GetClient();
             var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
@@ -341,7 +341,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.True(response.IsValid);
         }
 
-        [Fact(Skip = "Waiting for https://github.com/elastic/elasticsearch-net/issues/3695")]
+        [Fact]
         public void DateAggregation() {
             var client = GetClient();
             var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
