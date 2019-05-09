@@ -10,21 +10,6 @@ using Newtonsoft.Json.Linq;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class ElasticExtensions {
-        public static string GetErrorMessage(this IApiCallDetails response) {
-            var sb = new StringBuilder();
-            
-            if (response.OriginalException != null)
-                sb.AppendLine($"Original: ({response.HttpStatusCode} - {response.OriginalException.GetType().Name}) {response.OriginalException.Message}");
-
-            if (response is IBulkResponse bulkResponse)
-                sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
-
-            if (sb.Length == 0)
-                sb.AppendLine("Unknown error.");
-
-            return sb.ToString();
-        }
-
         public static TermsInclude AddValue(this TermsInclude include, string value) {
             if (include?.Values == null)
                 return new TermsInclude(new[] { value });
@@ -46,16 +31,20 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         } 
 
         // TODO: Handle IFailureReason/BulkIndexByScrollFailure and other bulk response types.
-        public static string GetErrorMessage(this IResponse response) {
+        public static string GetErrorMessage(this IElasticsearchResponse response) {
+            if (response == null)
+                return String.Empty;
+            
             var sb = new StringBuilder();
 
-            if (response.OriginalException != null)
-                sb.AppendLine($"Original: ({response.ApiCall.HttpStatusCode} - {response.OriginalException.GetType().Name}) {response.OriginalException.Message}");
+            var apiCall = response.ApiCall;
+            if (apiCall.OriginalException != null)
+                sb.AppendLine($"Original: ({apiCall.HttpStatusCode} - {apiCall.OriginalException.GetType().Name}) {apiCall.OriginalException.Message}");
+            
+            if (response is IResponse responseWithError && responseWithError.ServerError != null)
+                sb.AppendLine($"Server: ({responseWithError.ServerError.Status}) {responseWithError.ServerError.Error}");
 
-            if (response.ServerError != null)
-                sb.AppendLine($"Server: ({response.ServerError.Status}) {response.ServerError.Error}");
-
-            if (response is IBulkResponse bulkResponse)
+            if (response is BulkResponse bulkResponse)
                 sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
 
             if (sb.Length == 0)
@@ -64,23 +53,26 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return sb.ToString();
         }
 
-        public static string GetRequest(this IApiCallDetails response, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false) {
+        public static string GetRequest(this IElasticsearchResponse response, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false) {
             if (response == null)
                 return String.Empty;
 
             var sb = new StringBuilder();
-            if (includeDebugInformation && response.DebugInformation != null)
-                sb.AppendLine(response.DebugInformation);
-            if (response.HttpStatusCode.HasValue) {
-                sb.Append(response.HttpStatusCode);
+            var responseWithError = response as IResponse;
+            if (includeDebugInformation && responseWithError?.DebugInformation != null)
+                sb.AppendLine(responseWithError.DebugInformation);
+
+            var apiCall = response.ApiCall;
+            if (apiCall.HttpStatusCode.HasValue) {
+                sb.Append(response.ApiCall.HttpStatusCode);
                 sb.Append(" ");
             }
-            sb.Append(response.HttpMethod);
+            sb.Append(apiCall.HttpMethod);
             sb.Append(" ");
-            sb.AppendLine(response.Uri.ToString());
+            sb.AppendLine(apiCall.Uri.ToString());
 
-            if (response.RequestBodyInBytes != null) {
-                string body = Encoding.UTF8.GetString(response.RequestBodyInBytes)?.Trim();
+            if (apiCall.RequestBodyInBytes != null) {
+                string body = Encoding.UTF8.GetString(apiCall.RequestBodyInBytes)?.Trim();
                 
                 if (normalize)
                     body = JsonUtility.NormalizeJsonString(body)?.Trim();
@@ -89,8 +81,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     sb.AppendLine(body);
             }
 
-            if (includeResponse && response.ResponseBodyInBytes != null && response.ResponseBodyInBytes.Length > 0 && response.ResponseBodyInBytes.Length < 20000) {
-                string responseData = Encoding.UTF8.GetString(response.ResponseBodyInBytes)?.Trim();
+            if (includeResponse && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000) {
+                string responseData = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes)?.Trim();
                 
                 if (!String.IsNullOrWhiteSpace(responseData)) {
                     sb.AppendLine("##### Response #####");
@@ -99,10 +91,6 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             }
 
             return sb.ToString();
-        }
-
-        public static string GetRequest(this IResponse response, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false) {
-            return GetRequest(response?.ApiCall, normalize, includeResponse, includeDebugInformation);
         }
 
         public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null) {

@@ -253,7 +253,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 return null;
             
             if (_propertyCache.TryGetValue(field, out var propertyType)) {
-                _logger.LogTrace("Returning cached property mapping for {field} = {type}", field, propertyType);
+                _logger.LogTrace("Cached property mapping: {field}={type}", field, propertyType);
                 return propertyType;
             }
             
@@ -292,7 +292,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
                 if (depth == fieldParts.Length - 1) {
                     _propertyCache.TryAdd(field, fieldMapping);
-                    _logger.LogTrace("Returning property mapping for {field} = {fieldMapping}", field, fieldMapping);
+                    _logger.LogTrace("Property mapping: {field}={fieldMapping}", field, fieldMapping);
                     return fieldMapping;
                 }
 
@@ -306,7 +306,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 }
             }
 
-            _logger.LogTrace("Did not find property mapping for {field}", field);
+            _logger.LogTrace("Property mapping: {field}=<null>", field);
             return null;
         }
 
@@ -399,7 +399,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             });
         }
 
-        public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client, string index) {
+        public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index) {
             return UseMappings(() => {
                 var response = client.GetMapping(new GetMappingRequest(Indices.Index(index)));
                 _logger.LogInformation("GetMapping: {Request}", response.GetRequest(false, true));

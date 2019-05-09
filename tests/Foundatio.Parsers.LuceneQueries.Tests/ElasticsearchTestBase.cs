@@ -42,12 +42,12 @@ namespace Foundatio.Parsers.Tests {
             return index;
         }
 
-        protected ICreateIndexResponse CreateIndex(IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> selector = null) {
+        protected CreateIndexResponse CreateIndex(IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> selector = null) {
             var client = GetClient();
             return CreateIndex(client, index, selector);
         }
 
-        protected ICreateIndexResponse CreateIndex(IElasticClient client, IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> selector = null) {
+        protected CreateIndexResponse CreateIndex(IElasticClient client, IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> selector = null) {
             _createdIndexes.Add(index);
             
             // set replicas to 0
