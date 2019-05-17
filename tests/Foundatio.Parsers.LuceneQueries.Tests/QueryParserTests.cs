@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 using System.Threading;
+using Elasticsearch.Net;
 
 namespace Foundatio.Parsers.Tests {
 
@@ -36,7 +37,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void SimpleFilterProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(m => m.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value2" },
@@ -61,7 +62,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void IncludeProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value2" },
@@ -93,7 +94,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void ShouldGenerateORedTermsQuery() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index));
             client.Refresh(index);
             
@@ -117,8 +118,8 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void ShouldMergeMultipleAnalyzedFieldTermsIntoSingleMatchQuery() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p
-                .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword")))))));
+            var index = CreateRandomIndex<MyType>(client, d => d.Dynamic().Properties(p => p
+                .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))));
             
             client.Index(new MyType { Field1 = "value1" }, i => i.Index(index));
             client.Refresh(index);
@@ -142,11 +143,11 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void ShouldMergeTermsIntoMatchQueryForAnalyzedFields() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d
+            var index = CreateRandomIndex<MyType>(client, d => d
                 .Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))
                     .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
                     .Keyword(e => e.Name(m => m.Field2))
-                )));
+                ));
             client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index));
             client.Refresh(index);
 
@@ -202,7 +203,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void EscapeFilterProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "hey \"you there\"", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value2" },
@@ -232,7 +233,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void ExistsFilterProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value2" },
@@ -260,7 +261,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void MissingFilterProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value2" },
@@ -288,7 +289,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void MinMaxWithDateHistogramAggregation() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now },
                 new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now },
@@ -330,7 +331,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void CanDoNestDateHistogram() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] { new MyType { Field5 = DateTime.Now } }, index);
             client.Refresh(index);
 
@@ -344,7 +345,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void DateAggregation() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now },
                 new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now },
@@ -371,9 +372,9 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void SimpleQueryProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(t => t
+            var index = CreateRandomIndex<MyType>(client, t => t
                 .Properties(p => p
-                    .Text(e => e.Name(n => n.Field3).Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256)))))));
+                    .Text(e => e.Name(n => n.Field3).Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))));
 
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
@@ -443,7 +444,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void NegativeQueryProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value3" },
@@ -515,7 +516,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void NestedQueryProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value2" },
@@ -544,7 +545,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void NestedQuery() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value2" },
@@ -574,7 +575,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void MixedCaseTermFilterQueryProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index(index));
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
@@ -594,7 +595,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void MultipleWordsTermFilterQueryProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.Index(new MyType { Field1 = "Blake Niemyjski" }, i => i.Index(index));
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
@@ -614,7 +615,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void CanTranslateTermQueryProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index(index));
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).AddVisitor(new UpdateFixedTermFieldToDateFixedExistsQueryVisitor()));
@@ -635,7 +636,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void GroupedOrFilterProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value2" },
@@ -664,7 +665,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void NestedFilterProcessor() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyNestedType>(d => d.Properties(p => p
+            var index = CreateRandomIndex<MyNestedType>(client, d => d.Properties(p => p
                 .Text(e => e.Name(n => n.Field1).Index())
                 .Text(e => e.Name(n => n.Field2).Index())
                 .Text(e => e.Name(n => n.Field3).Index())
@@ -675,8 +676,7 @@ namespace Foundatio.Parsers.Tests {
                     .Text(e => e.Name(n => n.Field3).Index())
                     .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
                 ))
-            )));
-            client.ConnectionSettings.DefaultIndices.Add(typeof(MyNestedType), index);
+            ));
             client.IndexManyAsync(new[] {
                 new MyNestedType {
                     Field1 = "value1",
@@ -736,7 +736,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void NestedFilterProcessor2() {
             var client = GetClient();
-            var index = CreateRandomIndex(m => m.Map<MyNestedType>(d => d.Properties(p => p
+            var index = CreateRandomIndex<MyNestedType>(client, d => d.Properties(p => p
                 .Text(e => e.Name(n => n.Field1).Index())
                 .Text(e => e.Name(n => n.Field2).Index())
                 .Text(e => e.Name(n => n.Field3).Index())
@@ -747,8 +747,7 @@ namespace Foundatio.Parsers.Tests {
                     .Text(e => e.Name(n => n.Field3).Index())
                     .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
                 ))
-            )));
-            client.ConnectionSettings.DefaultIndices.Add(typeof(MyNestedType), index);
+            ));
 
             client.IndexMany(new[] {
                 new MyNestedType {
@@ -837,6 +836,42 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
+
+[Fact]
+// https://github.com/elastic/elasticsearch-net/issues/3750
+public void CanSendMetaWithAgg() {
+    var client = GetClient();
+    var index = CreateRandomIndex<MyType>(client);
+    client.IndexMany(new[] {
+        new MyType { Field4 = 1 },
+        new MyType { Field4 = 8 },
+        new MyType { Field4 = 3 }
+    }, index);
+    client.Refresh(index);
+
+    var expectedResult = client.Search<MyType>(s => s.Aggregations(a => a.Max("max_field4", m => m.Field(f => f.Field4).Meta(me => me.Add("@field_type", "int")))));
+    string expectedRequest = expectedResult.GetRequest();
+    _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+    AggregationContainer container = new MaxAggregation("max_field4", "field4") { Meta = new Dictionary<string, object> {{"@field_type", "int"}} };
+    var actualResult = client.Search<MyType>(s => s.Aggregations(container));
+    string actualRequest = actualResult.GetRequest();
+    _logger.LogInformation("Actual: {Request}", actualRequest);
+    
+    Assert.Contains("@field_type", actualRequest);
+    Assert.Equal(expectedRequest, actualRequest);
+}
+
+[Fact]
+// https://github.com/elastic/elasticsearch-net/issues/3751
+public void CanGetRaw() {
+    var client = GetClient();
+    var index = CreateRandomIndex<MyType>(client);
+    var response = client.IndexDocument(new MyType { Field4 = 12 });
+    
+    var doc = client.Get<BytesResponse>(response.Id, d => d.Index(index));
+    Assert.NotNull(doc.Source.Body);
+}
 
         [Fact]
         public void RangeQueryProcessor() {

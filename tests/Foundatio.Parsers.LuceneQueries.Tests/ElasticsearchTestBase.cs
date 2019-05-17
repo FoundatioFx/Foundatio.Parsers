@@ -29,34 +29,23 @@ namespace Foundatio.Parsers.Tests {
             return client;
         }
 
-        protected string CreateRandomIndex(Func<CreateIndexDescriptor, ICreateIndexRequest> selector = null) {
-            return CreateRandomIndex(GetClient(), selector);
-        }
-
-        protected string CreateRandomIndex(IElasticClient client, Func<CreateIndexDescriptor, ICreateIndexRequest> selector = null) {
+        protected string CreateRandomIndex<T>(IElasticClient client, Func<TypeMappingDescriptor<T>, ITypeMapping> selector = null) where T : class {
             var index = "test_" + Guid.NewGuid().ToString("N");
-            var result = CreateIndex(client, index, selector);
-            if (!result.IsValid)
-                throw new ApplicationException("Unable to create index.");
+            if (selector == null)
+                selector = m => m.AutoMap<T>().Dynamic();
+            
+            CreateIndex(client, index, i => i.Settings(s => s.NumberOfReplicas(0)).Map<T>(selector));
+            client.ConnectionSettings.DefaultIndices.Add(typeof(T), index);
 
             return index;
         }
 
-        protected CreateIndexResponse CreateIndex(IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> selector = null) {
-            var client = GetClient();
-            return CreateIndex(client, index, selector);
-        }
-
         protected CreateIndexResponse CreateIndex(IElasticClient client, IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> selector = null) {
             _createdIndexes.Add(index);
+
+            if (selector == null)
+                selector = d => d.Settings(s => s.NumberOfReplicas(0));
             
-            // set replicas to 0
-            var originalSelector = selector;
-            selector = d => {
-                originalSelector?.Invoke(d);
-                d.Settings(s => s.NumberOfReplicas(0));
-                return d;
-            };
             var result = client.CreateIndex(index, selector);
             if (!result.IsValid)
                 throw new ApplicationException($"Unable to create index {index}");

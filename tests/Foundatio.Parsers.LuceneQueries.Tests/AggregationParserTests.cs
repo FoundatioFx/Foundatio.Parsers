@@ -20,7 +20,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task ProcessSingleAggregationAsync() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3)))));
+            var index = CreateRandomIndex<MyType>(client, d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
                 new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -51,7 +51,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task ProcessSingleAggregationWithAliasAsync() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3)))));
+            var index = CreateRandomIndex<MyType>(client, d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
                 new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -83,7 +83,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task ProcessAggregationsAsync() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3)))));
+            var index = CreateRandomIndex<MyType>(client, d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
                 new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -125,12 +125,12 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task ProcessNestedAggregationsWithAliasesAsync() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p
+            var index = CreateRandomIndex<MyType>(client, d => d.Dynamic().Properties(p => p
                 .GeoPoint(g => g.Name(f => f.Field3))
                 .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
                     .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
                         .Text(f3 => f3.Name("identity")
-                            .Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256)))))))))));
+                            .Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))))));
 
             client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
             client.Refresh(index);
@@ -158,7 +158,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task ProcessSingleAggregationWithAlias() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             
             client.IndexMany(new[] {
                 new MyType { Field2 = "field2" }
@@ -188,11 +188,11 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task ProcessAggregationsWithAliasesAsync() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic().Properties(p => p
+            var index = CreateRandomIndex<MyType>(client, d => d.Dynamic().Properties(p => p
                 .GeoPoint(g => g.Name(f => f.Field3))
                 .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
                     .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
-                        .Text(f3 => f3.Name("identity").Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256)))))))))));
+                        .Text(f3 => f3.Name("identity").Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))))));
             
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" }
@@ -232,7 +232,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void ProcessTermAggregations() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
             client.Refresh(index);
 
@@ -261,7 +261,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void ProcessHistogramIntervalAggregations() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
             client.Refresh(index);
 
@@ -288,7 +288,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void ProcessTermTopHitsAggregations() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
             client.Refresh(index);
 
@@ -316,7 +316,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void ProcessSortedTermAggregations() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
             client.Refresh(index);
 
@@ -346,7 +346,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void ProcessDateHistogramAggregations() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] { new MyType { Field5 = SystemClock.UtcNow } }, index);
             client.Refresh(index);
 
@@ -380,7 +380,7 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void CanSpecifyDefaultValuesAggregations() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Dynamic()));
+            var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] { new MyType { Field1 = "test" }, new MyType { Field4 = 1 } }, index);
             client.Refresh(index);
 
@@ -409,12 +409,11 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task GeoGridDoesNotResolveLocationForAggregation() {
             var client = GetClient();
-            var index = CreateRandomIndex(client, i => i.Map<MyType>(d => d.Properties(p => p
+            var index = CreateRandomIndex<MyType>(client, d => d.Properties(p => p
                 .GeoPoint(g => g.Name(f => f.Field1))
-                .FieldAlias(a => a.Name("geo").Path(f => f.Field1)))));
+                .FieldAlias(a => a.Name("geo").Path(f => f.Field1))));
 
-            var processor = new ElasticQueryParser(
-                c => c
+            var processor = new ElasticQueryParser(c => c
                     .UseGeo(l => "someinvalidvaluehere")
                     .UseMappings(client, index));
             
