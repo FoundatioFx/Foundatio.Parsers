@@ -1,4 +1,4 @@
-﻿using Foundatio.Logging;
+using Foundatio.Logging;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
@@ -837,42 +837,6 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-[Fact]
-// https://github.com/elastic/elasticsearch-net/issues/3750
-public void CanSendMetaWithAgg() {
-    var client = GetClient();
-    var index = CreateRandomIndex<MyType>(client);
-    client.IndexMany(new[] {
-        new MyType { Field4 = 1 },
-        new MyType { Field4 = 8 },
-        new MyType { Field4 = 3 }
-    }, index);
-    client.Refresh(index);
-
-    var expectedResult = client.Search<MyType>(s => s.Aggregations(a => a.Max("max_field4", m => m.Field(f => f.Field4).Meta(me => me.Add("@field_type", "int")))));
-    string expectedRequest = expectedResult.GetRequest();
-    _logger.LogInformation("Expected: {Request}", expectedRequest);
-
-    AggregationContainer container = new MaxAggregation("max_field4", "field4") { Meta = new Dictionary<string, object> {{"@field_type", "int"}} };
-    var actualResult = client.Search<MyType>(s => s.Aggregations(container));
-    string actualRequest = actualResult.GetRequest();
-    _logger.LogInformation("Actual: {Request}", actualRequest);
-    
-    Assert.Contains("@field_type", actualRequest);
-    Assert.Equal(expectedRequest, actualRequest);
-}
-
-[Fact]
-// https://github.com/elastic/elasticsearch-net/issues/3751
-public void CanGetRaw() {
-    var client = GetClient();
-    var index = CreateRandomIndex<MyType>(client);
-    var response = client.IndexDocument(new MyType { Field4 = 12 });
-    
-    var doc = client.Get<BytesResponse>(response.Id, d => d.Index(index));
-    Assert.NotNull(doc.Source.Body);
-}
-
         [Fact]
         public void RangeQueryProcessor() {
             var index = Guid.NewGuid().ToString("N");
@@ -1147,8 +1111,9 @@ public void CanGetRaw() {
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
             var expectedResponse = client.Search<MyType>(d => d.Index(index)
-                .Sort(
-                    s => s.Ascending(new Field("multiWord.keyword")).Descending(new Field("multiWord.keyword"))
+                .Sort(s => s
+                    .Field(f => f.Field("multiWord.keyword").UnmappedType(FieldType.Keyword).Ascending())
+                    .Field(f => f.Field("multiWord.keyword").UnmappedType(FieldType.Keyword).Descending())
                 ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);

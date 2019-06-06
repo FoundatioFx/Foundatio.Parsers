@@ -392,11 +392,11 @@ namespace Foundatio.Parsers.Tests {
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index(index).Aggregations(a => a
-                .Sum("sum_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))
+                .Sum("sum_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "integer")))
                 .Cardinality("cardinality_field4", c => c.Field("field4").Missing(0))
-                .Average("avg_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))
-                .Max("max_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))
-                .Min("min_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "long")))));
+                .Average("avg_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "integer")))
+                .Max("max_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "integer")))
+                .Min("min_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "integer")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
 
