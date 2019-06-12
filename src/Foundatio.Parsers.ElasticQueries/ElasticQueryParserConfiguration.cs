@@ -376,7 +376,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class {
             return UseMappings(mappingBuilder, () => {
-                var response = client.GetMapping(new GetMappingRequest(index));
+                var response = client.Indices.GetMapping(new GetMappingRequest(index));
                 _logger.LogInformation("GetMapping: {Request}", response.GetRequest(false, true));
                 return response.GetMappingFor(index);
             });
@@ -393,7 +393,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client) {
             return UseMappings(() => {
-                var response = client.GetMapping(new GetMappingRequest(Indices.Index<T>()));
+                var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
                 _logger.LogInformation("GetMapping: {Request}", response.GetRequest(false, true));
                 return response.GetMappingFor(Indices.Index<T>());
             });
@@ -401,7 +401,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index) {
             return UseMappings(() => {
-                var response = client.GetMapping(new GetMappingRequest(index));
+                var response = client.Indices.GetMapping(new GetMappingRequest(index));
                 _logger.LogInformation("GetMapping: {Request}", response.GetRequest(false, true));
                 
                 // use first returned mapping because index could have been an index alias

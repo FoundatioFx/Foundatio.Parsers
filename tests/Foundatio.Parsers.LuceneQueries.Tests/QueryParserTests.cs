@@ -43,7 +43,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field1 = "value1", Field2 = "value4" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync("field1:value1").Result;
@@ -68,7 +68,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field1 = "value1", Field2 = "value4" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var includes = new Dictionary<string, string> {
                 {"stuff", "field2:value2"}
@@ -96,7 +96,7 @@ namespace Foundatio.Parsers.Tests {
             var client = GetClient();
             var index = CreateRandomIndex<MyType>(client);
             client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
             
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync("field1:value1 field2:value2 field3:value3",
@@ -122,7 +122,7 @@ namespace Foundatio.Parsers.Tests {
                 .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))));
             
             client.Index(new MyType { Field1 = "value1" }, i => i.Index(index));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).SetDefaultFields(new[] { "field1" }).UseMappings(client, index));
             var result = processor.BuildQueryAsync("value1 value2", new ElasticQueryVisitorContext {  DefaultOperator = Operator.Or, UseScoring = true }).Result;
@@ -149,7 +149,7 @@ namespace Foundatio.Parsers.Tests {
                     .Keyword(e => e.Name(m => m.Field2))
                 ));
             client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetDefaultFields(new[] { "field1" }).UseMappings(client, index));
 
@@ -209,7 +209,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field1 = "value1", Field2 = "value4" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
             var result = processor.BuildQueryAsync("field1:\"hey \\\"you there\\\"\"").Result;
@@ -239,7 +239,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field2 = "value4" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync($"_exists_:{nameof(MyType.Field2)}").Result;
@@ -267,7 +267,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field2 = "value4" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync($"_missing_:{nameof(MyType.Field2)}",
@@ -295,7 +295,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now },
                 new MyType { Field2 = "value4", Field5 = DateTime.Now }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
             var result = processor.BuildAggregationsAsync("min:field2 max:field2 date:(field5~1d^\"America/Chicago\" min:field2 max:field2 min:field1 @offset:-6h)").Result;
@@ -333,7 +333,7 @@ namespace Foundatio.Parsers.Tests {
             var client = GetClient();
             var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] { new MyType { Field5 = DateTime.Now } }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var response = client.Search<MyType>(i => i.Index(index).Aggregations(f => f
                 .DateHistogram("myagg", d => d.Field(d2 => d2.Field5).Interval("1d"))
@@ -351,7 +351,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now },
                 new MyType { Field2 = "value4", Field5 = DateTime.Now }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildAggregationsAsync("date:field5").Result;
@@ -381,7 +381,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
             var result = processor.BuildQueryAsync("field1:value1", new ElasticQueryVisitorContext { DefaultOperator = Operator.Or, UseScoring = true }).Result;
@@ -450,7 +450,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value3" },
                 new MyType { Field1 = "value1", Field2 = "value4" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync("field1:value1 AND -field2:value2",
@@ -522,7 +522,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field1 = "value1", Field2 = "value4" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync("field1:value1 (field2:value2 OR field3:value3)",
@@ -551,7 +551,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field1 = "value1", Field2 = "value4" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync("field1:value1 (field2:value2 OR field3:value3)").Result;
@@ -642,7 +642,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field1 = "value1", Field2 = "value4" }
             }, index);
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync("field1:value1 (field2:value2 OR field3:value3)",
@@ -686,7 +686,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyNestedType {Field1 = "value2", Field2 = "value2"},
                 new MyNestedType {Field1 = "value1", Field2 = "value4"}
             });
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(client).UseNested());
             var result = processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1)", new ElasticQueryVisitorContext().UseScoring()).Result;
@@ -758,7 +758,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyNestedType {Field1 = "value2", Field2 = "value2"},
                 new MyNestedType {Field1 = "value1", Field2 = "value4", Field3 = "value3"}
             });
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(client).UseNested());
             var result = processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1 nested.field4:4 nested.field3:value3)",
@@ -786,11 +786,11 @@ namespace Foundatio.Parsers.Tests {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();
 
-            client.CreateIndex(index, m => m.Map<MyType>(d => d.Properties(p => p
+            client.Indices.Create(index, m => m.Map<MyType>(d => d.Properties(p => p
                 .Text(f => f.Name(e => e.Field1)
                     .Fields(f1 => f1
                         .Keyword(k => k.Name("keyword").IgnoreAbove(256)))))));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
             var result = processor.BuildQueryAsync("field1:test", new ElasticQueryVisitorContext().UseScoring()).GetAwaiter().GetResult();
@@ -819,8 +819,8 @@ namespace Foundatio.Parsers.Tests {
                     .Text(e => e.Name("@browser_version"))
                     .FieldAlias(a => a.Name("browser.version").Path("data.@browser_version")))));
 
-            client.CreateIndex(index, m => m.Map<MyType>(d => mapping));
-            client.Refresh(index);
+            client.Indices.Create(index, m => m.Map<MyType>(d => mapping));
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync("browser.version:1", new ElasticQueryVisitorContext().UseScoring()).Result;
@@ -841,12 +841,12 @@ namespace Foundatio.Parsers.Tests {
         public void RangeQueryProcessor() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();
-            client.CreateIndex(index);
+            client.Indices.Create(index);
             client.Map<MyType>(d => d.Dynamic(true).Index(index));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1 }, i => i.Index(index));
             client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
             var result =
@@ -875,15 +875,15 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void DateRangeWithWildcardMinQueryProcessor() {
             var client = GetClient();
-            client.DeleteIndex("stuff");
-            client.Refresh("stuff");
+            client.Indices.Delete("stuff");
+            client.Indices.Refresh("stuff");
 
-            client.CreateIndex("stuff");
+            client.Indices.Create("stuff");
             client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
-            client.Refresh("stuff");
+            client.Indices.Refresh("stuff");
 
             var ctx = new ElasticQueryVisitorContext { UseScoring = true };
             ctx.Data["TimeZone"] = "America/Chicago";
@@ -916,15 +916,15 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void DateRangeWithWildcardMaxQueryProcessor() {
             var client = GetClient();
-            client.DeleteIndex("stuff");
-            client.Refresh("stuff");
+            client.Indices.Delete("stuff");
+            client.Indices.Refresh("stuff");
 
-            client.CreateIndex("stuff");
+            client.Indices.Create("stuff");
             client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
             client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
-            client.Refresh("stuff");
+            client.Indices.Refresh("stuff");
 
             var ctx = new ElasticQueryVisitorContext { UseScoring = true };
             ctx.Data["TimeZone"] = "America/Chicago";
@@ -959,12 +959,12 @@ namespace Foundatio.Parsers.Tests {
         public void DateRangeQueryProcessor() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();
-            client.CreateIndex(index);
+            client.Indices.Create(index);
             client.Map<MyType>(d => d.Dynamic(true).Index(index));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
             client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
             client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var ctx = new ElasticQueryVisitorContext { UseScoring = true };
             ctx.Data["TimeZone"] = "America/Chicago";
@@ -994,14 +994,14 @@ namespace Foundatio.Parsers.Tests {
         public void SimpleGeoRangeQuery() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();
-            client.CreateIndex(index);
+            client.Indices.Create(index);
             client.Map<MyType>(
                 d => d.Dynamic(true).Index(index).Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" },
                 i => i.Index(index));
             client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c
                 .UseMappings(client, index)
@@ -1027,9 +1027,9 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public void CanSortByUnmappedField() {
             var client = GetClient();
-            client.DeleteIndex("stuff");
-            client.Refresh("stuff");
-            client.CreateIndex("stuff");
+            client.Indices.Delete("stuff");
+            client.Indices.Refresh("stuff");
+            client.Indices.Create("stuff");
             client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             
             var processor = new ElasticQueryParser(c => c.UseMappings(client, "stuff"));
@@ -1055,7 +1055,7 @@ namespace Foundatio.Parsers.Tests {
         public void CanParseSort() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();
-            client.CreateIndex(index);
+            client.Indices.Create(index);
             client.Map<MyType>(
                 d => d.Dynamic(true).Index(index).Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))
                     .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
@@ -1065,7 +1065,7 @@ namespace Foundatio.Parsers.Tests {
                 i => i.Index(index));
             client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
             
             var aliasMap = new FieldMap { { "geo", "field3" } };
             var processor = new ElasticQueryParser(c => c
@@ -1097,14 +1097,14 @@ namespace Foundatio.Parsers.Tests {
         public void CanParseMixedCaseSort() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();
-            client.CreateIndex(index);
+            client.Indices.Create(index);
             client.Map<MyType>(
                 d => d.Dynamic(true).Index(index).Properties(p => p
                     .Text(e => e.Name(m => m.MultiWord).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
                 ));
 
             var res = client.Index(new MyType { MultiWord = "value1" }, i => i.Index(index));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
             var sort = processor.BuildSortAsync("multiWord -multiword").Result;
             var actualResponse = client.Search<MyType>(d => d.Index(index).Sort(sort));
@@ -1125,7 +1125,7 @@ namespace Foundatio.Parsers.Tests {
         public void GeoRangeQueryProcessor() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();
-            client.CreateIndex(index, i => i.Map<MyType>(d => d
+            client.Indices.Create(index, i => i.Map<MyType>(d => d
                 .Dynamic()
                 .Properties(p => p
                     .GeoPoint(g => g.Name(f => f.Field3))
@@ -1134,7 +1134,7 @@ namespace Foundatio.Parsers.Tests {
             client.Index(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index(index));
             client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
             client.Index(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
-            client.Refresh(index);
+            client.Indices.Refresh(index);
             
             var aliasMap = new FieldMap { { "geo", "field3" } };
             var processor = new ElasticQueryParser(c => c

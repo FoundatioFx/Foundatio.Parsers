@@ -46,7 +46,7 @@ namespace Foundatio.Parsers.Tests {
             if (selector == null)
                 selector = d => d.Settings(s => s.NumberOfReplicas(0));
             
-            var result = client.CreateIndex(index, selector);
+            var result = client.Indices.Create(index, selector);
             if (!result.IsValid)
                 throw new ApplicationException($"Unable to create index {index}");
 
@@ -55,10 +55,10 @@ namespace Foundatio.Parsers.Tests {
 
         public virtual async Task InitializeAsync() {
             var client = GetClient();
-            var indices = await client.GetIndexAsync(Indices.All);
+            var indices = await client.Indices.GetAsync(Indices.All);
             var testIndices = indices.Indices.Where(i => i.Key.Name.StartsWith("test_")).Select(i => i.Key).ToArray();
             if (testIndices.Length > 0)
-                await client.DeleteIndexAsync(Indices.Index(testIndices));
+                await client.Indices.DeleteAsync(Indices.Index(testIndices));
         }
 
         public virtual async Task DisposeAsync() {
@@ -66,7 +66,7 @@ namespace Foundatio.Parsers.Tests {
                 return;
             
             var client = GetClient();
-            await client.DeleteIndexAsync(Indices.Index(_createdIndexes));
+            await client.Indices.DeleteAsync(Indices.Index(_createdIndexes));
         }
     }
 }
