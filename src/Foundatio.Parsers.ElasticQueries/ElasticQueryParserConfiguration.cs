@@ -50,10 +50,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration UseFieldResolver(QueryFieldResolver resolver, int priority = 50) {
             FieldResolver = resolver;
 
-            if (FieldResolver != null)
-                ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(), priority);
-            else
-                RemoveVisitor<FieldResolverQueryVisitor>();
+            ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(resolver), priority);
 
             return this;
         }
@@ -377,7 +374,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class {
             return UseMappings(mappingBuilder, () => {
                 var response = client.Indices.GetMapping(new GetMappingRequest(index));
-                _logger.LogInformation("GetMapping: {Request}", response.GetRequest(false, true));
+                _logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
                 return response.GetMappingFor(index);
             });
         }
@@ -394,7 +391,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client) {
             return UseMappings(() => {
                 var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
-                _logger.LogInformation("GetMapping: {Request}", response.GetRequest(false, true));
+                _logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
                 return response.GetMappingFor(Indices.Index<T>());
             });
         }
@@ -402,7 +399,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index) {
             return UseMappings(() => {
                 var response = client.Indices.GetMapping(new GetMappingRequest(index));
-                _logger.LogInformation("GetMapping: {Request}", response.GetRequest(false, true));
+                _logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
                 
                 // use first returned mapping because index could have been an index alias
                 var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;

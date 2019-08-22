@@ -8,6 +8,12 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class FieldResolverQueryVisitor : ChainableQueryVisitor {
+        private readonly QueryFieldResolver _globalResolver;
+
+        public FieldResolverQueryVisitor(QueryFieldResolver globalResolver = null) {
+            _globalResolver = globalResolver;
+        }
+        
         public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             ResolveField(node, context);
 
@@ -34,8 +40,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             if (node.Parent == null)
                 return;
             
-            var resolver = context.GetFieldResolver();
-            var resolvedField = resolver?.Invoke(node.Field) ?? node.Field;
+            var contextResolver = context.GetFieldResolver();
+            var resolvedField = contextResolver?.Invoke(node.Field) ?? _globalResolver?.Invoke(node.Field) ?? node.Field;
             if (resolvedField != null && !resolvedField.Equals(node.Field, StringComparison.OrdinalIgnoreCase)) {
                 node.SetOriginalField(node.Field);
                 node.Field = resolvedField;
