@@ -18,6 +18,22 @@ namespace Foundatio.Parsers.Tests {
             var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
             Assert.Equal("field2:value", aliased.ToString());
         }
+        
+        [Theory]
+        [InlineData("notmapped", "notmapped")]
+        [InlineData("original", "replacement")]
+        [InlineData("original.hey", "replacement.hey")]
+        [InlineData("original.nested.hey", "otherreplacement.hey")]
+        public void CanResolveHierarchicalMap(string field, string expected) {
+            var map = new Dictionary<string, string> {
+                { "original", "replacement" },
+                { "original.nested", "otherreplacement" },
+                { "other", "stuff" }
+            };
+
+            var resolver = map.ToHierarchicalFieldResolver();
+            Assert.Equal(expected, resolver(field));
+        }
 
         [Fact]
         public async Task CanUseAliasMapForTopLevelAlias2Async() {

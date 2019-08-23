@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -62,7 +60,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver context = null) {
-            return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContextWithFieldResolver { FieldResolver = field => map.GetValueOrNull(field) });
+            return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContextWithFieldResolver { FieldResolver = map.ToHierarchicalFieldResolver() });
         }
 
         public static IQueryNode Run(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver context = null) {
@@ -73,9 +71,9 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public delegate string QueryFieldResolver(string field);
 
     public class FieldMap : Dictionary<string, string> {}
-
+    
     public static class FieldMapExtensions {
-        public static string GetValueOrNull(this IDictionary<string, string> map, string field) {
+        public static string GetValueOrDefault(this IDictionary<string, string> map, string field) {
             if (map == null || field == null)
                 return null;
             
@@ -83,6 +81,28 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 return value;
 
             return null;
+        }
+
+        public static QueryFieldResolver ToHierarchicalFieldResolver(this IDictionary<string, string> map) {
+            return field => {
+                if (field == null)
+                    return null;
+                
+                if (map.TryGetValue(field, out string result))
+                    return result;
+                
+                // start at the longest path and go backwards until we find a match in the map
+                int currentPart = field.LastIndexOf('.');
+                while (currentPart > 0) {
+                    string currentName = field.Substring(0, currentPart);
+                    if (map.TryGetValue(currentName, out string currentResult))
+                        return currentResult + field.Substring(currentPart);
+                    
+                    currentPart = field.LastIndexOf('.', currentPart - 1);
+                }
+                
+                return field;
+            };
         }
     }
 }
