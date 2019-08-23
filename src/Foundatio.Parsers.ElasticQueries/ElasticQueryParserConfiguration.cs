@@ -57,7 +57,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string> fields, int priority = 50) {
             if (fields != null)
-                return UseFieldResolver(fields.GetValueOrNull, priority);
+                return UseFieldResolver(fields.ToHierarchicalFieldResolver(), priority);
             else
                 return UseFieldResolver(null);
         }
@@ -269,7 +269,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 string fieldPart = fieldParts[depth];
                 IProperty fieldMapping = null;
                 if (currentProperties == null || !currentProperties.TryGetValue(fieldPart, out fieldMapping)) {
-                    // check to see if there is an index_name match
+                    // check to see if there is an name match
                     if (currentProperties != null)
                         fieldMapping = currentProperties
                             .Select(m => m.Value)

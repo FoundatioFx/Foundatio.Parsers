@@ -81,6 +81,42 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public async Task ProcessAnalyzedAggregationWithAliasAsync() {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyType>(client, d => d.Dynamic().Properties(p => p
+                .Text(f => f.Name(n => n.Field1)
+                    .Fields(k => k.Keyword(m => m.Name("keyword"))))
+                .FieldAlias(f => f.Name("heynow").Path(k => k.Field1))
+                .GeoPoint(g => g.Name(f => f.Field3))));
+            client.IndexMany(new[] {
+                new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
+                new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
+                new MyType { Field1 = "value3", Field4 = 3, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3)) },
+                new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
+                new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
+            }, index);
+            client.Indices.Refresh(index);
+
+            var fieldMap = new FieldMap { { "heynow2", "field1" } };
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index).UseFieldMap(fieldMap));
+            var aggregations = await processor.BuildAggregationsAsync("terms:heynow");
+
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+
+            var expectedResponse = client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+                .Terms("terms_heynow", c => c.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword")))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.True(actualResponse.IsValid);
+            Assert.True(expectedResponse.IsValid);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public async Task ProcessAggregationsAsync() {
             var client = GetClient();
             var index = CreateRandomIndex<MyType>(client, d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));

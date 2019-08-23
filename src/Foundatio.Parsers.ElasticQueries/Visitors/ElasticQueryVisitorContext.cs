@@ -29,10 +29,12 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return field;
 
             var property = context.GetPropertyMapping(field);
-            
-            if (property is FieldAliasProperty fieldAlias)
-                property = context.GetPropertyMapping(fieldAlias.Path.Name);
-            
+
+            if (property is FieldAliasProperty fieldAlias) {
+                field = fieldAlias.Path.Name;
+                property = context.GetPropertyMapping(field);
+            }
+
             if (property == null || !context.IsPropertyAnalyzed(property))
                 return field;
 
