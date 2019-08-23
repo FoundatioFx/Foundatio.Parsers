@@ -57,7 +57,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string> fields, int priority = 50) {
             if (fields != null)
-                return UseFieldResolver(fields.GetValueOrDefault, priority);
+                return UseFieldResolver(fields.GetValueOrNull, priority);
             else
                 return UseFieldResolver(null);
         }
