@@ -7,7 +7,7 @@
     <ProjectReference Include="..\..\src\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Foundatio.Logging.Xunit" Version="8.1.2120" />
+    <PackageReference Include="Foundatio.Logging.Xunit" Version="8.1.2123" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.2.0" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
