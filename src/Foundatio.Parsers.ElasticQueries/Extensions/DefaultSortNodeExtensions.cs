@@ -17,11 +17,10 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             var sort = new FieldSort {
                 Field = field,
-                UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType
+                UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType,
+                Order = node.IsNodeOrGroupNegated() ? SortOrder.Descending : SortOrder.Ascending
             };
-
-            sort.Order = node.IsNodeOrGroupNegated() ? SortOrder.Descending : SortOrder.Ascending;
-
+            
             return sort;
         }
     }

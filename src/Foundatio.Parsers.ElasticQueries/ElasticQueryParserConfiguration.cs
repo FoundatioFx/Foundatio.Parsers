@@ -47,7 +47,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseFieldResolver(QueryFieldResolver resolver, int priority = 50) {
+        public ElasticQueryParserConfiguration UseFieldResolver(QueryFieldResolver resolver, int priority = 10) {
             FieldResolver = resolver;
 
             ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(resolver), priority);
@@ -55,7 +55,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string> fields, int priority = 50) {
+        public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string> fields, int priority = 10) {
             if (fields != null)
                 return UseFieldResolver(fields.ToHierarchicalFieldResolver(), priority);
             else

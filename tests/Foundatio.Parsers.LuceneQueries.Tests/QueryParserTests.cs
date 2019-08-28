@@ -688,8 +688,8 @@ namespace Foundatio.Parsers.Tests {
             });
             client.Indices.Refresh(index);
 
-            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(client).UseNested());
-            var result = processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1)", new ElasticQueryVisitorContext().UseScoring()).Result;
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseFieldMap(new FieldMap {{ "blah", "nested" }}).UseMappings<MyNestedType>(client).UseNested());
+            var result = processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1)", new ElasticQueryVisitorContext().UseScoring()).Result;
 
             var actualResponse = client.Search<MyNestedType>(d => d.Query(f => result));
             string actualRequest = actualResponse.GetRequest();
@@ -710,7 +710,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-            result = processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1 nested.field4:4)", new ElasticQueryVisitorContext { UseScoring = true }).Result;
+            result = processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1 blah.field4:4)", new ElasticQueryVisitorContext().UseScoring()).Result;
 
             actualResponse = client.Search<MyNestedType>(d => d.Query(q => result));
             actualRequest = actualResponse.GetRequest();

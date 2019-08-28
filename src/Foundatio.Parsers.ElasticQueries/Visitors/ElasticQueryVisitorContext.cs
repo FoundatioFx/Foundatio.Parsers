@@ -17,11 +17,19 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
     }
 
     public static class ElasticQueryVisitorContextExtensions {
-        public static IProperty GetPropertyMapping(this IElasticQueryVisitorContext context, string field) {
+        public static (string ResolvedField, IProperty Mapping) GetPropertyMapping(this IElasticQueryVisitorContext context, string field, bool resolveAlias = true) {
             if (String.IsNullOrEmpty(field))
-                return null;
+                return (field, null);
 
-            return context.GetPropertyMappingFunc?.Invoke(field);
+            string resolvedField = field;
+            var property = context.GetPropertyMappingFunc?.Invoke(field);
+            
+            if (resolveAlias && property is FieldAliasProperty fieldAlias) {
+                resolvedField = fieldAlias.Path.Name;
+                property = context.GetPropertyMappingFunc?.Invoke(resolvedField);
+            }
+
+            return (resolvedField, property);
         }
 
         public static string GetNonAnalyzedFieldName(this IElasticQueryVisitorContext context, string field, string preferredSubField = null) {
@@ -30,17 +38,12 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
             var property = context.GetPropertyMapping(field);
 
-            if (property is FieldAliasProperty fieldAlias) {
-                field = fieldAlias.Path.Name;
-                property = context.GetPropertyMapping(field);
-            }
-
-            if (property == null || !context.IsPropertyAnalyzed(property))
+            if (property.Mapping == null || !context.IsPropertyAnalyzed(property.Mapping))
                 return field;
 
-            var multiFieldProperty = property as ICoreProperty;
+            var multiFieldProperty = property.Mapping as ICoreProperty;
             if (multiFieldProperty?.Fields == null)
-                return field;
+                return property.ResolvedField;
             
             var nonAnalyzedProperty = multiFieldProperty.Fields.OrderByDescending(kvp => kvp.Key.Name == preferredSubField).FirstOrDefault(kvp => {
                 if (kvp.Value is IKeywordProperty)
@@ -53,9 +56,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             });
 
             if (nonAnalyzedProperty.Value != null)
-                return field + "." + nonAnalyzedProperty.Key.Name;
+                return property.ResolvedField + "." + nonAnalyzedProperty.Key.Name;
 
-            return field;
+            return property.ResolvedField;
         }
 
         public static bool IsPropertyAnalyzed(this IElasticQueryVisitorContext context, string field) {
@@ -64,10 +67,10 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 return true;
 
             var property = context.GetPropertyMapping(field);
-            if (property == null)
+            if (property.Mapping == null)
                 return false;
 
-            return context.IsPropertyAnalyzed(property);
+            return context.IsPropertyAnalyzed(property.Mapping);
         }
 
         public static bool IsPropertyAnalyzed(this IElasticQueryVisitorContext context, IProperty property) {
@@ -81,47 +84,47 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return context.GetPropertyMapping(field) is INestedProperty;
+            return context.GetPropertyMapping(field).Mapping is INestedProperty;
         }
 
         public static bool IsGeoPropertyType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return context.GetPropertyMapping(field) is IGeoPointProperty;
+            return context.GetPropertyMapping(field).Mapping is IGeoPointProperty;
         }
 
         public static bool IsNumericPropertyType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return context.GetPropertyMapping(field) is INumberProperty;
+            return context.GetPropertyMapping(field).Mapping is INumberProperty;
         }
 
         public static bool IsBooleanPropertyType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return context.GetPropertyMapping(field) is IBooleanProperty;
+            return context.GetPropertyMapping(field).Mapping is IBooleanProperty;
         }
 
         public static bool IsDatePropertyType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return context.GetPropertyMapping(field) is IDateProperty;
+            return context.GetPropertyMapping(field).Mapping is IDateProperty;
         }
 
         public static FieldType GetFieldType(this IElasticQueryVisitorContext context, string field) {
             if (String.IsNullOrWhiteSpace(field))
                 return FieldType.None;
 
-            var mapping = context.GetPropertyMapping(field);
+            var property = context.GetPropertyMapping(field);
 
-            if (mapping?.Type == null)
+            if (property.Mapping?.Type == null)
                 return FieldType.None;
             
-            switch (mapping.Type) {
+            switch (property.Mapping.Type) {
                 case "geo_point":
                     return FieldType.GeoPoint;
                 case "geo_shape":
