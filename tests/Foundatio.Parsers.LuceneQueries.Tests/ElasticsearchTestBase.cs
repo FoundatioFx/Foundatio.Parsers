@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -12,7 +12,8 @@ using Xunit.Abstractions;
 namespace Foundatio.Parsers.Tests {
     public abstract class ElasticsearchTestBase : TestWithLoggingBase, IAsyncLifetime {
         private readonly List<IndexName> _createdIndexes = new List<IndexName>();
-        
+        private static bool _elaticsearchReady;
+
         public ElasticsearchTestBase(ITestOutputHelper output) : base(output) {
             Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
         }
@@ -23,8 +24,13 @@ namespace Foundatio.Parsers.Tests {
             configure?.Invoke(settings);
 
             var client = new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
-            if (!client.WaitForReady(new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token, _logger))
-                throw new ApplicationException("Unable to connect to Elasticsearch.");
+
+            if (!_elaticsearchReady) {
+                if (!client.WaitForReady(new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token, _logger))
+                    throw new ApplicationException("Unable to connect to Elasticsearch.");
+
+                _elaticsearchReady = true;
+            }
 
             return client;
         }
