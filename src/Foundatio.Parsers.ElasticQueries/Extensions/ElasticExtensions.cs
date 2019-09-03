@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Elasticsearch.Net;
 using Microsoft.Extensions.Logging;
 using Nest;
@@ -91,6 +92,27 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             }
 
             return sb.ToString();
+        }
+
+        public static async Task<bool> WaitForReadyAsync(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null) {
+            var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
+            var startTime = DateTime.UtcNow;
+
+            while (!cancellationToken.IsCancellationRequested) {
+                var pingResponse = await client.PingAsync(ct: cancellationToken);
+                if (pingResponse.IsValid)
+                    return true;
+
+                if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
+                    logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+
+                await Task.Delay(1000, cancellationToken);
+            }
+
+            if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+                logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+
+            return false;
         }
 
         public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null) {
