@@ -14,12 +14,12 @@ namespace Foundatio.Parsers.Tests {
         private readonly List<IndexName> _createdIndexes = new List<IndexName>();
         private static bool _elaticsearchReady;
 
-        public ElasticsearchTestBase(ITestOutputHelper output) : base(output) {
+        protected ElasticsearchTestBase(ITestOutputHelper output) : base(output) {
             Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
         }
 
         protected IElasticClient GetClient(Action<ConnectionSettings> configure = null) {
-            var elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
+            string elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
             var settings = new ConnectionSettings(new Uri(elasticsearchUrl));
             configure?.Invoke(settings);
 
@@ -36,7 +36,7 @@ namespace Foundatio.Parsers.Tests {
         }
 
         protected string CreateRandomIndex<T>(IElasticClient client, Func<TypeMappingDescriptor<T>, ITypeMapping> selector = null) where T : class {
-            var index = "test_" + Guid.NewGuid().ToString("N");
+            string index = "test_" + Guid.NewGuid().ToString("N");
             if (selector == null)
                 selector = m => m.AutoMap<T>().Dynamic();
             
