@@ -70,16 +70,20 @@ namespace Foundatio.Parsers.ElasticQueries {
             return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
         }
 
-        public ElasticQueryParserConfiguration UseIncludes(Func<string, Task<string>> includeResolver, int priority = 0) {
-            IncludeResolver = includeResolver;
-
-            return AddVisitor(new IncludeVisitor(), priority);
-        }
-
         public ElasticQueryParserConfiguration UseValidation(Func<QueryValidationInfo, Task<bool>> validator, int priority = 0) {
             Validator = validator;
 
             return AddVisitor(new ValidationVisitor { ShouldThrow = true }, priority);
+        }
+
+        public ElasticQueryParserConfiguration UseIncludes<T>(Func<string, Task<string>> includeResolver, int priority = 0) where T : IncludeVisitor, new() {
+            IncludeResolver = includeResolver;
+
+            return AddVisitor(new T(), priority);
+        }
+        
+        public ElasticQueryParserConfiguration UseIncludes(Func<string, Task<string>> includeResolver, int priority = 0) {
+            return UseIncludes<IncludeVisitor>(includeResolver, priority);
         }
 
         public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, int priority = 0) {

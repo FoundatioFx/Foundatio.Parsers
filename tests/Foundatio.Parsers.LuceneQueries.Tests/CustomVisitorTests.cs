@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -25,8 +26,8 @@ namespace Foundatio.Parsers.Tests {
 
             var processor = new ElasticQueryParser(c => c
                 .SetLoggerFactory(Log)
-                .AddVisitorBefore<IncludeVisitor>(new CustomFilterVisitor())
-                .AddVisitor(new IncludeVisitor()));
+                .AddVisitor(new IncludeVisitor())
+                .AddVisitor(new CustomFilterVisitor()));
             
             var result = processor.BuildQueryAsync("@custom:(one)").Result;
             var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
@@ -50,10 +51,10 @@ namespace Foundatio.Parsers.Tests {
 
             var processor = new ElasticQueryParser(c => c
                 .SetLoggerFactory(Log)
-                .AddVisitorBefore<IncludeVisitor>(new CustomFilterVisitor())
-                .AddVisitor(new IncludeVisitor()));
+                .AddVisitor(new IncludeVisitor())
+                .AddVisitor(new CustomFilterVisitor()));
             
-            var result = processor.BuildQueryAsync("@custom:(one @includes:3)").Result;
+            var result = processor.BuildQueryAsync("@custom:(one @include:3)").Result;
             var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -67,7 +68,38 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
         
-        
+        [Fact]
+        public void CanResolveIncludeToCustomFilterContainingIgnoredInclude() {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyType>(client);
+            client.Index(new MyType { Id = "1" }, i => i.Index(index));
+
+            var processor = new ElasticQueryParser(c => c
+                .SetLoggerFactory(Log)
+                .UseIncludes<CustomIncludeVisitor>(include => ResolveIncludeAsync("test", include, "@custom:(one @include:3)"), 0)
+                .AddVisitor(new CustomFilterVisitor(), 1));
+            
+            var result = processor.BuildQueryAsync("@include:test").Result;
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+
+            var expectedResponse = client.Search<MyType>(d => d
+                .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms("1", "3"))))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        private Task<string> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch) {
+            if (String.Equals(expected, actual))
+                return Task.FromResult(resolvedFilterIfMatch);
+            
+            throw new ArgumentException(nameof(actual), $"Unable to resolve filter with id: {actual}");
+        }
+
         [Fact]
         public void CanResolveMultipleCustomFilters() {
             var client = GetClient();
@@ -76,14 +108,13 @@ namespace Foundatio.Parsers.Tests {
 
             var processor = new ElasticQueryParser(c => c
                 .SetLoggerFactory(Log)
-                .AddVisitorBefore<IncludeVisitor>(new CustomFilterVisitor())
-                .AddVisitor(new IncludeVisitor()));
+                .AddVisitor(new IncludeVisitor())
+                .AddVisitor(new CustomFilterVisitor()));
             
             var result = processor.BuildQueryAsync("@custom:(one) OR (field1:Test @custom:(two))").Result;
             var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
             string actualRequest = actualResponse.GetRequest();
             _logger.LogInformation("Actual: {Request}", actualRequest);
-
             
             var expectedResponse = client.Search<MyType>(d => d.Index(index)
                 .Query(f => f
@@ -112,7 +143,16 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
     }
-    
+
+    public sealed class CustomIncludeVisitor : IncludeVisitor {
+        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+            if (node.Field == "@custom")
+                return Task.CompletedTask;
+
+            return base.VisitAsync(node, context);
+        }
+    }
+
     /// <summary>
     /// Let's resolve a custom id based on a node groups filter: @custom:(filter)
     /// </summary>
@@ -142,7 +182,7 @@ namespace Foundatio.Parsers.Tests {
                 case "two":
                     ids.Add("2");
                     break;
-                case "one @includes:3":
+                case "one @include:3":
                     ids.AddRange(new [] { "1", "3"});
                     break;
             }

@@ -20,7 +20,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             if (String.IsNullOrEmpty(includedQuery))
                 return;
 
-            GroupNode result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
+            var result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
             result.HasParens = true;
             await VisitAsync(result, context).ConfigureAwait(false);
 
