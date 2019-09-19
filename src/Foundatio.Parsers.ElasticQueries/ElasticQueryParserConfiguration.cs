@@ -73,7 +73,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration UseIncludes(IncludeResolver includeResolver, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
             IncludeResolver = includeResolver;
 
-            return AddVisitor(new IncludeVisitor(), priority);
+            return AddVisitor(new IncludeVisitor(shouldSkipInclude), priority);
         }
 
         public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
