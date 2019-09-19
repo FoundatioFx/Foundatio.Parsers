@@ -29,7 +29,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
         public string[] DefaultFields { get; private set; }
         public QueryFieldResolver FieldResolver { get; private set; }
-        public Func<string, Task<string>> IncludeResolver { get; private set; }
+        public IncludeResolver IncludeResolver { get; private set; }
         public Func<QueryValidationInfo, Task<bool>> Validator { get; private set; }
         public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
@@ -70,31 +70,24 @@ namespace Foundatio.Parsers.ElasticQueries {
             return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
         }
 
+        public ElasticQueryParserConfiguration UseIncludes(IncludeResolver includeResolver, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
+            IncludeResolver = includeResolver;
+
+            return AddVisitor(new IncludeVisitor(), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
+            return UseIncludes(name => Task.FromResult(resolveInclude(name)), shouldSkipInclude, priority);
+        }
+
+        public ElasticQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
+            return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, shouldSkipInclude, priority);
+        }
+
         public ElasticQueryParserConfiguration UseValidation(Func<QueryValidationInfo, Task<bool>> validator, int priority = 0) {
             Validator = validator;
 
             return AddVisitor(new ValidationVisitor { ShouldThrow = true }, priority);
-        }
-
-        public ElasticQueryParserConfiguration UseIncludes<T>(Func<string, Task<string>> includeResolver, int priority = 0) where T : IncludeVisitor, new() {
-            return UseIncludes(new T(), includeResolver, priority);
-        }
-        
-        public ElasticQueryParserConfiguration UseIncludes<T>(T visitor, Func<string, Task<string>> includeResolver, int priority = 0) where T : IncludeVisitor {
-            IncludeResolver = includeResolver;
-            return AddVisitor(visitor, priority);
-        }
-        
-        public ElasticQueryParserConfiguration UseIncludes(Func<string, Task<string>> includeResolver, int priority = 0) {
-            return UseIncludes<IncludeVisitor>(includeResolver, priority);
-        }
-
-        public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, int priority = 0) {
-            return UseIncludes(name => Task.FromResult(resolveInclude(name)), priority);
-        }
-
-        public ElasticQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, int priority = 0) {
-            return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, priority);
         }
 
         public ElasticQueryParserConfiguration UseNested(int priority = 300) {

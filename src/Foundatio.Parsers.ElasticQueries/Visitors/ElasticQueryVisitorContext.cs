@@ -10,7 +10,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public Operator DefaultOperator { get; set; } = Operator.And;
         public bool UseScoring { get; set; }
         public Func<string, IProperty> GetPropertyMappingFunc { get; set; }
-        public Func<string, Task<string>> IncludeResolver { get; set; }
+        public IncludeResolver IncludeResolver { get; set; }
         public QueryFieldResolver FieldResolver { get; set; }
         public Func<QueryValidationInfo, Task<bool>> Validator { get; set; }
         public QueryValidationInfo ValidationInfo { get; set; }

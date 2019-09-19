@@ -10,6 +10,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Microsoft.Extensions.Logging;
 
 namespace Foundatio.Parsers.Tests {
@@ -25,6 +26,40 @@ namespace Foundatio.Parsers.Tests {
             var includes = new Dictionary<string, string> { { "other", "field:value" } };
             var resolved = await IncludeVisitor.RunAsync(result, includes);
             Assert.Equal("(field:value)", resolved.ToString());
+        }
+
+        [Fact]
+        public async Task CanSkipIncludes() {
+            var parser = new LuceneQueryParser();
+            var result = await parser.ParseAsync("outter @include:other @skipped:(other stuff @include:other)");
+            var includes = new Dictionary<string, string> {
+                { "other", "field:value" },
+                { "nested", "field:value @include:other" }
+            };
+            var resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: (n, ctx) => true);
+            Assert.Equal("outter @include:other @skipped:(other stuff @include:other)", resolved.ToString());
+            
+            resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: ShouldSkipInclude);
+            Assert.Equal("outter (field:value) @skipped:(other stuff @include:other)", resolved.ToString());
+            
+            resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: (n, ctx) => !ShouldSkipInclude(n, ctx));
+            Assert.Equal("outter (field:value) @skipped:(other stuff (field:value))", resolved.ToString());
+            
+            var nestedResult = await parser.ParseAsync("outter @skipped:(other stuff @include:nested)");
+            resolved = await IncludeVisitor.RunAsync(nestedResult, includes, shouldSkipInclude: ShouldSkipInclude);
+            Assert.Equal("outter @skipped:(other stuff @include:nested)", resolved.ToString());
+        }
+
+        private bool ShouldSkipInclude(TermNode node, IQueryVisitorContext context) {
+            var current = node.Parent;
+            while (current != null) {
+                if (current is GroupNode groupNode && groupNode.Field == "@skipped")
+                    return true;
+                
+                current = current.Parent;
+            }
+
+            return false;
         }
 
         [Fact]

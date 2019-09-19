@@ -76,7 +76,7 @@ namespace Foundatio.Parsers.Tests {
 
             var processor = new ElasticQueryParser(c => c
                 .SetLoggerFactory(Log)
-                .UseIncludes<CustomIncludeVisitor>(include => ResolveIncludeAsync("test", include, "@custom:(one @include:3)"), 0)
+                .UseIncludes(include => ResolveIncludeAsync("test", include, "@custom:(one @include:3)"), ShouldSkipInclude, 0)
                 .AddVisitor(new CustomFilterVisitor(), 1));
             
             var result = processor.BuildQueryAsync("@include:test").Result;
@@ -91,6 +91,18 @@ namespace Foundatio.Parsers.Tests {
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        private bool ShouldSkipInclude(TermNode node, IQueryVisitorContext context) {
+            var current = node.Parent;
+            while (current != null) {
+                if (current is GroupNode groupNode && groupNode.Field == "@custom")
+                    return true;
+                
+                current = current.Parent;
+            }
+
+            return false;
         }
 
         private Task<string> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch) {
@@ -141,15 +153,6 @@ namespace Foundatio.Parsers.Tests {
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
-        }
-    }
-
-    public sealed class CustomIncludeVisitor : IncludeVisitor {
-        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-            if (node.Field == "@custom")
-                return Task.CompletedTask;
-
-            return base.VisitAsync(node, context);
         }
     }
 
