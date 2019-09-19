@@ -11,7 +11,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public bool UseScoring { get; set; }
         public string[] DefaultFields { get; set; }
         public Func<string, IProperty> GetPropertyMappingFunc { get; set; }
-        public Func<string, Task<string>> IncludeResolver { get; set; }
+        public IncludeResolver IncludeResolver { get; set; }
         public AliasResolver RootAliasResolver { get; set; }
         public Func<QueryValidationInfo, Task<bool>> Validator { get; set; }
         public QueryValidationInfo ValidationInfo { get; set; }

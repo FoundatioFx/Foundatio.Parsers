@@ -23,18 +23,27 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public void RemoveVisitor<T>() where T : IChainableQueryVisitor {
-            var index = _visitors.FindIndex(v => typeof(T) == v.Visitor.GetType());
-            if (index >= 0)
-                _visitors.RemoveAt(index);
+            var visitor = _visitors.FirstOrDefault(v => typeof(T) == v.Visitor.GetType());
+            if (visitor == null) 
+                return;
+            
+            _visitors.Remove(visitor);
+            _isDirty = true;
         }
 
         public void ReplaceVisitor<T>(IChainableQueryVisitor visitor, int? newPriority = null) where T : IChainableQueryVisitor {
-            int priority = 0;
+            int priority = newPriority.GetValueOrDefault(0);
+            
             var referenceVisitor = _visitors.FirstOrDefault(v => typeof(T) == v.Visitor.GetType());
-            if (referenceVisitor != null)
-                priority = referenceVisitor.Priority - 1;
+            if (referenceVisitor != null) {
+                if (!newPriority.HasValue)
+                    priority = referenceVisitor.Priority - 1;
+
+                _visitors.Remove(referenceVisitor);
+            }
 
             _visitors.Add(new QueryVisitorWithPriority { Visitor = visitor, Priority = priority });
+            _isDirty = true;
         }
 
         public void AddVisitorBefore<T>(IChainableQueryVisitor visitor) {
@@ -44,6 +53,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 priority = referenceVisitor.Priority - 1;
 
             _visitors.Add(new QueryVisitorWithPriority { Visitor = visitor, Priority = priority });
+            _isDirty = true;
         }
 
         public void AddVisitorAfter<T>(IChainableQueryVisitor visitor) {
@@ -53,6 +63,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 priority = referenceVisitor.Priority + 1;
 
             _visitors.Add(new QueryVisitorWithPriority { Visitor = visitor, Priority = priority });
+            _isDirty = true;
         }
 
         public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {

@@ -22,7 +22,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return context;
         }
 
-        public static Func<string, Task<string>> GetIncludeResolver(this IQueryVisitorContext context) {
+        public static IncludeResolver GetIncludeResolver(this IQueryVisitorContext context) {
             var aliasContext = context as IQueryVisitorContextWithIncludeResolver;
             if (aliasContext == null)
                 throw new ArgumentException("Context must be of type IQueryVisitorContextWithIncludeResolver", nameof(context));
@@ -30,7 +30,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return aliasContext.IncludeResolver;
         }
 
-        public static T SetIncludeResolver<T>(this T context, Func<string, Task<string>> includeResolver) where T : IQueryVisitorContext {
+        public static T SetIncludeResolver<T>(this T context, IncludeResolver includeResolver) where T : IQueryVisitorContext {
             var aliasContext = context as IQueryVisitorContextWithIncludeResolver;
             if (aliasContext == null)
                 throw new ArgumentException("Context must be of type IQueryVisitorContextWithIncludeResolver", nameof(context));

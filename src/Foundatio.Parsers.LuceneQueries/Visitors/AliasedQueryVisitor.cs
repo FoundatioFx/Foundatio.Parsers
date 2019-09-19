@@ -91,7 +91,8 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
     }
 
     public delegate GetAliasResult AliasResolver(string field);
-
+    public delegate Task<string> IncludeResolver(string name);
+    
     [DebuggerDisplay("{Name}")]
     public class GetAliasResult {
         public string Name { get; set; }
