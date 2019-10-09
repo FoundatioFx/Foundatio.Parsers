@@ -279,7 +279,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                     if (fieldMapping == null && GetServerMapping()) {
                         // we got updated mapping, start over from the top
                         depth = -1;
-                        currentProperties = MergeProperties(_codeMapping.Properties, _serverMapping.Properties);
+                        currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping.Properties);
                         continue;
                     }
 
