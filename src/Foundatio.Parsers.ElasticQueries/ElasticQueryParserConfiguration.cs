@@ -277,7 +277,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                     if (fieldMapping == null && GetServerMapping()) {
                         // we got updated mapping, start over from the top
                         depth = -1;
-                        currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping.Properties);
+                        currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
                         continue;
                     }
 
@@ -306,18 +306,21 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         private IProperties MergeProperties(IProperties codeProperties, IProperties serverProperties) {
+            // resolve code mapping property expressions using inferrer
+            if (_inferrer != null && codeProperties != null) {
+                foreach (var kvp in codeProperties.ToList()) {
+                    if (!String.IsNullOrEmpty(kvp.Key.Name))
+                        continue;
+
+                    var propertyName = _inferrer?.PropertyName(kvp.Key) ?? kvp.Key;
+                    codeProperties.Remove(kvp.Key);
+                    codeProperties[propertyName] = kvp.Value;
+                }
+            }
+            
+            // no need to merge
             if (codeProperties == null || serverProperties == null)
                 return codeProperties ?? serverProperties;
-            
-            // resolve code mapping property expressions
-            foreach (var kvp in codeProperties.ToList()) {
-                if (!String.IsNullOrEmpty(kvp.Key.Name))
-                    continue;
-                
-                var propertyName = _inferrer?.PropertyName(kvp.Key) ?? kvp.Key;
-                codeProperties.Remove(kvp.Key);
-                codeProperties[propertyName] = kvp.Value;
-            }
 
             IProperties properties = new Properties();
             foreach (var serverProperty in serverProperties) {
