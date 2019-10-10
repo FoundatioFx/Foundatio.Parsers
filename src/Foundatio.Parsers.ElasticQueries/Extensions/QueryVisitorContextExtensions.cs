@@ -1,12 +1,12 @@
-﻿using System;
+using System;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class QueryVisitorContextExtensions {
-         public static T SetGetPropertyMappingFunc<T>(this T context, Func<string, IProperty> getPropertyMappingFunc) where T: IQueryVisitorContext {
-             if (!(context is IElasticQueryVisitorContext elasticContext))
+        public static T SetGetPropertyMappingFunc<T>(this T context, Func<string, IProperty> getPropertyMappingFunc) where T: IQueryVisitorContext {
+            if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             elasticContext.GetPropertyMappingFunc = getPropertyMappingFunc ?? (field => null);

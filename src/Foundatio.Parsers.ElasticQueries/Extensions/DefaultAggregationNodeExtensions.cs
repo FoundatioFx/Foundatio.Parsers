@@ -170,7 +170,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 Field = field,
                 MinimumDocumentCount = 0,
                 Format = "date_optional_time",
-                Interval = GetInterval(proximity, start, end),
+                FixedInterval = GetInterval(proximity, start, end),
                 TimeZone = GetTimeZone(boost, context),
                 Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
                 ExtendedBounds = bounds

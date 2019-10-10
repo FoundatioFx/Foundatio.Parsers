@@ -15,6 +15,7 @@ namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParserConfiguration {
         private ITypeMapping _serverMapping;
         private ITypeMapping _codeMapping;
+        private Inferrer _inferrer;
         private readonly ConcurrentDictionary<string, IProperty> _propertyCache = new ConcurrentDictionary<string, IProperty>();
         private ILogger _logger = NullLogger.Instance;
 
@@ -253,12 +254,9 @@ namespace Foundatio.Parsers.ElasticQueries {
                 _logger.LogTrace("Cached property mapping: {field}={type}", field, propertyType);
                 return propertyType;
             }
-            
-            if (_serverMapping == null)
-                GetServerMapping();
 
-            if (_serverMapping == null) {
-                _logger.LogTrace("Server mapping is null");
+            if (GetServerMappingFunc == null && _codeMapping == null) {
+                _logger.LogTrace("No property mappings are available");
                 return null;
             }
 
@@ -310,6 +308,16 @@ namespace Foundatio.Parsers.ElasticQueries {
         private IProperties MergeProperties(IProperties codeProperties, IProperties serverProperties) {
             if (codeProperties == null || serverProperties == null)
                 return codeProperties ?? serverProperties;
+            
+            // resolve code mapping property expressions
+            foreach (var kvp in codeProperties.ToList()) {
+                if (!String.IsNullOrEmpty(kvp.Key.Name))
+                    continue;
+                
+                var propertyName = _inferrer?.PropertyName(kvp.Key) ?? kvp.Key;
+                codeProperties.Remove(kvp.Key);
+                codeProperties[propertyName] = kvp.Value;
+            }
 
             IProperties properties = new Properties();
             foreach (var serverProperty in serverProperties) {
@@ -320,8 +328,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 switch (merged) {
                     case IObjectProperty objectProperty:
                         var codeObjectProperty = codeProperty as IObjectProperty;
-                        objectProperty.Properties =
-                            MergeProperties(codeObjectProperty?.Properties, objectProperty.Properties);
+                        objectProperty.Properties = MergeProperties(codeObjectProperty?.Properties, objectProperty.Properties);
                         break;
                     case ITextProperty textProperty:
                         var codeTextProperty = codeProperty as ITextProperty;
@@ -372,17 +379,18 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class {
-            return UseMappings(mappingBuilder, () => {
+            return UseMappings(mappingBuilder, client.Infer, () => {
                 var response = client.Indices.GetMapping(new GetMappingRequest(index));
                 _logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
                 return response.GetMappingFor(index);
             });
         }
 
-        public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Func<ITypeMapping> getMapping) where T : class {
+        public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<ITypeMapping> getMapping) where T : class {
             var descriptor = new TypeMappingDescriptor<T>();
             descriptor = mappingBuilder(descriptor);
             _codeMapping = descriptor;
+            _inferrer = inferrer;
             GetServerMappingFunc = getMapping;
 
             return this;

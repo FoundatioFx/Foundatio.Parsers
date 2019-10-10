@@ -29,7 +29,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             if (field != null)
                 _fields.Add(field);
             else
-                foreach (var defaultField in node.GetDefaultFields(context.DefaultFields))
+                foreach (string defaultField in node.GetDefaultFields(context.DefaultFields))
                     _fields.Add(defaultField);
         }
 

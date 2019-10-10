@@ -201,6 +201,37 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void CanGetMappingsFromCode() {
+            var client = GetClient();
+
+            TypeMappingDescriptor<MyType> GetCodeMappings(TypeMappingDescriptor<MyType> d) =>
+                d.Dynamic()
+                    .Properties(p => p
+                        .GeoPoint(g => g.Name(f => f.Field3))
+                        .Text(e => e.Name(m => m.Field1)));
+
+            var index = CreateRandomIndex<MyType>(client, d => d.Dynamic()
+                .Properties(p => p
+                    .GeoPoint(g => g.Name(f => f.Field3))
+                    .Keyword(e => e.Name(m => m.Field2))));
+            
+            var res = client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index));
+            client.Indices.Refresh(index);
+
+            var parser = new ElasticQueryParser(c => c.SetDefaultFields(new[] { "field1" }).UseMappings<MyType>(GetCodeMappings, client, index));
+            
+            var dynamicServerMappingProperty = parser.Configuration.GetMappingProperty("field5");
+            var serverMappingProperty = parser.Configuration.GetMappingProperty("field2");
+            var codeMappingProperty = parser.Configuration.GetMappingProperty("field1");
+            var codeAndServerMappingProperty = parser.Configuration.GetMappingProperty("field3");
+            
+            Assert.Equal("date", dynamicServerMappingProperty.Type);
+            Assert.Equal("keyword", serverMappingProperty.Type);
+            Assert.Equal("text", codeMappingProperty.Type);
+            Assert.Equal("geo_point", codeAndServerMappingProperty.Type);
+        }
+
+        [Fact]
         public void EscapeFilterProcessor() {
             var client = GetClient();
             var index = CreateRandomIndex<MyType>(client);
@@ -308,7 +339,7 @@ namespace Foundatio.Parsers.Tests {
                 .DateHistogram("date_field5",
                     d =>
                         d.Field(d2 => d2.Field5)
-                            .Interval("1d")
+                            .FixedInterval("1d")
                             .Format("date_optional_time")
                             .MinimumDocumentCount(0)
                             .TimeZone("America/Chicago")
@@ -336,7 +367,7 @@ namespace Foundatio.Parsers.Tests {
             client.Indices.Refresh(index);
 
             var response = client.Search<MyType>(i => i.Index(index).Aggregations(f => f
-                .DateHistogram("myagg", d => d.Field(d2 => d2.Field5).Interval("1d"))
+                .DateHistogram("myagg", d => d.Field(d2 => d2.Field5).FixedInterval("1d"))
             ));
 
             Assert.True(response.IsValid);
@@ -360,7 +391,7 @@ namespace Foundatio.Parsers.Tests {
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(i => i.Index(index).Aggregations(f => f
-                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).Interval("1d").Format("date_optional_time").MinimumDocumentCount(0))
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).FixedInterval("1d").Format("date_optional_time").MinimumDocumentCount(0))
             ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);

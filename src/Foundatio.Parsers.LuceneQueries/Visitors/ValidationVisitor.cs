@@ -63,7 +63,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 if (!node.Field.StartsWith("@"))
                     validationInfo.ReferencedFields.Add(node.Field);
             } else {
-                foreach (var defaultField in node.GetDefaultFields(context.DefaultFields))
+                foreach (string defaultField in node.GetDefaultFields(context.DefaultFields))
                     validationInfo.ReferencedFields.Add(defaultField);
             }
         }

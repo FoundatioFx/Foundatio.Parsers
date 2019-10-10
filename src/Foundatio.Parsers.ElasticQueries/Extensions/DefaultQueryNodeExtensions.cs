@@ -31,7 +31,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            if ((node.Parent != null && !node.HasParens) || !(node is IFieldQueryNode))
+            if ((node?.Parent != null && !node.HasParens) || !(node is IFieldQueryNode))
                 return null;
             
             if (!node.Data.ContainsKey("match_terms"))
@@ -92,7 +92,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                             Query = node.UnescapedTerm
                         };
                         if (node.IsQuotedTerm)
-                            (query as MultiMatchQuery).Type = TextQueryType.Phrase;
+                            ((MultiMatchQuery)query).Type = TextQueryType.Phrase;
                     }
                 }
             } else {
