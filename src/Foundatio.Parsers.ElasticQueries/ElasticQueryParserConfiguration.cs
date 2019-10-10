@@ -385,7 +385,10 @@ namespace Foundatio.Parsers.ElasticQueries {
             return UseMappings(mappingBuilder, client.Infer, () => {
                 var response = client.Indices.GetMapping(new GetMappingRequest(index));
                 _logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
-                return response.GetMappingFor(index);
+
+                // use first returned mapping because index could have been an index alias
+                var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
+                return mapping;
             });
         }
 
@@ -403,7 +406,10 @@ namespace Foundatio.Parsers.ElasticQueries {
             return UseMappings(() => {
                 var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
                 _logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
-                return response.GetMappingFor(Indices.Index<T>());
+
+                // use first returned mapping because index could have been an index alias
+                var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
+                return mapping;
             });
         }
 
