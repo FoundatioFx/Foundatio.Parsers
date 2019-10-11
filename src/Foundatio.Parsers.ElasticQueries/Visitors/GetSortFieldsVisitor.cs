@@ -14,7 +14,11 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (String.IsNullOrEmpty(node.Field))
                 return;
 
-            _fields.Add(node.GetSort(() => node.GetDefaultSort(context)));
+            var sort = node.GetSort(() => node.GetDefaultSort(context));
+            if (sort.SortKey == null)
+                return;
+            
+            _fields.Add(sort);
         }
 
         public override async Task<IEnumerable<IFieldSort>> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
