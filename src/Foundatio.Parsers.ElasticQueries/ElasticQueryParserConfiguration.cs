@@ -309,12 +309,25 @@ namespace Foundatio.Parsers.ElasticQueries {
             // resolve code mapping property expressions using inferrer
             if (_inferrer != null && codeProperties != null) {
                 foreach (var kvp in codeProperties.ToList()) {
-                    if (!String.IsNullOrEmpty(kvp.Key.Name))
+                    if (!String.IsNullOrEmpty(kvp.Key.Name) && !(kvp.Value is IFieldAliasProperty))
                         continue;
 
                     var propertyName = _inferrer?.PropertyName(kvp.Key) ?? kvp.Key;
                     codeProperties.Remove(kvp.Key);
                     codeProperties[propertyName] = kvp.Value;
+                }
+                
+                // resolve field alias
+                foreach (var kvp in codeProperties.ToList().Where(kvp => kvp.Value is IFieldAliasProperty)) {
+                    var aliasProperty = kvp.Value as IFieldAliasProperty;
+                    if (aliasProperty == null)
+                        continue;
+                    
+                    codeProperties[kvp.Key] = new FieldAliasProperty {
+                        LocalMetadata = aliasProperty.LocalMetadata,
+                        Path = _inferrer?.Field(aliasProperty.Path) ?? aliasProperty.Path,
+                        Name = aliasProperty.Name
+                    };
                 }
             }
             

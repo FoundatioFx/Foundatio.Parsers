@@ -24,7 +24,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             string resolvedField = field;
             var property = context.GetPropertyMappingFunc?.Invoke(field);
             
-            if (resolveAlias && property is FieldAliasProperty fieldAlias) {
+            if (resolveAlias && property is IFieldAliasProperty fieldAlias) {
                 resolvedField = fieldAlias.Path.Name;
                 property = context.GetPropertyMappingFunc?.Invoke(resolvedField);
             }
