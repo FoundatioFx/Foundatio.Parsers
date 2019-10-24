@@ -269,9 +269,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 if (currentProperties == null || !currentProperties.TryGetValue(fieldPart, out fieldMapping)) {
                     // check to see if there is an name match
                     if (currentProperties != null)
-                        fieldMapping = currentProperties
-                            .Select(m => m.Value)
-                            .FirstOrDefault(m => m.Name == fieldPart);
+                        fieldMapping = currentProperties.Values.FirstOrDefault(m => m.Name == fieldPart);
                     
                     // no mapping found, call GetServerMapping again in case it hasn't been called recently and there are possibly new mappings
                     if (fieldMapping == null && GetServerMapping()) {
@@ -308,22 +306,24 @@ namespace Foundatio.Parsers.ElasticQueries {
         private IProperties MergeProperties(IProperties codeProperties, IProperties serverProperties) {
             // resolve code mapping property expressions using inferrer
             if (_inferrer != null && codeProperties != null) {
-                foreach (var kvp in codeProperties.ToList()) {
-                    if (!String.IsNullOrEmpty(kvp.Key.Name) && !(kvp.Value is IFieldAliasProperty))
+                foreach (var key in codeProperties.Keys.ToArray()) {
+                    if (!codeProperties.TryGetValue(key, out var value))
+                        continue;
+                    
+                    if (!String.IsNullOrEmpty(key.Name) && !(value is IFieldAliasProperty))
                         continue;
 
-                    var propertyName = _inferrer?.PropertyName(kvp.Key) ?? kvp.Key;
-                    codeProperties.Remove(kvp.Key);
-                    codeProperties[propertyName] = kvp.Value;
+                    var propertyName = _inferrer?.PropertyName(key) ?? key;
+                    codeProperties.Remove(key);
+                    codeProperties[propertyName] = value;
                 }
                 
                 // resolve field alias
-                foreach (var kvp in codeProperties.ToList().Where(kvp => kvp.Value is IFieldAliasProperty)) {
-                    var aliasProperty = kvp.Value as IFieldAliasProperty;
-                    if (aliasProperty == null)
+                foreach (var key in codeProperties.Keys.ToArray()) {
+                    if (!codeProperties.TryGetValue(key, out var value) || !(value is IFieldAliasProperty aliasProperty))
                         continue;
                     
-                    codeProperties[kvp.Key] = new FieldAliasProperty {
+                    codeProperties[key] = new FieldAliasProperty {
                         LocalMetadata = aliasProperty.LocalMetadata,
                         Path = _inferrer?.Field(aliasProperty.Path) ?? aliasProperty.Path,
                         Name = aliasProperty.Name
