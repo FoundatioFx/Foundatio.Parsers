@@ -312,13 +312,11 @@ namespace Foundatio.Parsers.ElasticQueries {
                 mergedCodeProperties = new Properties();
                 
                 foreach (var kvp in codeProperties) {
-                    if (!String.IsNullOrEmpty(kvp.Key.Name) && !(kvp.Value is IFieldAliasProperty)) {
-                        mergedCodeProperties.Add(kvp.Key, kvp.Value);
-                        continue;
-                    }
+                    var propertyName = kvp.Key;
+                    if (_inferrer != null && (String.IsNullOrEmpty(kvp.Key.Name) || kvp.Value is IFieldAliasProperty))
+                        propertyName = _inferrer.PropertyName(kvp.Key) ?? kvp.Key;
 
-                    var propertyName = _inferrer?.PropertyName(kvp.Key) ?? kvp.Key;
-                    mergedCodeProperties.Add(propertyName, kvp.Value);
+                    mergedCodeProperties[propertyName] = kvp.Value;
                 }
                    
                 if (_inferrer != null) {
