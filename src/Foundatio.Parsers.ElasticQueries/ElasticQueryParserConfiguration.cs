@@ -50,7 +50,6 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public ElasticQueryParserConfiguration UseFieldResolver(QueryFieldResolver resolver, int priority = 10) {
             FieldResolver = resolver;
-
             ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(resolver), priority);
 
             return this;
@@ -59,8 +58,8 @@ namespace Foundatio.Parsers.ElasticQueries {
         public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string> fields, int priority = 10) {
             if (fields != null)
                 return UseFieldResolver(fields.ToHierarchicalFieldResolver(), priority);
-            else
-                return UseFieldResolver(null);
+            
+            return UseFieldResolver(null);
         }
 
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
@@ -304,41 +303,47 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         private IProperties MergeProperties(IProperties codeProperties, IProperties serverProperties) {
+            if (codeProperties == null && serverProperties == null)
+                return null;
+            
+            IProperties mergedCodeProperties = null;
             // resolve code mapping property expressions using inferrer
-            if (_inferrer != null && codeProperties != null) {
-                foreach (var key in codeProperties.Keys.ToArray()) {
-                    if (!codeProperties.TryGetValue(key, out var value))
-                        continue;
-                    
-                    if (!String.IsNullOrEmpty(key.Name) && !(value is IFieldAliasProperty))
-                        continue;
-
-                    var propertyName = _inferrer?.PropertyName(key) ?? key;
-                    codeProperties.Remove(key);
-                    codeProperties[propertyName] = value;
-                }
+            if (codeProperties != null) {
+                mergedCodeProperties = new Properties();
                 
-                // resolve field alias
-                foreach (var key in codeProperties.Keys.ToArray()) {
-                    if (!codeProperties.TryGetValue(key, out var value) || !(value is IFieldAliasProperty aliasProperty))
+                foreach (var kvp in codeProperties) {
+                    if (!String.IsNullOrEmpty(kvp.Key.Name) && !(kvp.Value is IFieldAliasProperty)) {
+                        mergedCodeProperties.Add(kvp.Key, kvp.Value);
                         continue;
-                    
-                    codeProperties[key] = new FieldAliasProperty {
-                        LocalMetadata = aliasProperty.LocalMetadata,
-                        Path = _inferrer?.Field(aliasProperty.Path) ?? aliasProperty.Path,
-                        Name = aliasProperty.Name
-                    };
+                    }
+
+                    var propertyName = _inferrer?.PropertyName(kvp.Key) ?? kvp.Key;
+                    mergedCodeProperties.Add(propertyName, kvp.Value);
+                }
+                   
+                if (_inferrer != null) {
+                    // resolve field alias
+                    foreach (var kvp in codeProperties) {
+                        if (!(kvp.Value is IFieldAliasProperty aliasProperty))
+                            continue;
+                        
+                        mergedCodeProperties[kvp.Key] = new FieldAliasProperty {
+                            LocalMetadata = aliasProperty.LocalMetadata,
+                            Path = _inferrer?.Field(aliasProperty.Path) ?? aliasProperty.Path,
+                            Name = aliasProperty.Name
+                        };
+                    }
                 }
             }
             
             // no need to merge
-            if (codeProperties == null || serverProperties == null)
-                return codeProperties ?? serverProperties;
+            if (mergedCodeProperties == null || serverProperties == null)
+                return mergedCodeProperties ?? serverProperties;
 
             IProperties properties = new Properties();
             foreach (var serverProperty in serverProperties) {
                 var merged = serverProperty.Value;
-                if (codeProperties.TryGetValue(serverProperty.Key, out var codeProperty))
+                if (mergedCodeProperties.TryGetValue(serverProperty.Key, out var codeProperty))
                     merged.LocalMetadata = codeProperty.LocalMetadata;
 
                 switch (merged) {
@@ -355,7 +360,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 properties.Add(serverProperty.Key, merged);
             }
 
-            foreach (var codeProperty in codeProperties) {
+            foreach (var codeProperty in mergedCodeProperties) {
                 if (properties.TryGetValue(codeProperty.Key, out _))
                     continue;
 
