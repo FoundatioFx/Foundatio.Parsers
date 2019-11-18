@@ -111,8 +111,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             string field = node.Field;
             if (elasticContext.IsDatePropertyType(field)) {
-                string timezone = GetString(context, "TimeZone");
-                var range = new DateRangeQuery { Field = field, TimeZone = timezone };
+                var range = new DateRangeQuery { Field = field, TimeZone = elasticContext.DefaultTimeZone };
                 if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*") {
                     if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                         range.GreaterThan = node.UnescapedMin;

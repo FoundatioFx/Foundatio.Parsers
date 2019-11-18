@@ -70,7 +70,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "keyword");
             var mapping = elasticContext.GetPropertyMapping(field);
-            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: GetString(context, "TimeZone");
+            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: elasticContext.DefaultTimeZone;
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:
@@ -178,13 +178,15 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static string GetTimeZone(string boost, IQueryVisitorContext context) {
+            var elasticContext = context as IElasticQueryVisitorContext;
+
             TimeSpan? timezoneOffset = null;
             if (boost != null && !Exceptionless.DateTimeExtensions.TimeUnit.TryParse(boost, out timezoneOffset)) {
                 // assume if it doesn't parse as time, that it's Olson time
                 return boost;
             }
 
-            return timezoneOffset.HasValue ? (timezoneOffset.Value < TimeSpan.Zero ? "-" : "+") + timezoneOffset.Value.ToString("hh\\:mm") : GetString(context, "TimeZone");
+            return timezoneOffset.HasValue ? (timezoneOffset.Value < TimeSpan.Zero ? "-" : "+") + timezoneOffset.Value.ToString("hh\\:mm") : elasticContext?.DefaultTimeZone;
         }
 
         private static Union<DateInterval, Time> GetInterval(string proximity, DateTime? start, DateTime? end) {
