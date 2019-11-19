@@ -88,6 +88,7 @@ namespace Foundatio.Parsers.Tests {
         [InlineData("data.age:[10 TO *]", "data.age:[10 TO *]", true)]
         [InlineData("title:(full text search)^2", "title:(full text search)^2", true)]
         [InlineData("data.age:[* TO 10]", "data.age:[* TO 10]", true)]
+        [InlineData("data:[* TO 10]^hey", "data:[* TO 10]^hey", true)]
         [InlineData("hidden:true AND data.age:(>30 AND <=40)", "hidden:true AND data.age:(>30 AND <=40)", true)]
         [InlineData("hidden:true", "hidden:true", true)]
         [InlineData("geo:\"Dallas, TX\"~75m", "geo:\"Dallas, TX\"~75m", true)]
