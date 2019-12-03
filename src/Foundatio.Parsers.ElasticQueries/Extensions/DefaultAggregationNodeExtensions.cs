@@ -217,15 +217,15 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static DateTime? GetDate(IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out var value) && value is DateTime)
-                return (DateTime)value;
+            if (context.Data.TryGetValue(key, out var value) && value is DateTime date)
+                return date;
 
             return null;
         }
 
         private static string GetString(IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out var value) && value is string)
-                return (string)value;
+            if (context.Data.TryGetValue(key, out var value) && value is string str)
+                return str;
 
             return null;
         }
