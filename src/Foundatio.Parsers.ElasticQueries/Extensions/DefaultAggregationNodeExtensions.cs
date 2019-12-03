@@ -160,6 +160,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
+            // NOTE: StartDate and EndDate are set in the Repositories QueryBuilderContext.
             var start = GetDate(context, "StartDate");
             var end = GetDate(context, "EndDate");
             var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
