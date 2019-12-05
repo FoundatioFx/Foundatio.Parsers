@@ -163,7 +163,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             // NOTE: StartDate and EndDate are set in the Repositories QueryBuilderContext.
             var start = GetDate(context, "StartDate");
             var end = GetDate(context, "EndDate");
-            var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
+            
+            bool hasValidStartBoundDate = start.HasValue && start.Value > DateTime.MinValue && start.Value < DateTime.MaxValue;
+            var bounds = hasValidStartBoundDate && end.HasValue ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
 
             // TODO: Look into memoizing this lookup
             // TODO: Should we validate the interval range.
