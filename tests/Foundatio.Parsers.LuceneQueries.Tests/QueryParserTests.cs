@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 using System.Threading;
+using System.Threading.Tasks;
 using Elasticsearch.Net;
 
 namespace Foundatio.Parsers.Tests {
@@ -351,6 +352,139 @@ namespace Foundatio.Parsers.Tests {
                                 .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "keyword")))
                             ))
                 .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "keyword")))
+            ));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+        
+        /// <summary>
+        /// https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-datehistogram-aggregation.html#calendar_intervalsl
+        /// </summary>
+        [InlineData("1micros", false)] // NOTE: This is not listed in official documentation
+        [InlineData("1nanos", false)] // NOTE: This is not listed in official documentation
+        [InlineData("1ms", false)]
+        [InlineData("1s", false)]
+        [InlineData("second", false)]
+        [InlineData("m", true)]
+        [InlineData("1m", true)]
+        [InlineData("minute", true)]
+        [InlineData("h", true)]
+        [InlineData("1h", true)]
+        [InlineData("1.5h", false)]
+        [InlineData("hour", true)]
+        [InlineData("d", true)]
+        [InlineData("1d", true)]
+        [InlineData("day", true)]
+        [InlineData("2d", false)] // NOTE: Elastic doesn't support Multiples, such as 2d, are not supported and will throw an exception.
+        [InlineData("w", true)]
+        [InlineData("1w", true)]
+        [InlineData("week", true)]
+        [InlineData("M", true)]
+        [InlineData("1M", true)]
+        [InlineData("month", true)]
+        [InlineData("q", true)]
+        [InlineData("1q", true)]
+        [InlineData("quarter", true)]
+        [InlineData("y", true)]
+        [InlineData("1y", true)]
+        [InlineData("year", true)]
+        [Theory] 
+        public async Task CanUseDateHistogramAggregationCalendarInterval(string interval, bool isValid) {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyType>(client);
+            client.IndexMany(new[] { new MyType { Field5 = DateTime.Now } }, index);
+            client.Indices.Refresh(index);
+
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
+            
+            if (!isValid) {
+                await Assert.ThrowsAsync<ArgumentException>(() => processor.BuildAggregationsAsync($"date:(field5~{interval})"));
+                return;
+            }
+            
+            var result = await processor.BuildAggregationsAsync($"date:(field5~{interval})");
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Aggregations(result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+
+            var expectedResponse = client.Search<MyType>(i => i.Index(index).Aggregations(f => f
+                .DateHistogram("date_field5",
+                    d =>
+                        d.Field(d2 => d2.Field5)
+                            .CalendarInterval(interval)
+                            .Format("date_optional_time")
+                            .MinimumDocumentCount(0))
+            ));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+        
+        /// <summary>
+        /// https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-datehistogram-aggregation.html#fixed_intervals
+        /// </summary>
+        [InlineData("1micros", false)] // NOTE: This is not listed in official documentation
+        [InlineData("1nanos", false)] // NOTE: This is not listed in official documentation
+        [InlineData("ms", false)]
+        [InlineData("1ms", true)]
+        [InlineData("s", false)]
+        [InlineData("1s", true)]
+        [InlineData("second", false)]
+        [InlineData("m", false)]
+        [InlineData("1m", true)]
+        [InlineData("minute", false)]
+        [InlineData("h", false)]
+        [InlineData("1h", true)]
+        [InlineData("1.5h", false)] // NOTE: fractional time values are not supported, but you can address this by shifting to another time unit (e.g., 1.5h could instead be specified as 90m).
+        [InlineData("hour", true)]
+        [InlineData("d", false)] 
+        [InlineData("1d", true)]
+        [InlineData("2d", true)]
+        [InlineData("day", false)]
+        [InlineData("w", false)]
+        [InlineData("1w", false)]
+        [InlineData("week", false)]
+        [InlineData("M", false)]
+        [InlineData("1M", false)]
+        [InlineData("month", false)]
+        [InlineData("q", false)]
+        [InlineData("1q", false)]
+        [InlineData("quarter", false)]
+        [InlineData("y", false)]
+        [InlineData("1y", false)]
+        [InlineData("year", false)]
+        // NOTE: Looking at Time units parser it supports +- for intervals, but nothing is in the elastic documentation.
+        [Theory] 
+        public async Task CanUseDateHistogramAggregationFixedInterval(string interval, bool isValid) {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyType>(client);
+            client.IndexMany(new[] { new MyType { Field5 = DateTime.Now } }, index);
+            client.Indices.Refresh(index);
+
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
+            
+            if (!isValid) {
+                await Assert.ThrowsAsync<ArgumentException>(() => processor.BuildAggregationsAsync($"date:(field5~{interval})"));
+                return;
+            }
+            
+            var result = await processor.BuildAggregationsAsync($"date:(field5~{interval})");
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Aggregations(result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+
+            var expectedResponse = client.Search<MyType>(i => i.Index(index).Aggregations(f => f
+                .DateHistogram("date_field5",
+                    d =>
+                        d.Field(d2 => d2.Field5)
+                            .FixedInterval(interval)
+                            .Format("date_optional_time")
+                            .MinimumDocumentCount(0))
             ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
