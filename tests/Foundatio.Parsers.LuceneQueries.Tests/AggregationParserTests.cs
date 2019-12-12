@@ -141,7 +141,7 @@ namespace Foundatio.Parsers.Tests {
                     .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Source("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Source("doc['field3'].lon")))))
                 .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword")))
                 .Histogram("histogram_field4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
-                .DateHistogram("date_field5", d1 => d1.Field("field5").FixedInterval("1d").Format("date_optional_time").MinimumDocumentCount(0))
+                .DateHistogram("date_field5", d1 => d1.Field("field5").CalendarInterval("1d").Format("date_optional_time").MinimumDocumentCount(0))
                 .Missing("missing_field2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_field4", c => c.Field("field4"))
                 .Percentiles("percentiles_field4", c => c.Field("field4").Percents(50,100))
@@ -248,7 +248,7 @@ namespace Foundatio.Parsers.Tests {
                     .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Source("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Source("doc['field3'].lon")))))
                 .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword")))
                 .Histogram("histogram_alias4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
-                .DateHistogram("date_alias5", d1 => d1.Field("field5").FixedInterval("1d").Format("date_optional_time").MinimumDocumentCount(0))
+                .DateHistogram("date_alias5", d1 => d1.Field("field5").CalendarInterval("1d").Format("date_optional_time").MinimumDocumentCount(0))
                 .Missing("missing_alias2", t => t.Field("field2.keyword"))
                 .Cardinality("cardinality_user", c => c.Field("data.@user.identity.keyword"))
                 .Percentiles("percentiles_alias4", c => c.Field("field4"))
@@ -396,7 +396,7 @@ namespace Foundatio.Parsers.Tests {
             var expectedResponse = client.Search<MyType>(d => d.Index(index).Aggregations(a => a
                 .DateHistogram("date_field5", d1 => d1
                     .Field("field5").Meta(m => m.Add("@timezone", "1h"))
-                    .FixedInterval("1d")
+                    .CalendarInterval("1d")
                     .Format("date_optional_time")
                     .MinimumDocumentCount(0)
                     .TimeZone("+01:00")

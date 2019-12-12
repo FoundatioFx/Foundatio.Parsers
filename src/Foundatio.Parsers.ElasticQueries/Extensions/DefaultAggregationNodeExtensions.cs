@@ -167,17 +167,19 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             bool hasValidStartBoundDate = start.HasValue && start.Value > DateTime.MinValue && start.Value < DateTime.MaxValue;
             var bounds = hasValidStartBoundDate && end.HasValue ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
 
-            // TODO: Look into memoizing this lookup
-            // TODO: Should we validate the interval range.
-            return new DateHistogramAggregation(originalField) {
+            var interval = GetInterval(proximity, start, end);
+            var agg = new DateHistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
                 Format = "date_optional_time",
-                FixedInterval = GetInterval(proximity, start, end),
                 TimeZone = GetTimeZone(boost, context),
                 Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
                 ExtendedBounds = bounds
             };
+
+            interval.Match(d => agg.CalendarInterval = d, f => agg.FixedInterval = f);
+
+            return agg;
         }
 
         private static string GetTimeZone(string boost, IQueryVisitorContext context) {
@@ -196,26 +198,42 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (String.IsNullOrEmpty(proximity))
                 return new Union<DateInterval, Time>(GetInterval(start, end));
 
-            switch (proximity.ToLower().Trim()) {
+            switch (proximity.Trim()) {
+                case "s":
+                case "1s":
                 case "second":
                     return DateInterval.Second;
+                case "m":
+                case "1m":
                 case "minute":
                     return DateInterval.Minute;
+                case "h":
+                case "1h":
                 case "hour":
                     return DateInterval.Hour;
+                case "d":
+                case "1d":
                 case "day":
                     return DateInterval.Day;
+                case "w":
+                case "1w":
                 case "week":
                     return DateInterval.Week;
+                case "M":
+                case "1M":
                 case "month":
                     return DateInterval.Month;
+                case "q":
+                case "1q":
                 case "quarter":
                     return DateInterval.Quarter;
+                case "y":
+                case "1y":
                 case "year":
                     return DateInterval.Year;
-                default:
-                    return new Union<DateInterval, Time>(proximity);
             }
+
+            return new Union<DateInterval, Time>(proximity);
         }
 
         private static DateTime? GetDate(IQueryVisitorContext context, string key) {
@@ -232,7 +250,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return null;
         }
 
-        private static string GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {
+        private static Time GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {
             if (!utcStart.HasValue || !utcEnd.HasValue)
                 return "1d";
 
@@ -240,24 +258,24 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             var timePerBlock = TimeSpan.FromMinutes(totalTime.TotalMinutes / desiredDataPoints);
             if (timePerBlock.TotalDays > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromDays(1));
-                return $"{timePerBlock.TotalDays:0}d";
+                return timePerBlock;
             }
 
             if (timePerBlock.TotalHours > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromHours(1));
-                return $"{timePerBlock.TotalHours:0}h";
+                return timePerBlock;
             }
 
             if (timePerBlock.TotalMinutes > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromMinutes(1));
-                return $"{timePerBlock.TotalMinutes:0}m";
+                return timePerBlock;
             }
 
             timePerBlock = timePerBlock.Round(TimeSpan.FromSeconds(15));
             if (timePerBlock.TotalSeconds < 1)
                 timePerBlock = TimeSpan.FromSeconds(15);
 
-            return $"{timePerBlock.TotalSeconds:0}s";
+            return timePerBlock;
         }
 
         public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
