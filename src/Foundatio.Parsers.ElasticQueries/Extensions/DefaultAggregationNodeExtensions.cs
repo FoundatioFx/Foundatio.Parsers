@@ -196,7 +196,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
         private static Union<DateInterval, Time> GetInterval(string proximity, DateTime? start, DateTime? end) {
             if (String.IsNullOrEmpty(proximity))
-                return new Union<DateInterval, Time>(GetInterval(start, end));
+                return GetInterval(start, end);
 
             switch (proximity.Trim()) {
                 case "s":
@@ -250,32 +250,32 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return null;
         }
 
-        private static Time GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {
+        private static Union<DateInterval, Time> GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {
             if (!utcStart.HasValue || !utcEnd.HasValue)
-                return "1d";
+                return DateInterval.Day;
 
             var totalTime = utcEnd.Value - utcStart.Value;
             var timePerBlock = TimeSpan.FromMinutes(totalTime.TotalMinutes / desiredDataPoints);
             if (timePerBlock.TotalDays > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromDays(1));
-                return timePerBlock;
+                return (Time)timePerBlock;
             }
 
             if (timePerBlock.TotalHours > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromHours(1));
-                return timePerBlock;
+                return (Time)timePerBlock;
             }
 
             if (timePerBlock.TotalMinutes > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromMinutes(1));
-                return timePerBlock;
+                return (Time)timePerBlock;
             }
 
             timePerBlock = timePerBlock.Round(TimeSpan.FromSeconds(15));
             if (timePerBlock.TotalSeconds < 1)
                 timePerBlock = TimeSpan.FromSeconds(15);
 
-            return timePerBlock;
+            return (Time)timePerBlock;
         }
 
         public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node) {

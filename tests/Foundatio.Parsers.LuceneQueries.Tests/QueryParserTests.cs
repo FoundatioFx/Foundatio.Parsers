@@ -435,7 +435,7 @@ namespace Foundatio.Parsers.Tests {
             client.Indices.Refresh(index);
 
             var response = client.Search<MyType>(i => i.Index(index).Aggregations(f => f
-                .DateHistogram("myagg", d => d.Field(d2 => d2.Field5).CalendarInterval("1d"))
+                .DateHistogram("myagg", d => d.Field(d2 => d2.Field5).CalendarInterval(DateInterval.Day))
             ));
 
             Assert.True(response.IsValid);
@@ -459,7 +459,7 @@ namespace Foundatio.Parsers.Tests {
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(i => i.Index(index).Aggregations(f => f
-                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).CalendarInterval("1d").Format("date_optional_time").MinimumDocumentCount(0))
+                .DateHistogram("date_field5", d => d.Field(d2 => d2.Field5).CalendarInterval(DateInterval.Day).Format("date_optional_time").MinimumDocumentCount(0))
             ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
