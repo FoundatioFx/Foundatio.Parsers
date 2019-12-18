@@ -164,9 +164,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             var start = GetDate(context, "StartDate");
             var end = GetDate(context, "EndDate");
             
-            bool hasValidStartBoundDate = start.HasValue && start.Value > DateTime.MinValue && start.Value < DateTime.MaxValue;
-            var bounds = hasValidStartBoundDate && end.HasValue ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
-
+            var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
             var interval = GetInterval(proximity, start, end);
             var agg = new DateHistogramAggregation(originalField) {
                 Field = field,
