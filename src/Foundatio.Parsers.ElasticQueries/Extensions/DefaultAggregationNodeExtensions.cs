@@ -256,6 +256,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             var timePerBlock = TimeSpan.FromMinutes(totalTime.TotalMinutes / desiredDataPoints);
             if (timePerBlock.TotalDays > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromDays(1));
+                if (timePerBlock.TotalDays > 365)
+                    timePerBlock = TimeSpan.FromDays(365);
                 return (Time)timePerBlock;
             }
 
