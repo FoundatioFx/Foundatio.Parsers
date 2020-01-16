@@ -1,42 +1,51 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Elasticsearch.Net;
+using Microsoft.Extensions.Logging;
 using Nest;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class ElasticExtensions {
-        public static string GetErrorMessage(this IApiCallDetails response) {
-            var sb = new StringBuilder();
+        public static TermsInclude AddValue(this TermsInclude include, string value) {
+            if (include?.Values == null)
+                return new TermsInclude(new[] { value });
 
-            if (response.OriginalException != null)
-                sb.AppendLine($"Original: ({response.HttpStatusCode} - {response.OriginalException.GetType().Name}) {response.OriginalException.Message}");
+            var values = include.Values.ToList();
+            values.Add(value);
 
-            if (response.ServerError != null)
-                sb.AppendLine($"Server: ({response.ServerError.Status}) {response.ServerError.Error}");
+            return new TermsInclude(values);
+        } 
 
-            if (response is IBulkResponse bulkResponse)
-                sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
+        public static TermsExclude AddValue(this TermsExclude exclude, string value) {
+            if (exclude?.Values == null)
+                return new TermsExclude(new[] { value });
 
-            if (sb.Length == 0)
-                sb.AppendLine("Unknown error.");
-
-            return sb.ToString();
-        }
+            var values = exclude.Values.ToList();
+            values.Add(value);
+            
+            return new TermsExclude(values);
+        } 
 
         // TODO: Handle IFailureReason/BulkIndexByScrollFailure and other bulk response types.
-        public static string GetErrorMessage(this IResponse response) {
+        public static string GetErrorMessage(this IElasticsearchResponse response) {
+            if (response == null)
+                return String.Empty;
+            
             var sb = new StringBuilder();
 
-            if (response.OriginalException != null)
-                sb.AppendLine($"Original: ({response.ApiCall.HttpStatusCode} - {response.OriginalException.GetType().Name}) {response.OriginalException.Message}");
+            var apiCall = response.ApiCall;
+            if (apiCall.OriginalException != null)
+                sb.AppendLine($"Original: ({apiCall.HttpStatusCode} - {apiCall.OriginalException.GetType().Name}) {apiCall.OriginalException.Message}");
+            
+            if (response is IResponse responseWithError && responseWithError.ServerError != null)
+                sb.AppendLine($"Server: ({responseWithError.ServerError.Status}) {responseWithError.ServerError.Error}");
 
-            if (response.ServerError != null)
-                sb.AppendLine($"Server: ({response.ServerError.Status}) {response.ServerError.Error}");
-
-            if (response is IBulkResponse bulkResponse)
+            if (response is BulkResponse bulkResponse)
                 sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
 
             if (sb.Length == 0)
@@ -45,22 +54,86 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return sb.ToString();
         }
 
-        public static string GetRequest(this IApiCallDetails response, bool normalize = false) {
+        public static string GetRequest(this IElasticsearchResponse response, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false) {
             if (response == null)
                 return String.Empty;
 
-            if (response.RequestBodyInBytes != null) {
-                string body = Encoding.UTF8.GetString(response.RequestBodyInBytes);
-                if (normalize)
-                    body = JsonUtility.NormalizeJsonString(body);
-                return $"{response.HttpMethod} {response.Uri.PathAndQuery}\r\n{body}\r\n";
-            } else {
-                return $"{response.HttpMethod} {response.Uri.PathAndQuery}\r\n";
+            var sb = new StringBuilder();
+            var responseWithError = response as IResponse;
+            if (includeDebugInformation && responseWithError?.DebugInformation != null)
+                sb.AppendLine(responseWithError.DebugInformation);
+
+            var apiCall = response.ApiCall;
+            if (apiCall.HttpStatusCode.HasValue) {
+                sb.Append(response.ApiCall.HttpStatusCode);
+                sb.Append(" ");
             }
+            sb.Append(apiCall.HttpMethod);
+            sb.Append(" ");
+            sb.AppendLine(apiCall.Uri.ToString());
+
+            if (apiCall.RequestBodyInBytes != null) {
+                string body = Encoding.UTF8.GetString(apiCall.RequestBodyInBytes)?.Trim();
+                
+                if (normalize)
+                    body = JsonUtility.NormalizeJsonString(body)?.Trim();
+                
+                if (!String.IsNullOrWhiteSpace(body))
+                    sb.AppendLine(body);
+            }
+
+            if (includeResponse && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000) {
+                string responseData = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes)?.Trim();
+                
+                if (!String.IsNullOrWhiteSpace(responseData)) {
+                    sb.AppendLine("##### Response #####");
+                    sb.AppendLine(responseData);
+                }
+            }
+
+            return sb.ToString();
         }
 
-        public static string GetRequest(this IResponse response, bool normalize = false) {
-            return GetRequest(response?.ApiCall, normalize);
+        public static async Task<bool> WaitForReadyAsync(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null) {
+            var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
+            var startTime = DateTime.UtcNow;
+
+            while (!cancellationToken.IsCancellationRequested) {
+                var pingResponse = await client.PingAsync(ct: cancellationToken);
+                if (pingResponse.IsValid)
+                    return true;
+
+                if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
+                    logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+
+                await Task.Delay(1000, cancellationToken);
+            }
+
+            if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+                logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+
+            return false;
+        }
+
+        public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null) {
+            var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
+            var startTime = DateTime.UtcNow;
+
+            while (!cancellationToken.IsCancellationRequested) {
+                var pingResponse = client.Ping();
+                if (pingResponse.IsValid)
+                    return true;
+
+                if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
+                    logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+
+                Thread.Sleep(1000);
+            }
+
+            if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+                logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+
+            return false;
         }
     }
 

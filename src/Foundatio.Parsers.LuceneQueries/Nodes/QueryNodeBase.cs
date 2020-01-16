@@ -6,20 +6,20 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public abstract class QueryNodeBase : IQueryNode {
         public virtual Task AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context) {
-            if (this is GroupNode)
-                return visitor.VisitAsync((GroupNode)this, context);
+            if (this is GroupNode node)
+                return visitor.VisitAsync(node, context);
 
-            if (this is TermNode)
-                return visitor.VisitAsync((TermNode)this, context);
+            if (this is TermNode termNode)
+                return visitor.VisitAsync(termNode, context);
 
-            if (this is TermRangeNode)
-                return visitor.VisitAsync((TermRangeNode)this, context);
+            if (this is TermRangeNode rangeNode)
+                return visitor.VisitAsync(rangeNode, context);
 
-            if (this is MissingNode)
-                return visitor.VisitAsync((MissingNode)this, context);
+            if (this is MissingNode missingNode)
+                return visitor.VisitAsync(missingNode, context);
 
-            if (this is ExistsNode)
-                return visitor.VisitAsync((ExistsNode)this, context);
+            if (this is ExistsNode existsNode)
+                return visitor.VisitAsync(existsNode, context);
 
             return Task.CompletedTask;
         }

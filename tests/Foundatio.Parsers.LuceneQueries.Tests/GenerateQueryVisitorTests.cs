@@ -12,7 +12,9 @@ using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.Tests {
     public class GenerateQueryVisitorTests : TestWithLoggingBase {
-        public GenerateQueryVisitorTests(ITestOutputHelper output) : base(output) {}
+        public GenerateQueryVisitorTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        }
 
         [Theory]
         [InlineData(null, null, false)]
@@ -86,6 +88,7 @@ namespace Foundatio.Parsers.Tests {
         [InlineData("data.age:[10 TO *]", "data.age:[10 TO *]", true)]
         [InlineData("title:(full text search)^2", "title:(full text search)^2", true)]
         [InlineData("data.age:[* TO 10]", "data.age:[* TO 10]", true)]
+        [InlineData("data:[* TO 10]^hey", "data:[* TO 10]^hey", true)]
         [InlineData("hidden:true AND data.age:(>30 AND <=40)", "hidden:true AND data.age:(>30 AND <=40)", true)]
         [InlineData("hidden:true", "hidden:true", true)]
         [InlineData("geo:\"Dallas, TX\"~75m", "geo:\"Dallas, TX\"~75m", true)]
@@ -127,15 +130,16 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task CanGenerateSingleQueryAsync() {
             string query = "datehistogram:(date~2^-5\\:30 min:date max:date)";
+            string expected = "datehistogram:(date~2^-5\\:30 min:date max:date)";
             var parser = new LuceneQueryParser();
 
             var result = await parser.ParseAsync(query);
 
             _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
-            Assert.Equal(query, generatedQuery);
+            Assert.Equal(expected, generatedQuery);
 
-            await new AssignAggregationTypeVisitor().AcceptAsync(result, null);
+            await new AssignOperationTypeVisitor().AcceptAsync(result, null);
             _logger.LogInformation(DebugQueryVisitor.Run(result));
         }
     }

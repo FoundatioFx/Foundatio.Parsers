@@ -4,53 +4,62 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Exceptionless.DateTimeExtensions;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParserConfiguration {
         private ITypeMapping _serverMapping;
         private ITypeMapping _codeMapping;
+        private Inferrer _inferrer;
         private readonly ConcurrentDictionary<string, IProperty> _propertyCache = new ConcurrentDictionary<string, IProperty>();
+        private ILogger _logger = NullLogger.Instance;
 
         public ElasticQueryParserConfiguration() {
             AddQueryVisitor(new CombineQueriesVisitor(), 10000);
             AddSortVisitor(new TermToFieldVisitor(), 0);
-            AddAggregationVisitor(new AssignAggregationTypeVisitor(), 0);
+            AddAggregationVisitor(new AssignOperationTypeVisitor(), 0);
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
+            AddVisitor(new FieldResolverQueryVisitor(), 10);
         }
 
-        public string[] DefaultFields { get; private set; } = new[] { "_all" };
-        public AliasResolver DefaultAliasResolver { get; private set; }
-        public IncludeResolver DefaultIncludeResolver { get; private set; }
-        public Func<QueryValidationInfo, Task<bool>> DefaultValidator { get; private set; }
+        public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
+        public string[] DefaultFields { get; private set; }
+        public QueryFieldResolver FieldResolver { get; private set; }
+        public IncludeResolver IncludeResolver { get; private set; }
+        public Func<QueryValidationInfo, Task<bool>> Validator { get; private set; }
         public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
+
+        public ElasticQueryParserConfiguration SetLoggerFactory(ILoggerFactory loggerFactory) {
+            LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
+            _logger = loggerFactory.CreateLogger<ElasticQueryParserConfiguration>();
+            
+            return this;
+        }
 
         public ElasticQueryParserConfiguration SetDefaultFields(string[] fields) {
             DefaultFields = fields;
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseAliases(int priority = 50) {
-            return UseAliases((AliasResolver)null, priority);
-        }
+        public ElasticQueryParserConfiguration UseFieldResolver(QueryFieldResolver resolver, int priority = 10) {
+            FieldResolver = resolver;
+            ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(resolver), priority);
 
-        public ElasticQueryParserConfiguration UseAliases(AliasResolver defaultAliasResolver, int priority = 50) {
-            DefaultAliasResolver = defaultAliasResolver;
-
-            var visitor = new AliasedQueryVisitor();
-            QueryVisitor.AddVisitor(visitor, priority);
-            SortVisitor.AddVisitor(visitor, priority);
-
-            AggregationVisitor.AddVisitor(new AliasedQueryVisitor(false), priority);
             return this;
         }
 
-        public ElasticQueryParserConfiguration UseAliases(AliasMap defaultAliasMap, int priority = 50) {
-            return UseAliases(defaultAliasMap.Resolve, priority);
+        public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string> fields, int priority = 10) {
+            if (fields != null)
+                return UseFieldResolver(fields.ToHierarchicalFieldResolver(), priority);
+            
+            return UseFieldResolver(null);
         }
 
         public ElasticQueryParserConfiguration UseGeo(Func<string, string> resolveGeoLocation, int priority = 200) {
@@ -62,7 +71,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseIncludes(IncludeResolver includeResolver, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
-            DefaultIncludeResolver = includeResolver;
+            IncludeResolver = includeResolver;
 
             return AddVisitor(new IncludeVisitor(shouldSkipInclude), priority);
         }
@@ -76,7 +85,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseValidation(Func<QueryValidationInfo, Task<bool>> validator, int priority = 0) {
-            DefaultValidator = validator;
+            Validator = validator;
 
             return AddVisitor(new ValidationVisitor { ShouldThrow = true }, priority);
         }
@@ -237,14 +246,18 @@ namespace Foundatio.Parsers.ElasticQueries {
         #endregion
 
         public IProperty GetMappingProperty(string field) {
-            if (_propertyCache.TryGetValue(field, out var propertyType))
-                return propertyType;
-            
-            if (_serverMapping == null)
-                GetServerMapping();
-
-            if (String.IsNullOrEmpty(field) || _serverMapping == null)
+            if (String.IsNullOrEmpty(field))
                 return null;
+            
+            if (_propertyCache.TryGetValue(field, out var propertyType)) {
+                _logger.LogTrace("Cached property mapping: {field}={type}", field, propertyType);
+                return propertyType;
+            }
+
+            if (GetServerMappingFunc == null && _codeMapping == null) {
+                _logger.LogTrace("No property mappings are available");
+                return null;
+            }
 
             var fieldParts = field.Split('.');
             var currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
@@ -253,16 +266,15 @@ namespace Foundatio.Parsers.ElasticQueries {
                 string fieldPart = fieldParts[depth];
                 IProperty fieldMapping = null;
                 if (currentProperties == null || !currentProperties.TryGetValue(fieldPart, out fieldMapping)) {
-                    // check to see if there is an index_name match
+                    // check to see if there is an name match
                     if (currentProperties != null)
-                        fieldMapping = currentProperties
-                            .Select(m => m.Value)
-                            .FirstOrDefault(m => m.Name == fieldPart);
-
+                        fieldMapping = currentProperties.Values.FirstOrDefault(m => m.Name == fieldPart);
+                    
+                    // no mapping found, call GetServerMapping again in case it hasn't been called recently and there are possibly new mappings
                     if (fieldMapping == null && GetServerMapping()) {
-                        // we have updated mapping, start over from the top
+                        // we got updated mapping, start over from the top
                         depth = -1;
-                        currentProperties = MergeProperties(_codeMapping.Properties, _serverMapping.Properties);
+                        currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
                         continue;
                     }
 
@@ -272,12 +284,13 @@ namespace Foundatio.Parsers.ElasticQueries {
 
                 if (depth == fieldParts.Length - 1) {
                     _propertyCache.TryAdd(field, fieldMapping);
+                    _logger.LogTrace("Property mapping: {field}={fieldMapping}", field, fieldMapping);
                     return fieldMapping;
                 }
 
-                if (fieldMapping is IObjectProperty objectProperty)
+                if (fieldMapping is IObjectProperty objectProperty) {
                     currentProperties = objectProperty.Properties;
-                else {
+                } else {
                     if (fieldMapping is ITextProperty textProperty)
                         currentProperties = textProperty.Fields;
                     else
@@ -285,24 +298,56 @@ namespace Foundatio.Parsers.ElasticQueries {
                 }
             }
 
+            _logger.LogTrace("Property mapping: {field}=<null>", field);
             return null;
         }
 
         private IProperties MergeProperties(IProperties codeProperties, IProperties serverProperties) {
-            if (codeProperties == null || serverProperties == null)
-                return codeProperties ?? serverProperties;
+            if (codeProperties == null && serverProperties == null)
+                return null;
+            
+            IProperties mergedCodeProperties = null;
+            // resolve code mapping property expressions using inferrer
+            if (codeProperties != null) {
+                mergedCodeProperties = new Properties();
+                
+                foreach (var kvp in codeProperties) {
+                    var propertyName = kvp.Key;
+                    if (_inferrer != null && (String.IsNullOrEmpty(kvp.Key.Name) || kvp.Value is IFieldAliasProperty))
+                        propertyName = _inferrer.PropertyName(kvp.Key) ?? kvp.Key;
+
+                    mergedCodeProperties[propertyName] = kvp.Value;
+                }
+                   
+                if (_inferrer != null) {
+                    // resolve field alias
+                    foreach (var kvp in codeProperties) {
+                        if (!(kvp.Value is IFieldAliasProperty aliasProperty))
+                            continue;
+                        
+                        mergedCodeProperties[kvp.Key] = new FieldAliasProperty {
+                            LocalMetadata = aliasProperty.LocalMetadata,
+                            Path = _inferrer?.Field(aliasProperty.Path) ?? aliasProperty.Path,
+                            Name = aliasProperty.Name
+                        };
+                    }
+                }
+            }
+            
+            // no need to merge
+            if (mergedCodeProperties == null || serverProperties == null)
+                return mergedCodeProperties ?? serverProperties;
 
             IProperties properties = new Properties();
             foreach (var serverProperty in serverProperties) {
                 var merged = serverProperty.Value;
-                if (codeProperties.TryGetValue(serverProperty.Key, out var codeProperty))
+                if (mergedCodeProperties.TryGetValue(serverProperty.Key, out var codeProperty))
                     merged.LocalMetadata = codeProperty.LocalMetadata;
 
                 switch (merged) {
                     case IObjectProperty objectProperty:
                         var codeObjectProperty = codeProperty as IObjectProperty;
-                        objectProperty.Properties =
-                            MergeProperties(codeObjectProperty?.Properties, objectProperty.Properties);
+                        objectProperty.Properties = MergeProperties(codeObjectProperty?.Properties, objectProperty.Properties);
                         break;
                     case ITextProperty textProperty:
                         var codeTextProperty = codeProperty as ITextProperty;
@@ -313,7 +358,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 properties.Add(serverProperty.Key, merged);
             }
 
-            foreach (var codeProperty in codeProperties) {
+            foreach (var codeProperty in mergedCodeProperties) {
                 if (properties.TryGetValue(codeProperty.Key, out _))
                     continue;
 
@@ -334,10 +379,12 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             try {
                 _serverMapping = GetServerMappingFunc();
+                _logger.LogTrace("Got server mapping {mapping}", _serverMapping);
                 _lastMappingUpdate = DateTime.UtcNow;
 
                 return true;
-            } catch (Exception) {
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Error getting server mapping: " + ex.Message);
                 return false;
             }
         }
@@ -351,28 +398,46 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class {
-            return UseMappings(mappingBuilder, () => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Mapping);
+            return UseMappings(mappingBuilder, client.Infer, () => {
+                var response = client.Indices.GetMapping(new GetMappingRequest(index));
+                _logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
+
+                // use first returned mapping because index could have been an index alias
+                var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
+                return mapping;
+            });
         }
 
-        public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Func<ITypeMapping> getMapping) where T : class {
+        public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<ITypeMapping> getMapping) where T : class {
             var descriptor = new TypeMappingDescriptor<T>();
             descriptor = mappingBuilder(descriptor);
             _codeMapping = descriptor;
+            _inferrer = inferrer;
             GetServerMappingFunc = getMapping;
 
             return this;
         }
 
         public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(Indices.Index<T>(), Types.Type<T>())).Mapping);
+            return UseMappings(() => {
+                var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
+                _logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
+
+                // use first returned mapping because index could have been an index alias
+                var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
+                return mapping;
+            });
         }
 
-        public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client, string index) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, Types.Type<T>())).Mapping);
-        }
-
-        public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index, string type) {
-            return UseMappings(() => client.GetMapping(new GetMappingRequest(index, type)).Mapping);
+        public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index) {
+            return UseMappings(() => {
+                var response = client.Indices.GetMapping(new GetMappingRequest(index));
+                _logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
+                
+                // use first returned mapping because index could have been an index alias
+                var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
+                return mapping;
+            });
         }
 
         public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping) {

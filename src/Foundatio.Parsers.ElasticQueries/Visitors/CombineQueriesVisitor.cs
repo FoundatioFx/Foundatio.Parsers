@@ -14,6 +14,11 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             await base.VisitAsync(node, context).ConfigureAwait(false);
+            
+            // Only stop on scoped group nodes (parens). Gather all child queries (including scoped groups) and then combine them.
+            // Combining only happens at the scoped group level though.
+            // Merge all non-field terms together into a single match or multi-match query
+            // Merge all nested queries for the same nested field together
 
             if (!(context is IElasticQueryVisitorContext elasticContext))
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -29,10 +34,10 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (childQuery == null) continue;
 
                 var op = node.GetOperator(elasticContext.DefaultOperator);
-                if (child.IsNodeNegated())
+                if (child.IsExcluded())
                     childQuery = !childQuery;
 
-                if (op == Operator.Or && !String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+")
+                if (op == Operator.Or && node.IsRequired())
                     op = Operator.And;
 
                 if (op == Operator.And) {
@@ -53,15 +58,12 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
             await base.VisitAsync(node, context).ConfigureAwait(false);
 
-            if (!(context is IElasticQueryVisitorContext elasticContext))
-                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
-
-            if (node.GetScopedNode() is IFieldQueryNode scopedNode && node.Field == null &&
-                (node.GetQuery(() => node.GetDefaultQuery(context)) is MatchQuery || node.GetQuery(() => node.GetDefaultQuery(context)) is MultiMatchQuery)) {
-                if (!scopedNode.Data.ContainsKey("match_terms")) {
-                    scopedNode.Data["match_terms"] = new List<TermNode>();
-                }
-                ((List<TermNode>)scopedNode.Data["match_terms"]).Add(node);
+            if (node.GetGroupNode() is IFieldQueryNode groupNode && node.Field == null
+                && (node.GetQuery(() => node.GetDefaultQuery(context)) is MatchQuery || node.GetQuery(() => node.GetDefaultQuery(context)) is MultiMatchQuery)) {
+                if (!groupNode.Data.ContainsKey("match_terms"))
+                    groupNode.Data["match_terms"] = new List<TermNode>();
+                
+                ((List<TermNode>)groupNode.Data["match_terms"]).Add(node);
                 node.SetQuery(null);
             }
         }

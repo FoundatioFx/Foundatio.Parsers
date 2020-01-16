@@ -15,13 +15,12 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "sort");
             var fieldType = elasticContext.GetFieldType(field);
 
-            var sort = new SortField {
+            var sort = new FieldSort {
                 Field = field,
-                UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType
+                UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType,
+                Order = node.IsNodeOrGroupNegated() ? SortOrder.Descending : SortOrder.Ascending
             };
-
-            sort.Order = node.IsNodeOrGroupedParentNegated() ? SortOrder.Descending : SortOrder.Ascending;
-
+            
             return sort;
         }
     }

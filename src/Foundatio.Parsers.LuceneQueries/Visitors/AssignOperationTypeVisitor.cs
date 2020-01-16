@@ -4,21 +4,23 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
-namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class AssignAggregationTypeVisitor: ChainableQueryVisitor {
+namespace Foundatio.Parsers.LuceneQueries.Visitors {
+    public class AssignOperationTypeVisitor: ChainableQueryVisitor {
         public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-            if (!String.IsNullOrEmpty(node.Field)) {
-                if (!(node.Left is TermNode leftTerm) || !String.IsNullOrEmpty(leftTerm.Field))
-                    throw new ApplicationException("The first item in an aggregation group must be the name of the target field.");
+            if (String.IsNullOrEmpty(node.Field))
+                return base.VisitAsync(node, context);
+            
+            if (!(node.Left is TermNode leftTerm) || !String.IsNullOrEmpty(leftTerm.Field))
+                throw new ApplicationException("The first item in an aggregation group must be the name of the target field.");
 
-                if (IsKnownAggregationType(node.Field)) {
-                    node.SetOperationType(node.Field);
-                    node.Field = leftTerm.Term;
-                    node.Boost = leftTerm.Boost;
-                    node.Proximity = leftTerm.Proximity;
-                    node.Left = null;
-                }
-            }
+            if (!IsKnownAggregationType(node.Field))
+                return base.VisitAsync(node, context);
+            
+            node.SetOperationType(node.Field);
+            node.Field = leftTerm.Term;
+            node.Boost = leftTerm.Boost;
+            node.Proximity = leftTerm.Proximity;
+            node.Left = null;
 
             return base.VisitAsync(node, context);
         }
@@ -27,13 +29,14 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             if (String.IsNullOrEmpty(node.Term))
                 return;
 
-            if (IsKnownAggregationType(node.Field)) {
-                node.SetOperationType(node.Field);
-                node.Field = node.Term;
-                node.Term = null;
-            }
+            if (!IsKnownAggregationType(node.Field))
+                return;
+            
+            node.SetOperationType(node.Field);
+            node.Field = node.Term;
+            node.Term = null;
         }
-
+        
         private bool IsKnownAggregationType(string type) {
             switch (type) {
                 case AggregationType.Min:

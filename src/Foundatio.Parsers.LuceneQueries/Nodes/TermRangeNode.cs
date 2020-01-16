@@ -16,6 +16,9 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public string Delimiter { get; set; }
         public bool? MinInclusive { get; set; }
         public bool? MaxInclusive { get; set; }
+        public string Boost { get; set; }
+        public string UnescapedBoost => Boost?.Unescape();
+        public string Proximity { get; set; }
 
         public TermRangeNode CopyTo(TermRangeNode target) {
             if (Field != null)
@@ -45,6 +48,12 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (MaxInclusive.HasValue)
                 target.MaxInclusive = MaxInclusive;
 
+            if (Boost != null)
+                target.Boost = Boost;
+
+            if (Proximity != null)
+                target.Proximity = Proximity;
+
             foreach (var kvp in Data)
                 target.Data.Add(kvp.Key, kvp.Value);
 
@@ -59,7 +68,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
                 builder.Append("NOT ");
 
             builder.Append(Prefix);
-
+            
             if (!String.IsNullOrEmpty(Field))
             {
                 builder.Append(Field);
@@ -81,6 +90,12 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
 
             if (MaxInclusive.HasValue && String.IsNullOrEmpty(Operator))
                 builder.Append(MaxInclusive.Value ? "]" : "}");
+
+            if (Proximity != null)
+                builder.Append("~" + Proximity);
+
+            if (Boost != null)
+                builder.Append("^" + Boost);
 
             return builder.ToString();
         }

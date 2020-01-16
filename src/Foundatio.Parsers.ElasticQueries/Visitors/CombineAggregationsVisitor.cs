@@ -18,7 +18,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
             var container = GetParentContainer(node, context);
             var termsAggregation = container as ITermsAggregation;
-            var termsProperty = elasticContext.GetPropertyMapping(node.GetFullName());
             var dateHistogramAggregation = container as IDateHistogramAggregation;
             var topHitsAggregation = container as ITopHitsAggregation;
 
@@ -29,15 +28,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                     if (termNode != null && termsAggregation != null) {
                         // TODO: Move these to the default aggs method using a visitor to walk down the tree to gather them but not going into any sub groups
                         if (termNode.Field == "@exclude") {
-                            if (termsAggregation.Exclude == null)
-                                termsAggregation.Exclude = new TermsIncludeExclude { Values = new List<string> { termNode.UnescapedTerm } };
-                            else
-                                termsAggregation.Exclude = new TermsIncludeExclude { Values = new List<string>(termsAggregation.Exclude.Values.ToList().Union(new[] { termNode.UnescapedTerm })) };
+                            termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm);
                         } else if (termNode.Field == "@include") {
-                            if (termsAggregation.Include == null)
-                                termsAggregation.Include = new TermsIncludeExclude { Values = new List<string> { termNode.UnescapedTerm } };
-                            else
-                                termsAggregation.Include = new TermsIncludeExclude { Values = new List<string>(termsAggregation.Include.Values.ToList().Union(new[] { termNode.UnescapedTerm })) };
+                            termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm);
                         } else if (termNode.Field == "@missing") {
                             termsAggregation.Missing = termNode.UnescapedTerm;
                         } else if (termNode.Field == "@min") {
@@ -73,7 +66,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
                             dateHistogramAggregation.Missing = missingValue;
                         } else if (termNode.Field == "@offset") {
-                            dateHistogramAggregation.Offset = termNode.IsNodeNegated() ? "-" + termNode.Term : termNode.Term;
+                            dateHistogramAggregation.Offset = termNode.IsExcluded() ? "-" + termNode.Term : termNode.Term;
                         }
                     }
 

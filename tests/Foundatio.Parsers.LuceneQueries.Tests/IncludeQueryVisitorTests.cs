@@ -14,8 +14,10 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Microsoft.Extensions.Logging;
 
 namespace Foundatio.Parsers.Tests {
-    public class IncludeQueryVisitorTests : TestWithLoggingBase {
-        public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output) { }
+    public class IncludeQueryVisitorTests : ElasticsearchTestBase {
+        public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        }
 
         [Fact]
         public async Task CanExpandIncludesAsync() {
@@ -93,17 +95,17 @@ namespace Foundatio.Parsers.Tests {
         [Fact]
         public async Task CanExpandElasticIncludesAsync() {
             var client = new ElasticClient(new ConnectionSettings().DisableDirectStreaming().PrettyJson());
-            var aliases = new AliasMap { { "field", "aliased" }, { "included", "aliasedincluded" } };
+            var aliases = new FieldMap { { "field", "aliased" }, { "included", "aliasedincluded" } };
 
-            var processor = new ElasticQueryParser(c => c.UseIncludes(i => GetIncludeAsync(i)).UseAliases(aliases));
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(GetIncludeAsync).UseFieldMap(aliases));
             var result = await processor.BuildQueryAsync("@include:other");
             var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => f.Bool(b => b.Filter(f1 => f1.Term("aliasedincluded", "value")))));
             string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
@@ -111,8 +113,8 @@ namespace Foundatio.Parsers.Tests {
             result = await processor.BuildQueryAsync("@include:other");
             actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
             actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualResponse);
-            _logger.LogInformation("Actual: {Request}", expectedRequest);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
 
             Assert.Equal(expectedRequest, actualRequest);
             Assert.Equal(expectedResponse.Total, actualResponse.Total);

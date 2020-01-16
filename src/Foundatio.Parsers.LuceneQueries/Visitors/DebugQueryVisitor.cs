@@ -19,7 +19,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             await _writer.WriteLineAsync("Group:").ConfigureAwait(false);
             _writer.Indent++;
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
-            _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
+            _writer.WriteLineIf(node.GetOriginalField() != null, "Field: {0}", node.GetOriginalField());
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
             _writer.WriteLineIf(node.Boost != null, "Boost: {0}", node.Boost);
             _writer.WriteLineIf(node.Proximity != null, "Proximity: {0}", node.Proximity);
@@ -43,7 +43,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         public override void Visit(TermNode node, IQueryVisitorContext context) {
             _writer.WriteLine("Term: ");
             _writer.Indent++;
-            _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
+            _writer.WriteLineIf(node.GetOriginalField() != null, "Field: {0}", node.GetOriginalField());
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
             _writer.WriteLine("IsQuoted: {0}", node.IsQuotedTerm);
@@ -60,6 +60,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLine("Term Range: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
+            _writer.WriteLineIf(node.GetOriginalField() != null, "Original Field: {0}", node.GetOriginalField());
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
             _writer.WriteLineIf(node.Operator != null, "Operator: {0}", node.Operator);
@@ -77,6 +78,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLine("Exists: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
+            _writer.WriteLineIf(node.GetOriginalField() != null, "Original Field: {0}", node.GetOriginalField());
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
 
@@ -89,6 +91,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLine("Missing: ");
             _writer.Indent++;
             _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
+            _writer.WriteLineIf(node.GetOriginalField() != null, "Original Field: {0}", node.GetOriginalField());
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
 

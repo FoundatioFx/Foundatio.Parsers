@@ -29,7 +29,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 return null;
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "keyword");
-            var mapping = elasticContext.GetPropertyMapping(field);
+            var property = elasticContext.GetPropertyMapping(field);
 
             switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
@@ -54,7 +54,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     };
 
                 case AggregationType.Terms:
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", property.Mapping?.Type } } };
 
                 case AggregationType.TopHits:
                     return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
@@ -70,26 +70,26 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "keyword");
             var mapping = elasticContext.GetPropertyMapping(field);
-            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: GetString(context, "TimeZone");
+            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: elasticContext.DefaultTimeZone;
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() }, { "@timezone", timezone } } };
+                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping.Mapping?.Type }, { "@timezone", timezone } } };
 
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() }, { "@timezone", timezone } } };
+                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping.Mapping?.Type }, { "@timezone", timezone } } };
 
                 case AggregationType.Avg:
-                    return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping.Mapping?.Type } } };
 
                 case AggregationType.Sum:
-                    return new SumAggregation("sum_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new SumAggregation("sum_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping.Mapping?.Type } } };
 
                 case AggregationType.Stats:
-                    return new StatsAggregation("stats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new StatsAggregation("stats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping.Mapping?.Type } } };
 
                 case AggregationType.ExtendedStats:
-                    return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", mapping.Mapping?.Type } } };
 
                 case AggregationType.Cardinality:
                     return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
@@ -125,7 +125,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     };
 
                 case AggregationType.Terms:
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping?.Type?.ToString() } } };
+                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping.Mapping?.Type } } };
             }
 
             return null;
@@ -136,9 +136,9 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (!String.IsNullOrWhiteSpace(proximity)) {
                 var percentStrings = proximity.Split(',');
                 percents = new List<double>();
-                foreach  (var ps in percentStrings) {
-                    if (double.TryParse(ps, out double outPerc))
-                        percents.Add(outPerc);
+                foreach  (string ps in percentStrings) {
+                    if (Double.TryParse(ps, out var percent))
+                        percents.Add(percent);
                 }
             }
 
@@ -160,124 +160,147 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
+            // NOTE: StartDate and EndDate are set in the Repositories QueryBuilderContext.
             var start = GetDate(context, "StartDate");
             var end = GetDate(context, "EndDate");
-            var bounds = start.HasValue && end.HasValue ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
+            var bounds = start.HasValue && end.HasValue && start.Value <= end.Value ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
 
-            // TODO: Look into memoizing this lookup
-            // TODO: Should we validate the interval range.
-            return new DateHistogramAggregation(originalField) {
+            var interval = GetInterval(proximity, start, end);
+            var agg = new DateHistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
                 Format = "date_optional_time",
-                Interval = GetInterval(proximity, start, end),
                 TimeZone = GetTimeZone(boost, context),
                 Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
-                ExtendedBoundsDateMath = bounds
+                ExtendedBounds = bounds
             };
+
+            interval.Match(d => agg.CalendarInterval = d, f => agg.FixedInterval = f);
+
+            return agg;
         }
 
         private static string GetTimeZone(string boost, IQueryVisitorContext context) {
+            var elasticContext = context as IElasticQueryVisitorContext;
+
             TimeSpan? timezoneOffset = null;
             if (boost != null && !Exceptionless.DateTimeExtensions.TimeUnit.TryParse(boost, out timezoneOffset)) {
                 // assume if it doesn't parse as time, that it's Olson time
                 return boost;
             }
 
-            return timezoneOffset.HasValue ? (timezoneOffset.Value < TimeSpan.Zero ? "-" : "+") + timezoneOffset.Value.ToString("hh\\:mm") : GetString(context, "TimeZone");
+            return timezoneOffset.HasValue ? (timezoneOffset.Value < TimeSpan.Zero ? "-" : "+") + timezoneOffset.Value.ToString("hh\\:mm") : elasticContext?.DefaultTimeZone;
         }
 
         private static Union<DateInterval, Time> GetInterval(string proximity, DateTime? start, DateTime? end) {
             if (String.IsNullOrEmpty(proximity))
-                return new Union<DateInterval, Time>(GetInterval(start, end));
+                return GetInterval(start, end);
 
-            switch (proximity.ToLower().Trim()) {
+            switch (proximity.Trim()) {
+                case "s":
+                case "1s":
                 case "second":
                     return DateInterval.Second;
+                case "m":
+                case "1m":
                 case "minute":
                     return DateInterval.Minute;
+                case "h":
+                case "1h":
                 case "hour":
                     return DateInterval.Hour;
+                case "d":
+                case "1d":
                 case "day":
                     return DateInterval.Day;
+                case "w":
+                case "1w":
                 case "week":
                     return DateInterval.Week;
+                case "M":
+                case "1M":
                 case "month":
                     return DateInterval.Month;
+                case "q":
+                case "1q":
                 case "quarter":
                     return DateInterval.Quarter;
+                case "y":
+                case "1y":
                 case "year":
                     return DateInterval.Year;
-                default:
-                    return new Union<DateInterval, Time>(proximity);
             }
+
+            return new Union<DateInterval, Time>(proximity);
         }
 
         private static DateTime? GetDate(IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out object value) && value is DateTime)
-                return (DateTime)value;
+            if (context.Data.TryGetValue(key, out var value) && value is DateTime date)
+                return date;
 
             return null;
         }
 
         private static string GetString(IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out object value) && value is string)
-                return (string)value;
+            if (context.Data.TryGetValue(key, out var value) && value is string str)
+                return str;
 
             return null;
         }
 
-        private static string GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {
+        private static Union<DateInterval, Time> GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {
             if (!utcStart.HasValue || !utcEnd.HasValue)
-                return "1d";
+                return DateInterval.Day;
 
             var totalTime = utcEnd.Value - utcStart.Value;
             var timePerBlock = TimeSpan.FromMinutes(totalTime.TotalMinutes / desiredDataPoints);
             if (timePerBlock.TotalDays > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromDays(1));
-                return $"{timePerBlock.TotalDays:0}d";
+                if (timePerBlock.TotalDays > 365)
+                    timePerBlock = TimeSpan.FromDays(365);
+                return (Time)timePerBlock;
             }
 
             if (timePerBlock.TotalHours > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromHours(1));
-                return $"{timePerBlock.TotalHours:0}h";
+                return (Time)timePerBlock;
             }
 
             if (timePerBlock.TotalMinutes > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromMinutes(1));
-                return $"{timePerBlock.TotalMinutes:0}m";
+                return (Time)timePerBlock;
             }
 
             timePerBlock = timePerBlock.Round(TimeSpan.FromSeconds(15));
             if (timePerBlock.TotalSeconds < 1)
                 timePerBlock = TimeSpan.FromSeconds(15);
 
-            return $"{timePerBlock.TotalSeconds:0}s";
+            return (Time)timePerBlock;
         }
 
         public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
-            if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out int parsedSize))
+            if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out var parsedSize))
                 return parsedSize;
 
             return null;
         }
 
         public static int? GetBoostAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
-            if (!String.IsNullOrEmpty(node.Boost) && Int32.TryParse(node.Boost, out int parsedSize))
+            if (!String.IsNullOrEmpty(node.Boost) && Int32.TryParse(node.Boost, out var parsedSize))
                 return parsedSize;
 
             return null;
         }
 
         public static double? GetProximityAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
-            if (!String.IsNullOrEmpty(node.Proximity) && Double.TryParse(node.Proximity, out double parsedSize))
+            if (!String.IsNullOrEmpty(node.Proximity) && Double.TryParse(node.Proximity, out var parsedSize))
                 return parsedSize;
 
             return null;
         }
 
         public static double? GetBoostAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
-            if (!String.IsNullOrEmpty(node.Boost) && Double.TryParse(node.Boost, out double parsedSize))
+            if (!String.IsNullOrEmpty(node.Boost) && Double.TryParse(node.Boost, out var parsedSize))
                 return parsedSize;
 
             return null;

@@ -1,0 +1,9 @@
+{
+    "cSpell.words": [
+        "Lucene",
+        "Niemyjski",
+        "Xunit",
+        "aggs"
+    ],
+    "msbuildProjectTools.nuget.includePreRelease": true
+}

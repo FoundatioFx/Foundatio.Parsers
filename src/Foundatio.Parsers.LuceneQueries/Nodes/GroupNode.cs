@@ -52,10 +52,8 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
 
             builder.Append(Prefix);
 
-            if (!String.IsNullOrEmpty(Field)) {
-                builder.Append(Field);
-                builder.Append(":");
-            }
+            if (!String.IsNullOrEmpty(Field))
+                builder.Append(Field).Append(':');
 
             if (HasParens)
                 builder.Append("(");

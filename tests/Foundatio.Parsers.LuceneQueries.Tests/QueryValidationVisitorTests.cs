@@ -4,19 +4,24 @@ using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
+using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.Tests {
     public class QueryValidationVisitorTests : TestWithLoggingBase {
         private readonly IQueryParser _luceneQueryParser = new LuceneQueryParser();
-        private readonly IQueryParser _elasticQueryParser = new ElasticQueryParser();
+        private readonly IQueryParser _elasticQueryParser;
 
-        public QueryValidationVisitorTests(ITestOutputHelper output) : base(output) {}
+        public QueryValidationVisitorTests(ITestOutputHelper output) : base(output) {
+            Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+            _elasticQueryParser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+        }
 
         [Fact]
         public Task GetLuceneQueryInfoAsync() {
@@ -39,7 +44,7 @@ namespace Foundatio.Parsers.Tests {
                 "_all",
                 "hey",
                 "nested",
-                "nested.stuff"
+                "stuff"
             }, info.ReferencedFields);
         }
 
@@ -87,8 +92,9 @@ namespace Foundatio.Parsers.Tests {
 
         private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations) {
             IQueryNode queryNode;
+            var context = new ElasticQueryVisitorContext { QueryType = QueryType.Aggregation };
             try {
-                queryNode = await parser.ParseAsync(query, QueryType.Aggregation);
+                queryNode = await parser.ParseAsync(query, context);
             } catch (Exception ex) {
                 _logger.LogError(ex, "Error parsing query: {Message}", ex.Message);
                 if (isValid)
@@ -96,8 +102,8 @@ namespace Foundatio.Parsers.Tests {
 
                 return;
             }
-
-            var info = await ValidationVisitor.RunAsync(queryNode);
+            
+            var info = await ValidationVisitor.RunAsync(queryNode, context);
             Assert.Equal(QueryType.Aggregation, info.QueryType);
             Assert.Equal(isValid, info.IsValid);
             Assert.Equal(maxNodeDepth, info.MaxNodeDepth);

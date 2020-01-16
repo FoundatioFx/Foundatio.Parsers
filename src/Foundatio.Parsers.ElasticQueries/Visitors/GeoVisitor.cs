@@ -15,7 +15,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
-            if (!(context is IElasticQueryVisitorContext elasticContext) || !elasticContext.IsGeoPropertyType(node.Field) || node.GetQueryType() != QueryType.Query)
+            if (context.QueryType != QueryType.Query || !(context is IElasticQueryVisitorContext elasticContext) || !elasticContext.IsGeoPropertyType(node.Field))
                 return;
 
             string location = _resolveGeoLocation != null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;

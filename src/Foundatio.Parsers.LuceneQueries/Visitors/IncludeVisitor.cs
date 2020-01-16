@@ -7,6 +7,7 @@ using System.Collections.Generic;
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
     public delegate bool ShouldSkipIncludeFunc(TermNode node, IQueryVisitorContext context);
+    public delegate Task<string> IncludeResolver(string name);
     
     public class IncludeVisitor : ChainableQueryVisitor {
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
