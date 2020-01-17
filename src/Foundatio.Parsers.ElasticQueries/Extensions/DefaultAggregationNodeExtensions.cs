@@ -249,15 +249,13 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private static Union<DateInterval, Time> GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {
-            if (!utcStart.HasValue || !utcEnd.HasValue)
+            if (!utcStart.HasValue || !utcEnd.HasValue || utcStart.Value == DateTime.MinValue)
                 return DateInterval.Day;
 
             var totalTime = utcEnd.Value - utcStart.Value;
             var timePerBlock = TimeSpan.FromMinutes(totalTime.TotalMinutes / desiredDataPoints);
             if (timePerBlock.TotalDays > 1) {
                 timePerBlock = timePerBlock.Round(TimeSpan.FromDays(1));
-                if (timePerBlock.TotalDays > 365)
-                    timePerBlock = TimeSpan.FromDays(365);
                 return (Time)timePerBlock;
             }
 
