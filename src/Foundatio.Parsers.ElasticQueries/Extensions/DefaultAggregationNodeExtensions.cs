@@ -163,7 +163,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             // NOTE: StartDate and EndDate are set in the Repositories QueryBuilderContext.
             var start = GetDate(context, "StartDate");
             var end = GetDate(context, "EndDate");
-            var bounds = start.HasValue && end.HasValue && start.Value <= end.Value ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
+            bool isValidRange = start.HasValue && start.Value > DateTime.MinValue && end.HasValue && end.Value < DateTime.MaxValue && start.Value <= end.Value;
+            var bounds = isValidRange ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
 
             var interval = GetInterval(proximity, start, end);
             var agg = new DateHistogramAggregation(originalField) {
@@ -176,7 +177,6 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             };
 
             interval.Match(d => agg.CalendarInterval = d, f => agg.FixedInterval = f);
-
             return agg;
         }
 
