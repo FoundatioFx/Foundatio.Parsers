@@ -9,7 +9,9 @@ using System.Collections.Generic;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultAggregationNodeExtensions {
-
+        // NOTE: We may want to read this dynamically from server settings.
+        public const int MAX_BUCKET_SIZE = 10000;
+        
         public static AggregationBase GetDefaultAggregation(this IQueryNode node, IQueryVisitorContext context) {
             if (node is GroupNode groupNode)
                 return groupNode.GetDefaultAggregation(context);
@@ -54,7 +56,17 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     };
 
                 case AggregationType.Terms:
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", property.Mapping?.Type } } };
+                    var agg = new TermsAggregation("terms_" + node.GetOriginalField()) {
+                        Field = field, 
+                        Size = node.GetProximityAsInt32(), 
+                        MinimumDocumentCount = node.GetBoostAsInt32(), 
+                        Meta = new Dictionary<string, object> { { "@field_type", property.Mapping?.Type } }
+                    };
+                    
+                    if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
+                        agg.ShardSize = Math.Max((int)agg.Size, MAX_BUCKET_SIZE);
+
+                    return agg;
 
                 case AggregationType.TopHits:
                     return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
@@ -125,7 +137,17 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     };
 
                 case AggregationType.Terms:
-                    return new TermsAggregation("terms_" + node.GetOriginalField()) { Field = field, Size = node.GetProximityAsInt32(), MinimumDocumentCount = node.GetBoostAsInt32(), Meta = new Dictionary<string, object> { { "@field_type", mapping.Mapping?.Type } } };
+                    var agg = new TermsAggregation("terms_" + node.GetOriginalField()) {
+                        Field = field, 
+                        Size = node.GetProximityAsInt32(), 
+                        MinimumDocumentCount = node.GetBoostAsInt32(), 
+                        Meta = new Dictionary<string, object> { { "@field_type", mapping.Mapping?.Type } }
+                    };
+
+                    if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
+                        agg.ShardSize = Math.Max((int)agg.Size, MAX_BUCKET_SIZE);
+
+                    return agg;
             }
 
             return null;
@@ -149,13 +171,13 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
         private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
             double interval = 50;
-            if (double.TryParse(proximity, out double prox))
+            if (Double.TryParse(proximity, out double prox))
                 interval = prox;
 
             return new HistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
-                Interval = interval,
+                Interval = interval
             };
         }
 
