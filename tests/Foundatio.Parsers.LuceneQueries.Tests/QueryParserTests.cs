@@ -976,8 +976,8 @@ namespace Foundatio.Parsers.Tests {
             var client = GetClient();
             client.Indices.Delete("stuff");
             client.Indices.Refresh("stuff");
-
             client.Indices.Create("stuff");
+            
             client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
             var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
             client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
@@ -999,6 +999,40 @@ namespace Foundatio.Parsers.Tests {
                     .Query(f => f
                         .DateRange(m => m.Field(f2 => f2.Field5).LessThan("2017-01-31").TimeZone("America/Chicago"))
                             || f.Match(e => e.Field(m => m.Field1).Query("value1"))));
+            
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
+        public void DateRangeWithDateMathQueryProcessor() {
+            var client = GetClient();
+            client.Indices.Delete("stuff");
+            client.Indices.Refresh("stuff");
+            client.Indices.Create("stuff");
+            
+            client.Map<MyType>(d => d.Dynamic(true).Index("stuff"));
+            var res = client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
+            client.Index(new MyType { Field4 = 2 }, i => i.Index("stuff"));
+            client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
+            client.Indices.Refresh("stuff");
+
+            var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = "America/Chicago" };
+
+            var processor = new ElasticQueryParser(c => c.UseMappings(client, "stuff"));
+
+            var result = processor.BuildQueryAsync("field5:[now-1d/d TO now/d]", ctx).Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualResponse);
+
+            var expectedResponse = client.Search<MyType>(d => d
+                .Index("stuff")
+                .Query(f => f.DateRange(m => m.Field(f2 => f2.Field5).GreaterThanOrEquals("now-1d/d").LessThanOrEquals("now/d").TimeZone("America/Chicago"))));
             
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);

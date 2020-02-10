@@ -82,7 +82,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             string field = elasticContext.GetNonAnalyzedFieldName(node.Field, "keyword");
             var mapping = elasticContext.GetPropertyMapping(field);
-            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: elasticContext.DefaultTimeZone;
+            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: node.GetTimeZone(elasticContext.DefaultTimeZone);
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:

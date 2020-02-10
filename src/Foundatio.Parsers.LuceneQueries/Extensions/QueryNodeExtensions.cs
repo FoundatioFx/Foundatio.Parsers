@@ -42,6 +42,18 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return null;
         }
 
+        private const string TimeZoneKey = "@TimeZone";
+        public static string GetTimeZone(this IFieldQueryNode node, string defaultTimeZone = null) {
+            if (!node.Data.TryGetValue(TimeZoneKey, out var value))
+                return defaultTimeZone;
+
+            return value as string;
+        }
+
+        public static void SetTimeZone(this IFieldQueryNode node, string timeZone) {
+            node.Data[TimeZoneKey] = timeZone;
+        }
+
         private const string OriginalFieldKey = "@OriginalField";
         public static string GetOriginalField(this IFieldQueryNode node) {
             if (!node.Data.TryGetValue(OriginalFieldKey, out var value))
