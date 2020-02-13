@@ -35,7 +35,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost ?? node.GetTimeZone(elasticContext.DefaultTimeZone), context);
 
                 case AggregationType.Histogram:
                     return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
@@ -189,11 +189,12 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             var bounds = isValidRange ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
 
             var interval = GetInterval(proximity, start, end);
+            string timezone = TryConvertTimeUnitToUtcOffset(boost);
             var agg = new DateHistogramAggregation(originalField) {
                 Field = field,
                 MinimumDocumentCount = 0,
                 Format = "date_optional_time",
-                TimeZone = GetTimeZone(boost, context),
+                TimeZone = timezone,
                 Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
                 ExtendedBounds = bounds
             };
@@ -202,16 +203,22 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return agg;
         }
 
-        private static string GetTimeZone(string boost, IQueryVisitorContext context) {
-            var elasticContext = context as IElasticQueryVisitorContext;
-
-            TimeSpan? timezoneOffset = null;
-            if (boost != null && !Exceptionless.DateTimeExtensions.TimeUnit.TryParse(boost, out timezoneOffset)) {
-                // assume if it doesn't parse as time, that it's Olson time
+        private static string TryConvertTimeUnitToUtcOffset(string boost) {
+            if (String.IsNullOrEmpty(boost))
+                return null;
+            
+            if (!Exceptionless.DateTimeExtensions.TimeUnit.TryParse(boost, out var timezoneOffset)) {
+                // if it fails to parse, just return it unmodified
                 return boost;
             }
 
-            return timezoneOffset.HasValue ? (timezoneOffset.Value < TimeSpan.Zero ? "-" : "+") + timezoneOffset.Value.ToString("hh\\:mm") : elasticContext?.DefaultTimeZone;
+            if (!timezoneOffset.HasValue)
+                return null;
+
+            if (timezoneOffset.Value < TimeSpan.Zero)
+                return "-" + timezoneOffset.Value.ToString("hh\\:mm");
+
+            return "+" + timezoneOffset.Value.ToString("hh\\:mm");
         }
 
         private static Union<DateInterval, Time> GetInterval(string proximity, DateTime? start, DateTime? end) {
