@@ -1125,7 +1125,7 @@ namespace Foundatio.Parsers.Tests {
             var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = "America/Chicago" };
 
             var processor = new ElasticQueryParser(c => c.UseMappings(client, index).SetLoggerFactory(Log));
-            var result = processor.BuildQueryAsync("field5:[2017-01-01 TO 2017-01-31} OR field1:value1", ctx).Result;
+            var result = processor.BuildQueryAsync("field5:[2017-01-01T00\\:00\\:00Z TO 2017-01-31} OR field1:value1", ctx).Result;
 
             var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
             string actualRequest = actualResponse.GetRequest();
@@ -1136,7 +1136,7 @@ namespace Foundatio.Parsers.Tests {
                     .Index(index)
                     .Query(f => f
                         .DateRange(m => m
-                            .Field(f2 => f2.Field5).GreaterThanOrEquals("2017-01-01").LessThan("2017-01-31").TimeZone("America/Chicago"))
+                            .Field(f2 => f2.Field5).GreaterThanOrEquals("2017-01-01T00:00:00Z").LessThan("2017-01-31").TimeZone("America/Chicago"))
                                 || f.Match(e => e.Field(m => m.Field1).Query("value1"))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
