@@ -26,11 +26,16 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
         private void AddField(IFieldQueryNode node, IQueryVisitorContext context) {
             string field = node.Field;
-            if (field != null)
+            if (field != null) {
                 _fields.Add(field);
-            else
-                foreach (string defaultField in node.GetDefaultFields(context.DefaultFields))
-                    _fields.Add(defaultField);
+            } else {
+                var fields = node.GetDefaultFields(context.DefaultFields);
+                if (fields == null || fields.Length == 0)
+                    _fields.Add("");
+                else
+                    foreach (string defaultField in fields)
+                        _fields.Add(defaultField);
+            }
         }
 
         public override Task<ISet<string>> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {

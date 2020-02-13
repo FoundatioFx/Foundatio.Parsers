@@ -41,7 +41,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(QueryType.Query, info.QueryType);
             Assert.Equal(2, info.MaxNodeDepth);
             Assert.Equal(new HashSet<string> {
-                "_all",
+                "",
                 "hey",
                 "nested",
                 "stuff"
@@ -52,7 +52,7 @@ namespace Foundatio.Parsers.Tests {
             get {
                 return new[] {
                     new object[] { null, false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
-                    new object[] { "avg", false, 1, new HashSet<string> { "_all"}, new Dictionary<string, ICollection<string>>() },
+                    new object[] { "avg", false, 1, new HashSet<string> { ""}, new Dictionary<string, ICollection<string>>() },
                     new object[] { "avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
                     new object[] { "avg:value", true, 1,
                         new HashSet<string> { "value" },

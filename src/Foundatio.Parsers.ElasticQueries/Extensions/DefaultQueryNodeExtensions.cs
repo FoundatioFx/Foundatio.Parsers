@@ -60,7 +60,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             QueryBase query;
             string field = node.Field;
             var defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
-            if (field == null && defaultFields.Length == 1)
+            if (field == null && defaultFields != null && defaultFields.Length == 1)
                 field = defaultFields[0];
             
             if (elasticContext.IsPropertyAnalyzed(field)) {

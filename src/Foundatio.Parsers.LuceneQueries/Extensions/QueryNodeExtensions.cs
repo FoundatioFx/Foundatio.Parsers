@@ -80,7 +80,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         
         public static string[] GetDefaultFields(this IQueryNode node, string[] rootDefaultFields) {
             var scopedNode = GetGroupNode(node);
-            return !String.IsNullOrEmpty(scopedNode?.Field) ? new[] { scopedNode.Field } : rootDefaultFields ?? new[] { "_all" };
+            return !String.IsNullOrEmpty(scopedNode?.Field) ? new[] { scopedNode.Field } : rootDefaultFields;
         }
     }
 }
