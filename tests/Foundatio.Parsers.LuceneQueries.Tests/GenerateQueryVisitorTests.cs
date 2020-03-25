@@ -109,6 +109,7 @@ namespace Foundatio.Parsers.Tests {
         [InlineData(@"updated:2016-09-02T15\:41\:43.3385286Z", @"updated:2016-09-02T15\:41\:43.3385286Z", true)]
         [InlineData(@"updated:>2016-09-02T15\:41\:43.3385286Z", @"updated:>2016-09-02T15\:41\:43.3385286Z", true)]
         [InlineData(@"field1:""\""value1\""""", @"field1:""\""value1\""""", true)]
+        [InlineData(@"( ( cat AND dog ))", @"((cat AND dog))", true)]
         public async Task CanGenerateQueryAsync(string query, string expected, bool isValid) {
             var parser = new LuceneQueryParser();
             Log.MinimumLevel = LogLevel.Information;

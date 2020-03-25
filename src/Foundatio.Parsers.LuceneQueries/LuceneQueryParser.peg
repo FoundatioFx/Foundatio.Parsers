@@ -62,7 +62,7 @@ group_exp<IQueryNode>
   / paren_exp
 
 paren_exp<GroupNode>
-  = op:prefix_operator_exp? "(" node:node ")" boost:boost_modifier? _*
+  = op:prefix_operator_exp? "(" _* node:node _* ")" boost:boost_modifier? _*
     {{
         node.HasParens = true;
         node.Prefix = op.SingleOrDefault();
