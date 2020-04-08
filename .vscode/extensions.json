@@ -1,7 +1,7 @@
 {
 	"recommendations": [
     "theaustinseven.pegs",
-    "ms-vscode.csharp",
+    "ms-dotnettools.csharp",
     "streetsidesoftware.code-spell-checker",
     "editorconfig.editorconfig",
     "tintoy.msbuild-project-tools"

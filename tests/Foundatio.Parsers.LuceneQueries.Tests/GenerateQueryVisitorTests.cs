@@ -100,8 +100,9 @@ namespace Foundatio.Parsers.Tests {
         [InlineData("NOT Test", "NOT Test", true)]
         [InlineData("! Test", "! Test", true)] // The symbol ! can be used in place of the word NOT.
         [InlineData("type:?", "type:?", false)]
-        // TODO: We don't yet support this.
-        //[InlineData(@"type:\(1\+1\)\:2", @"type:\(1\+1\)\:2", true)] // https://lucene.apache.org/core/2_9_4/queryparsersyntax.html#Escaping%20Special%20Characters
+        // TODO: Need to work on allowing more characters to be escaped
+        //[InlineData(@"type:\(11\)2\+", @"type:\(11\)2\+", true)]
+        [InlineData(@"""\""now""", @"""\""now""", true)]
         [InlineData("title:(+return +\"pink panther\")", "title:(+return +\"pink panther\")", true)]
         [InlineData("\"jakarta apache\" -\"Apache Lucene\"", "\"jakarta apache\" -\"Apache Lucene\"", true)]
         [InlineData("\"jakarta apache\"^4 \"Apache Lucene\"", "\"jakarta apache\"^4 \"Apache Lucene\"", true)]
@@ -109,6 +110,7 @@ namespace Foundatio.Parsers.Tests {
         [InlineData(@"updated:2016-09-02T15\:41\:43.3385286Z", @"updated:2016-09-02T15\:41\:43.3385286Z", true)]
         [InlineData(@"updated:>2016-09-02T15\:41\:43.3385286Z", @"updated:>2016-09-02T15\:41\:43.3385286Z", true)]
         [InlineData(@"field1:""\""value1\""""", @"field1:""\""value1\""""", true)]
+        [InlineData(@"""\""value1""", @"""\""value1""", true)]
         [InlineData(@"( ( cat AND dog ))", @"((cat AND dog))", true)]
         public async Task CanGenerateQueryAsync(string query, string expected, bool isValid) {
             var parser = new LuceneQueryParser();

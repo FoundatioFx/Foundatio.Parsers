@@ -117,32 +117,7 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
-        public void ShouldMergeMultipleAnalyzedFieldTermsIntoSingleMatchQuery() {
-            var client = GetClient();
-            var index = CreateRandomIndex<MyType>(client, d => d.Dynamic().Properties(p => p
-                .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))));
-            
-            client.Index(new MyType { Field1 = "value1" }, i => i.Index(index));
-            client.Indices.Refresh(index);
-
-            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).SetDefaultFields(new[] { "field1" }).UseMappings(client, index));
-            var result = processor.BuildQueryAsync("value1 value2", new ElasticQueryVisitorContext {  DefaultOperator = Operator.Or, UseScoring = true }).Result;
-            var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
-            var actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualRequest);
-
-            var expectedResponse = client.Search<MyType>(d => d.Index(index).Query(f =>
-                f.Match(m => m.Field(mf => mf.Field1).Query("value1 value2"))));
-
-            var expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Expected: {Request}", expectedRequest);
-
-            Assert.Equal(expectedRequest, actualRequest);
-            Assert.Equal(expectedResponse.Total, actualResponse.Total);
-        }
-
-        [Fact]
-        public void ShouldMergeTermsIntoMatchQueryForAnalyzedFields() {
+        public void ShouldHandleMultipleTermsForAnalyzedFields() {
             var client = GetClient();
             var index = CreateRandomIndex<MyType>(client, d => d
                 .Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))
@@ -161,7 +136,11 @@ namespace Foundatio.Parsers.Tests {
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index(index).Query(f =>
-                f.Match(m => m.Field(mf => mf.Field1).Query("value1 abc def ghi")) || f.Term(m => m.Field2, "value2") || f.Term(m => m.Field2, "jhk")));
+                f.Match(m => m.Field(mf => mf.Field1).Query("value1"))
+                || f.Match(m => m.Field(mf => mf.Field1).Query("abc"))
+                || f.Match(m => m.Field(mf => mf.Field1).Query("def"))
+                || f.Match(m => m.Field(mf => mf.Field1).Query("ghi"))
+                || f.Term(m => m.Field2, "value2") || f.Term(m => m.Field2, "jhk")));
 
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -176,7 +155,10 @@ namespace Foundatio.Parsers.Tests {
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
             expectedResponse = client.Search<MyType>(d => d.Index(index).Query(f =>
-                f.Match(m => m.Field(mf => mf.Field1).Query("value1 abc def ghi"))));
+                f.Match(m => m.Field(mf => mf.Field1).Query("value1"))
+                || f.Match(m => m.Field(mf => mf.Field1).Query("abc"))
+                || f.Match(m => m.Field(mf => mf.Field1).Query("def"))
+                || f.Match(m => m.Field(mf => mf.Field1).Query("ghi"))));
 
             expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -192,7 +174,10 @@ namespace Foundatio.Parsers.Tests {
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
             expectedResponse = client.Search<MyType>(d => d.Index(index).Query(f =>
-                f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("value1 abc def ghi").Type(TextQueryType.BestFields))));
+                f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("value1"))
+                || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("abc"))
+                || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("def"))
+                || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("ghi"))));
 
             expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -237,14 +222,14 @@ namespace Foundatio.Parsers.Tests {
             var client = GetClient();
             var index = CreateRandomIndex<MyType>(client);
             client.IndexMany(new[] {
-                new MyType { Field1 = "hey \"you there\"", Field2 = "value2" },
+                new MyType { Field1 = "\"now there\"", Field2 = "value2" },
                 new MyType { Field1 = "value2", Field2 = "value2" },
                 new MyType { Field1 = "value1", Field2 = "value4" }
             }, index);
             client.Indices.Refresh(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
-            var result = processor.BuildQueryAsync("field1:\"hey \\\"you there\\\"\"").Result;
+            var result = processor.BuildQueryAsync("\"\\\"now there\"").Result;
             var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
             string actualRequest = actualResponse.GetRequest(true);
             _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -253,7 +238,7 @@ namespace Foundatio.Parsers.Tests {
                 .Query(q => q
                     .Bool(b => b
                         .Filter(f => f
-                            .MatchPhrase(m => m.Query("hey \"you there\"").Field(w => w.Field1))))));
+                            .MultiMatch(m => m.Query("\"now there").Type(TextQueryType.Phrase))))));
             string expectedRequest = expectedResponse.GetRequest(true);
             _logger.LogInformation("Expected: {Request}", expectedRequest);
 

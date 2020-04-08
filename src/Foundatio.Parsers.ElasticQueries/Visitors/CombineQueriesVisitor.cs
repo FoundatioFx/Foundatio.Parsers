@@ -54,18 +54,5 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 node.SetQuery(container);
             }
         }
-
-        public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
-            await base.VisitAsync(node, context).ConfigureAwait(false);
-
-            if (node.GetGroupNode() is IFieldQueryNode groupNode && node.Field == null
-                && (node.GetQuery(() => node.GetDefaultQuery(context)) is MatchQuery || node.GetQuery(() => node.GetDefaultQuery(context)) is MultiMatchQuery)) {
-                if (!groupNode.Data.ContainsKey("match_terms"))
-                    groupNode.Data["match_terms"] = new List<TermNode>();
-                
-                ((List<TermNode>)groupNode.Data["match_terms"]).Add(node);
-                node.SetQuery(null);
-            }
-        }
     }
 }
