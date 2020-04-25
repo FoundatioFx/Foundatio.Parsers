@@ -378,8 +378,8 @@ namespace Foundatio.Parsers.Tests {
         public async Task CanUseDateHistogramAggregationInterval(string interval, object expectedInterval = null) {
             var client = GetClient();
             var index = CreateRandomIndex<MyType>(client);
-            client.IndexMany(new[] { new MyType { Field5 = DateTime.Now } }, index);
-            client.Indices.Refresh(index);
+            await client.IndexManyAsync(new[] { new MyType { Field5 = DateTime.Now } }, index);
+            await client.Indices.RefreshAsync(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
             

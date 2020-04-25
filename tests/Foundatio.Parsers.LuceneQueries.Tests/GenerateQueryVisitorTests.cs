@@ -143,7 +143,7 @@ namespace Foundatio.Parsers.Tests {
             Assert.Equal(expected, generatedQuery);
 
             await new AssignOperationTypeVisitor().AcceptAsync(result, null);
-            _logger.LogInformation(DebugQueryVisitor.Run(result));
+            _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
         }
     }
 }

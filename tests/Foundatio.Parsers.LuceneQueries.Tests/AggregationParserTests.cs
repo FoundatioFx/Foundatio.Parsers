@@ -25,7 +25,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
                 new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
             }, index);
-            client.Indices.Refresh(index);
+            await client.Indices.RefreshAsync(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index).UseGeo(l => "51.5032520,-0.1278990"));
             var aggregations = await processor.BuildAggregationsAsync("min:field4");
@@ -56,7 +56,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
                 new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
             }, index);
-            client.Indices.Refresh(index);
+            await client.Indices.RefreshAsync(index);
 
             var fieldMap = new FieldMap { { "heynow", "field4" } };
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index).UseFieldMap(fieldMap).UseGeo(l => "51.5032520,-0.1278990"));
@@ -92,7 +92,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
                 new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
             }, index);
-            client.Indices.Refresh(index);
+            await client.Indices.RefreshAsync(index);
 
             var fieldMap = new FieldMap { { "heynow2", "field1" } };
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index).UseFieldMap(fieldMap));
@@ -124,7 +124,7 @@ namespace Foundatio.Parsers.Tests {
                 new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
                 new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
             }, index);
-            client.Indices.Refresh(index);
+            await client.Indices.RefreshAsync(index);
 
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index).UseGeo(l => "51.5032520,-0.1278990"));
             var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4~50,100 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
@@ -166,7 +166,7 @@ namespace Foundatio.Parsers.Tests {
                             .Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))))));
 
             client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
-            client.Indices.Refresh(index);
+            await client.Indices.RefreshAsync(index);
 
             var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" } };
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index).UseFieldMap(aliasMap));
@@ -196,7 +196,7 @@ namespace Foundatio.Parsers.Tests {
             client.IndexMany(new[] {
                 new MyType { Field2 = "field2" }
             }, index);
-            client.Indices.Refresh(index);
+            await client.Indices.RefreshAsync(index);
 
             var aliasMap = new FieldMap { { "alias2", "field2" } };
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index).UseFieldMap(aliasMap));
@@ -230,7 +230,7 @@ namespace Foundatio.Parsers.Tests {
             client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" }
             }, index);
-            client.Indices.Refresh(index);
+            await client.Indices.RefreshAsync(index);
 
             var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
             var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index).UseGeo(l => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
@@ -440,7 +440,7 @@ namespace Foundatio.Parsers.Tests {
         }
         
         [Fact]
-        public async Task GeoGridDoesNotResolveLocationForAggregation() {
+        public Task GeoGridDoesNotResolveLocationForAggregation() {
             var client = GetClient();
             var index = CreateRandomIndex<MyType>(client, d => d.Properties(p => p
                 .GeoPoint(g => g.Name(f => f.Field1))
@@ -449,8 +449,8 @@ namespace Foundatio.Parsers.Tests {
             var processor = new ElasticQueryParser(c => c
                     .UseGeo(l => "someinvalidvaluehere")
                     .UseMappings(client, index));
-            
-            await processor.BuildAggregationsAsync("geogrid:geo~3");
+
+            return processor.BuildAggregationsAsync("geogrid:geo~3");
 
         }
     }
