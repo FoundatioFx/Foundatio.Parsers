@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Foundatio.Logging;
-using Foundatio.Logging.Xunit;
-using Foundatio.Parsers.ElasticQueries.Visitors;
+using Foundatio.Xunit;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;

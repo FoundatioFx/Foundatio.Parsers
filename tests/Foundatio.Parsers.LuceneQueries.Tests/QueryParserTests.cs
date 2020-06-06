@@ -1,6 +1,4 @@
-﻿using Foundatio.Logging;
-using Foundatio.Logging.Xunit;
-using Foundatio.Parsers.ElasticQueries;
+﻿using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
@@ -13,9 +11,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
-using System.Threading;
 using System.Threading.Tasks;
-using Elasticsearch.Net;
 
 namespace Foundatio.Parsers.Tests {
 

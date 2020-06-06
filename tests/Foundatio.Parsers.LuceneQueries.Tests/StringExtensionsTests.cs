@@ -1,5 +1,5 @@
 ﻿using System;
-using Foundatio.Logging.Xunit;
+using Foundatio.Xunit;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Xunit;
 using Xunit.Abstractions;

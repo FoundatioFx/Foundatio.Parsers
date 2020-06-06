@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Foundatio.Logging.Xunit;
+using Foundatio.Xunit;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Nest;
 using Xunit;

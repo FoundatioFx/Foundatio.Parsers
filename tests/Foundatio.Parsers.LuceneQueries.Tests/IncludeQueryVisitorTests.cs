@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Foundatio.Logging;
-using Foundatio.Logging.Xunit;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
