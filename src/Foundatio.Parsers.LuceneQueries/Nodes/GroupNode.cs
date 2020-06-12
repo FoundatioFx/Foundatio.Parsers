@@ -50,6 +50,9 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public override string ToString() {
             var builder = new StringBuilder();
 
+            if (IsNegated.HasValue && IsNegated.Value)
+                builder.Append("NOT ");
+
             builder.Append(Prefix);
 
             if (!String.IsNullOrEmpty(Field))
@@ -67,9 +70,6 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
                 builder.Append(" OR ");
             else if (Right != null)
                 builder.Append(" ");
-
-            if (IsNegated.HasValue && IsNegated.Value)
-                builder.Append("NOT ");
 
             if (Right != null)
                 builder.Append(Right);
