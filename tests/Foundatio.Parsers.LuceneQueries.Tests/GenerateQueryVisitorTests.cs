@@ -7,6 +7,10 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
+using Pegasus.Common.Tracing;
+using Pegasus.Common;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Text;
 
 namespace Foundatio.Parsers.Tests {
     public class GenerateQueryVisitorTests : TestWithLoggingBase {
@@ -142,6 +146,70 @@ namespace Foundatio.Parsers.Tests {
 
             await new AssignOperationTypeVisitor().AcceptAsync(result, null);
             _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+        }
+
+        [Theory]
+        [InlineData("+")]
+        [InlineData("-")]
+        [InlineData("!")]
+        [InlineData("(")]
+        [InlineData(")")]
+        [InlineData("{")]
+        [InlineData("}")]
+        [InlineData("[")]
+        [InlineData("]")]
+        [InlineData("^")]
+        [InlineData("\"")]
+        [InlineData("~")]
+        [InlineData("*")]
+        [InlineData("?")]
+        [InlineData(":")]
+        [InlineData("\\")]
+        public async Task CanParseEscapedQuery(string escaped) {
+            // https://lucene.apache.org/core/2_9_4/queryparsersyntax.html#Escaping%20Special%20Characters
+            // + - && || ! ( ) { } [ ] ^ " ~ * ? : \
+            string query = @"\" + escaped;
+            var tracer = new StringBuilderTrace();
+            var parser = new LuceneQueryParser {
+                //Tracer = tracer
+            };
+
+            try {
+                _logger.LogInformation($"Attempting: {escaped}");
+                var result = await parser.ParseAsync(query);
+
+                _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+                string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
+                Assert.Equal(query, generatedQuery);
+            } catch (FormatException ex) {
+                _logger.LogInformation(tracer.ToString());
+                var cursor = ex.Data["cursor"] as Cursor;
+                throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            }
+        }
+    }
+
+    public class StringBuilderTrace : ITracer {
+        private readonly StringBuilder _builder = new StringBuilder();
+        private int _indentLevel = 0;
+
+        public override string ToString() => _builder.ToString();
+
+        public void TraceCacheHit<T>(string ruleName, Cursor cursor, CacheKey cacheKey, IParseResult<T> parseResult) => TraceInfo(ruleName, cursor, "Cache hit.");
+
+        public void TraceCacheMiss(string ruleName, Cursor cursor, CacheKey cacheKey) => TraceInfo(ruleName, cursor, "Cache miss.");
+
+        public void TraceInfo(string ruleName, Cursor cursor, string info) => _builder.Append(new string(' ', _indentLevel)).AppendLine(info);
+
+        public void TraceRuleEnter(string ruleName, Cursor cursor) {
+            _builder.AppendLine(new string(' ', _indentLevel)).Append($"Begin '{ruleName}' at ({cursor.Line},{cursor.Column}) with state key {cursor.StateKey}");
+            _indentLevel++;
+        }
+
+        public void TraceRuleExit<T>(string ruleName, Cursor cursor, IParseResult<T> parseResult) {
+            var success = parseResult != null;
+            _indentLevel--;
+            _builder.AppendLine(new string(' ', _indentLevel)).Append($"End '{ruleName}' with {(success ? "success" : "failure")} at ({cursor.Line},{cursor.Column}) with state key {cursor.StateKey}");
         }
     }
 }

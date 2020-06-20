@@ -1,5 +1,6 @@
 ﻿﻿@namespace Foundatio.Parsers.LuceneQueries
 @classname LuceneQueryParser
+@trace false
 @using System.Linq;
 @using Foundatio.Parsers.LuceneQueries.Nodes;
 @using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -17,7 +18,6 @@ start<GroupNode>
     {
         node.SingleOrDefault() ?? new GroupNode()
     }
-  / #ERROR{ "Unable to parse query." }
 
 node<GroupNode>
   = op:operator_exp EOF
@@ -168,20 +168,24 @@ term<TermNode>
         return result;
     }}
 
+// https://lucene.apache.org/core/2_9_4/queryparsersyntax.html#Escaping%20Special%20Characters
+escape_sequence
+  = '\\' [\+\-\!\(\)\{\}\[\]\^\"\~\*\?\:\\]
+
 name_term
-  = term:(([^: \t\r\n\f\{\}\(\)"/^~\[\]] / '\\' [:-\\\(\)^~\*])+ "")
+  = term:(([^: \\\t\r\n\f\{\}\(\)"/^~\[\]] / escape_sequence)+ "")
     {
         term
     }
 
 unquoted_term
-  = term:(([^: \\\t\r\n\f\{\}\(\)/^~\[\]] / '\\' [:-\\\(\)^~\*])+ "")
+  = term:(([^: \\\t\r\n\f\{\}\(\)/^~\[\]] / escape_sequence)+ "")
     {
         term
     }
 
 range_unquoted_term
-  = term:((([^: \\\.\t\r\n\f\{\}\(\)"^~\[\]] / [\.][^\.] / '\\' [:-\\\(\)^~\*])+ "") / '*')
+  = term:((([^: \\\.\t\r\n\f\{\}\(\)"^~\[\]] / [\.][^\.] / escape_sequence)+ "") / '*')
     {
         term
     }
@@ -375,8 +379,9 @@ prefix_operator -lexical
   = '+'
   / '-'
 
-_
+_ -memoize
   = [ \t\r\n\f]+
 
 EOF
   = !.
+  / unexpected:. #error{ "Unexpected character '" + unexpected + "'." }
