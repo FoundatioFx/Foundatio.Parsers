@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
+    [DebuggerDisplay("{Priority}, {Visitor}")]
     public class QueryVisitorWithPriority : IChainableQueryVisitor {
         public int Priority { get; set; }
         public IQueryNodeVisitorWithResult<IQueryNode> Visitor { get; set; }
