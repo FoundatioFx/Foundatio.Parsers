@@ -382,7 +382,7 @@ prefix_operator -lexical
   = '+'
   / '-'
 
-_ -memoize
+_
   = [ \t\r\n\f]+
 
 EOF

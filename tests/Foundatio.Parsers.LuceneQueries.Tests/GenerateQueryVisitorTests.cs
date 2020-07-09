@@ -11,6 +11,7 @@ using Pegasus.Common.Tracing;
 using Pegasus.Common;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Text;
+using System.Collections.Generic;
 
 namespace Foundatio.Parsers.Tests {
     public class GenerateQueryVisitorTests : TestWithLoggingBase {
@@ -186,6 +187,15 @@ namespace Foundatio.Parsers.Tests {
                 var cursor = ex.Data["cursor"] as Cursor;
                 throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
             }
+        }
+
+        [Fact]
+        public void CanParseQueryConcurrently() {
+            var parser = new LuceneQueryParser();
+            Parallel.For(0, 100, i => {
+                var result = parser.Parse("criteria   some:criteria blah:(more      stuff)");
+                Assert.NotNull(result);
+            });
         }
     }
 
