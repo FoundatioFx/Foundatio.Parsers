@@ -136,7 +136,7 @@ fieldname<FieldInfo> -lexical
     }}
 
 term<TermNode>
-  = not:not_exp? op:prefix_operator_exp? term:quoted_term proximity:proximity_modifier? boost:boost_modifier? _*
+  = not:not_exp? op:prefix_operator_exp? !operator_exp term:quoted_term proximity:proximity_modifier? boost:boost_modifier? _*
       {{
         var result = new TermNode { Term = term, IsQuotedTerm = true };
 
@@ -153,7 +153,7 @@ term<TermNode>
 
         return result;
     }}
-  / not:not_exp? op:prefix_operator_exp? term:unquoted_term proximity:proximity_modifier? boost:boost_modifier? _*
+  / not:not_exp? op:prefix_operator_exp? !operator_exp term:unquoted_term proximity:proximity_modifier? boost:boost_modifier? _*
     {{
         var result = new TermNode { Term = term };
 
@@ -170,6 +170,7 @@ term<TermNode>
 
         return result;
     }}
+  / not:not_exp? prefix:prefix_operator_exp? op:operator_exp #error{ "Unexpected operator '" + op + "'." }
 
 // https://lucene.apache.org/core/2_9_4/queryparsersyntax.html#Escaping%20Special%20Characters
 escape_sequence
