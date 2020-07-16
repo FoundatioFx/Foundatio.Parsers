@@ -15,6 +15,9 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
             new object[] { "NOT someField:(stuff)" },
             new object[] { "NOT someField:(NOT stuff)" },
             new object[] { "NOT -someField:(stuff)" },
+            new object[] { "something AND NOT otherthing" },
+            new object[] { "something AND otherthing" },
+            new object[] { "something OR otherthing" },
         };
 
         [Theory]
@@ -37,6 +40,24 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
             Assert.IsType<GroupNode>(result.Left);
             Assert.True((result.Left as GroupNode).HasParens);
             Assert.True((result.Left as GroupNode).IsNegated);
+        }
+
+        [Fact]
+        public void MultipleOperatorsIsNotValid() {
+            var sut = new LuceneQueryParser();
+
+            Assert.Throws<FormatException>(() => {
+                var result = sut.Parse("something AND NOT OR otherthing");
+            });
+        }
+
+        [Fact]
+        public void DoubleOperatorsIsNotValid() {
+            var sut = new LuceneQueryParser();
+
+            Assert.Throws<FormatException>(() => {
+                var result = sut.Parse("something AND OR otherthing");
+            });
         }
     }
 }
