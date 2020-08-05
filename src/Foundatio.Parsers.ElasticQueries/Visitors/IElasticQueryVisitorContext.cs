@@ -7,6 +7,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         Operator DefaultOperator { get; set; }
         string DefaultTimeZone { get; set; }
         bool UseScoring { get; set; }
-        Func<string, IProperty> GetPropertyMappingFunc { get; set; }
+        ElasticMappingResolver MappingResolver { get; set; }
     }
 }

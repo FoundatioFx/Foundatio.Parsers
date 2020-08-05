@@ -35,7 +35,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
 
                 fieldName += nameParts[i];
 
-                if (elasticContext.IsNestedPropertyType(fieldName))
+                if (elasticContext.MappingResolver.IsNestedPropertyType(fieldName))
                     return fieldName;
             }
 

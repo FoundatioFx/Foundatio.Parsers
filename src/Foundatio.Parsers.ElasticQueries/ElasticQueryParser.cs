@@ -32,18 +32,18 @@ namespace Foundatio.Parsers.ElasticQueries {
             SetupQueryVisitorContextDefaults(context);
             switch (context.QueryType) {
                 case QueryType.Aggregation:
-                    context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
+                    context.SetMappingResolver(_config.MappingResolver);
                     result = await _config.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
                 case QueryType.Query:
-                    context.SetGetPropertyMappingFunc(_config.GetMappingProperty).SetDefaultFields(_config.DefaultFields);
+                    context.SetMappingResolver(_config.MappingResolver).SetDefaultFields(_config.DefaultFields);
                     if (_config.IncludeResolver != null && context.GetIncludeResolver() == null)
                         context.SetIncludeResolver(_config.IncludeResolver);
 
                     result = await _config.QueryVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
                 case QueryType.Sort:
-                    context.SetGetPropertyMappingFunc(_config.GetMappingProperty);
+                    context.SetMappingResolver(_config.MappingResolver);
                     result = await _config.SortVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
             }
@@ -54,6 +54,9 @@ namespace Foundatio.Parsers.ElasticQueries {
         private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context) {
             if (_config.FieldResolver != null && context.GetFieldResolver() == null)
                 context.SetFieldResolver(_config.FieldResolver);
+
+            if (_config.MappingResolver != null && context.GetMappingResolver() == null)
+                context.SetMappingResolver(_config.MappingResolver);
 
             if (_config.Validator != null && context.GetValidator() == null)
                 context.SetValidator(_config.Validator);

@@ -35,7 +35,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (field == null && defaultFields != null && defaultFields.Length == 1)
                 field = defaultFields[0];
             
-            if (elasticContext.IsPropertyAnalyzed(field)) {
+            if (elasticContext.MappingResolver.IsPropertyAnalyzed(field)) {
                 var fields = !String.IsNullOrEmpty(field) ? new[] { field } : defaultFields;
 
                 if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
@@ -82,7 +82,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             string field = node.Field;
-            if (elasticContext.IsDatePropertyType(field)) {
+            if (elasticContext.MappingResolver.IsDatePropertyType(field)) {
                 var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(elasticContext.DefaultTimeZone) };
                 if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*") {
                     if (node.MinInclusive.HasValue && !node.MinInclusive.Value)

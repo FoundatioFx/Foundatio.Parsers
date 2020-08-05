@@ -35,24 +35,26 @@ namespace Foundatio.Parsers.Tests {
             return client;
         }
 
-        protected string CreateRandomIndex<T>(IElasticClient client, Func<TypeMappingDescriptor<T>, ITypeMapping> selector = null) where T : class {
+        protected string CreateRandomIndex<T>(IElasticClient client, Func<TypeMappingDescriptor<T>, ITypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where T : class {
             string index = "test_" + Guid.NewGuid().ToString("N");
-            if (selector == null)
-                selector = m => m.AutoMap<T>().Dynamic();
-            
-            CreateIndex(client, index, i => i.Settings(s => s.NumberOfReplicas(0)).Map<T>(selector));
+            if (configureMappings == null)
+                configureMappings = m => m.AutoMap<T>().Dynamic();
+            if (configureIndex == null)
+                configureIndex = i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
+
+            CreateIndex(client, index, i => i.Settings(configureIndex).Map<T>(configureMappings));
             client.ConnectionSettings.DefaultIndices.Add(typeof(T), index);
 
             return index;
         }
 
-        protected CreateIndexResponse CreateIndex(IElasticClient client, IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> selector = null) {
+        protected CreateIndexResponse CreateIndex(IElasticClient client, IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> configureIndex = null) {
             _createdIndexes.Add(index);
 
-            if (selector == null)
-                selector = d => d.Settings(s => s.NumberOfReplicas(0));
+            if (configureIndex == null)
+                configureIndex = d => d.Settings(s => s.NumberOfReplicas(0));
             
-            var result = client.Indices.Create(index, selector);
+            var result = client.Indices.Create(index, configureIndex);
             if (!result.IsValid)
                 throw new ApplicationException($"Unable to create index {index}");
 
