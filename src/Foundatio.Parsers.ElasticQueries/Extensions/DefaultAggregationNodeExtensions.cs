@@ -30,7 +30,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left != null)
                 return null;
 
-            string field = elasticContext.MappingResolver.GetNonAnalyzedFieldName(node.Field, "keyword");
+            string field = elasticContext.MappingResolver.GetAggregationsFieldName(node.Field);
             var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
 
             switch (node.GetOperationType()) {
@@ -80,7 +80,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            string field = elasticContext.MappingResolver.GetNonAnalyzedFieldName(node.Field, "keyword");
+            string field = elasticContext.MappingResolver.GetAggregationsFieldName(node.Field);
             var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
             string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: node.GetTimeZone(elasticContext.DefaultTimeZone);
 

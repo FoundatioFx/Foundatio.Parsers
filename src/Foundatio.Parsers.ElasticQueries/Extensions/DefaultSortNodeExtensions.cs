@@ -12,7 +12,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            string field = elasticContext.MappingResolver.GetNonAnalyzedFieldName(node.Field, "sort");
+            string field = elasticContext.MappingResolver.GetSortFieldName(node.Field);
             var fieldType = elasticContext.MappingResolver.GetFieldType(field);
 
             var sort = new FieldSort {
