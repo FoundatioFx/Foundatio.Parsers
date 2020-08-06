@@ -12,7 +12,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         private ITypeMapping _serverMapping;
         private readonly ITypeMapping _codeMapping;
         private readonly Inferrer _inferrer;
-        private readonly ConcurrentDictionary<string, IProperty> _propertyCache = new ConcurrentDictionary<string, IProperty>();
+        private readonly ConcurrentDictionary<string, FieldMapping> _mappingCache = new ConcurrentDictionary<string, FieldMapping>();
         private readonly ILogger _logger;
 
         public static ElasticMappingResolver NullInstance = new ElasticMappingResolver(() => null);
@@ -36,28 +36,25 @@ namespace Foundatio.Parsers.ElasticQueries {
             _lastMappingUpdate = null;
         }
 
-        public IProperty GetMappingProperty(Field field) {
-            if (_inferrer == null)
-                throw new InvalidOperationException("Unable to resolve Field without inferrer");
-
-            return GetMappingProperty(_inferrer.Field(field));
-        }
-
-        public IProperty GetMappingProperty(string field) {
+        public FieldMapping GetMapping(string field, bool followAlias = false) {
             if (String.IsNullOrEmpty(field))
                 return null;
 
-            if (_propertyCache.TryGetValue(field.ToLowerInvariant(), out var propertyType)) {
-                _logger.LogTrace("Cached property mapping: {field}={type}", field, propertyType);
-                return propertyType;
-            }
+            if (GetServerMappingFunc == null && _codeMapping == null)
+                throw new InvalidOperationException("No mappings are available.");
 
-            if (GetServerMappingFunc == null && _codeMapping == null) {
-                _logger.LogTrace("No property mappings are available");
-                return null;
+            if (_mappingCache.TryGetValue(field.ToLowerInvariant(), out var mapping)) {
+                _logger.LogTrace("Cached mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property);
+
+                if (followAlias && mapping.Found && mapping.Property is IFieldAliasProperty fieldAlias)
+                    return GetMapping(fieldAlias.Path.Name);
+
+                if (mapping.Found || !GetServerMapping())
+                    return mapping;
             }
 
             var fieldParts = field.Split('.');
+            string resolvedFieldName = "";
             var currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
 
             for (int depth = 0; depth < fieldParts.Length; depth++) {
@@ -77,13 +74,23 @@ namespace Foundatio.Parsers.ElasticQueries {
                     }
 
                     if (fieldMapping == null)
-                        return null;
+                        break;
                 }
 
+                if (depth == 0)
+                    resolvedFieldName += _inferrer.PropertyName(fieldMapping.Name);
+                else
+                    resolvedFieldName += "." + _inferrer.PropertyName(fieldMapping.Name);
+
                 if (depth == fieldParts.Length - 1) {
-                    _propertyCache.TryAdd(field, fieldMapping);
-                    _logger.LogTrace("Property mapping: {field}={fieldMapping}", field, fieldMapping);
-                    return fieldMapping;
+                    var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping);
+                    _mappingCache.AddOrUpdate(field.ToLowerInvariant(), resolvedMapping, (f, m) => resolvedMapping);
+                    _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property);
+
+                    if (followAlias && resolvedMapping.Property is IFieldAliasProperty fieldAlias)
+                        return GetMapping(fieldAlias.Path.Name);
+
+                    return resolvedMapping;
                 }
 
                 if (fieldMapping is IObjectProperty objectProperty) {
@@ -92,12 +99,35 @@ namespace Foundatio.Parsers.ElasticQueries {
                     if (fieldMapping is ITextProperty textProperty)
                         currentProperties = textProperty.Fields;
                     else
-                        return null;
+                        break;
                 }
             }
 
-            _logger.LogTrace("Property mapping: {field}=<null>", field);
-            return null;
+            _logger.LogTrace("Resolved mapping: {field}=<null>", field);
+            var notFoundMapping = new FieldMapping(resolvedFieldName, null);
+            _mappingCache.AddOrUpdate(field.ToLowerInvariant(), notFoundMapping, (f, m) => notFoundMapping);
+
+            return notFoundMapping;
+        }
+
+        public FieldMapping GetMapping(Field field, bool followAlias = false) {
+            if (_inferrer == null)
+                throw new InvalidOperationException("Unable to resolve Field without inferrer");
+
+            return GetMapping(_inferrer.Field(field), followAlias);
+        }
+
+        public IProperty GetMappingProperty(string field, bool followAlias = false) {
+            return GetMapping(field, followAlias).Property;
+        }
+
+        public IProperty GetMappingProperty(Field field, bool followAlias = false) {
+            return GetMapping(field, followAlias).Property;
+        }
+
+        public string GetResolvedField(string field) {
+            var result = GetMapping(field, true);
+            return result.FullPath;
         }
 
         public string GetResolvedField(Field field) {
@@ -105,26 +135,6 @@ namespace Foundatio.Parsers.ElasticQueries {
                 throw new InvalidOperationException("Unable to resolve Field without inferrer");
 
             return GetResolvedField(_inferrer.Field(field));
-        }
-
-        public string GetResolvedField(string field) {
-            var result = GetResolvedMappingProperty(field);
-            return result.ResolvedField;
-        }
-
-        public (string ResolvedField, IProperty Mapping) GetResolvedMappingProperty(string field) {
-            if (String.IsNullOrEmpty(field))
-                return (field, null);
-
-            string resolvedField = field;
-            var property = GetMappingProperty(field);
-
-            if (property is IFieldAliasProperty fieldAlias) {
-                resolvedField = fieldAlias.Path.Name;
-                property = GetMappingProperty(resolvedField);
-            }
-
-            return (resolvedField, property);
         }
 
         public string GetSortFieldName(string field) {
@@ -147,14 +157,14 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (String.IsNullOrEmpty(field))
                 return field;
 
-            var property = GetResolvedMappingProperty(field);
+            var mapping = GetMapping(field, true);
 
-            if (property.Mapping == null || !IsPropertyAnalyzed(property.Mapping))
+            if (mapping.Property == null || !IsPropertyAnalyzed(mapping.Property))
                 return field;
 
-            var multiFieldProperty = property.Mapping as ICoreProperty;
+            var multiFieldProperty = mapping.Property as ICoreProperty;
             if (multiFieldProperty?.Fields == null)
-                return property.ResolvedField;
+                return mapping.FullPath;
 
             var nonAnalyzedProperty = multiFieldProperty.Fields.OrderByDescending(kvp => kvp.Key.Name == preferredSubField).FirstOrDefault(kvp => {
                 if (kvp.Value is IKeywordProperty)
@@ -167,9 +177,9 @@ namespace Foundatio.Parsers.ElasticQueries {
             });
 
             if (nonAnalyzedProperty.Value != null)
-                return property.ResolvedField + "." + nonAnalyzedProperty.Key.Name;
+                return mapping.FullPath + "." + nonAnalyzedProperty.Key.Name;
 
-            return property.ResolvedField;
+            return mapping.FullPath;
         }
 
         public bool IsPropertyAnalyzed(string field) {
@@ -177,11 +187,11 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (String.IsNullOrEmpty(field))
                 return true;
 
-            var property = GetResolvedMappingProperty(field);
-            if (property.Mapping == null)
+            var property = GetMapping(field, true);
+            if (!property.Found)
                 return false;
 
-            return IsPropertyAnalyzed(property.Mapping);
+            return IsPropertyAnalyzed(property.Property);
         }
 
         public bool IsPropertyAnalyzed(IProperty property) {
@@ -195,47 +205,47 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return GetResolvedMappingProperty(field).Mapping is INestedProperty;
+            return GetMappingProperty(field, true) is INestedProperty;
         }
 
         public bool IsGeoPropertyType(string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return GetResolvedMappingProperty(field).Mapping is IGeoPointProperty;
+            return GetMappingProperty(field, true) is IGeoPointProperty;
         }
 
         public bool IsNumericPropertyType(string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return GetResolvedMappingProperty(field).Mapping is INumberProperty;
+            return GetMappingProperty(field, true) is INumberProperty;
         }
 
         public bool IsBooleanPropertyType(string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return GetResolvedMappingProperty(field).Mapping is IBooleanProperty;
+            return GetMappingProperty(field, true) is IBooleanProperty;
         }
 
         public bool IsDatePropertyType(string field) {
             if (String.IsNullOrEmpty(field))
                 return false;
 
-            return GetResolvedMappingProperty(field).Mapping is IDateProperty;
+            return GetMappingProperty(field, true) is IDateProperty;
         }
 
         public FieldType GetFieldType(string field) {
             if (String.IsNullOrWhiteSpace(field))
                 return FieldType.None;
 
-            var property = GetResolvedMappingProperty(field);
+            var property = GetMappingProperty(field, true);
 
-            if (property.Mapping?.Type == null)
+            if (property?.Type == null)
                 return FieldType.None;
 
-            switch (property.Mapping.Type) {
+            switch (property.Type) {
                 case "geo_point":
                     return FieldType.GeoPoint;
                 case "geo_shape":
@@ -433,5 +443,17 @@ namespace Foundatio.Parsers.ElasticQueries {
         public static ElasticMappingResolver Create(Func<ITypeMapping> getMapping, Inferrer inferrer, ILogger logger = null) {
             return new ElasticMappingResolver(getMapping, inferrer, logger: logger);
         }
+    }
+
+    public class FieldMapping {
+        public FieldMapping(string path, IProperty property) {
+            FullPath = path;
+            Property = property;
+        }
+
+        public bool Found => Property != null;
+        public string FullPath { get; private set; }
+        public IProperty Property { get; private set; }
+        public DateTime Date { get; private set; } = DateTime.Now;
     }
 }

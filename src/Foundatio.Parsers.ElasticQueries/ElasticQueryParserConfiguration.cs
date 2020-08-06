@@ -238,19 +238,6 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         #endregion
 
-        public IProperty GetMappingProperty(string field) {
-            if (MappingResolver == null) {
-                _logger.LogTrace("Mapping resolver has not been configured");
-                return null;
-            }
-
-            return MappingResolver.GetMappingProperty(field);
-        }
-
-        public void RefreshMapping() {
-            MappingResolver?.RefreshMapping();
-        }
-
         public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class {
             MappingResolver = ElasticMappingResolver.Create<T>(mappingBuilder, client, index, logger: _logger);
 

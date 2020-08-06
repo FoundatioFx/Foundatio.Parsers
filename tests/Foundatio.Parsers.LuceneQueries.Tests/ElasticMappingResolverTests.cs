@@ -37,6 +37,9 @@ namespace Foundatio.Parsers.Tests {
             var field1Property = resolver.GetMappingProperty("Field1");
             Assert.IsType<TextProperty>(field1Property);
 
+            var field1 = resolver.GetResolvedField("FielD1");
+            Assert.Equal("field1", field1);
+
             var field4Property = resolver.GetMappingProperty("Field4");
             Assert.IsType<TextProperty>(field4Property);
 
@@ -46,9 +49,9 @@ namespace Foundatio.Parsers.Tests {
             var field4ExpressionProperty = resolver.GetMappingProperty(new Field(GetObjectPath(p => p.Field4)));
             Assert.IsType<TextProperty>(field4ExpressionProperty);
 
-            var field4AliasProperty = resolver.GetResolvedMappingProperty("Field4Alias");
-            Assert.IsType<TextProperty>(field4AliasProperty.Mapping);
-            Assert.Same(field4Property, field4AliasProperty.Mapping);
+            var field4AliasMapping = resolver.GetMapping("Field4Alias", true);
+            Assert.IsType<TextProperty>(field4AliasMapping.Property);
+            Assert.Same(field4Property, field4AliasMapping.Property);
 
             var field4sort = resolver.GetSortFieldName("Field4Alias");
             Assert.Equal("field4.sort", field4sort);
@@ -58,6 +61,9 @@ namespace Foundatio.Parsers.Tests {
 
             var nestedIdProperty = resolver.GetMappingProperty("Nested.Id");
             Assert.IsType<TextProperty>(nestedIdProperty);
+
+            var nestedId = resolver.GetResolvedField("Nested.Id");
+            Assert.Equal("nested.id", nestedId);
 
             nestedIdProperty = resolver.GetMappingProperty("nested.id");
             Assert.IsType<TextProperty>(nestedIdProperty);

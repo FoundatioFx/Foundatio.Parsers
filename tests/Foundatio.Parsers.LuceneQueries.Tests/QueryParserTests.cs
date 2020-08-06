@@ -202,10 +202,10 @@ namespace Foundatio.Parsers.Tests {
 
             var parser = new ElasticQueryParser(c => c.SetDefaultFields(new[] { "field1" }).UseMappings<MyType>(GetCodeMappings, client, index));
             
-            var dynamicServerMappingProperty = parser.Configuration.GetMappingProperty("field5");
-            var serverMappingProperty = parser.Configuration.GetMappingProperty("field2");
-            var codeMappingProperty = parser.Configuration.GetMappingProperty("field1");
-            var codeAndServerMappingProperty = parser.Configuration.GetMappingProperty("field3");
+            var dynamicServerMappingProperty = parser.Configuration.MappingResolver.GetMapping("field5").Property;
+            var serverMappingProperty = parser.Configuration.MappingResolver.GetMapping("field2").Property;
+            var codeMappingProperty = parser.Configuration.MappingResolver.GetMapping("field1").Property;
+            var codeAndServerMappingProperty = parser.Configuration.MappingResolver.GetMapping("field3").Property;
             
             Assert.Equal("date", dynamicServerMappingProperty.Type);
             Assert.Equal("keyword", serverMappingProperty.Type);
