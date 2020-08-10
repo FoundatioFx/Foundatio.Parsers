@@ -51,7 +51,7 @@ System.Diagnostics.Debug.Assert(query == generatedQuery);
 
 ## Features
 - Lucene Query Syntax Parser
-  - Parsers fairly standardized syntax from [Lucene](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/query-dsl-query-string-query.html).
+  - Parsers fairly standardized syntax from [Lucene](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html).
   - Visitors for extensibility
 - Field Aliases
 - Query Includes
@@ -79,3 +79,7 @@ System.Diagnostics.Debug.Assert(query == generatedQuery);
   - Automatically resolves non-analyzed keyword sub-fields for sorting and aggregations
   - Aliases can be defined right on your NEST mappings
     - Supports both root and inner field name aliases
+    
+## Thanks to all the people who have contributed
+
+[![contributors](https://contributors-img.web.app/image?repo=FoundatioFx/Foundatio.Parsers)](https://github.com/FoundatioFx/Foundatio.Parsers/graphs/contributors)
