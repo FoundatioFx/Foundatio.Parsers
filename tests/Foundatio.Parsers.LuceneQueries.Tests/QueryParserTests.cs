@@ -317,7 +317,7 @@ namespace Foundatio.Parsers.Tests {
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(i => i.Index(index).Aggregations(f => f
-                .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "keyword")))
+                .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "text")))
                 .DateHistogram("date_field5",
                     d =>
                         d.Field(d2 => d2.Field5)
@@ -328,11 +328,11 @@ namespace Foundatio.Parsers.Tests {
                             .Offset("-6h")
                             .Meta(m2 => m2.Add("@timezone", "America/Chicago"))
                             .Aggregations(l => l
-                                .Min("min_field1", m => m.Field("field1.keyword").Meta(m2 => m2.Add("@field_type", "keyword")))
-                                .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "keyword")))
-                                .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "keyword")))
+                                .Min("min_field1", m => m.Field("field1.keyword").Meta(m2 => m2.Add("@field_type", "text")))
+                                .Max("max_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "text")))
+                                .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "text")))
                             ))
-                .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "keyword")))
+                .Min("min_field2", m => m.Field("field2.keyword").Meta(m2 => m2.Add("@field_type", "text")))
             ));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
