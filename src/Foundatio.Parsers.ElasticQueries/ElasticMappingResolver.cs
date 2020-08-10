@@ -32,6 +32,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         /// Allows you to refresh server side mapping. This should be used only in unit tests.
         /// </summary>
         public void RefreshMapping() {
+            _logger.LogInformation("Mapping refresh triggered.");
             _serverMapping = null;
             _lastMappingUpdate = null;
         }
@@ -44,17 +45,28 @@ namespace Foundatio.Parsers.ElasticQueries {
                 throw new InvalidOperationException("No mappings are available.");
 
             if (_mappingCache.TryGetValue(field.ToLowerInvariant(), out var mapping)) {
-                _logger.LogTrace("Cached mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property);
 
-                if (followAlias && mapping.Found && mapping.Property is IFieldAliasProperty fieldAlias)
+                if (followAlias && mapping.Found && mapping.Property is IFieldAliasProperty fieldAlias) {
+                    _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
                     return GetMapping(fieldAlias.Path.Name);
+                }
 
-                if (mapping.Found || !GetServerMapping())
+                if (mapping.Found) {
+                    _logger.LogTrace("Cached mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
                     return mapping;
+                }
+
+                if (mapping.ServerMapTime >= _lastMappingUpdate && !GetServerMapping()) {
+                    _logger.LogTrace("Cached mapping (not found): {field}=<null>", field);
+                    return mapping;
+                }
+
+                _logger.LogTrace("Cached mapping (not found), got new server mapping.");
             }
 
             var fieldParts = field.Split('.');
             string resolvedFieldName = "";
+            var mappingServerTime = _lastMappingUpdate;
             var currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
 
             for (int depth = 0; depth < fieldParts.Length; depth++) {
@@ -93,9 +105,9 @@ namespace Foundatio.Parsers.ElasticQueries {
                     resolvedFieldName += "." + _inferrer.PropertyName(fieldMapping.Name);
 
                 if (depth == fieldParts.Length - 1) {
-                    var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping);
+                    var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping, mappingServerTime);
                     _mappingCache.AddOrUpdate(field.ToLowerInvariant(), resolvedMapping, (f, m) => resolvedMapping);
-                    _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property);
+                    _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property?.Type);
 
                     if (followAlias && resolvedMapping.Property is IFieldAliasProperty fieldAlias)
                         return GetMapping(fieldAlias.Path.Name);
@@ -113,8 +125,8 @@ namespace Foundatio.Parsers.ElasticQueries {
                 }
             }
 
-            _logger.LogTrace("Resolved mapping: {field}=<null>", field);
-            var notFoundMapping = new FieldMapping(resolvedFieldName, null);
+            _logger.LogTrace("Mapping not found: {field}", field);
+            var notFoundMapping = new FieldMapping(resolvedFieldName, null, mappingServerTime);
             _mappingCache.AddOrUpdate(field.ToLowerInvariant(), notFoundMapping, (f, m) => notFoundMapping);
 
             return notFoundMapping;
@@ -395,8 +407,8 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             try {
                 _serverMapping = GetServerMappingFunc();
-                _logger.LogTrace("Got server mapping {mapping}", _serverMapping);
                 _lastMappingUpdate = DateTime.UtcNow;
+                _logger.LogInformation("Got server mapping");
 
                 return true;
             } catch (Exception ex) {
@@ -409,26 +421,28 @@ namespace Foundatio.Parsers.ElasticQueries {
             logger = logger ?? NullLogger.Instance;
 
             return Create(mappingBuilder, client.Infer, () => {
+                client.Indices.Refresh(Indices.Index<T>());
                 var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
                 logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
                 // use first returned mapping because index could have been an index alias
                 var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
                 return mapping;
-            });
+            }, logger);
         }
 
         public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, string index, ILogger logger = null) where T : class {
             logger = logger ?? NullLogger.Instance;
 
             return Create(mappingBuilder, client.Infer, () => {
+                client.Indices.Refresh(index);
                 var response = client.Indices.GetMapping(new GetMappingRequest(index));
                 logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
                 // use first returned mapping because index could have been an index alias
                 var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
                 return mapping;
-            });
+            }, logger);
         }
 
         public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, Inferrer inferrer, Func<ITypeMapping> getMapping, ILogger logger = null) where T : class {
@@ -441,26 +455,28 @@ namespace Foundatio.Parsers.ElasticQueries {
             logger = logger ?? NullLogger.Instance;
 
             return Create(() => {
+                client.Indices.Refresh(Indices.Index<T>());
                 var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
                 logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
                 // use first returned mapping because index could have been an index alias
                 var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
                 return mapping;
-            }, client.Infer);
+            }, client.Infer, logger);
         }
 
         public static ElasticMappingResolver Create(IElasticClient client, string index, ILogger logger = null) {
             logger = logger ?? NullLogger.Instance;
 
             return Create(() => {
+                client.Indices.Refresh(index);
                 var response = client.Indices.GetMapping(new GetMappingRequest(index));
                 logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
                 // use first returned mapping because index could have been an index alias
                 var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
                 return mapping;
-            }, client.Infer);
+            }, client.Infer, logger);
         }
 
         public static ElasticMappingResolver Create(Func<ITypeMapping> getMapping, Inferrer inferrer, ILogger logger = null) {
@@ -469,14 +485,16 @@ namespace Foundatio.Parsers.ElasticQueries {
     }
 
     public class FieldMapping {
-        public FieldMapping(string path, IProperty property) {
+        public FieldMapping(string path, IProperty property, DateTime? serverMapTime) {
             FullPath = path;
             Property = property;
+            ServerMapTime = serverMapTime;
         }
 
         public bool Found => Property != null;
         public string FullPath { get; private set; }
         public IProperty Property { get; private set; }
         public DateTime Date { get; private set; } = DateTime.Now;
+        internal DateTime? ServerMapTime { get; private set; }
     }
 }
