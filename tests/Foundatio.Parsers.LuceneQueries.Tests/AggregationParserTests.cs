@@ -103,7 +103,7 @@ namespace Foundatio.Parsers.Tests {
             _logger.LogInformation("Actual: {Request}", actualRequest);
 
             var expectedResponse = client.Search<MyType>(d => d.Index(index).Aggregations(a => a
-                .Terms("terms_heynow", c => c.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword")))));
+                .Terms("terms_heynow", c => c.Field("field1.keyword").Meta(m => m.Add("@field_type", "text")))));
             string expectedRequest = expectedResponse.GetRequest();
             _logger.LogInformation("Expected: {Request}", expectedRequest);
 
