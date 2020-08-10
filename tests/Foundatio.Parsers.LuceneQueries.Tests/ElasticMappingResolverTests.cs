@@ -14,25 +14,39 @@ namespace Foundatio.Parsers.Tests {
             Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
         }
 
-        [Fact]
-        public void CanResolveProperties() {
-            var client = GetClient();
-            var index = CreateRandomIndex<MyNestedType>(client, m => m
+        private ITypeMapping MapMyNestedType(TypeMappingDescriptor<MyNestedType> m) {
+            return m
                 .AutoMap<MyNestedType>()
+                .Dynamic()
+                .DynamicTemplates(t => t.DynamicTemplate("idx_text", t => t.Match("text*").Mapping(m => m.Text(mp => mp.AddKeywordAndSortFields()))))
                 .Properties(p => p
                     .Text(p1 => p1.Name(n => n.Field1).AddKeywordAndSortFields())
                     .Text(p1 => p1.Name(n => n.Field4).AddKeywordAndSortFields())
                         .FieldAlias(a => a.Path(n => n.Field4).Name("field4alias"))
-                ));
+                );
+        }
+
+        [Fact]
+        public void CanResolveProperties() {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyNestedType>(client, MapMyNestedType);
 
             client.IndexMany(new[] {
-                new MyType { Field1 = "value1", Field2 = "value2" },
-                new MyType { Field1 = "value2", Field2 = "value2" },
-                new MyType { Field1 = "value1", Field2 = "value4" }
+                new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = new MyType[] {
+                    new MyType { Field1 = "banana", Data = {
+                        { "number-0001", 23 },
+                        { "text-0001", "Hey" }
+                    }}
+                }},
+                new MyNestedType { Field1 = "value2", Field2 = "value2" },
+                new MyNestedType { Field1 = "value1", Field2 = "value4" }
             }, index);
             client.Indices.Refresh(index);
 
-            var resolver = ElasticMappingResolver.Create<MyNestedType>(client, _logger);
+            var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, client, _logger);
+
+            var dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001");
+            Assert.Equal("nested.data.text-0001.keyword", dynamicTextAggregation);
 
             var field1Property = resolver.GetMappingProperty("Field1");
             Assert.IsType<TextProperty>(field1Property);
@@ -87,7 +101,5 @@ namespace Foundatio.Parsers.Tests {
         private Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath) {
             return objectPath;
         }
-
-        // resolve from Field instance
     }
 }

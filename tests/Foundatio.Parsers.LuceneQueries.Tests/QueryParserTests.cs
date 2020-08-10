@@ -1312,7 +1312,7 @@ namespace Foundatio.Parsers.Tests {
         public int Field4 { get; set; }
         public DateTime Field5 { get; set; }
         public string MultiWord { get; set; }
-        public Dictionary<string, object> Data { get; set; }
+        public Dictionary<string, object> Data { get; set; } = new Dictionary<string, object>();
     }
 
     public class MyNestedType {

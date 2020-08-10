@@ -63,18 +63,28 @@ namespace Foundatio.Parsers.ElasticQueries {
                 if (currentProperties == null || !currentProperties.TryGetValue(fieldPart, out fieldMapping)) {
                     // check to see if there is an name match
                     if (currentProperties != null)
-                        fieldMapping = currentProperties.Values.FirstOrDefault(m => m.Name == fieldPart || (m.Name?.Name != null && m.Name.Name.Equals(fieldPart, StringComparison.OrdinalIgnoreCase)));
+                        fieldMapping = currentProperties.Values.FirstOrDefault(m => {
+                            var propertyName = _inferrer.PropertyName(m?.Name);
+                            return propertyName == null ? false : propertyName.Equals(fieldPart, StringComparison.OrdinalIgnoreCase);
+                        });
 
                     // no mapping found, call GetServerMapping again in case it hasn't been called recently and there are possibly new mappings
                     if (fieldMapping == null && GetServerMapping()) {
                         // we got updated mapping, start over from the top
                         depth = -1;
+                        resolvedFieldName = "";
                         currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
                         continue;
                     }
 
-                    if (fieldMapping == null)
+                    if (fieldMapping == null) {
+                        if (depth == 0)
+                            resolvedFieldName += fieldPart;
+                        else
+                            resolvedFieldName += "." + fieldPart;
+
                         break;
+                    }
                 }
 
                 if (depth == 0)
@@ -395,7 +405,20 @@ namespace Foundatio.Parsers.ElasticQueries {
             }
         }
 
-        public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index, ILogger logger = null) where T : class {
+        public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, ILogger logger = null) where T : class {
+            logger = logger ?? NullLogger.Instance;
+
+            return Create(mappingBuilder, client.Infer, () => {
+                var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
+                logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
+
+                // use first returned mapping because index could have been an index alias
+                var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
+                return mapping;
+            });
+        }
+
+        public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, string index, ILogger logger = null) where T : class {
             logger = logger ?? NullLogger.Instance;
 
             return Create(mappingBuilder, client.Infer, () => {
@@ -408,9 +431,9 @@ namespace Foundatio.Parsers.ElasticQueries {
             });
         }
 
-        public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<ITypeMapping> getMapping, ILogger logger = null) where T : class {
+        public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, Inferrer inferrer, Func<ITypeMapping> getMapping, ILogger logger = null) where T : class {
             var codeMapping = new TypeMappingDescriptor<T>();
-            codeMapping = mappingBuilder(codeMapping);
+            codeMapping = mappingBuilder(codeMapping) as TypeMappingDescriptor<T>;
             return new ElasticMappingResolver(codeMapping, inferrer, getMapping, logger: logger);
         }
 
