@@ -80,46 +80,46 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (elasticContext == null)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            string field = elasticContext.MappingResolver.GetAggregationsFieldName(node.Field);
-            var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
+            string aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.Field);
+            var property = elasticContext.MappingResolver.GetMappingProperty(node.Field, true);
             string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: node.GetTimeZone(elasticContext.DefaultTimeZone);
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
+                    return new MinAggregation("min_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
 
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
+                    return new MaxAggregation("max_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
 
                 case AggregationType.Avg:
-                    return new AverageAggregation("avg_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                    return new AverageAggregation("avg_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
 
                 case AggregationType.Sum:
-                    return new SumAggregation("sum_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                    return new SumAggregation("sum_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
 
                 case AggregationType.Stats:
-                    return new StatsAggregation("stats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                    return new StatsAggregation("stats_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
 
                 case AggregationType.ExtendedStats:
-                    return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                    return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
 
                 case AggregationType.Cardinality:
-                    return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), field) { Missing = node.GetProximityAsDouble() };
+                    return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble() };
 
                 case AggregationType.TopHits:
                     return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
 
                 case AggregationType.Missing:
-                    return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = field };
+                    return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = aggField };
 
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), aggField, node.Proximity, node.UnescapedBoost, context);
 
                 case AggregationType.Histogram:
-                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), aggField, node.Proximity, node.UnescapedBoost, context);
 
                 case AggregationType.Percentiles:
-                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), aggField, node.Proximity, node.UnescapedBoost, context);
 
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
@@ -127,7 +127,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                         Enum.TryParse(node.Proximity, out precision);
 
                     return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
-                        Field = field,
+                        Field = aggField,
                         Precision = precision,
                         Aggregations = new AverageAggregation("avg_lat", null) {
                             Script = new InlineScript($"doc['{node.Field}'].lat")
@@ -138,7 +138,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
                 case AggregationType.Terms:
                     var agg = new TermsAggregation("terms_" + node.GetOriginalField()) {
-                        Field = field, 
+                        Field = aggField, 
                         Size = node.GetProximityAsInt32(), 
                         MinimumDocumentCount = node.GetBoostAsInt32(), 
                         Meta = new Dictionary<string, object> { { "@field_type", property?.Type } }
