@@ -48,6 +48,9 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         }
 
         public override string ToString() {
+            if (Left == null && Right == null)
+                return String.Empty;
+
             var builder = new StringBuilder();
 
             if (IsNegated.HasValue && IsNegated.Value)

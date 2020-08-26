@@ -27,6 +27,21 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return node.IsExcluded() || node.GetGroupNode().IsExcluded();
         }
 
+        public static GroupNode GetRootNode(this IQueryNode node) {
+            if (node == null)
+                return null;
+
+            var current = node;
+            do {
+                if (current.Parent == null)
+                    return current as GroupNode;
+
+                current = current.Parent;
+            } while (current != null);
+
+            return null;
+        }
+
         public static GroupNode GetGroupNode(this IQueryNode node) {
             if (node == null)
                 return null;
