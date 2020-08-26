@@ -5,8 +5,26 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
-        public IQueryNode Left { get; set; }
-        public IQueryNode Right { get; set; }
+        private IQueryNode _left;
+        public IQueryNode Left {
+            get => _left;
+            set {
+                _left = value;
+                if (_left != null)
+                    _left.Parent = this;
+            }
+        }
+
+        private IQueryNode _right;
+        public IQueryNode Right {
+            get => _right;
+            set {
+                _right = value;
+                if (_right != null)
+                    _right.Parent = this;
+            }
+        }
+
         public GroupOperator Operator { get; set; } = GroupOperator.Default;
         public bool HasParens { get; set; }
         public string Field { get; set; }
