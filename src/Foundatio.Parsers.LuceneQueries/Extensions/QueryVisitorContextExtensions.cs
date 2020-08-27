@@ -1,6 +1,7 @@
 ﻿using System;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class QueryVisitorContextExtensions {
@@ -68,6 +69,13 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
 
         public static T SetDefaultFields<T>(this T context, string[] defaultFields) where T : IQueryVisitorContext {
             context.DefaultFields = defaultFields;
+
+            return context;
+        }
+
+
+        public static T SetDefaultOperator<T>(this T context, GroupOperator defaultOperator) where T : IQueryVisitorContext {
+            context.DefaultOperator = defaultOperator;
 
             return context;
         }

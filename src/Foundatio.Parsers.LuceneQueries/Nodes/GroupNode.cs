@@ -66,10 +66,15 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         }
 
         public override string ToString() {
+            return ToString(GroupOperator.Default);
+        }
+
+        public string ToString(GroupOperator defaultOperator) {
             if (Left == null && Right == null)
                 return String.Empty;
 
             var builder = new StringBuilder();
+            var op = Operator != GroupOperator.Default ? Operator : defaultOperator;
 
             if (IsNegated.HasValue && IsNegated.Value)
                 builder.Append("NOT ");
@@ -85,9 +90,9 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (Left != null) {
                 builder.Append(Left);
 
-                if (Operator == GroupOperator.And)
+                if (op == GroupOperator.And)
                     builder.Append(" AND ");
-                else if (Operator == GroupOperator.Or)
+                else if (op == GroupOperator.Or)
                     builder.Append(" OR ");
                 else if (Right != null)
                     builder.Append(" ");

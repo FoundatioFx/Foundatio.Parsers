@@ -7,7 +7,6 @@ using Elasticsearch.Net;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class ElasticQueryVisitorContext : QueryVisitorContext, IQueryVisitorContextWithIncludeResolver, IQueryVisitorContextWithFieldResolver, IElasticQueryVisitorContext, IQueryVisitorContextWithValidator {
-        public Operator DefaultOperator { get; set; } = Operator.And;
         public string DefaultTimeZone { get; set; }
         public bool UseScoring { get; set; }
         public ElasticMappingResolver MappingResolver { get; set; }

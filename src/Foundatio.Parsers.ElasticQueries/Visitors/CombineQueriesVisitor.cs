@@ -4,7 +4,6 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -37,12 +36,12 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (child.IsExcluded())
                     childQuery = !childQuery;
 
-                if (op == Operator.Or && node.IsRequired())
-                    op = Operator.And;
+                if (op == GroupOperator.Or && node.IsRequired())
+                    op = GroupOperator.And;
 
-                if (op == Operator.And) {
+                if (op == GroupOperator.And) {
                     container &= childQuery;
-                } else if (op == Operator.Or) {
+                } else if (op == GroupOperator.Or) {
                     container |= childQuery;
                 }
             }

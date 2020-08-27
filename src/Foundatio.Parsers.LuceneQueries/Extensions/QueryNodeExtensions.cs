@@ -97,5 +97,23 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             var scopedNode = GetGroupNode(node);
             return !String.IsNullOrEmpty(scopedNode?.Field) ? new[] { scopedNode.Field } : rootDefaultFields;
         }
+
+        public static GroupOperator GetOperator(this IQueryNode node, GroupOperator defaultOperator) {
+            if (defaultOperator == GroupOperator.Default)
+                defaultOperator = GroupOperator.And;
+
+            var groupNode = node as GroupNode;
+            if (groupNode == null)
+                return defaultOperator;
+
+            switch (groupNode.Operator) {
+                case GroupOperator.And:
+                    return GroupOperator.And;
+                case GroupOperator.Or:
+                    return GroupOperator.Or;
+                default:
+                    return defaultOperator;
+            }
+        }
     }
 }

@@ -4,21 +4,6 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class QueryNodeExtensions {
-        public static Operator GetOperator(this IQueryNode node, Operator defaultOperator) {
-            var groupNode = node as GroupNode;
-            if (groupNode == null)
-                return defaultOperator;
-
-            switch (groupNode.Operator) {
-                case GroupOperator.And:
-                    return Operator.And;
-                case GroupOperator.Or:
-                    return Operator.Or;
-                default:
-                    return defaultOperator;
-            }
-        }
-
         private const string QueryKey = "@Query";
         public static QueryBase GetQuery(this IQueryNode node, Func<QueryBase> getDefaultValue = null) {
             if (!node.Data.TryGetValue(QueryKey, out object value))

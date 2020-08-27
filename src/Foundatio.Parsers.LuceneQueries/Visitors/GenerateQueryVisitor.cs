@@ -8,7 +8,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         private readonly StringBuilder _builder = new StringBuilder();
 
         public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-            _builder.Append(node);
+            _builder.Append(node.ToString(context != null ? context.DefaultOperator : GroupOperator.Default));
 
             return Task.CompletedTask;
         }

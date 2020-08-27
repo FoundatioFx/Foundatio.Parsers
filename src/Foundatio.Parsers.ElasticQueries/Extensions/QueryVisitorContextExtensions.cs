@@ -1,5 +1,7 @@
 ﻿using System;
 using Foundatio.Parsers.ElasticQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
@@ -20,12 +22,18 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return elasticContext.MappingResolver ?? ElasticMappingResolver.NullInstance;
         }
 
+        public static T UseSearchMode<T>(this T context) where T : IQueryVisitorContext {
+            context.SetDefaultOperator(GroupOperator.Or);
+            context.UseScoring();
+
+            return context;
+        }
 
         public static T SetDefaultOperator<T>(this T context, Operator defaultOperator) where T : IQueryVisitorContext {
-            if (!(context is IElasticQueryVisitorContext elasticContext))
-                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
-
-            elasticContext.DefaultOperator = defaultOperator;
+            if (defaultOperator == Operator.And)
+                context.DefaultOperator = GroupOperator.And;
+            else if (defaultOperator == Operator.Or)
+                context.DefaultOperator = GroupOperator.Or;
 
             return context;
         }
