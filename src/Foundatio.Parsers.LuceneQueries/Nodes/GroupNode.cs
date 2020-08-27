@@ -82,15 +82,16 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (HasParens)
                 builder.Append("(");
 
-            if (Left != null)
+            if (Left != null) {
                 builder.Append(Left);
 
-            if (Operator == GroupOperator.And)
-                builder.Append(" AND ");
-            else if (Operator == GroupOperator.Or)
-                builder.Append(" OR ");
-            else if (Right != null)
-                builder.Append(" ");
+                if (Operator == GroupOperator.And)
+                    builder.Append(" AND ");
+                else if (Operator == GroupOperator.Or)
+                    builder.Append(" OR ");
+                else if (Right != null)
+                    builder.Append(" ");
+            }
 
             if (Right != null)
                 builder.Append(Right);
