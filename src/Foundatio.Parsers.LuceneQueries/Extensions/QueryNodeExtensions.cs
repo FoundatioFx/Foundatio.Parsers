@@ -104,6 +104,9 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
 
             var groupNode = node as GroupNode;
             if (groupNode == null)
+                groupNode = node.Parent as GroupNode;
+
+            if (groupNode == null)
                 return defaultOperator;
 
             switch (groupNode.Operator) {
