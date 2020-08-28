@@ -32,7 +32,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 var childQuery = child.GetQuery(() => child.GetDefaultQuery(context));
                 if (childQuery == null) continue;
 
-                var op = node.GetOperator(elasticContext.DefaultOperator);
+                var op = node.GetOperator(elasticContext);
                 if (child.IsExcluded())
                     childQuery = !childQuery;
 

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public class MissingNode : QueryNodeBase, IFieldQueryNode {
