@@ -140,11 +140,11 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public IProperty GetMappingProperty(string field, bool followAlias = false) {
-            return GetMapping(field, followAlias).Property;
+            return GetMapping(field, followAlias)?.Property;
         }
 
         public IProperty GetMappingProperty(Field field, bool followAlias = false) {
-            return GetMapping(field, followAlias).Property;
+            return GetMapping(field, followAlias)?.Property;
         }
 
         public string GetResolvedField(string field) {
