@@ -104,10 +104,10 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
 
                 case AggregationType.Cardinality:
-                    return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble() };
+                    return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), PrecisionThreshold = node.GetBoostAsInt32() };
 
                 case AggregationType.TopHits:
-                    return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
+                    return new TopHitsAggregation("tophits_") { Size = node.GetProximityAsInt32() };
 
                 case AggregationType.Missing:
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = aggField };
