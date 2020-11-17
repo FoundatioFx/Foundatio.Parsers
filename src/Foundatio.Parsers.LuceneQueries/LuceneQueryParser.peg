@@ -177,13 +177,13 @@ escape_sequence
   = '\\' [\+\-\!\(\)\{\}\[\]\^\"\~\*\?\:\\]
 
 name_term
-  = term:(([^: \\\t\r\n\f\{\}\(\)"/^~\[\]] / escape_sequence)+ "")
+  = term:(([^: \\\t\r\n\f\{\}\(\)"^~\[\]] / escape_sequence)+ "")
     {
         term
     }
 
 unquoted_term
-  = term:(([^: \\\t\r\n\f\{\}\(\)/^~\[\]] / escape_sequence)+ "")
+  = term:(([^: \\\t\r\n\f\{\}\(\)^~\[\]] / escape_sequence)+ "")
     {
         term
     }

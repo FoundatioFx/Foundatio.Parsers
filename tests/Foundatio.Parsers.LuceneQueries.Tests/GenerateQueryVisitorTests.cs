@@ -190,6 +190,27 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public async Task CanUseForwardSlashes() {
+            string query = @"hey/now";
+            var tracer = new StringBuilderTrace();
+            var parser = new LuceneQueryParser {
+                //Tracer = tracer
+            };
+
+            try {
+                var result = await parser.ParseAsync(query);
+
+                _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+                string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
+                Assert.Equal(query, generatedQuery);
+            } catch (FormatException ex) {
+                _logger.LogInformation(tracer.ToString());
+                var cursor = ex.Data["cursor"] as Cursor;
+                throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            }
+        }
+
+        [Fact]
         public void CanParseQueryConcurrently() {
             var parser = new LuceneQueryParser();
             Parallel.For(0, 100, i => {
