@@ -1,4 +1,4 @@
-using Foundatio.Parsers.ElasticQueries;
+﻿using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
@@ -236,6 +236,62 @@ namespace Foundatio.Parsers.Tests {
                     .Bool(b => b
                         .Filter(f => f
                             .MultiMatch(m => m.Query("\"now there").Type(TextQueryType.Phrase))))));
+            string expectedRequest = expectedResponse.GetRequest(true);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+            Assert.Equal(1, actualResponse.Total);
+        }
+
+        [Fact]
+        public void CanHandleEscapedQueryWithWildcards() {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyType>(client);
+            client.IndexMany(new[] {
+                new MyType { Field1 = "one/two/three" }
+            }, index);
+            client.Indices.Refresh(index);
+
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
+            var result = processor.BuildQueryAsync(@"field1:one\\/two*").Result;
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
+            string actualRequest = actualResponse.GetRequest(true);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+
+            var expectedResponse = client.Search<MyType>(d => d.Index(index)
+                .Query(q => q
+                    .Bool(b => b
+                        .Filter(f => f
+                            .QueryString(m => m.Query("one\\/two*").Fields(f => f.Field(f2 => f2.Field1)).AllowLeadingWildcard(false).AnalyzeWildcard())))));
+            string expectedRequest = expectedResponse.GetRequest(true);
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+            Assert.Equal(1, actualResponse.Total);
+        }
+
+        [Fact]
+        public void CanHandleEscapedQuery() {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyType>(client);
+            client.IndexMany(new[] {
+                new MyType { Field1 = "one/two/three" }
+            }, index);
+            client.Indices.Refresh(index);
+
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
+            var result = processor.BuildQueryAsync(@"field1:one\\/two").Result;
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
+            string actualRequest = actualResponse.GetRequest(true);
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+
+            var expectedResponse = client.Search<MyType>(d => d.Index(index)
+                .Query(q => q
+                    .Bool(b => b
+                        .Filter(f => f
+                            .Match(m => m.Query("one\\/two").Field(f => f.Field1))))));
             string expectedRequest = expectedResponse.GetRequest(true);
             _logger.LogInformation("Expected: {Request}", expectedRequest);
 

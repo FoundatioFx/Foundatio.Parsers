@@ -27,9 +27,12 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return sb.ToString();
         }
 
+        // Lucene:  + - && || ! ( ) { } [ ] ^ " ~ * ? : \
+        // Elastic: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ / = > <
         //private static readonly char[] LuceneSpecialCharacters = { '+', '-', '&', '|', '!', '(', ')', '{', '}', '[', ']', '^', '"', '~', '*', '?', ':', '\\' };
         private static readonly char[] LuceneSpecialCharacters = { ':', '\\' };
 
+        // NOTE: This is not being used as the parser itself handles escape sequences and queries need to be escaped (not auto escaped)
         public static string Escape(this string input) {
             if (input == null)
                 return null;
