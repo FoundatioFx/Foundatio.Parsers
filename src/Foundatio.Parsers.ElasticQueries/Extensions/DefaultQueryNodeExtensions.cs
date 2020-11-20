@@ -68,10 +68,17 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     }
                 }
             } else {
-                query = new TermQuery {
-                    Field = field,
-                    Value = node.UnescapedTerm
-                };
+                if (node.UnescapedTerm.EndsWith("*")) {
+                    query = new PrefixQuery {
+                        Field = field,
+                        Value = node.UnescapedTerm.TrimEnd('*')
+                    };
+                } else {
+                    query = new TermQuery {
+                        Field = field,
+                        Value = node.UnescapedTerm
+                    };
+                }
             }
 
             return query;
