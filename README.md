@@ -16,7 +16,7 @@ A lucene style query parser that is extensible and allows additional syntax feat
 
 ## Using LuceneQueryParser
 
-Below is a small sampling of the things you can accomplish with LuceneQueryParser, so check it out! We use this library in [Exceptionless](https://github.com/exceptionless/Exceptionless) to [ensure the query is valid before executing it, check to see if you are trying to a basic or premium search query and much more](https://github.com/exceptionless/Exceptionless/blob/master/src/Exceptionless.Core/Repositories/Queries/Validation/QueryValidator.cs)!
+Below is a small sampling of the things you can accomplish with LuceneQueryParser, so check it out! We use this library extensively in [Exceptionless](https://github.com/exceptionless/Exceptionless)!
 
 In the sample below we will parse a query and output it's structure using the `DebugQueryVisitor` and then generate the same exact query using the parse result.
 
@@ -53,7 +53,7 @@ System.Diagnostics.Debug.Assert(query == generatedQuery);
 - Lucene Query Syntax Parser
   - Parsers fairly standardized syntax from [Lucene](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html).
   - Visitors for extensibility
-- Field Aliases
+- Field Aliases (static and dynamic)
 - Query Includes
   - Define stored queries that can be included inside other queries as macros that will be expanded
 - Validation
