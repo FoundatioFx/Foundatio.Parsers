@@ -68,7 +68,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     }
                 }
             } else {
-                if (node.UnescapedTerm.EndsWith("*")) {
+                if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*")) {
                     query = new PrefixQuery {
                         Field = field,
                         Value = node.UnescapedTerm.TrimEnd('*')

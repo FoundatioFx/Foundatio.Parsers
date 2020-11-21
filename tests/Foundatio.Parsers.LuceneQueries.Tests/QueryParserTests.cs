@@ -974,6 +974,31 @@ namespace Foundatio.Parsers.Tests {
         }
 
         [Fact]
+        public void NonAnalyzedPrefixQuery() {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyType>(client, d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
+            client.Index(new MyType { Field1 = "value123" }, i => i.Index(index));
+            client.Indices.Refresh(index);
+
+            var processor = new ElasticQueryParser(c => c.UseMappings(client, index));
+            var result = processor.BuildQueryAsync("field1:value*", new ElasticQueryVisitorContext().UseSearchMode()).Result;
+
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Query(q => result));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualResponse);
+
+            var expectedResponse = client.Search<MyType>(d => d
+                .Index(index)
+                .Query(f => f.Prefix(m => m.Field(f2 => f2.Field1).Value("value"))));
+
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void RangeQueryProcessor() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();
