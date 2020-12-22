@@ -43,7 +43,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         public override void Visit(TermNode node, IQueryVisitorContext context) {
             _writer.WriteLine("Term: ");
             _writer.Indent++;
-            _writer.WriteLineIf(node.GetOriginalField() != null, "Field: {0}", node.GetOriginalField());
+            _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
             _writer.WriteLine("IsQuoted: {0}", node.IsQuotedTerm);
