@@ -183,7 +183,7 @@ name_term
     }
 
 unquoted_term
-  = term:(([^: \\\t\r\n\f\{\}\(\)^~\[\]] / escape_sequence)+ "")
+  = term:(([^: \\\t\r\n\f\{\}\(\)"^~\[\]] / escape_sequence)+ "")
     {
         term
     }

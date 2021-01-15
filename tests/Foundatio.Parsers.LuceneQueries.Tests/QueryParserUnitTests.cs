@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -40,6 +39,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
             var sut = new LuceneQueryParser();
 
             var result = sut.Parse("NOT (dog parrot)");
+            var ast = DebugQueryVisitor.Run(result);
 
             Assert.IsType<GroupNode>(result.Left);
             Assert.True((result.Left as GroupNode).HasParens);
@@ -52,6 +52,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
             Assert.Throws<FormatException>(() => {
                 var result = sut.Parse("something AND NOT OR otherthing");
+                var ast = DebugQueryVisitor.Run(result);
             });
         }
 
@@ -61,6 +62,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
             Assert.Throws<FormatException>(() => {
                 var result = sut.Parse("something AND OR otherthing");
+                var ast = DebugQueryVisitor.Run(result);
             });
         }
 
@@ -70,6 +72,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
             var ex = Assert.Throws<FormatException>(() => {
                 var result = sut.Parse("something + other");
+                var ast = DebugQueryVisitor.Run(result);
             });
             Assert.Contains("Unexpected character '+'.", ex.Message);
         }
@@ -80,8 +83,20 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
             var ex = Assert.Throws<FormatException>(() => {
                 var result = sut.Parse("\"something");
+                var ast = DebugQueryVisitor.Run(result);
             });
             Assert.Contains("Unterminated quoted string", ex.Message);
+        }
+
+        [Fact]
+        public void DoubleUnterminatedQuotedStringIsNotValid() {
+            var sut = new LuceneQueryParser();
+
+            var ex = Assert.Throws<FormatException>(() => {
+                var result = sut.Parse("\"something\"\"");
+                var ast = DebugQueryVisitor.Run(result);
+            });
+            Assert.Contains("Unexpected character", ex.Message);
         }
 
         [Fact]
