@@ -62,7 +62,7 @@ group_exp<IQueryNode>
   / paren_exp
 
 paren_exp<GroupNode>
-  = not:not_exp? op:prefix_operator_exp? "(" _* node:node _* ")" boost:boost_modifier? _*
+  = not:not_exp? op:prefix_operator_exp? "(" _* node:node _* (")" / #error{ "Missing closing paren ')' for group expression" }) boost:boost_modifier? _*
     {{
         node.HasParens = true;
         node.Prefix = op.SingleOrDefault();
@@ -195,7 +195,7 @@ range_unquoted_term
     }
 
 quoted_term
-  = '"' term:(('\\"' / [^"])+ "") '"'
+  = '"' term:(('\\"' / [^"])+ "") ('"' / #error{ "Unterminated quoted string" })
     {
         term
     }

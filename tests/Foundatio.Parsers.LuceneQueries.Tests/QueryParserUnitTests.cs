@@ -65,6 +65,36 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         }
 
         [Fact]
+        public void PrefixWithoutImmediateExpressionIsInvalid() {
+            var sut = new LuceneQueryParser();
+
+            var ex = Assert.Throws<FormatException>(() => {
+                var result = sut.Parse("something + other");
+            });
+            Assert.Contains("Unexpected character '+'.", ex.Message);
+        }
+
+        [Fact]
+        public void UnterminatedQuotedStringIsNotValid() {
+            var sut = new LuceneQueryParser();
+
+            var ex = Assert.Throws<FormatException>(() => {
+                var result = sut.Parse("\"something");
+            });
+            Assert.Contains("Unterminated quoted string", ex.Message);
+        }
+
+        [Fact]
+        public void UnterminatedParensIsNotValid() {
+            var sut = new LuceneQueryParser();
+
+            var ex = Assert.Throws<FormatException>(() => {
+                var result = sut.Parse("(something");
+            });
+            Assert.Contains("Missing closing paren ')' for group expression", ex.Message);
+        }
+
+        [Fact]
         public void CanUseElasticQueryParser() {
             var sut = new ElasticQueryParser();
 
