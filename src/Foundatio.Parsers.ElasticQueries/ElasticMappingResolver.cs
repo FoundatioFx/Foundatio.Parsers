@@ -38,13 +38,13 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public FieldMapping GetMapping(string field, bool followAlias = false) {
-            if (String.IsNullOrEmpty(field))
+            if (String.IsNullOrWhiteSpace(field))
                 return null;
 
             if (GetServerMappingFunc == null && _codeMapping == null)
                 throw new InvalidOperationException("No mappings are available.");
 
-            if (_mappingCache.TryGetValue(field.ToLowerInvariant(), out var mapping)) {
+            if (_mappingCache.TryGetValue(field, out var mapping)) {
 
                 if (followAlias && mapping.Found && mapping.Property is IFieldAliasProperty fieldAlias) {
                     _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
@@ -95,6 +95,12 @@ namespace Foundatio.Parsers.ElasticQueries {
                         else
                             resolvedFieldName += "." + fieldPart;
 
+                        // mapping is not fully resolved, append the rest of the parts unmodified and break
+                        if (fieldParts.Length - 1 > depth) {
+                            for (int i = depth + 1; i < fieldParts.Length; i++)
+                                resolvedFieldName += "." + fieldParts[i];
+                        }
+
                         break;
                     }
                 }
@@ -106,7 +112,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
                 if (depth == fieldParts.Length - 1) {
                     var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping, mappingServerTime);
-                    _mappingCache.AddOrUpdate(field.ToLowerInvariant(), resolvedMapping, (f, m) => resolvedMapping);
+                    _mappingCache.AddOrUpdate(field, resolvedMapping, (f, m) => resolvedMapping);
                     _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property?.Type);
 
                     if (followAlias && resolvedMapping.Property is IFieldAliasProperty fieldAlias)
@@ -127,7 +133,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
             _logger.LogTrace("Mapping not found: {field}", field);
             var notFoundMapping = new FieldMapping(resolvedFieldName, null, mappingServerTime);
-            _mappingCache.AddOrUpdate(field.ToLowerInvariant(), notFoundMapping, (f, m) => notFoundMapping);
+            _mappingCache.AddOrUpdate(field, notFoundMapping, (f, m) => notFoundMapping);
 
             return notFoundMapping;
         }
@@ -149,7 +155,7 @@ namespace Foundatio.Parsers.ElasticQueries {
 
         public string GetResolvedField(string field) {
             var result = GetMapping(field, true);
-            return result.FullPath;
+            return result?.FullPath ?? field;
         }
 
         public string GetResolvedField(Field field) {

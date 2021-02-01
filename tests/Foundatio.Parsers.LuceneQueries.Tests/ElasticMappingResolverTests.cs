@@ -54,6 +54,18 @@ namespace Foundatio.Parsers.Tests {
             var field1 = resolver.GetResolvedField("FielD1");
             Assert.Equal("field1", field1);
 
+            var emptyField = resolver.GetResolvedField(" ");
+            Assert.Equal(" ", emptyField);
+
+            var unknownField = resolver.GetResolvedField("UnknowN.test.doesNotExist");
+            Assert.Equal("UnknowN.test.doesNotExist", unknownField);
+
+            var unknownField2 = resolver.GetResolvedField("unknown.test.doesnotexist");
+            Assert.Equal("unknown.test.doesnotexist", unknownField2);
+
+            var unknownField3 = resolver.GetResolvedField("unknown");
+            Assert.Equal("unknown", unknownField3);
+
             var field4Property = resolver.GetMappingProperty("Field4");
             Assert.IsType<TextProperty>(field4Property);
 
