@@ -1,6 +1,4 @@
-﻿using System;
-using System.Linq;
-using System.Text;
+﻿using System.Text;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class StringExtensions {
@@ -23,27 +21,6 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
 
             if (escaped)
                 sb.Append('\\');
-
-            return sb.ToString();
-        }
-
-        // Lucene:  + - && || ! ( ) { } [ ] ^ " ~ * ? : \
-        // Elastic: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ / = > <
-        //private static readonly char[] LuceneSpecialCharacters = { '+', '-', '&', '|', '!', '(', ')', '{', '}', '[', ']', '^', '"', '~', '*', '?', ':', '\\' };
-        private static readonly char[] LuceneSpecialCharacters = { ':', '\\' };
-
-        // NOTE: This is not being used as the parser itself handles escape sequences and queries need to be escaped (not auto escaped)
-        public static string Escape(this string input) {
-            if (input == null)
-                return null;
-
-            var sb = new StringBuilder();
-            foreach (var ch in input) {
-                if (LuceneSpecialCharacters.Contains(ch))
-                    sb.Append("\\" + ch);
-                else
-                    sb.Append(ch);
-            }
 
             return sb.ToString();
         }

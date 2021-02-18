@@ -11,9 +11,11 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public string Term { get; set; }
         public string UnescapedTerm => Term?.Unescape();
         public bool IsQuotedTerm { get; set; }
+        public bool IsRegexTerm { get; set; }
         public string Boost { get; set; }
         public string UnescapedBoost => Boost?.Unescape();
         public string Proximity { get; set; }
+        public string UnescapedProximity => Proximity?.Unescape();
 
         public TermNode CopyTo(TermNode target) {
             if (IsNegated.HasValue)
@@ -29,6 +31,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
                 target.Term = Term;
 
             target.IsQuotedTerm = IsQuotedTerm;
+            target.IsRegexTerm = IsRegexTerm;
 
             if (Boost != null)
                 target.Boost = Boost;
@@ -55,7 +58,12 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
                 builder.Append(":");
             }
 
-            builder.Append(IsQuotedTerm ? "\"" + Term + "\"" : Term);
+            if (IsQuotedTerm)
+                builder.Append("\"" + Term + "\"");
+            else if (IsRegexTerm)
+                builder.Append("/" + Term + "/");
+            else
+                builder.Append(Term);
 
             if (Proximity != null)
                 builder.Append("~" + Proximity);

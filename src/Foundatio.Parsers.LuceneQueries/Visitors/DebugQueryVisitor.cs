@@ -49,6 +49,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
             _writer.WriteLineIf(node.Prefix != null, "Prefix: {0}", node.Prefix);
             _writer.WriteLine("IsQuoted: {0}", node.IsQuotedTerm);
+            _writer.WriteLine("IsRegex: {0}", node.IsRegexTerm);
             _writer.WriteLineIf(node.Term != null, "Term: {0}", node.Term);
             _writer.WriteLineIf(node.Boost != null, "Boost: {0}", node.Boost);
             _writer.WriteLineIf(node.Proximity != null, "Proximity: {0}", node.Proximity);

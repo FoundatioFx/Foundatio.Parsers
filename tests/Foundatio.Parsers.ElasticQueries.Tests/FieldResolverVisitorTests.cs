@@ -1,10 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Nest;
 using Xunit;
 
-namespace Foundatio.Parsers.LuceneQueries.Tests {
+namespace Foundatio.Parsers.ElasticQueries.Tests {
     public class FieldResolverVisitorTests {
         [Fact]
         public async Task CanUseAliasMapForTopLevelAliasAsync() {
@@ -29,6 +31,21 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
             var resolver = map.ToHierarchicalFieldResolver();
             Assert.Equal(expected, resolver(field));
+        }
+
+        [Fact]
+        public async Task CanUseAliasMapForTopLevelAlias2Async() {
+            string filter = "program:postgrad";
+            var aliasMap = new FieldMap {
+               { "program", "programName" }
+            };
+
+            var p = new ElasticQueryParser(c => c.UseFieldMap(aliasMap));
+            IQueryContainer query = await p.BuildQueryAsync(filter);
+            var term = query.Bool.Filter.Single() as IQueryContainer;
+            Assert.NotNull(term.Term);
+            Assert.Equal("programName", term.Term.Field.Name);
+            Assert.Equal("postgrad", term.Term.Value);
         }
 
         [Fact]

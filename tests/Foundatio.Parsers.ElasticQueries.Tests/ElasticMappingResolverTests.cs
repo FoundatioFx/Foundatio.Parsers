@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Linq.Expressions;
-using Foundatio.Parsers.ElasticQueries;
-using Foundatio.Parsers.ElasticQueries.Extensions;
 using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Foundatio.Parsers.Tests {
+namespace Foundatio.Parsers.ElasticQueries.Tests {
 
     public class ElasticMappingResolverTests : ElasticsearchTestBase {
 
