@@ -1,8 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -11,7 +10,7 @@ using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Foundatio.Parsers.Tests {
+namespace Foundatio.Parsers.ElasticQueries.Tests {
     public class CustomVisitorTests : ElasticsearchTestBase {
 
         public CustomVisitorTests(ITestOutputHelper output) : base(output) {

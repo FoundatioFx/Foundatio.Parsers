@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
-using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.ElasticQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Utility;
 using Microsoft.Extensions.Logging;
@@ -10,7 +13,7 @@ using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Foundatio.Parsers.Tests {
+namespace Foundatio.Parsers.ElasticQueries.Tests {
     public class AggregationParserTests : ElasticsearchTestBase {
         public AggregationParserTests(ITestOutputHelper output) : base(output) { }
 
@@ -452,6 +455,70 @@ namespace Foundatio.Parsers.Tests {
 
             return processor.BuildAggregationsAsync("geogrid:geo~3");
 
+        }
+
+        public static IEnumerable<object[]> AggregationTestCases {
+            get {
+                return new[] {
+                    new object[] { null, false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
+                    new object[] { "avg", false, 1, new HashSet<string> { ""}, new Dictionary<string, ICollection<string>>() },
+                    new object[] { "avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
+                    new object[] { "avg:value", true, 1,
+                        new HashSet<string> { "value" },
+                        new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+                    },
+                    new object[] { "    avg    :    value", true, 1,
+                        new HashSet<string> { "value"},
+                        new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+                    },
+                    new object[] { "avg:value cardinality:value sum:value min:value max:value", true, 1,
+                        new HashSet<string> { "value" },
+                        new Dictionary<string, ICollection<string>> {
+                            { "avg", new HashSet<string> { "value" } },
+                            { "cardinality", new HashSet<string> { "value" } },
+                            { "sum", new HashSet<string> { "value" } },
+                            { "min", new HashSet<string> { "value" } },
+                            { "max", new HashSet<string> { "value" } }
+                        }
+                    },
+                    new object[] { "avg:value avg:value2", true, 1,
+                        new HashSet<string> { "value", "value2" },
+                        new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value", "value2" } } }
+                    },
+                    new object[] { "avg:value avg:value", true, 1,
+                        new HashSet<string> { "value" },
+                        new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+                    }
+                };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(AggregationTestCases))]
+        public Task GetElasticAggregationQueryInfoAsync(string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations) {
+            var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+            return GetAggregationQueryInfoAsync(parser, query, isValid, maxNodeDepth, fields, operations);
+        }
+
+        private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations) {
+            IQueryNode queryNode;
+            var context = new ElasticQueryVisitorContext { QueryType = QueryType.Aggregation };
+            try {
+                queryNode = await parser.ParseAsync(query, context);
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Error parsing query: {Message}", ex.Message);
+                if (isValid)
+                    throw;
+
+                return;
+            }
+
+            var info = await ValidationVisitor.RunAsync(queryNode, context);
+            Assert.Equal(QueryType.Aggregation, info.QueryType);
+            Assert.Equal(isValid, info.IsValid);
+            Assert.Equal(maxNodeDepth, info.MaxNodeDepth);
+            Assert.Equal(fields, info.ReferencedFields);
+            Assert.Equal(operations, info.Operations.ToDictionary(pair => pair.Key, pair => pair.Value));
         }
     }
 }

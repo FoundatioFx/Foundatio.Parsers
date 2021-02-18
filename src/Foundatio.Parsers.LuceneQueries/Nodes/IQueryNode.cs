@@ -19,6 +19,8 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
 
     public interface IFieldQueryWithProximityAndBoostNode : IFieldQueryNode {
         string Boost { get; set; }
+        string UnescapedBoost { get; }
         string Proximity { get; set; }
+        string UnescapedProximity { get; }
     }
 }

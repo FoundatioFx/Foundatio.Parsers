@@ -9,7 +9,7 @@ using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Foundatio.Parsers.Tests {
+namespace Foundatio.Parsers.ElasticQueries.Tests {
     public abstract class ElasticsearchTestBase : TestWithLoggingBase, IAsyncLifetime {
         private readonly List<IndexName> _createdIndexes = new List<IndexName>();
         private static bool _elaticsearchReady;

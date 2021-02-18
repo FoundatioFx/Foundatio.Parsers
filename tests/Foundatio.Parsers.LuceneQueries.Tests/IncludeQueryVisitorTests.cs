@@ -1,18 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using Foundatio.Parsers.ElasticQueries;
-using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 using Xunit;
 using Xunit.Abstractions;
-using Foundatio.Parsers.ElasticQueries.Extensions;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
-using Microsoft.Extensions.Logging;
+using Foundatio.Xunit;
 
-namespace Foundatio.Parsers.Tests {
-    public class IncludeQueryVisitorTests : ElasticsearchTestBase {
+namespace Foundatio.Parsers.LuceneQueries.Tests {
+    public class IncludeQueryVisitorTests : TestWithLoggingBase {
         public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output) {
             Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
         }
@@ -88,39 +84,6 @@ namespace Foundatio.Parsers.Tests {
             };
             var resolved = await IncludeVisitor.RunAsync(result, includes);
             Assert.Equal("((field2:value2))", resolved.ToString());
-        }
-
-        [Fact]
-        public async Task CanExpandElasticIncludesAsync() {
-            var client = new ElasticClient(new ConnectionSettings().DisableDirectStreaming().PrettyJson());
-            var aliases = new FieldMap { { "field", "aliased" }, { "included", "aliasedincluded" } };
-
-            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(GetIncludeAsync).UseFieldMap(aliases));
-            var result = await processor.BuildQueryAsync("@include:other");
-            var actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
-            string actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualRequest);
-
-            var expectedResponse = client.Search<MyType>(d => d.Index("stuff").Query(f => f.Bool(b => b.Filter(f1 => f1.Term("aliasedincluded", "value")))));
-            string expectedRequest = expectedResponse.GetRequest();
-            _logger.LogInformation("Expected: {Request}", expectedRequest);
-
-            Assert.Equal(expectedRequest, actualRequest);
-            Assert.Equal(expectedResponse.Total, actualResponse.Total);
-
-            result = await processor.BuildQueryAsync("@include:other");
-            actualResponse = client.Search<MyType>(d => d.Index("stuff").Query(q => result));
-            actualRequest = actualResponse.GetRequest();
-            _logger.LogInformation("Actual: {Request}", actualRequest);
-            _logger.LogInformation("Expected: {Request}", expectedRequest);
-
-            Assert.Equal(expectedRequest, actualRequest);
-            Assert.Equal(expectedResponse.Total, actualResponse.Total);
-        }
-
-        private async Task<string> GetIncludeAsync(string name) {
-            await Task.Delay(150);
-            return "included:value";
         }
     }
 }

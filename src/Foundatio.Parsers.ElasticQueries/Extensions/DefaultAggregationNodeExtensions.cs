@@ -35,15 +35,15 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost ?? node.GetTimeZone(elasticContext.DefaultTimeZone), context);
+                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(elasticContext.DefaultTimeZone), context);
 
                 case AggregationType.Histogram:
-                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.Proximity, node.UnescapedBoost, context);
+                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost, context);
 
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
-                    if (!String.IsNullOrEmpty(node.Proximity))
-                        Enum.TryParse(node.Proximity, out precision);
+                    if (!String.IsNullOrEmpty(node.UnescapedProximity))
+                        Enum.TryParse(node.UnescapedProximity, out precision);
 
                     return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
                         Field = field,
@@ -113,18 +113,18 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = aggField };
 
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), aggField, node.Proximity, node.UnescapedBoost, context);
+                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
                 case AggregationType.Histogram:
-                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), aggField, node.Proximity, node.UnescapedBoost, context);
+                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
                 case AggregationType.Percentiles:
-                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), aggField, node.Proximity, node.UnescapedBoost, context);
+                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
-                    if (!String.IsNullOrEmpty(node.Proximity))
-                        Enum.TryParse(node.Proximity, out precision);
+                    if (!String.IsNullOrEmpty(node.UnescapedProximity))
+                        Enum.TryParse(node.UnescapedProximity, out precision);
 
                     return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
                         Field = aggField,
@@ -306,29 +306,29 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
-            if (!String.IsNullOrEmpty(node.Proximity) && Int32.TryParse(node.Proximity, out var parsedSize))
-                return parsedSize;
+            if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out var parsedValue))
+                return parsedValue;
 
             return null;
         }
 
         public static int? GetBoostAsInt32(this IFieldQueryWithProximityAndBoostNode node) {
-            if (!String.IsNullOrEmpty(node.Boost) && Int32.TryParse(node.Boost, out var parsedSize))
-                return parsedSize;
+            if (!String.IsNullOrEmpty(node.UnescapedBoost) && Int32.TryParse(node.UnescapedBoost, out var parsedValue))
+                return parsedValue;
 
             return null;
         }
 
         public static double? GetProximityAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
-            if (!String.IsNullOrEmpty(node.Proximity) && Double.TryParse(node.Proximity, out var parsedSize))
-                return parsedSize;
+            if (!String.IsNullOrEmpty(node.UnescapedProximity) && Double.TryParse(node.UnescapedProximity, out var parsedValue))
+                return parsedValue;
 
             return null;
         }
 
         public static double? GetBoostAsDouble(this IFieldQueryWithProximityAndBoostNode node) {
-            if (!String.IsNullOrEmpty(node.Boost) && Double.TryParse(node.Boost, out var parsedSize))
-                return parsedSize;
+            if (!String.IsNullOrEmpty(node.UnescapedBoost) && Double.TryParse(node.UnescapedBoost, out var parsedValue))
+                return parsedValue;
 
             return null;
         }

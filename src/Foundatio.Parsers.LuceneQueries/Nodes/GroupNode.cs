@@ -33,6 +33,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public string Boost { get; set; }
         public string UnescapedBoost => Boost?.Unescape();
         public string Proximity { get; set; }
+        public string UnescapedProximity => Proximity?.Unescape();
 
         public GroupNode CopyTo(GroupNode target) {
             if (Left != null)

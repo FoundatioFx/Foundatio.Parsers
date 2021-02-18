@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!--<DefineConstants>ENABLE_TRACING</DefineConstants>-->
+  </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Foundatio.Parsers.ElasticQueries\Foundatio.Parsers.ElasticQueries.csproj" />
     <ProjectReference Include="..\..\src\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj" />
   </ItemGroup>
 </Project>

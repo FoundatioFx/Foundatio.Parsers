@@ -1,6 +1,6 @@
-﻿﻿@namespace Foundatio.Parsers.LuceneQueries
+﻿@namespace Foundatio.Parsers.LuceneQueries
 @classname LuceneQueryParser
-@trace false
+@trace true
 @using System.Linq;
 @using Foundatio.Parsers.LuceneQueries.Nodes;
 @using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -153,6 +153,23 @@ term<TermNode>
 
         return result;
     }}
+  / not:not_exp? op:prefix_operator_exp? !operator_exp term:regex_term proximity:proximity_modifier? boost:boost_modifier? _*
+    {{
+        var result = new TermNode { Term = term, IsRegexTerm = true };
+
+        if (proximity.Count > 0)
+            result.Proximity = proximity.SingleOrDefault();
+
+        if (boost.Count > 0)
+            result.Boost = boost.SingleOrDefault();
+
+        if (not.Any())
+          result.IsNegated = true;
+        
+        result.Prefix = op.SingleOrDefault();
+
+        return result;
+    }}
   / not:not_exp? op:prefix_operator_exp? !operator_exp term:unquoted_term proximity:proximity_modifier? boost:boost_modifier? _*
     {{
         var result = new TermNode { Term = term };
@@ -174,7 +191,7 @@ term<TermNode>
 
 // https://lucene.apache.org/core/2_9_4/queryparsersyntax.html#Escaping%20Special%20Characters
 escape_sequence
-  = '\\' [\+\-\!\(\)\{\}\[\]\^\"\~\*\?\:\\]
+  = '\\' [\+\-\!\(\)\{\}\[\]\^\"\~\*\?\:\\\/]
 
 name_term
   = term:(([^: \\\t\r\n\f\{\}\(\)"^~\[\]] / escape_sequence)+ "")
@@ -196,6 +213,12 @@ range_unquoted_term
 
 quoted_term
   = '"' term:(('\\"' / [^"])+ "") ('"' / #error{ "Unterminated quoted string" })
+    {
+        term
+    }
+
+regex_term
+  = '/' term:(('\\/' / [^/])+ "") ('/' / #error{ "Unterminated regex" })
     {
         term
     }
