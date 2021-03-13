@@ -37,10 +37,10 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
 
         public GroupNode CopyTo(GroupNode target) {
             if (Left != null)
-                target.Left = Left;
+                target.Left = Left.Clone();
 
             if (Right != null)
-                target.Right = Right;
+                target.Right = Right.Clone();
 
             target.Operator = Operator;
             target.HasParens = HasParens;
@@ -113,6 +113,13 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
                 builder.Append("^" + Boost);
 
             return builder.ToString();
+        }
+
+        public override IQueryNode Clone() {
+            var clone = new GroupNode();
+            CopyTo(clone);
+
+            return clone;
         }
 
         public override IEnumerable<IQueryNode> Children {

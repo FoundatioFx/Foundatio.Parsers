@@ -9,6 +9,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         IDictionary<string, object> Data { get; }
         Task AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context);
         string ToString();
+        IQueryNode Clone();
     }
 
     public interface IFieldQueryNode : IQueryNode {

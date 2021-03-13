@@ -6,8 +6,8 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public abstract class QueryNodeBase : IQueryNode {
         public virtual Task AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context) {
-            if (this is GroupNode node)
-                return visitor.VisitAsync(node, context);
+            if (this is GroupNode groupNode)
+                return visitor.VisitAsync(groupNode, context);
 
             if (this is TermNode termNode)
                 return visitor.VisitAsync(termNode, context);
@@ -29,6 +29,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public IQueryNode Parent { get; set; }
         public static readonly IList<IQueryNode> EmptyNodeList = new List<IQueryNode>().AsReadOnly();
 
+        public abstract IQueryNode Clone();
         public abstract override string ToString();
     }
 }

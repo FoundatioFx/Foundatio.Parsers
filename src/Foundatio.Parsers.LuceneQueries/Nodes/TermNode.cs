@@ -74,6 +74,12 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             return builder.ToString();
         }
 
+        public override IQueryNode Clone() {
+            var clone = new TermNode();
+            CopyTo(clone);
+            return clone;
+        }
+
         public override IEnumerable<IQueryNode> Children => EmptyNodeList;
     }
 }

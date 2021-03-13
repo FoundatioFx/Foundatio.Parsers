@@ -5,10 +5,10 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class QueryVisitorContextExtensions {
-         public static QueryFieldResolver GetFieldResolver(this IQueryVisitorContext context) {
+        public static QueryFieldResolver GetFieldResolver(this IQueryVisitorContext context) {
             var resolverContext = context as IQueryVisitorContextWithFieldResolver;
             return resolverContext?.FieldResolver;
-         }
+        }
 
         public static T SetFieldResolver<T>(this T context, QueryFieldResolver resolver) where T: IQueryVisitorContext {
             if (!(context is IQueryVisitorContextWithFieldResolver resolverContext))

@@ -24,6 +24,12 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             return target;
         }
 
+        public override IQueryNode Clone() {
+            var clone = new MissingNode();
+            CopyTo(clone);
+            return clone;
+        }
+
         public override string ToString() {
             var builder = new StringBuilder();
 

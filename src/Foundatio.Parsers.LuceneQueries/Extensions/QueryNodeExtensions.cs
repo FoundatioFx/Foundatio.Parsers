@@ -1,11 +1,36 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class QueryNodeExtensions {
+        public static void ReplaceSelf(this IQueryNode node, IQueryNode newValue) {
+            var parent = node.Parent as GroupNode;
+
+            if (parent == null)
+                return;
+
+            newValue.Parent = parent;
+
+            if (parent.Left == node)
+                parent.Left = newValue;
+            else if (parent.Right == node)
+                parent.Right = newValue;
+        }
+
+        public static void RemoveSelf(this IQueryNode node) {
+            var parent = node.Parent as GroupNode;
+
+            if (parent == null)
+                return;
+
+            if (parent.Left == node)
+                parent.Left = null;
+            else if (parent.Right == node)
+                parent.Right = null;
+        }
+
         public static bool IsExcluded(this IFieldQueryNode node) {
             if (node == null)
                 return false;
@@ -42,13 +67,13 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return null;
         }
 
-        public static GroupNode GetGroupNode(this IQueryNode node) {
+        public static GroupNode GetGroupNode(this IQueryNode node, bool onlyParensOrRoot = true) {
             if (node == null)
                 return null;
             
             var current = node;
             do {
-                if (current is GroupNode groupNode && (groupNode.HasParens || groupNode.Parent == null))
+                if (current is GroupNode groupNode && (!onlyParensOrRoot || groupNode.HasParens || groupNode.Parent == null))
                     return groupNode;
                 
                 current = current.Parent;
@@ -117,6 +142,56 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
                     return GroupOperator.Or;
                 default:
                     return defaultOperator;
+            }
+        }
+
+        private const string ReferencedFieldsKey = "@ReferencedFields";
+        private const string CurrentGroupReferencedFieldsKey = "@CurrentGroupReferencedFields";
+        public static ISet<string> GetReferencedFields<T>(this T node, IQueryVisitorContext context = null, bool currentGroupOnly = false) where T : IQueryNode {
+            if (!currentGroupOnly && node.Data.TryGetValue(ReferencedFieldsKey, out var allFieldsObject) && allFieldsObject is ISet<string> allFields)
+                return allFields;
+
+            if (currentGroupOnly && node.Data.TryGetValue(CurrentGroupReferencedFieldsKey, out var immediateFieldsObject) && immediateFieldsObject is ISet<string> immediateFields)
+                return immediateFields;
+
+            var fields = new HashSet<string>();
+            GatherReferencedFields(context, node, fields, 0, currentGroupOnly ? 0 : -1);
+
+            if (!currentGroupOnly)
+                node.Data[ReferencedFieldsKey] = fields;
+
+            if (currentGroupOnly)
+                node.Data[CurrentGroupReferencedFieldsKey] = fields;
+
+            return fields;
+        }
+
+        private static void GatherReferencedFields(IQueryVisitorContext context, IQueryNode node, HashSet<string> fields, int currentGroupDepth, int maxGroupDepth) {
+            if (maxGroupDepth >= 0 && currentGroupDepth >= 0 && currentGroupDepth > maxGroupDepth)
+                return;
+
+            if (node is IFieldQueryNode fieldNode) {
+                if (fieldNode.Field != null) {
+                    fields.Add(fieldNode.Field);
+                } else if (fieldNode is not GroupNode) {
+                    var defaultFields = node.GetDefaultFields(context?.DefaultFields);
+                    if (defaultFields == null || defaultFields.Length == 0)
+                        fields.Add("");
+                    else
+                        foreach (string defaultField in fields)
+                            fields.Add(defaultField);
+                }
+            }
+
+            if (node is GroupNode groupNode) {
+                if (groupNode.HasParens)
+                    currentGroupDepth++;
+
+                if (groupNode.Left != null)
+                    GatherReferencedFields(context, groupNode.Left, fields, currentGroupDepth, maxGroupDepth);
+
+                if (groupNode.Right != null)
+                    GatherReferencedFields(context, groupNode.Right, fields, currentGroupDepth, maxGroupDepth);
             }
         }
     }
