@@ -5,7 +5,7 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public abstract class QueryNodeBase : IQueryNode {
-        public virtual Task AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context) {
+        public virtual Task<IQueryNode> AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context) {
             if (this is GroupNode groupNode)
                 return visitor.VisitAsync(groupNode, context);
 
@@ -21,7 +21,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (this is ExistsNode existsNode)
                 return visitor.VisitAsync(existsNode, context);
 
-            return Task.CompletedTask;
+            return Task.FromResult<IQueryNode>(this);
         }
 
         public IDictionary<string, object> Data { get; } = new Dictionary<string, object>();

@@ -9,7 +9,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public delegate bool ShouldSkipIncludeFunc(TermNode node, IQueryVisitorContext context);
     public delegate Task<string> IncludeResolver(string name);
     
-    public class IncludeVisitor : ChainableQueryVisitor {
+    public class IncludeVisitor : ChainableMutatingQueryVisitor {
         private readonly LuceneQueryParser _parser = new LuceneQueryParser();
         private readonly ShouldSkipIncludeFunc _shouldSkipInclude;
 
@@ -17,30 +17,23 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _shouldSkipInclude = shouldSkipInclude;
         }
 
-        public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
+        public override async Task<IQueryNode> VisitAsync(TermNode node, IQueryVisitorContext context) {
             if (node.Field != "@include" || (_shouldSkipInclude != null && _shouldSkipInclude(node, context)))
-                return;
+                return node;
 
             var includeResolver = context.GetIncludeResolver();
             if (includeResolver == null)
-                return;
+                return node;
 
             string includedQuery = await includeResolver(node.Term).ConfigureAwait(false);
             if (String.IsNullOrEmpty(includedQuery))
-                return;
+                return node;
 
             var result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
             result.HasParens = true;
             await VisitAsync(result, context).ConfigureAwait(false);
 
-            var parent = node.Parent as GroupNode;
-            if (parent == null)
-                return;
-
-            if (parent.Left == node)
-                parent.Left = result;
-            else if (parent.Right == node)
-                parent.Right = result;
+            return node.ReplaceSelf(result);
         }
 
         public static Task<IQueryNode> RunAsync(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {

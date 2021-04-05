@@ -79,5 +79,32 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
 
             return context;
         }
+
+        public static T SetValue<T>(this T context, string key, object value) where T : IQueryVisitorContext {
+            context.Data[key] = value;
+
+            return context;
+        }
+
+        public static DateTime? GetDate(this IQueryVisitorContext context, string key) {
+            if (context.Data.TryGetValue(key, out var value) && value is DateTime date)
+                return date;
+
+            return null;
+        }
+
+        public static string GetString(this IQueryVisitorContext context, string key) {
+            if (context.Data.TryGetValue(key, out var value) && value is string str)
+                return str;
+
+            return null;
+        }
+
+        public static bool GetBoolean(this IQueryVisitorContext context, string key, bool defaultValue = false) {
+            if (context.Data.TryGetValue(key, out var value) && value is bool b)
+                return b;
+
+            return defaultValue;
+        }
     }
 }

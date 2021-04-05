@@ -7,7 +7,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         IQueryNode Parent { get; set; }
         IEnumerable<IQueryNode> Children { get; }
         IDictionary<string, object> Data { get; }
-        Task AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context);
+        Task<IQueryNode> AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context);
         string ToString();
         IQueryNode Clone();
     }

@@ -16,12 +16,14 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
         [Theory]
         [InlineData("value", "NOT (value)")]
+        [InlineData("NOT status:fixed", "status:fixed")]
         [InlineData("field:value", "NOT (field:value)")]
         [InlineData("field1:value noninvertedfield:value", "NOT (field1:value) noninvertedfield:value")]
         [InlineData("field1:value noninvertedfield:value field2:value", "NOT (field1:value) noninvertedfield:value NOT (field2:value)")]
         [InlineData("(field1:value noninvertedfield:value) field2:value", "NOT ((field1:value noninvertedfield:value) field2:value)")] // non-root level fields will always be inverted
         [InlineData("field1:value field2:value field3:value", "NOT (field1:value field2:value field3:value)")]
         [InlineData("noninvertedfield:value field1:value field2:value field3:value", "noninvertedfield:value NOT (field1:value field2:value field3:value)")]
+        [InlineData("noninvertedfield:123 (status:open OR status:regressed) noninvertedfield:234", "noninvertedfield:123 NOT (status:open OR status:regressed) noninvertedfield:234")]
         public Task CanInvertQuery(string query, string expected) {
             return InvertAndValidateQuery(query, expected, true);
         }
@@ -44,7 +46,11 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
                 return;
             }
 
-            string invertedQuery = InvertQueryVisitor.Run(result, new[] { "noninvertedfield" });
+            var invertQueryVisitor = new ChainedQueryVisitor();
+            invertQueryVisitor.AddVisitor(new InvertQueryVisitor(new[] { "noninvertedfield" }));
+            invertQueryVisitor.AddVisitor(new CleanupQueryVisitor());
+            result = await invertQueryVisitor.AcceptAsync(result, new QueryVisitorContext());
+            string invertedQuery = result.ToString();
             string nodes = await DebugQueryVisitor.RunAsync(result);
             _logger.LogInformation(nodes);
             Assert.Equal(expected, invertedQuery);

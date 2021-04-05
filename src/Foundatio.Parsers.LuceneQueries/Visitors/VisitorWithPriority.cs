@@ -14,23 +14,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return Visitor.AcceptAsync(node, context);
         }
 
-        public Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-            return Visitor.VisitAsync(node, context);
-        }
-
-        public Task VisitAsync(TermNode node, IQueryVisitorContext context) {
-            return Visitor.VisitAsync(node, context);
-        }
-
-        public Task VisitAsync(TermRangeNode node, IQueryVisitorContext context) {
-            return Visitor.VisitAsync(node, context);
-        }
-
-        public Task VisitAsync(ExistsNode node, IQueryVisitorContext context) {
-            return Visitor.VisitAsync(node, context);
-        }
-
-        public Task VisitAsync(MissingNode node, IQueryVisitorContext context) {
+        public Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context) {
             return Visitor.VisitAsync(node, context);
         }
 

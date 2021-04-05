@@ -6,55 +6,52 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
-    public class InvertQueryVisitor : ChainableQueryVisitor {
+    public class InvertQueryVisitor : ChainableMutatingQueryVisitor {
         public InvertQueryVisitor(IEnumerable<string> nonInvertedFields = null) {
             NonInvertedFields.AddRange(nonInvertedFields);
         }
 
         public List<string> NonInvertedFields { get; } = new List<string>();
 
-        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+        public override Task<IQueryNode> VisitAsync(GroupNode node, IQueryVisitorContext context) {
             if (node.HasParens) {
                 // invert the group
                 if (node.IsNegated.HasValue)
-                    node.IsNegated = !node.IsNegated;
+                    node.IsNegated = node.IsNegated.HasValue ? !node.IsNegated.Value : true;
                 else
                     node.IsNegated = true;
 
-                return Task.CompletedTask;
+                return Task.FromResult<IQueryNode>(node);
             } else {
                 // check to see if we reference any non-inverted fields at the current grouping level
                 // if there aren't any non-inverted fields, then just group and invert the entire thing
                 if (node.GetReferencedFields(currentGroupOnly: true).All(f => !NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase))) {
-                    node.IsNegated = true;
+                    node.IsNegated = node.IsNegated.HasValue ? !node.IsNegated.Value : true;
                     node.HasParens = true;
 
-                    return Task.CompletedTask;
+                    return Task.FromResult<IQueryNode>(node);
                 }
             }
 
             return base.VisitAsync(node, context);
         }
 
-        public override Task VisitAsync(IQueryNode node, IQueryVisitorContext context) {
+        public override Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context) {
             if (node is GroupNode groupNode)
                 return VisitAsync(groupNode, context);
 
             if (node is IFieldQueryNode fieldNode && NonInvertedFields.Contains(fieldNode.Field, StringComparer.OrdinalIgnoreCase))
-                return Task.CompletedTask;
+                return Task.FromResult(node);
 
-            node.ReplaceSelf(new GroupNode {
+            return Task.FromResult(node.ReplaceSelf(new GroupNode {
                 Left = node.Clone(),
                 HasParens = true,
                 IsNegated = true
-            });
-
-            return Task.CompletedTask;
+            }));
         }
 
-        public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
-            await node.AcceptAsync(this, context);
-            return node;
+        public override Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+            return node.AcceptAsync(this, context);
         }
 
         public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null) {

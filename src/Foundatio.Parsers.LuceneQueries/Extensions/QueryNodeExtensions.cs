@@ -5,11 +5,11 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class QueryNodeExtensions {
-        public static void ReplaceSelf(this IQueryNode node, IQueryNode newValue) {
+        public static IQueryNode ReplaceSelf(this IQueryNode node, IQueryNode newValue) {
             var parent = node.Parent as GroupNode;
 
             if (parent == null)
-                return;
+                return node;
 
             newValue.Parent = parent;
 
@@ -17,6 +17,8 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
                 parent.Left = newValue;
             else if (parent.Right == node)
                 parent.Right = newValue;
+
+            return newValue;
         }
 
         public static void RemoveSelf(this IQueryNode node) {

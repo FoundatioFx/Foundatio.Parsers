@@ -183,8 +183,8 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
         private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context) {
             // NOTE: StartDate and EndDate are set in the Repositories QueryBuilderContext.
-            var start = GetDate(context, "StartDate");
-            var end = GetDate(context, "EndDate");
+            var start = context.GetDate("StartDate");
+            var end = context.GetDate("EndDate");
             bool isValidRange = start.HasValue && start.Value > DateTime.MinValue && end.HasValue && end.Value < DateTime.MaxValue && start.Value <= end.Value;
             var bounds = isValidRange ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
 
@@ -261,20 +261,6 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             }
 
             return new Union<DateInterval, Time>(proximity);
-        }
-
-        private static DateTime? GetDate(IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out var value) && value is DateTime date)
-                return date;
-
-            return null;
-        }
-
-        private static string GetString(IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out var value) && value is string str)
-                return str;
-
-            return null;
         }
 
         private static Union<DateInterval, Time> GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {

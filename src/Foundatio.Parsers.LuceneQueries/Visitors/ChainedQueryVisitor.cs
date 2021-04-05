@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
@@ -71,7 +72,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 _frozenVisitors = _visitors.OrderBy(v => v.Priority).ToArray();
 
             foreach (var visitor in _frozenVisitors)
-                await visitor.AcceptAsync(node, context).ConfigureAwait(false);
+                node = await visitor.AcceptAsync(node, context).ConfigureAwait(false);
 
             return node;
         }

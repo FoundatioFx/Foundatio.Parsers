@@ -24,10 +24,10 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
         public Func<string, bool> ShouldRemoveField { get; }
 
-        public override Task VisitAsync(IQueryNode node, IQueryVisitorContext context) {
+        public override Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context) {
             if (node is IFieldQueryNode fieldNode && fieldNode.Field != null && ShouldRemoveField(fieldNode.Field)) {
                 node.RemoveSelf();
-                return Task.CompletedTask;
+                return Task.FromResult<IQueryNode>(null);
             }
 
             return base.VisitAsync(node, context);
