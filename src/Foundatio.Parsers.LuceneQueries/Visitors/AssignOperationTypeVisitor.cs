@@ -2,7 +2,6 @@
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
-using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class AssignOperationTypeVisitor: ChainableQueryVisitor {
@@ -11,7 +10,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 return base.VisitAsync(node, context);
             
             if (!(node.Left is TermNode leftTerm) || !String.IsNullOrEmpty(leftTerm.Field))
-                throw new ApplicationException("The first item in an aggregation group must be the name of the target field.");
+                throw new FormatException("The first item in an aggregation group must be the name of the target field.");
 
             if (!IsKnownAggregationType(node.Field))
                 return base.VisitAsync(node, context);

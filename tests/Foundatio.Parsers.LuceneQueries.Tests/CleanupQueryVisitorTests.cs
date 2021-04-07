@@ -26,7 +26,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         [InlineData("NOT (value)", "NOT value")]
         [InlineData("NOT (status:fixed)", "NOT status:fixed")]
         [InlineData("project:123 NOT ((status:open OR status:regressed))", "project:123 NOT (status:open OR status:regressed)")]
-        public Task CanInvertQuery(string query, string expected) {
+        public Task CanCleanupQuery(string query, string expected) {
             return CleanupAndValidateQuery(query, expected, true);
         }
 

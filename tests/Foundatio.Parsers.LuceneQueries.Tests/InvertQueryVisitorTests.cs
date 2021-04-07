@@ -18,12 +18,13 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         [InlineData("value", "NOT (value)")]
         [InlineData("NOT status:fixed", "status:fixed")]
         [InlineData("field:value", "NOT (field:value)")]
-        [InlineData("field1:value noninvertedfield:value", "NOT (field1:value) noninvertedfield:value")]
-        [InlineData("field1:value noninvertedfield:value field2:value", "NOT (field1:value) noninvertedfield:value NOT (field2:value)")]
-        [InlineData("(field1:value noninvertedfield:value) field2:value", "NOT ((field1:value noninvertedfield:value) field2:value)")] // non-root level fields will always be inverted
+        [InlineData("(noninvertedfield1:value AND (noninvertedfield2:value)) field1:value", "(noninvertedfield1:value AND (noninvertedfield2:value)) NOT (field1:value)")]
+        [InlineData("field1:value noninvertedfield1:value", "NOT (field1:value) noninvertedfield1:value")]
+        [InlineData("field1:value noninvertedfield1:value field2:value", "NOT (field1:value) noninvertedfield1:value NOT (field2:value)")]
+        [InlineData("(field1:value noninvertedfield1:value) field2:value", "NOT ((field1:value noninvertedfield1:value) field2:value)")] // non-root level fields will always be inverted
         [InlineData("field1:value field2:value field3:value", "NOT (field1:value field2:value field3:value)")]
-        [InlineData("noninvertedfield:value field1:value field2:value field3:value", "noninvertedfield:value NOT (field1:value field2:value field3:value)")]
-        [InlineData("noninvertedfield:123 (status:open OR status:regressed) noninvertedfield:234", "noninvertedfield:123 NOT (status:open OR status:regressed) noninvertedfield:234")]
+        [InlineData("noninvertedfield1:value field1:value field2:value field3:value", "noninvertedfield1:value NOT (field1:value field2:value field3:value)")]
+        [InlineData("noninvertedfield1:123 (status:open OR status:regressed) noninvertedfield1:234", "noninvertedfield1:123 NOT (status:open OR status:regressed) noninvertedfield1:234")]
         public Task CanInvertQuery(string query, string expected) {
             return InvertAndValidateQuery(query, expected, true);
         }
@@ -47,7 +48,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
             }
 
             var invertQueryVisitor = new ChainedQueryVisitor();
-            invertQueryVisitor.AddVisitor(new InvertQueryVisitor(new[] { "noninvertedfield" }));
+            invertQueryVisitor.AddVisitor(new InvertQueryVisitor(new[] { "noninvertedfield1", "noninvertedfield2" }));
             invertQueryVisitor.AddVisitor(new CleanupQueryVisitor());
             result = await invertQueryVisitor.AcceptAsync(result, new QueryVisitorContext());
             string invertedQuery = result.ToString();
