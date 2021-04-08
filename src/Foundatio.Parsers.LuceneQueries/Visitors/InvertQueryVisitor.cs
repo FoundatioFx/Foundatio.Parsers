@@ -15,6 +15,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
         public override Task<IQueryNode> VisitAsync(GroupNode node, IQueryVisitorContext context) {
             if (node.HasParens) {
+                // don't call base inside here to make sure that we don't visit nodes past the first set of parens
+
+                // don't invert groups that only contain inverted fields
+                if (node.GetReferencedFields().All(f => NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase)))
+                    return Task.FromResult<IQueryNode>(node);
+
                 // invert the group
                 if (node.IsNegated.HasValue)
                     node.IsNegated = node.IsNegated.HasValue ? !node.IsNegated.Value : true;
@@ -25,9 +31,17 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             } else {
                 // check to see if we reference any non-inverted fields at the current grouping level
                 // if there aren't any non-inverted fields, then just group and invert the entire thing
-                if (node.GetReferencedFields(currentGroupOnly: true).All(f => !NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase))) {
-                    node.IsNegated = node.IsNegated.HasValue ? !node.IsNegated.Value : true;
-                    node.HasParens = true;
+                if (node.GetReferencedFields().All(f => !NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase))) {
+                    if (node.Left is GroupNode || node.Right is GroupNode)
+                        node.HasParens = true;
+
+                    if (node.Right == null && node.Left is IFieldQueryNode leftField && leftField.IsNegated()) {
+                        leftField.IsNegated = false;
+                    } else if (node.Left == null && node.Right is IFieldQueryNode rightField && rightField.IsNegated()) {
+                        rightField.IsNegated = false;
+                    } else {
+                        node.IsNegated = node.IsNegated.HasValue ? !node.IsNegated.Value : true;
+                    }
 
                     return Task.FromResult<IQueryNode>(node);
                 }

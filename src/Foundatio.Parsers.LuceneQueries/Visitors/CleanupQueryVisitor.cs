@@ -78,12 +78,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                     && groupNode.Left is TermNode leftTermNode
                     && groupNode.Right == null) {
 
-                    if (groupNode.IsNegated.HasValue && groupNode.IsNegated.Value)
+                    if (groupNode.IsNegated.HasValue && groupNode.IsNegated.Value) {
                         groupNode.HasParens = false;
-                    else
+                    } else {
                         groupNode.ReplaceSelf(leftTermNode);
-
-                    node = leftTermNode;
+                        node = leftTermNode;
+                    }
                 }
 
                 // don't need parens on single term
@@ -91,12 +91,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                     && groupNode.Right is TermNode rightTermNode
                     && groupNode.Left == null) {
 
-                    if (groupNode.IsNegated.HasValue && groupNode.IsNegated.Value)
+                    if (groupNode.IsNegated.HasValue && groupNode.IsNegated.Value) {
                         groupNode.HasParens = false;
-                    else
+                    } else {
                         groupNode.ReplaceSelf(rightTermNode);
-
-                    node = rightTermNode;
+                        node = rightTermNode;
+                    }
                 }
             }
 

@@ -46,6 +46,10 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             
             return !String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+";
         }
+
+        public static bool IsNegated(this IFieldQueryNode node) {
+            return node.IsNegated.HasValue && node.IsNegated.Value;
+        }
         
         public static bool IsNodeOrGroupNegated(this IFieldQueryNode node) {
             if (node.IsRequired())
