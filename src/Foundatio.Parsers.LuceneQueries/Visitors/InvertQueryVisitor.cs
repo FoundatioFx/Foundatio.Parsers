@@ -51,6 +51,9 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public override Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context) {
+            if (context.DefaultOperator == GroupOperator.Or)
+                throw new ArgumentException("Queries using OR as the default operator can not be inverted.");
+
             if (node is GroupNode groupNode)
                 return VisitAsync(groupNode, context);
 
