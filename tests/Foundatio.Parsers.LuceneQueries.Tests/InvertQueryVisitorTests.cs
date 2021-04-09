@@ -18,6 +18,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         [InlineData("value", "NOT value")]
         [InlineData("NOT status:fixed", "status:fixed")]
         [InlineData("field:value", "NOT field:value")]
+        [InlineData("-field:value", "field:value")]
         [InlineData("(noninvertedfield1:value AND (noninvertedfield2:value)) field1:value", "(noninvertedfield1:value AND (noninvertedfield2:value)) NOT (field1:value)")]
         [InlineData("field1:value noninvertedfield1:value", "NOT (field1:value) noninvertedfield1:value")]
         [InlineData("field1:value noninvertedfield1:value field2:value", "NOT (field1:value) noninvertedfield1:value NOT (field2:value)")]

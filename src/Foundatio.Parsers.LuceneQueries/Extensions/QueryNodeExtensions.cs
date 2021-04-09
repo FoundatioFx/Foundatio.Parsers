@@ -48,9 +48,18 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
 
         public static bool IsNegated(this IFieldQueryNode node) {
-            return node.IsNegated.HasValue && node.IsNegated.Value;
+            return node.IsExcluded();
         }
-        
+
+        public static void InvertNegation(this IFieldQueryNode node) {
+            if (node.IsNegated.HasValue)
+                node.IsNegated = !node.IsNegated.Value;
+            else if (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-")
+                node.Prefix = null;
+            else
+                node.IsNegated = true;
+        }
+
         public static bool IsNodeOrGroupNegated(this IFieldQueryNode node) {
             if (node.IsRequired())
                 return false;

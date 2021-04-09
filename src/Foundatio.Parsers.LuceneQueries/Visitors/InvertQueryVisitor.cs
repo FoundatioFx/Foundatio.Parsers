@@ -22,10 +22,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                     return Task.FromResult<IQueryNode>(node);
 
                 // invert the group
-                if (node.IsNegated.HasValue)
-                    node.IsNegated = node.IsNegated.HasValue ? !node.IsNegated.Value : true;
-                else
-                    node.IsNegated = true;
+                node.InvertNegation();
 
                 return Task.FromResult<IQueryNode>(node);
             } else {
@@ -36,11 +33,11 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                         node.HasParens = true;
 
                     if (node.Right == null && node.Left is IFieldQueryNode leftField && leftField.IsNegated()) {
-                        leftField.IsNegated = false;
+                        leftField.InvertNegation();
                     } else if (node.Left == null && node.Right is IFieldQueryNode rightField && rightField.IsNegated()) {
-                        rightField.IsNegated = false;
+                        rightField.InvertNegation();
                     } else {
-                        node.IsNegated = node.IsNegated.HasValue ? !node.IsNegated.Value : true;
+                        node.InvertNegation();
                     }
 
                     return Task.FromResult<IQueryNode>(node);
