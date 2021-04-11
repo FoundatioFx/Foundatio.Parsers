@@ -32,11 +32,18 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                     if (node.Left is GroupNode || node.Right is GroupNode)
                         node.HasParens = true;
 
-                    if (node.Right == null && node.Left is IFieldQueryNode leftField && leftField.IsNegated()) {
-                        leftField.InvertNegation();
-                    } else if (node.Left == null && node.Right is IFieldQueryNode rightField && rightField.IsNegated()) {
-                        rightField.InvertNegation();
+                    if (node.Right == null && node.Left is IFieldQueryNode leftField) {
+                        if (leftField.IsNegated())
+                            leftField.InvertNegation();
+                        else
+                            node.InvertNegation();
+                    } else if (node.Left == null && node.Right is IFieldQueryNode rightField) {
+                        if (rightField.IsNegated())
+                            rightField.InvertNegation();
+                        else
+                            node.InvertNegation();
                     } else {
+                        node.HasParens = true;
                         node.InvertNegation();
                     }
 
