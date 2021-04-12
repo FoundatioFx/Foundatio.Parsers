@@ -5,13 +5,8 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
     public static class QueryNodeExtensions {
-        public static IQueryNode ReplaceSelf(this IQueryNode node, IQueryNode newValue) {
-            var parent = node.Parent as GroupNode;
-
-            if (parent == null)
-                return node;
-
-            newValue.Parent = parent;
+        public static T ReplaceSelf<T>(this IQueryNode node, T newValue) where T: class, IQueryNode {
+            var parent = node.Parent as GroupNode ?? new GroupNode();
 
             if (parent.Left == node)
                 parent.Left = newValue;
@@ -49,6 +44,72 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
 
         public static bool IsNegated(this IFieldQueryNode node) {
             return node.IsExcluded();
+        }
+
+        public static IQueryNode InvertGroupNegation(this GroupNode node, IQueryVisitorContext context) {
+            var alternateInvertedCriteria = context.GetValue<IQueryNode>("AlternateInvertedCriteria");
+
+            if (node.Left is GroupNode || node.Right is GroupNode)
+                node.HasParens = true;
+
+            if (node.Right == null && node.Left is IFieldQueryNode leftField) {
+                if (leftField.IsNegated()) {
+                    leftField.InvertNegation();
+
+                    if (alternateInvertedCriteria != null)
+                        leftField.ReplaceSelf(new GroupNode {
+                            Left = alternateInvertedCriteria,
+                            Right = leftField.Clone(),
+                            Operator = GroupOperator.Or,
+                            HasParens = true
+                        });
+                } else {
+                    node.InvertNegation();
+
+                    if (alternateInvertedCriteria != null)
+                        node = node.ReplaceSelf(new GroupNode {
+                            Left = alternateInvertedCriteria,
+                            Right = node.Clone(),
+                            Operator = GroupOperator.Or,
+                            HasParens = true
+                        });
+                }
+            } else if (node.Left == null && node.Right is IFieldQueryNode rightField) {
+                if (rightField.IsNegated()) {
+                    rightField.InvertNegation();
+
+                    if (alternateInvertedCriteria != null)
+                        rightField.ReplaceSelf(new GroupNode {
+                            Left = alternateInvertedCriteria,
+                            Right = rightField.Clone(),
+                            Operator = GroupOperator.Or,
+                            HasParens = true
+                        });
+                } else {
+                    node.InvertNegation();
+
+                    if (alternateInvertedCriteria != null)
+                        node = node.ReplaceSelf(new GroupNode {
+                            Left = alternateInvertedCriteria,
+                            Right = node.Clone(),
+                            Operator = GroupOperator.Or,
+                            HasParens = true
+                        });
+                }
+            } else {
+                node.HasParens = true;
+                node.InvertNegation();
+
+                if (alternateInvertedCriteria != null)
+                    node = node.ReplaceSelf(new GroupNode {
+                        Left = alternateInvertedCriteria,
+                        Right = node.Clone(),
+                        Operator = GroupOperator.Or,
+                        HasParens = true
+                    });
+            }
+
+            return node;
         }
 
         public static void InvertNegation(this IFieldQueryNode node) {

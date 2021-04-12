@@ -86,6 +86,13 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return context;
         }
 
+        public static T GetValue<T>(this IQueryVisitorContext context, string key) {
+            if (context.Data.TryGetValue(key, out var value) && value is T typedValue)
+                return typedValue;
+
+            return default;
+        }
+
         public static DateTime? GetDate(this IQueryVisitorContext context, string key) {
             if (context.Data.TryGetValue(key, out var value) && value is DateTime date)
                 return date;

@@ -21,34 +21,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 if (node.GetReferencedFields().All(f => NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase)))
                     return Task.FromResult<IQueryNode>(node);
 
-                // invert the group
-                node.InvertNegation();
-
-                return Task.FromResult<IQueryNode>(node);
+                return Task.FromResult(node.InvertGroupNegation(context));
             } else {
                 // check to see if we reference any non-inverted fields at the current grouping level
                 // if there aren't any non-inverted fields, then just group and invert the entire thing
-                if (node.GetReferencedFields().All(f => !NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase))) {
-                    if (node.Left is GroupNode || node.Right is GroupNode)
-                        node.HasParens = true;
-
-                    if (node.Right == null && node.Left is IFieldQueryNode leftField) {
-                        if (leftField.IsNegated())
-                            leftField.InvertNegation();
-                        else
-                            node.InvertNegation();
-                    } else if (node.Left == null && node.Right is IFieldQueryNode rightField) {
-                        if (rightField.IsNegated())
-                            rightField.InvertNegation();
-                        else
-                            node.InvertNegation();
-                    } else {
-                        node.HasParens = true;
-                        node.InvertNegation();
-                    }
-
-                    return Task.FromResult<IQueryNode>(node);
-                }
+                if (node.GetReferencedFields().All(f => !NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase)))
+                    return Task.FromResult(node.InvertGroupNegation(context));
             }
 
             return base.VisitAsync(node, context);
@@ -64,7 +42,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             if (node is IFieldQueryNode fieldNode && NonInvertedFields.Contains(fieldNode.Field, StringComparer.OrdinalIgnoreCase))
                 return Task.FromResult(node);
 
-            return Task.FromResult(node.ReplaceSelf(new GroupNode {
+            return Task.FromResult<IQueryNode>(node.ReplaceSelf(new GroupNode {
                 Left = node.Clone(),
                 HasParens = true,
                 IsNegated = true

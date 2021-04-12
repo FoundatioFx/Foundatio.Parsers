@@ -4,6 +4,7 @@ using Xunit;
 using Xunit.Abstractions;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Xunit;
 using Pegasus.Common.Tracing;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
         [Theory]
         [InlineData("value", "NOT value")]
+        [InlineData("value", "(is_deleted:true OR NOT value)", "is_deleted:true")]
         [InlineData("NOT status:fixed", "status:fixed")]
         [InlineData("field:value", "NOT field:value")]
         [InlineData("-field:value", "field:value")]
@@ -26,12 +28,13 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         [InlineData("(field1:value noninvertedfield1:value) field2:value", "NOT (field1:value noninvertedfield1:value) NOT (field2:value)")] // non-root level fields will always be inverted
         [InlineData("field1:value field2:value field3:value", "NOT (field1:value field2:value field3:value)")]
         [InlineData("noninvertedfield1:value field1:value field2:value field3:value", "noninvertedfield1:value NOT (field1:value field2:value field3:value)")]
+        [InlineData("noninvertedfield1:value field1:value field2:value field3:value", "noninvertedfield1:value (is_deleted:true OR NOT (field1:value field2:value field3:value))", "is_deleted:true")]
         [InlineData("noninvertedfield1:123 (status:open OR status:regressed) noninvertedfield1:234", "noninvertedfield1:123 NOT (status:open OR status:regressed) noninvertedfield1:234")]
-        public Task CanInvertQuery(string query, string expected) {
-            return InvertAndValidateQuery(query, expected, true);
+        public Task CanInvertQuery(string query, string expected, string alternateInvertedCriteria = null) {
+            return InvertAndValidateQuery(query, expected, alternateInvertedCriteria, true);
         }
 
-        private async Task InvertAndValidateQuery(string query, string expected, bool isValid) {
+        private async Task InvertAndValidateQuery(string query, string expected, string alternateInvertedCriteria, bool isValid) {
 #if ENABLE_TRACING
             var tracer = new LoggingTracer(_logger, reportPerformance: true);
 #else
@@ -50,7 +53,14 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
             }
 
             var invertQueryVisitor = new InvertQueryVisitor(new[] { "noninvertedfield1", "noninvertedfield2" });
-            result = await invertQueryVisitor.AcceptAsync(result, new QueryVisitorContext());
+            var context = new QueryVisitorContext();
+
+            if (!String.IsNullOrWhiteSpace(alternateInvertedCriteria)) {
+                var invertedAlternate = await parser.ParseAsync(alternateInvertedCriteria);
+                context.SetValue("AlternateInvertedCriteria", invertedAlternate);
+            }
+
+            result = await invertQueryVisitor.AcceptAsync(result, context);
             string invertedQuery = result.ToString();
             string nodes = await DebugQueryVisitor.RunAsync(result);
             _logger.LogInformation(nodes);
