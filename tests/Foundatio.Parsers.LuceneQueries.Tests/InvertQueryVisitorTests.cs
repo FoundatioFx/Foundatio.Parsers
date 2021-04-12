@@ -61,8 +61,8 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
             }
 
             result = await invertQueryVisitor.AcceptAsync(result, context);
-            string invertedQuery = result.ToString();
-            string nodes = await DebugQueryVisitor.RunAsync(result);
+            var invertedQuery = result.ToString();
+            var nodes = await DebugQueryVisitor.RunAsync(result);
             _logger.LogInformation(nodes);
             Assert.Equal(expected, invertedQuery);
         }

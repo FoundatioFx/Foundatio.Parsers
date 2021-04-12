@@ -17,9 +17,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
 
         public static void RemoveSelf(this IQueryNode node) {
-            var parent = node.Parent as GroupNode;
-
-            if (parent == null)
+            if (node.Parent is not GroupNode parent)
                 return;
 
             if (parent.Left == node)
@@ -47,7 +45,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
 
         public static IQueryNode InvertGroupNegation(this GroupNode node, IQueryVisitorContext context) {
-            var alternateInvertedCriteria = context.GetValue<IQueryNode>("AlternateInvertedCriteria");
+            var alternateInvertedCriteria = context.GetAlternateInvertedCriteria();
 
             if (node.Left is GroupNode || node.Right is GroupNode)
                 node.HasParens = true;
@@ -204,21 +202,17 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             if (context != null && context.DefaultOperator != GroupOperator.Default)
                 defaultOperator = context.DefaultOperator;
 
-            var groupNode = node as GroupNode;
-            if (groupNode == null)
+            if (node is not GroupNode groupNode)
                 groupNode = node.Parent as GroupNode;
 
             if (groupNode == null)
                 return defaultOperator;
 
-            switch (groupNode.Operator) {
-                case GroupOperator.And:
-                    return GroupOperator.And;
-                case GroupOperator.Or:
-                    return GroupOperator.Or;
-                default:
-                    return defaultOperator;
-            }
+            return groupNode.Operator switch {
+                GroupOperator.And => GroupOperator.And,
+                GroupOperator.Or => GroupOperator.Or,
+                _ => defaultOperator,
+            };
         }
 
         private const string ReferencedFieldsKey = "@ReferencedFields";
@@ -254,7 +248,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
                     if (defaultFields == null || defaultFields.Length == 0)
                         fields.Add("");
                     else
-                        foreach (string defaultField in fields)
+                        foreach (var defaultField in fields)
                             fields.Add(defaultField);
                 }
             }

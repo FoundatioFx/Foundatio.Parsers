@@ -11,7 +11,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
 
         public static T SetFieldResolver<T>(this T context, QueryFieldResolver resolver) where T: IQueryVisitorContext {
-            if (!(context is IQueryVisitorContextWithFieldResolver resolverContext))
+            if (context is not IQueryVisitorContextWithFieldResolver resolverContext)
                 throw new ArgumentException("Context must be of type IQueryVisitorContextWithFieldResolver", nameof(context));
 
             resolverContext.FieldResolver = resolver;
@@ -20,14 +20,14 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
 
         public static IncludeResolver GetIncludeResolver(this IQueryVisitorContext context) {
-            if (!(context is IQueryVisitorContextWithIncludeResolver includeContext))
+            if (context is not IQueryVisitorContextWithIncludeResolver includeContext)
                 throw new ArgumentException("Context must be of type IQueryVisitorContextWithIncludeResolver", nameof(context));
 
             return includeContext.IncludeResolver;
         }
 
         public static T SetIncludeResolver<T>(this T context, IncludeResolver includeResolver) where T : IQueryVisitorContext {
-            if (!(context is IQueryVisitorContextWithIncludeResolver includeContext))
+            if (context is not IQueryVisitorContextWithIncludeResolver includeContext)
                 throw new ArgumentException("Context must be of type IQueryVisitorContextWithIncludeResolver", nameof(context));
 
             includeContext.IncludeResolver = includeResolver;
@@ -36,14 +36,14 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
 
         public static Func<QueryValidationInfo, Task<bool>> GetValidator(this IQueryVisitorContext context) {
-            if (!(context is IQueryVisitorContextWithValidator validatorContext))
+            if (context is not IQueryVisitorContextWithValidator validatorContext)
                 throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidator", nameof(context));
 
             return validatorContext.Validator;
         }
 
         public static T SetValidator<T>(this T context, Func<QueryValidationInfo, Task<bool>> validator) where T : IQueryVisitorContext {
-            if (!(context is IQueryVisitorContextWithValidator validatorContext))
+            if (context is not IQueryVisitorContextWithValidator validatorContext)
                 throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidator", nameof(context));
 
             validatorContext.Validator = validator;
@@ -52,14 +52,14 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         }
 
         public static QueryValidationInfo GetValidationInfo(this IQueryVisitorContext context) {
-            if (!(context is IQueryVisitorContextWithValidator validatorContext))
+            if (context is not IQueryVisitorContextWithValidator validatorContext)
                 throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidator", nameof(context));
 
-            return validatorContext.ValidationInfo ?? (validatorContext.ValidationInfo = new QueryValidationInfo());
+            return validatorContext.ValidationInfo ??= new QueryValidationInfo();
         }
 
         public static T SetValidationInfo<T>(this T context, QueryValidationInfo validationInfo) where T : IQueryVisitorContext {
-            if (!(context is IQueryVisitorContextWithValidator validatorContext))
+            if (context is not IQueryVisitorContextWithValidator validatorContext)
                 throw new ArgumentException("Context must be of type IQueryVisitorContextWithAliasResolver", nameof(context));
 
             validatorContext.ValidationInfo = validationInfo;
@@ -112,6 +112,17 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
                 return b;
 
             return defaultValue;
+        }
+
+        private const string AlternateInvertedCriteriaKey = "AlternateInvertedCriteria";
+        public static T SetAlternateInvertedCriteria<T>(this T context, IQueryNode criteria) where T : IQueryVisitorContext {
+            context.Data[AlternateInvertedCriteriaKey] = criteria;
+
+            return context;
+        }
+
+        public static IQueryNode GetAlternateInvertedCriteria(this IQueryVisitorContext context) {
+            return context.GetValue<IQueryNode>(AlternateInvertedCriteriaKey);
         }
     }
 }
