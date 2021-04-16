@@ -14,18 +14,31 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         public List<string> NonInvertedFields { get; } = new List<string>();
 
         public override Task<IQueryNode> VisitAsync(GroupNode node, IQueryVisitorContext context) {
+            bool onlyNonInvertedFields = node.GetReferencedFields().All(f => NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase));
+            bool hasNonInvertedFields = node.GetReferencedFields().Any(f => NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase));
+            bool onlyInvertedFields = !hasNonInvertedFields;
+
+            var alternateInvertedCriteria = context.GetAlternateInvertedCriteria();
+            if (node.Parent == null && onlyNonInvertedFields && alternateInvertedCriteria != null) {
+                node = node.ReplaceSelf(new GroupNode {
+                    Left = alternateInvertedCriteria,
+                    Right = node.Clone()
+                });
+
+                return Task.FromResult<IQueryNode>(node);
+            }
+
             if (node.HasParens) {
                 // don't call base inside here to make sure that we don't visit nodes past the first set of parens
 
-                // don't invert groups that only contain inverted fields
-                if (node.GetReferencedFields().All(f => NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase)))
+                // don't invert groups that only contain non-inverted fields
+                if (onlyNonInvertedFields)
                     return Task.FromResult<IQueryNode>(node);
 
                 return Task.FromResult(node.InvertGroupNegation(context));
             } else {
-                // check to see if we reference any non-inverted fields at the current grouping level
-                // if there aren't any non-inverted fields, then just group and invert the entire thing
-                if (node.GetReferencedFields().All(f => !NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase)))
+                // if all fields should be inverted, then just group and invert the entire thing
+                if (onlyInvertedFields)
                     return Task.FromResult(node.InvertGroupNegation(context));
             }
 

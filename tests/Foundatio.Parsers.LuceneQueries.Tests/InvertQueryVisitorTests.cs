@@ -18,6 +18,8 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         [Theory]
         [InlineData("value", "NOT value")]
         [InlineData("value", "(is_deleted:true OR NOT value)", "is_deleted:true")]
+        [InlineData("noninvertedfield1:value", "is_deleted:true noninvertedfield1:value", "is_deleted:true")]
+        [InlineData("(noninvertedfield1:value)", "is_deleted:true (noninvertedfield1:value)", "is_deleted:true")]
         [InlineData("NOT status:fixed", "status:fixed")]
         [InlineData("field:value", "NOT field:value")]
         [InlineData("-field:value", "field:value")]
