@@ -20,9 +20,13 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
             var alternateInvertedCriteria = context.GetAlternateInvertedCriteria();
             if (node.Parent == null && onlyNonInvertedFields && alternateInvertedCriteria != null) {
+                var originalNode = node.Clone() as GroupNode;
+                originalNode.HasParens = true;
+
                 node = node.ReplaceSelf(new GroupNode {
                     Left = alternateInvertedCriteria,
-                    Right = node.Clone()
+                    Right = originalNode,
+                    Operator = GroupOperator.And
                 });
 
                 return Task.FromResult<IQueryNode>(node);
