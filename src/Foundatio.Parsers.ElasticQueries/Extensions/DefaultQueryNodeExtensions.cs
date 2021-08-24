@@ -90,7 +90,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             string field = node.Field;
             if (elasticContext.MappingResolver.IsDatePropertyType(field)) {
-                var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(elasticContext.DefaultTimeZone) };
+                var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(elasticContext.DefaultTimeZone?.Value) };
                 if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*") {
                     if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                         range.GreaterThan = node.UnescapedMin;

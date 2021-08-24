@@ -58,8 +58,8 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (_config.MappingResolver != null && context.GetMappingResolver() == null)
                 context.SetMappingResolver(_config.MappingResolver);
 
-            if (_config.Validator != null && context.GetValidator() == null)
-                context.SetValidator(_config.Validator);
+            if (_config.ValidationOptions != null && context.GetValidationOptions() == null)
+                context.SetValidationOptions(_config.ValidationOptions);
         }
 
         public async Task<QueryContainer> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null) {

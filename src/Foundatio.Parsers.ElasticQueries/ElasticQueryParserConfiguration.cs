@@ -24,7 +24,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public QueryFieldResolver FieldResolver { get; private set; }
         public IncludeResolver IncludeResolver { get; private set; }
         public ElasticMappingResolver MappingResolver { get; private set; }
-        public Func<QueryValidationInfo, Task<bool>> Validator { get; private set; }
+        public QueryValidationOptions ValidationOptions { get; private set; }
         public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
@@ -77,8 +77,8 @@ namespace Foundatio.Parsers.ElasticQueries {
             return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, shouldSkipInclude, priority);
         }
 
-        public ElasticQueryParserConfiguration UseValidation(Func<QueryValidationInfo, Task<bool>> validator, int priority = 0) {
-            Validator = validator;
+        public ElasticQueryParserConfiguration UseValidation(QueryValidationOptions options, int priority = 0) {
+            ValidationOptions = options;
 
             return AddVisitor(new ValidationVisitor { ShouldThrow = true }, priority);
         }

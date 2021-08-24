@@ -58,7 +58,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public static Task<IQueryNode> RunAsync(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver context = null) {
-            return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContextWithFieldResolver { FieldResolver = resolver });
+            return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext { FieldResolver = resolver });
         }
 
         public static IQueryNode Run(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver context = null) {
@@ -66,7 +66,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver context = null) {
-            return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContextWithFieldResolver { FieldResolver = map.ToHierarchicalFieldResolver() });
+            return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext { FieldResolver = map.ToHierarchicalFieldResolver() });
         }
 
         public static IQueryNode Run(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver context = null) {

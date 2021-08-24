@@ -35,7 +35,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(elasticContext.DefaultTimeZone), context);
+                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(elasticContext.DefaultTimeZone?.Value), context);
 
                 case AggregationType.Histogram:
                     return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost, context);
@@ -82,7 +82,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             string aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.Field);
             var property = elasticContext.MappingResolver.GetMappingProperty(node.Field, true);
-            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: node.GetTimeZone(elasticContext.DefaultTimeZone);
+            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: node.GetTimeZone(elasticContext.DefaultTimeZone?.Value);
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:

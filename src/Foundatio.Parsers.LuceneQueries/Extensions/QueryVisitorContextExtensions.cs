@@ -1,6 +1,5 @@
 ﻿using System;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Extensions {
@@ -35,32 +34,32 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             return context;
         }
 
-        public static Func<QueryValidationInfo, Task<bool>> GetValidator(this IQueryVisitorContext context) {
-            if (context is not IQueryVisitorContextWithValidator validatorContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidator", nameof(context));
+        public static QueryValidationOptions GetValidationOptions(this IQueryVisitorContext context) {
+            if (context is not IQueryVisitorContextWithValidation validatorContext)
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidation", nameof(context));
 
-            return validatorContext.Validator;
+            return validatorContext.ValidationOptions;
         }
 
-        public static T SetValidator<T>(this T context, Func<QueryValidationInfo, Task<bool>> validator) where T : IQueryVisitorContext {
-            if (context is not IQueryVisitorContextWithValidator validatorContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidator", nameof(context));
+        public static T SetValidationOptions<T>(this T context, QueryValidationOptions options) where T : IQueryVisitorContext {
+            if (context is not IQueryVisitorContextWithValidation validatorContext)
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidation", nameof(context));
 
-            validatorContext.Validator = validator;
+            validatorContext.ValidationOptions = options;
 
             return context;
         }
 
         public static QueryValidationInfo GetValidationInfo(this IQueryVisitorContext context) {
-            if (context is not IQueryVisitorContextWithValidator validatorContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidator", nameof(context));
+            if (context is not IQueryVisitorContextWithValidation validatorContext)
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidation", nameof(context));
 
             return validatorContext.ValidationInfo ??= new QueryValidationInfo();
         }
 
         public static T SetValidationInfo<T>(this T context, QueryValidationInfo validationInfo) where T : IQueryVisitorContext {
-            if (context is not IQueryVisitorContextWithValidator validatorContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithAliasResolver", nameof(context));
+            if (context is not IQueryVisitorContextWithValidation validatorContext)
+                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidation", nameof(context));
 
             validatorContext.ValidationInfo = validationInfo;
 

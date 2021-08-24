@@ -37,7 +37,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public static Task<IQueryNode> RunAsync(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
-            return new IncludeVisitor(shouldSkipInclude).AcceptAsync(node, context ?? new QueryVisitorContextWithIncludeResolver { IncludeResolver = includeResolver });
+            return new IncludeVisitor(shouldSkipInclude).AcceptAsync(node, context ?? new QueryVisitorContext { IncludeResolver = includeResolver });
         }
 
         public static IQueryNode Run(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {

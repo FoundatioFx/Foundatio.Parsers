@@ -1057,7 +1057,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
             client.Indices.Refresh("stuff");
 
-            var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = "America/Chicago" };
+            var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = new Lazy<string>(() => "America/Chicago") };
 
             var processor = new ElasticQueryParser(c => c.UseMappings(client, "stuff"));
 
@@ -1093,7 +1093,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
             client.Indices.Refresh("stuff");
 
-            var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = "America/Chicago" };
+            var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = new Lazy<string>(() => "America/Chicago") };
 
             var processor = new ElasticQueryParser(c => c.UseMappings(client, "stuff"));
 
@@ -1127,7 +1127,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index("stuff"));
             client.Indices.Refresh("stuff");
 
-            var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = "America/Chicago" };
+            var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = new Lazy<string>(() => "America/Chicago") };
 
             var processor = new ElasticQueryParser(c => c.UseMappings(client, "stuff"));
 
@@ -1195,7 +1195,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             client.Index(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index));
             client.Indices.Refresh(index);
 
-            var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = "America/Chicago" };
+            var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = new Lazy<string>(() => "America/Chicago") };
 
             var processor = new ElasticQueryParser(c => c.UseMappings(client, index).SetLoggerFactory(Log));
             var result = processor.BuildQueryAsync("field5:[2017-01-01T00\\:00\\:00Z TO 2017-01-31} OR field1:value1", ctx).Result;
