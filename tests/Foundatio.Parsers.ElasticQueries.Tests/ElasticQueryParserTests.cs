@@ -1253,6 +1253,53 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
         }
 
         [Fact]
+        public async Task CanUseValidationToGetUnresolvedFields() {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyType>(client, d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
+            client.Index(new MyType { Field1 = "value123" }, i => i.Index(index));
+            client.Indices.Refresh(index);
+
+            var context = new ElasticQueryVisitorContext();
+            var parser = new ElasticQueryParser(c => c.UseMappings(client, index).UseValidation(new QueryValidationOptions { AllowUnresolvedFields = false }));
+            var query = await parser.BuildQueryAsync("field1:value", context);
+
+            var validationInfo = context.GetValidationInfo();
+            Assert.True(validationInfo.IsValid);
+            Assert.Single(validationInfo.ReferencedFields, "field1");
+            Assert.Empty(validationInfo.UnresolvedFields);
+
+            context = new ElasticQueryVisitorContext();
+            parser = new ElasticQueryParser(c => c.UseMappings(client, index).UseValidation(new QueryValidationOptions { AllowUnresolvedFields = false }));
+            query = await parser.BuildQueryAsync("field2:value", context);
+
+            validationInfo = context.GetValidationInfo();
+            Assert.False(validationInfo.IsValid);
+            Assert.Single(validationInfo.ReferencedFields, "field2");
+            Assert.Single(validationInfo.UnresolvedFields, "field2");
+
+            var aliasMap = new FieldMap { { "field2", "field1" } };
+            context = new ElasticQueryVisitorContext();
+            parser = new ElasticQueryParser(c => c.UseMappings(client, index).UseFieldMap(aliasMap).UseValidation(new QueryValidationOptions { AllowUnresolvedFields = false }));
+            query = await parser.BuildQueryAsync("field2:value", context);
+
+            validationInfo = context.GetValidationInfo();
+            Assert.True(validationInfo.IsValid);
+            Assert.Single(validationInfo.ReferencedFields, "field1");
+            Assert.Empty(validationInfo.UnresolvedFields);
+
+            context = new ElasticQueryVisitorContext();
+            //context.RuntimeFieldResolver = f => f == "field2" ? new ElasticRuntimeField { Name = "field2" } : null;
+            parser = new ElasticQueryParser(c => c.UseMappings(client, index).UseValidation(new QueryValidationOptions { AllowUnresolvedFields = false, ShouldThrow = true }));
+            var ex = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync("field2:value", context));
+            Assert.Contains("resolved", ex.Message);
+            Assert.Contains("field2", ex.ValidationInfo.ReferencedFields);
+            Assert.Contains("field2", ex.ValidationInfo.UnresolvedFields);
+            Assert.False(ex.ValidationInfo.IsValid);
+            Assert.NotNull(ex.ValidationInfo.Message);
+            Assert.Contains("resolved", ex.ValidationInfo.Message);
+        }
+
+        [Fact]
         public void CanSortByUnmappedField() {
             var client = GetClient();
             client.Indices.Delete("stuff");

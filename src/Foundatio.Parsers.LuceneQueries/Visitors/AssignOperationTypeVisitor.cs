@@ -9,7 +9,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             if (String.IsNullOrEmpty(node.Field))
                 return base.VisitAsync(node, context);
             
-            if (!(node.Left is TermNode leftTerm) || !String.IsNullOrEmpty(leftTerm.Field))
+            if (node.Left is not TermNode leftTerm || !String.IsNullOrEmpty(leftTerm.Field))
                 throw new FormatException("The first item in an aggregation group must be the name of the target field.");
 
             if (node.Field.StartsWith("@"))

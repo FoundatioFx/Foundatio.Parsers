@@ -8,15 +8,16 @@ using Nest;
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class QueryVisitorContextExtensions {
         public static T SetMappingResolver<T>(this T context, ElasticMappingResolver mappingResolver) where T: IQueryVisitorContext {
-            if (!(context is IElasticQueryVisitorContext elasticContext))
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             elasticContext.MappingResolver = mappingResolver ?? ElasticMappingResolver.NullInstance;
 
             return context;
         }
+
         public static ElasticMappingResolver GetMappingResolver<T>(this T context) where T : IQueryVisitorContext {
-            if (!(context is IElasticQueryVisitorContext elasticContext))
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             return elasticContext.MappingResolver ?? ElasticMappingResolver.NullInstance;
@@ -39,7 +40,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static T UseScoring<T>(this T context) where T : IQueryVisitorContext {
-            if (!(context is IElasticQueryVisitorContext elasticContext))
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             elasticContext.UseScoring = true;

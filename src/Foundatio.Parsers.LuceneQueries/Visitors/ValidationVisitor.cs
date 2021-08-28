@@ -9,8 +9,6 @@ using System.Diagnostics;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class ValidationVisitor : ChainableQueryVisitor {
-        public bool ShouldThrow { get; set; }
-
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             var validationInfo = context.GetValidationInfo();
 
@@ -65,21 +63,12 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                     return;
 
                 validationInfo.ReferencedFields.Add(node.Field);
-                if (!context.GetValidationOptions().ShouldResolveFields)
+                var validationOptions = context.GetValidationOptions();
+                if (validationOptions == null || !validationOptions.ShouldResolveFields)
                     return;
 
-                var resolver = context.GetFieldResolver();
-                if (resolver == null)
-                    throw new InvalidOperationException("Field resolver not configured when using ShouldResolveFields query validation option.");
-                        
-                try {
-                    var resolvedField = resolver(node.Field);
-                    if (resolvedField == null)
-                        validationInfo.UnresolvedFields.Add(node.Field);
-                } catch {
-                    // TODO: This should be logged but not blow up
+                if (!CanResolveField(node.Field, context))
                     validationInfo.UnresolvedFields.Add(node.Field);
-                }
             } else {
                 var fields = node.GetDefaultFields(context.DefaultFields);
                 if (fields == null || fields.Length == 0)
@@ -87,6 +76,20 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 else
                     foreach (string defaultField in fields)
                         validationInfo.ReferencedFields.Add(defaultField);
+            }
+        }
+
+        protected virtual bool CanResolveField(string field, IQueryVisitorContext context) {
+            var resolver = context.GetFieldResolver();
+            if (resolver == null)
+                throw new InvalidOperationException("Field resolver not configured when using ShouldResolveFields query validation option.");
+
+            try {
+                var resolvedField = resolver(field);
+                return resolvedField != null;
+            } catch {
+                // TODO: This should be logged but not blow up
+                return false;
             }
         }
 
@@ -108,15 +111,17 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             var validationInfo = context.GetValidationInfo();
             validationInfo.QueryType = context.QueryType;
             var options = context.GetValidationOptions();
-            await validationInfo.ApplyOptionsAsync(options);
+            if (options != null) {
+                await validationInfo.ApplyOptionsAsync(options);
 
-            if (ShouldThrow && !validationInfo.IsValid)
-                throw new QueryValidationException($"Invalid query: {validationInfo.Message}", validationInfo);
+                if (options.ShouldThrow && !validationInfo.IsValid)
+                    throw new QueryValidationException($"Invalid query: {validationInfo.Message}", validationInfo);
+            }
             
             return node;
         }
 
-        public static async Task<QueryValidationInfo> RunAsync(IQueryNode node, IQueryVisitorContextWithValidation context = null, bool shouldThrow = false) {
+        public static async Task<QueryValidationInfo> RunAsync(IQueryNode node, IQueryVisitorContextWithValidation context = null) {
             if (context == null)
                 context = new QueryVisitorContext();
 
@@ -125,7 +130,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 visitor.AddVisitor(new AssignOperationTypeVisitor());
             if (context.QueryType == QueryType.Sort)
                 visitor.AddVisitor(new TermToFieldVisitor());
-            visitor.AddVisitor(new ValidationVisitor { ShouldThrow = shouldThrow });
+            visitor.AddVisitor(new ValidationVisitor());
 
             await visitor.AcceptAsync(node, context);
             return context.GetValidationInfo();
@@ -176,6 +181,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class QueryValidationOptions {
         private bool _allowUnresolvedFields;
 
+        public bool ShouldThrow { get; set; }
         public ICollection<string> AllowedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public bool ShouldResolveFields { get; set; }
         public bool AllowUnresolvedFields {

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -26,7 +24,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static QueryBase GetDefaultQuery(this TermNode node, IQueryVisitorContext context) {
-            if (!(context is IElasticQueryVisitorContext elasticContext))
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             QueryBase query;
@@ -85,7 +83,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static QueryBase GetDefaultQuery(this TermRangeNode node, IQueryVisitorContext context) {
-            if (!(context is IElasticQueryVisitorContext elasticContext))
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             string field = node.Field;

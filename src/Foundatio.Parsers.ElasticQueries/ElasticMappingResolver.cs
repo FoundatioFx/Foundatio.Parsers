@@ -356,7 +356,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 if (_inferrer != null) {
                     // resolve field alias
                     foreach (var kvp in codeProperties) {
-                        if (!(kvp.Value is IFieldAliasProperty aliasProperty))
+                        if (kvp.Value is not IFieldAliasProperty aliasProperty)
                             continue;
 
                         mergedCodeProperties[kvp.Key] = new FieldAliasProperty {

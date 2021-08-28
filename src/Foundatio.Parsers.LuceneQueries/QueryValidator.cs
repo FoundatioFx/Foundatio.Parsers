@@ -87,10 +87,11 @@ namespace Foundatio.Parsers.LuceneQueries {
                 if (context == null)
                     context = new QueryVisitorContext();
 
-                if (options != null)
-                    context.SetValidationOptions(options);
+                options ??= new QueryValidationOptions();
+                options.ShouldThrow = true;
+                context.SetValidationOptions(options);
 
-                return await ValidationVisitor.RunAsync(node, context, shouldThrow: true);
+                return await ValidationVisitor.RunAsync(node, context);
             } catch (FormatException ex) {
                 var info = new QueryValidationInfo();
                 var cursor = ex.Data["cursor"] as Cursor;

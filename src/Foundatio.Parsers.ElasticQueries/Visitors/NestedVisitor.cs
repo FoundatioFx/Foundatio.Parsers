@@ -24,7 +24,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         private string GetNestedProperty(string fullName, IQueryVisitorContext context) {
             string[] nameParts = fullName?.Split('.').ToArray();
             
-            if (nameParts == null || !(context is IElasticQueryVisitorContext elasticContext) || nameParts.Length == 0)
+            if (nameParts == null || context is not IElasticQueryVisitorContext elasticContext || nameParts.Length == 0)
                 return null;
 
             string fieldName = String.Empty;

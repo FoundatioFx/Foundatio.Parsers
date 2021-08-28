@@ -19,7 +19,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             // Merge all non-field terms together into a single match or multi-match query
             // Merge all nested queries for the same nested field together
 
-            if (!(context is IElasticQueryVisitorContext elasticContext))
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             QueryBase query = node.GetQuery(() => node.GetDefaultQuery(context));

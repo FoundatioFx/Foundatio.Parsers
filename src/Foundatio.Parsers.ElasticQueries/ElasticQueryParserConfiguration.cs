@@ -17,6 +17,7 @@ namespace Foundatio.Parsers.ElasticQueries {
             AddAggregationVisitor(new AssignOperationTypeVisitor(), 0);
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
             AddVisitor(new FieldResolverQueryVisitor(), 10);
+            AddVisitor(new ElasticFieldResolverVisitor(), 20);
         }
 
         public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
@@ -77,10 +78,10 @@ namespace Foundatio.Parsers.ElasticQueries {
             return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, shouldSkipInclude, priority);
         }
 
-        public ElasticQueryParserConfiguration UseValidation(QueryValidationOptions options, int priority = 0) {
+        public ElasticQueryParserConfiguration UseValidation(QueryValidationOptions options, int priority = 30) {
             ValidationOptions = options;
 
-            return AddVisitor(new ValidationVisitor { ShouldThrow = true }, priority);
+            return AddVisitor(new ElasticValidationVisitor(), priority);
         }
 
         public ElasticQueryParserConfiguration UseNested(int priority = 300) {

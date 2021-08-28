@@ -15,7 +15,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
-            if (context.QueryType != QueryType.Query || !(context is IElasticQueryVisitorContext elasticContext) || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
+            if (context.QueryType != QueryType.Query || context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
                 return;
 
             string location = _resolveGeoLocation != null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;
@@ -24,7 +24,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         }
 
         public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
-            if (!(context is IElasticQueryVisitorContext elasticContext) || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
+            if (context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
                 return;
 
             var box = new BoundingBox { TopLeft = node.Min, BottomRight = node.Max };

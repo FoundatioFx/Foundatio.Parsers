@@ -13,7 +13,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             await base.VisitAsync(node, context).ConfigureAwait(false);
 
-            if (!(context is IElasticQueryVisitorContext elasticContext))
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             var container = GetParentContainer(node, context);
