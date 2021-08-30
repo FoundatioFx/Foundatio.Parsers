@@ -7,6 +7,22 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class QueryVisitorContextExtensions {
+        public static RuntimeFieldResolver GetRuntimeFieldResolver(this IQueryVisitorContext context) {
+            if (context is not IElasticQueryVisitorContext elasticContext)
+                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+            return elasticContext.RuntimeFieldResolver;
+        }
+
+        public static T SetRuntimeFieldResolver<T>(this T context, RuntimeFieldResolver resolver) where T : IQueryVisitorContext {
+            if (context is not IElasticQueryVisitorContext elasticContext)
+                throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+            elasticContext.RuntimeFieldResolver = resolver;
+
+            return context;
+        }
+
         public static T SetMappingResolver<T>(this T context, ElasticMappingResolver mappingResolver) where T: IQueryVisitorContext {
             if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));

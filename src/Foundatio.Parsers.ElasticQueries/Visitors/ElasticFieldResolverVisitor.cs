@@ -7,29 +7,28 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class ElasticFieldResolverVisitor : ChainableQueryVisitor {
-        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-            ResolveField(node, context);
-
-            return base.VisitAsync(node, context);
+        public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+            await ResolveFieldAsync(node, context).ConfigureAwait(false);
+            await base.VisitAsync(node, context).ConfigureAwait(false);
         }
 
-        public override void Visit(TermNode node, IQueryVisitorContext context) {
-            ResolveField(node, context);
+        public override Task VisitAsync(TermNode node, IQueryVisitorContext context) {
+            return ResolveFieldAsync(node, context);
         }
 
-        public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
-            ResolveField(node, context);
+        public override Task VisitAsync(TermRangeNode node, IQueryVisitorContext context) {
+            return ResolveFieldAsync(node, context);
         }
 
-        public override void Visit(ExistsNode node, IQueryVisitorContext context) {
-            ResolveField(node, context);
+        public override Task VisitAsync(ExistsNode node, IQueryVisitorContext context) {
+            return ResolveFieldAsync(node, context);
         }
 
-        public override void Visit(MissingNode node, IQueryVisitorContext context) {
-            ResolveField(node, context);
+        public override Task VisitAsync(MissingNode node, IQueryVisitorContext context) {
+            return ResolveFieldAsync(node, context);
         }
 
-        private void ResolveField(IFieldQueryNode node, IQueryVisitorContext context) {
+        private async Task ResolveFieldAsync(IFieldQueryNode node, IQueryVisitorContext context) {
             if (node.Parent == null || node.Field == null)
                 return;
 
@@ -45,6 +44,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                     node.SetOriginalField(node.Field);
                     node.Field = resolvedField.FullPath;
                 }
+
                 return;
             }
 
@@ -56,12 +56,14 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                         node.SetOriginalField(node.Field);
                         node.Field = resolvedRuntimeField.Name;
                     }
+
+                    return;
                 }
             }
 
             // try to use the runtime field resolver to dynamically discover a new runtime field and, if so, add it to the list of runtime fields
             if (elasticContext.RuntimeFieldResolver != null) {
-                var newRuntimeField = elasticContext.RuntimeFieldResolver(node.Field);
+                var newRuntimeField = await elasticContext.RuntimeFieldResolver(node.Field);
                 if (newRuntimeField != null) {
                     elasticContext.RuntimeFields.Add(newRuntimeField);
                     if (!newRuntimeField.Name.Equals(node.Field, StringComparison.Ordinal)) {

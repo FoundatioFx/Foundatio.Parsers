@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
@@ -10,8 +11,10 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         ICollection<ElasticRuntimeField> RuntimeFields { get; }
         RuntimeFieldResolver RuntimeFieldResolver { get; set; }
     }
+}
 
-    public delegate ElasticRuntimeField RuntimeFieldResolver(string field);
+namespace Foundatio.Parsers {
+    public delegate Task<ElasticRuntimeField> RuntimeFieldResolver(string field);
 
     public class ElasticRuntimeField {
         public string Name { get; set; }
