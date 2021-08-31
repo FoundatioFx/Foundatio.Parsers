@@ -457,41 +457,37 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
 
         }
 
-        public static IEnumerable<object[]> AggregationTestCases {
-            get {
-                return new[] {
-                    new object[] { null, false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
-                    new object[] { "avg", false, 1, new HashSet<string> { ""}, new Dictionary<string, ICollection<string>>() },
-                    new object[] { "avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
-                    new object[] { "avg:value", true, 1,
-                        new HashSet<string> { "value" },
-                        new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
-                    },
-                    new object[] { "    avg    :    value", true, 1,
-                        new HashSet<string> { "value"},
-                        new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
-                    },
-                    new object[] { "avg:value cardinality:value sum:value min:value max:value", true, 1,
-                        new HashSet<string> { "value" },
-                        new Dictionary<string, ICollection<string>> {
-                            { "avg", new HashSet<string> { "value" } },
-                            { "cardinality", new HashSet<string> { "value" } },
-                            { "sum", new HashSet<string> { "value" } },
-                            { "min", new HashSet<string> { "value" } },
-                            { "max", new HashSet<string> { "value" } }
-                        }
-                    },
-                    new object[] { "avg:value avg:value2", true, 1,
-                        new HashSet<string> { "value", "value2" },
-                        new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value", "value2" } } }
-                    },
-                    new object[] { "avg:value avg:value", true, 1,
-                        new HashSet<string> { "value" },
-                        new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
-                    }
-                };
+        public static IEnumerable<object[]> AggregationTestCases => new[] {
+            new object[] { null, false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
+            new object[] { "avg", false, 1, new HashSet<string> { ""}, new Dictionary<string, ICollection<string>>() },
+            new object[] { "avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
+            new object[] { "avg:value", true, 1,
+                new HashSet<string> { "value" },
+                new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+            },
+            new object[] { "    avg    :    value", true, 1,
+                new HashSet<string> { "value"},
+                new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+            },
+            new object[] { "avg:value cardinality:value sum:value min:value max:value", true, 1,
+                new HashSet<string> { "value" },
+                new Dictionary<string, ICollection<string>> {
+                    { "avg", new HashSet<string> { "value" } },
+                    { "cardinality", new HashSet<string> { "value" } },
+                    { "sum", new HashSet<string> { "value" } },
+                    { "min", new HashSet<string> { "value" } },
+                    { "max", new HashSet<string> { "value" } }
+                }
+            },
+            new object[] { "avg:value avg:value2", true, 1,
+                new HashSet<string> { "value", "value2" },
+                new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value", "value2" } } }
+            },
+            new object[] { "avg:value avg:value", true, 1,
+                new HashSet<string> { "value" },
+                new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
             }
-        }
+        };
 
         [Theory]
         [MemberData(nameof(AggregationTestCases))]

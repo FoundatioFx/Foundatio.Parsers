@@ -8,7 +8,7 @@ using Foundatio.Parsers.ElasticQueries.Extensions;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors {
     public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<IFieldSort>> {
-        private readonly List<IFieldSort> _fields = new List<IFieldSort>();
+        private readonly List<IFieldSort> _fields = new();
 
         public override void Visit(TermNode node, IQueryVisitorContext context) {
             if (String.IsNullOrEmpty(node.Field))

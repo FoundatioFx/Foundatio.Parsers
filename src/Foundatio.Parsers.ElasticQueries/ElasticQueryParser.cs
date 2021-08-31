@@ -11,15 +11,13 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.ElasticQueries {
     public class ElasticQueryParser : LuceneQueryParser {
-        private readonly ElasticQueryParserConfiguration _config;
-
         public ElasticQueryParser(Action<ElasticQueryParserConfiguration> configure = null) {
             var config = new ElasticQueryParserConfiguration();
             configure?.Invoke(config);
-            _config = config;
+            Configuration = config;
         }
 
-        public ElasticQueryParserConfiguration Configuration => _config;
+        public ElasticQueryParserConfiguration Configuration { get; }
 
         public override async Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null) {
             if (String.IsNullOrEmpty(query))
@@ -32,19 +30,19 @@ namespace Foundatio.Parsers.ElasticQueries {
             SetupQueryVisitorContextDefaults(context);
             switch (context.QueryType) {
                 case QueryType.Aggregation:
-                    context.SetMappingResolver(_config.MappingResolver);
-                    result = await _config.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    context.SetMappingResolver(Configuration.MappingResolver);
+                    result = await Configuration.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
                 case QueryType.Query:
-                    context.SetMappingResolver(_config.MappingResolver).SetDefaultFields(_config.DefaultFields);
-                    if (_config.IncludeResolver != null && context.GetIncludeResolver() == null)
-                        context.SetIncludeResolver(_config.IncludeResolver);
+                    context.SetMappingResolver(Configuration.MappingResolver).SetDefaultFields(Configuration.DefaultFields);
+                    if (Configuration.IncludeResolver != null && context.GetIncludeResolver() == null)
+                        context.SetIncludeResolver(Configuration.IncludeResolver);
 
-                    result = await _config.QueryVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    result = await Configuration.QueryVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
                 case QueryType.Sort:
-                    context.SetMappingResolver(_config.MappingResolver);
-                    result = await _config.SortVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    context.SetMappingResolver(Configuration.MappingResolver);
+                    result = await Configuration.SortVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
             }
 
@@ -52,17 +50,17 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context) {
-            if (_config.RuntimeFieldResolver != null && context.GetRuntimeFieldResolver() == null)
-                context.SetRuntimeFieldResolver(_config.RuntimeFieldResolver);
+            if (Configuration.RuntimeFieldResolver != null && context.GetRuntimeFieldResolver() == null)
+                context.SetRuntimeFieldResolver(Configuration.RuntimeFieldResolver);
 
-            if (_config.FieldResolver != null && context.GetFieldResolver() == null)
-                context.SetFieldResolver(_config.FieldResolver);
+            if (Configuration.FieldResolver != null && context.GetFieldResolver() == null)
+                context.SetFieldResolver(Configuration.FieldResolver);
 
-            if (_config.MappingResolver != null && context.GetMappingResolver() == null)
-                context.SetMappingResolver(_config.MappingResolver);
+            if (Configuration.MappingResolver != null && context.GetMappingResolver() == null)
+                context.SetMappingResolver(Configuration.MappingResolver);
 
-            if (_config.ValidationOptions != null && context.GetValidationOptions() == null)
-                context.SetValidationOptions(_config.ValidationOptions);
+            if (Configuration.ValidationOptions != null && context.GetValidationOptions() == null)
+                context.SetValidationOptions(Configuration.ValidationOptions);
         }
 
         public async Task<QueryContainer> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null) {
@@ -74,18 +72,18 @@ namespace Foundatio.Parsers.ElasticQueries {
             return await BuildQueryAsync(result, context).ConfigureAwait(false);
         }
 
-        public Task<QueryContainer> BuildQueryAsync(IQueryNode query, IElasticQueryVisitorContext context = null) {
+        public async Task<QueryContainer> BuildQueryAsync(IQueryNode query, IElasticQueryVisitorContext context = null) {
             if (context == null)
                 context = new ElasticQueryVisitorContext();
 
-            var q = query.GetQuery() ?? new MatchAllQuery();
+            var q = await query.GetQueryAsync() ?? new MatchAllQuery();
             if (context?.UseScoring == false) {
                 q = new BoolQuery {
                     Filter = new QueryContainer[] { q }
                 };
             }
 
-            return Task.FromResult<QueryContainer>(q);
+            return q;
         }
 
         public async Task<AggregationContainer> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null) {
@@ -97,8 +95,13 @@ namespace Foundatio.Parsers.ElasticQueries {
             return await BuildAggregationsAsync(result, context).ConfigureAwait(false);
         }
 
-        public Task<AggregationContainer> BuildAggregationsAsync(IQueryNode aggregations, IElasticQueryVisitorContext context = null) {
-            return Task.FromResult<AggregationContainer>(aggregations?.GetAggregation());
+#pragma warning disable IDE0060 // Remove unused parameter
+        public async Task<AggregationContainer> BuildAggregationsAsync(IQueryNode aggregations, IElasticQueryVisitorContext context = null) {
+            if (aggregations == null)
+                return null;
+
+#pragma warning restore IDE0060 // Remove unused parameter
+            return await aggregations?.GetAggregationAsync();
         }
 
         public async Task<IEnumerable<IFieldSort>> BuildSortAsync(string sort, IElasticQueryVisitorContext context = null) {

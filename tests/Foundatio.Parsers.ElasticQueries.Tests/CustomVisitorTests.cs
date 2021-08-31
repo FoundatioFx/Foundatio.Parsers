@@ -104,7 +104,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             return false;
         }
 
-        private Task<string> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch) {
+        private static Task<string> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch) {
             if (String.Equals(expected, actual))
                 return Task.FromResult(resolvedFilterIfMatch);
             
@@ -175,7 +175,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             await base.VisitAsync(node, context);
         }
 
-        private Task<List<string>> GetIdsAsync(string term) {
+        private static Task<List<string>> GetIdsAsync(string term) {
             var ids = new List<string>();
             switch (term?.ToLowerInvariant()) {
                 case "one":
@@ -192,7 +192,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             return Task.FromResult(ids);
         }
         
-        private string ToTerm(GroupNode node) {
+        private static string ToTerm(GroupNode node) {
             var builder = new StringBuilder();
 
             if (node.Left != null)

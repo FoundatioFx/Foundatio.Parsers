@@ -10,7 +10,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public delegate Task<string> IncludeResolver(string name);
     
     public class IncludeVisitor : ChainableMutatingQueryVisitor {
-        private readonly LuceneQueryParser _parser = new LuceneQueryParser();
+        private readonly LuceneQueryParser _parser = new();
         private readonly ShouldSkipIncludeFunc _shouldSkipInclude;
 
         public IncludeVisitor(ShouldSkipIncludeFunc shouldSkipInclude = null) {

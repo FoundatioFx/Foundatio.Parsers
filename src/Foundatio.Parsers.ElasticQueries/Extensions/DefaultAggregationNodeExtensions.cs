@@ -6,25 +6,25 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultAggregationNodeExtensions {
         // NOTE: We may want to read this dynamically from server settings.
         public const int MAX_BUCKET_SIZE = 10000;
         
-        public static AggregationBase GetDefaultAggregation(this IQueryNode node, IQueryVisitorContext context) {
+        public static Task<AggregationBase> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context) {
             if (node is GroupNode groupNode)
-                return groupNode.GetDefaultAggregation(context);
+                return groupNode.GetDefaultAggregationAsync(context);
 
             if (node is TermNode termNode)
-                return termNode.GetDefaultAggregation(context);
+                return termNode.GetDefaultAggregationAsync(context);
 
             return null;
         }
 
-        public static AggregationBase GetDefaultAggregation(this GroupNode node, IQueryVisitorContext context) {
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null)
+        public static async Task<AggregationBase> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context) {
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left != null)
@@ -35,7 +35,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
             switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(elasticContext.DefaultTimeZone?.Value), context);
+                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()), context);
 
                 case AggregationType.Histogram:
                     return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost, context);
@@ -75,14 +75,13 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return null;
         }
 
-        public static AggregationBase GetDefaultAggregation(this TermNode node, IQueryVisitorContext context) {
-            var elasticContext = context as IElasticQueryVisitorContext;
-            if (elasticContext == null)
+        public static async Task<AggregationBase> GetDefaultAggregationAsync(this TermNode node, IQueryVisitorContext context) {
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             string aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.Field);
             var property = elasticContext.MappingResolver.GetMappingProperty(node.Field, true);
-            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: node.GetTimeZone(elasticContext.DefaultTimeZone?.Value);
+            string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: node.GetTimeZone(await elasticContext.GetTimeZoneAsync());
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:
@@ -225,42 +224,17 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (String.IsNullOrEmpty(proximity))
                 return GetInterval(start, end);
 
-            switch (proximity.Trim()) {
-                case "s":
-                case "1s":
-                case "second":
-                    return DateInterval.Second;
-                case "m":
-                case "1m":
-                case "minute":
-                    return DateInterval.Minute;
-                case "h":
-                case "1h":
-                case "hour":
-                    return DateInterval.Hour;
-                case "d":
-                case "1d":
-                case "day":
-                    return DateInterval.Day;
-                case "w":
-                case "1w":
-                case "week":
-                    return DateInterval.Week;
-                case "M":
-                case "1M":
-                case "month":
-                    return DateInterval.Month;
-                case "q":
-                case "1q":
-                case "quarter":
-                    return DateInterval.Quarter;
-                case "y":
-                case "1y":
-                case "year":
-                    return DateInterval.Year;
-            }
-
-            return new Union<DateInterval, Time>(proximity);
+            return proximity.Trim() switch {
+                "s" or "1s" or "second" => DateInterval.Second,
+                "m" or "1m" or "minute" => DateInterval.Minute,
+                "h" or "1h" or "hour" => DateInterval.Hour,
+                "d" or "1d" or "day" => DateInterval.Day,
+                "w" or "1w" or "week" => DateInterval.Week,
+                "M" or "1M" or "month" => DateInterval.Month,
+                "q" or "1q" or "quarter" => DateInterval.Quarter,
+                "y" or "1y" or "year" => DateInterval.Year,
+                _ => new Union<DateInterval, Time>(proximity),
+            };
         }
 
         private static Union<DateInterval, Time> GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100) {

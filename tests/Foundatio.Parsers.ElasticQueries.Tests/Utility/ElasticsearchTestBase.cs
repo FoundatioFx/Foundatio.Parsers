@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests {
     public abstract class ElasticsearchTestBase : TestWithLoggingBase, IAsyncLifetime {
-        private readonly List<IndexName> _createdIndexes = new List<IndexName>();
+        private readonly List<IndexName> _createdIndexes = new();
         private static bool _elaticsearchReady;
 
         protected ElasticsearchTestBase(ITestOutputHelper output) : base(output) {

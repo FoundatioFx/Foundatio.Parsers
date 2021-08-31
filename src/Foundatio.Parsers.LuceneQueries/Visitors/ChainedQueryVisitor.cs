@@ -6,7 +6,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode>, IChainableQueryVisitor {
-        private readonly List<QueryVisitorWithPriority> _visitors = new List<QueryVisitorWithPriority>();
+        private readonly List<QueryVisitorWithPriority> _visitors = new();
         private QueryVisitorWithPriority[] _frozenVisitors;
         private bool _isDirty = true;
 

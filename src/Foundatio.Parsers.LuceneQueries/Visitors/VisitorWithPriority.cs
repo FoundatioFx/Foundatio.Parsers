@@ -23,7 +23,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 return x.Priority.CompareTo(y.Priority);
             }
 
-            public static readonly PriorityComparer Instance = new PriorityComparer();
+            public static readonly PriorityComparer Instance = new();
         }
     }
 }

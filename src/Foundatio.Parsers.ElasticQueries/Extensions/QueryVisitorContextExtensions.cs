@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -21,6 +22,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             elasticContext.RuntimeFieldResolver = resolver;
 
             return context;
+        }
+
+        public static Task<string> GetTimeZoneAsync(this IQueryVisitorContext context) {
+            var elasticContext = context as IElasticQueryVisitorContext;
+            if (elasticContext?.DefaultTimeZone != null)
+                return elasticContext?.DefaultTimeZone?.Invoke();
+
+            return Task.FromResult<string>(null);
         }
 
         public static T SetMappingResolver<T>(this T context, ElasticMappingResolver mappingResolver) where T: IQueryVisitorContext {

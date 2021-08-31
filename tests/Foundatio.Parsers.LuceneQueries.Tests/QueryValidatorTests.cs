@@ -56,8 +56,9 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
         [Fact]
         public async Task ResolvedFields() {
-            var options = new QueryValidationOptions();
-            options.AllowUnresolvedFields = false;
+            var options = new QueryValidationOptions {
+                AllowUnresolvedFields = false
+            };
             var context = new QueryVisitorContext();
             context.SetFieldResolver(f => f == "field1" ? f : null);
             var info = await QueryValidator.ValidateQueryAsync(@"field1:blah", options, context);
@@ -66,8 +67,9 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
         [Fact]
         public async Task NonResolvedFields() {
-            var options = new QueryValidationOptions();
-            options.AllowUnresolvedFields = false;
+            var options = new QueryValidationOptions {
+                AllowUnresolvedFields = false
+            };
             var context = new QueryVisitorContext();
             context.SetFieldResolver(f => f == "field1" ? f : null);
             var info = await QueryValidator.ValidateQueryAsync(@"field1:blah field2:blah", options, context);
@@ -77,8 +79,9 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
 
         [Fact]
         public async Task NonResolvedThrowsFields() {
-            var options = new QueryValidationOptions();
-            options.AllowUnresolvedFields = false;
+            var options = new QueryValidationOptions {
+                AllowUnresolvedFields = false
+            };
             var context = new QueryVisitorContext();
             context.SetFieldResolver(f => f == "field1" ? f : null);
             var ex = await Assert.ThrowsAsync<QueryValidationException>(() => QueryValidator.ValidateQueryAndThrowAsync(@"field1:blah field2:blah", options, context));

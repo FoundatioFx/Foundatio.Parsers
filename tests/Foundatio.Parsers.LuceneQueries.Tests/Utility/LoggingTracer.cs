@@ -10,9 +10,9 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
     public class LoggingTracer : ITracer {
         private readonly ILogger _logger;
         private readonly bool _reportPerformance;
-        private readonly RuleStats _cacheHitStats = new RuleStats();
-        private readonly Stack<RuleStackEntry> _ruleStack = new Stack<RuleStackEntry>();
-        private readonly Dictionary<string, RuleStats> _stats = new Dictionary<string, RuleStats>();
+        private readonly RuleStats _cacheHitStats = new();
+        private readonly Stack<RuleStackEntry> _ruleStack = new();
+        private readonly Dictionary<string, RuleStats> _stats = new();
         private int _indentLevel;
 
         public LoggingTracer(ILogger logger, bool reportPerformance = false) {

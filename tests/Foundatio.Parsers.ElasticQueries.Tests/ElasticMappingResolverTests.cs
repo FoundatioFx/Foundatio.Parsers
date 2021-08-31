@@ -111,7 +111,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             Assert.IsType<ObjectProperty>(nestedDataProperty);
         }
 
-        private Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath) {
+        private static Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath) {
             return objectPath;
         }
     }

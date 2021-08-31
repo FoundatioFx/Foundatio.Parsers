@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -7,12 +8,12 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class DefaultQueryNodeExtensions {
-        public static QueryBase GetDefaultQuery(this IQueryNode node, IQueryVisitorContext context) {
+        public static async Task<QueryBase> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context) {
             if (node is TermNode termNode)
                 return termNode.GetDefaultQuery(context);
 
             if (node is TermRangeNode termRangeNode)
-                return termRangeNode.GetDefaultQuery(context);
+                return await termRangeNode.GetDefaultQueryAsync(context);
 
             if (node is ExistsNode existsNode)
                 return existsNode.GetDefaultQuery(context);
@@ -82,13 +83,13 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             return query;
         }
 
-        public static QueryBase GetDefaultQuery(this TermRangeNode node, IQueryVisitorContext context) {
+        public static async Task<QueryBase> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context) {
             if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             string field = node.Field;
             if (elasticContext.MappingResolver.IsDatePropertyType(field)) {
-                var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(elasticContext.DefaultTimeZone?.Value) };
+                var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()) };
                 if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*") {
                     if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
                         range.GreaterThan = node.UnescapedMin;
@@ -136,13 +137,6 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     }
                 }
             };
-        }
-
-        private static string GetString(IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out var value) && value is string)
-                return (string)value;
-
-            return null;
         }
     }
 }
