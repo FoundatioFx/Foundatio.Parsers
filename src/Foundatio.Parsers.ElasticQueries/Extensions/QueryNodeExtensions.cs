@@ -7,8 +7,12 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class QueryNodeExtensions {
         private const string QueryKey = "@Query";
         public static Task<QueryBase> GetQueryAsync(this IQueryNode node, Func<Task<QueryBase>> getDefaultValue = null) {
-            if (!node.Data.TryGetValue(QueryKey, out object value))
+            if (!node.Data.TryGetValue(QueryKey, out object value)) {
+                if (getDefaultValue == null)
+                    return Task.FromResult<QueryBase>(null);
+
                 return getDefaultValue?.Invoke();
+            }
 
             return Task.FromResult(value as QueryBase);
         }
@@ -32,8 +36,12 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
 
         private const string AggregationKey = "@Aggregation";
         public static Task<AggregationBase> GetAggregationAsync(this IQueryNode node, Func<Task<AggregationBase>> getDefaultValue = null) {
-            if (!node.Data.TryGetValue(AggregationKey, out object value))
+            if (!node.Data.TryGetValue(AggregationKey, out object value)) {
+                if (getDefaultValue == null)
+                    return Task.FromResult<AggregationBase>(null);
+
                 return getDefaultValue?.Invoke();
+            }
 
             return Task.FromResult(value as AggregationBase);
         }

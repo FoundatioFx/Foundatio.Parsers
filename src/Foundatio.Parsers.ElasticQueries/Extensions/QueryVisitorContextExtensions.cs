@@ -27,7 +27,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         public static Task<string> GetTimeZoneAsync(this IQueryVisitorContext context) {
             var elasticContext = context as IElasticQueryVisitorContext;
             if (elasticContext?.DefaultTimeZone != null)
-                return elasticContext?.DefaultTimeZone?.Invoke();
+                return elasticContext.DefaultTimeZone.Invoke();
 
             return Task.FromResult<string>(null);
         }
