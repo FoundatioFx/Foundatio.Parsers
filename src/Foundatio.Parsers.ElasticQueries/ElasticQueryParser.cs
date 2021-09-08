@@ -50,6 +50,9 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context) {
+            if (Configuration.EnableRuntimeFieldResolver.HasValue && !context.IsRuntimeFieldResolverEnabled().HasValue)
+                context.EnableRuntimeFieldResolver(Configuration.EnableRuntimeFieldResolver.Value);
+
             if (Configuration.RuntimeFieldResolver != null && context.GetRuntimeFieldResolver() == null)
                 context.SetRuntimeFieldResolver(Configuration.RuntimeFieldResolver);
 

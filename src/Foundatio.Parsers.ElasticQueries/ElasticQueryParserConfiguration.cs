@@ -25,6 +25,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         public QueryFieldResolver FieldResolver { get; private set; }
         public IncludeResolver IncludeResolver { get; private set; }
         public RuntimeFieldResolver RuntimeFieldResolver { get; private set; }
+        public bool? EnableRuntimeFieldResolver { get; private set; }
         public ElasticMappingResolver MappingResolver { get; private set; }
         public QueryValidationOptions ValidationOptions { get; private set; }
         public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
@@ -69,6 +70,13 @@ namespace Foundatio.Parsers.ElasticQueries {
             IncludeResolver = includeResolver;
 
             return AddVisitor(new IncludeVisitor(shouldSkipInclude), priority);
+        }
+
+        public ElasticQueryParserConfiguration UseOptInRuntimeFieldResolver(RuntimeFieldResolver fieldResolver) {
+            EnableRuntimeFieldResolver = false;
+            RuntimeFieldResolver = fieldResolver;
+
+            return this;
         }
 
         public ElasticQueryParserConfiguration UseRuntimeFieldResolver(RuntimeFieldResolver fieldResolver) {

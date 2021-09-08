@@ -62,7 +62,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             }
 
             // try to use the runtime field resolver to dynamically discover a new runtime field and, if so, add it to the list of runtime fields
-            if (elasticContext.RuntimeFieldResolver != null) {
+            if ((elasticContext.EnableRuntimeFieldResolver.HasValue == false || elasticContext.EnableRuntimeFieldResolver.Value) && elasticContext.RuntimeFieldResolver != null) {
                 var newRuntimeField = await elasticContext.RuntimeFieldResolver(node.Field);
                 if (newRuntimeField != null) {
                     elasticContext.RuntimeFields.Add(newRuntimeField);

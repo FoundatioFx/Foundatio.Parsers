@@ -112,7 +112,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             validationInfo.QueryType = context.QueryType;
             var options = context.GetValidationOptions();
             if (options != null) {
-                await validationInfo.ApplyOptionsAsync(options);
+                await validationInfo.ApplyOptionsAsync(options, node);
 
                 if (options.ShouldThrow && !validationInfo.IsValid)
                     throw new QueryValidationException($"Invalid query: {validationInfo.Message}", validationInfo);
@@ -140,7 +140,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return RunAsync(node, context).GetAwaiter().GetResult();
         }
 
-        public static async Task<bool> RunAsync(IQueryNode node, QueryValidationOptions options, IQueryVisitorContextWithValidation context = null) {
+        public static async Task<QueryValidationInfo> RunAsync(IQueryNode node, QueryValidationOptions options, IQueryVisitorContextWithValidation context = null) {
             if (context == null)
                 context = new QueryVisitorContext();
 
@@ -149,31 +149,29 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
             await new ValidationVisitor().AcceptAsync(node, context);
             var validationInfo = context.GetValidationInfo();
-            return validationInfo.IsValid;
+            return validationInfo;
         }
 
-        public static bool Run(IQueryNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidation context = null) {
-            var options = new QueryValidationOptions {
-                CustomValidationCallback = async i => (await validator(i), null)
-            };
+        public static QueryValidationInfo Run(IQueryNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidation context = null) {
+            var options = new QueryValidationOptions();
+            options.CustomRules.Add(async (i, n) => await validator(i) ? new QueryValidationRuleResult() : new QueryValidationRuleResult());
             return RunAsync(node, options, context).GetAwaiter().GetResult();
         }
 
-        public static bool Run(IQueryNode node, Func<QueryValidationInfo, Task<(bool, string)>> validator, IQueryVisitorContextWithValidation context = null) {
-            var options = new QueryValidationOptions {
-                CustomValidationCallback = validator
-            };
+        public static QueryValidationInfo Run(IQueryNode node, QueryValidationRule validator, IQueryVisitorContextWithValidation context = null) {
+            var options = new QueryValidationOptions();
+            options.CustomRules.Add(validator);
             return RunAsync(node, options, context).GetAwaiter().GetResult();
         }
 
-        public static Task<bool> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null) {
+        public static Task<QueryValidationInfo> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null) {
             var options = new QueryValidationOptions();
             foreach (var field in allowedFields)
                 options.AllowedFields.Add(field);
             return RunAsync(node, options, context);
         }
 
-        public static bool Run(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null) {
+        public static QueryValidationInfo Run(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null) {
             return RunAsync(node, allowedFields, context).GetAwaiter().GetResult();
         }
     }
@@ -194,7 +192,14 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
         public ICollection<string> AllowedOperations { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public int AllowedMaxNodeDepth { get; set; }
-        public Func<QueryValidationInfo, Task<(bool, string)>> CustomValidationCallback { get; set; }
+        public ICollection<QueryValidationRule> CustomRules { get; } = new List<QueryValidationRule>();
+    }
+
+    public delegate Task<QueryValidationRuleResult> QueryValidationRule(QueryValidationInfo validationInfo, IQueryNode root);
+
+    public class QueryValidationRuleResult {
+        public bool IsValid {  get; set; }
+        public string Message { get; set; }
     }
 
     [DebuggerDisplay("IsValid: {IsValid} Message: {Message} Type: {QueryType}")]
@@ -222,7 +227,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             Message = message;
         }
 
-        internal async Task ApplyOptionsAsync(QueryValidationOptions options) {
+        internal async Task ApplyOptionsAsync(QueryValidationOptions options, IQueryNode rootNode) {
             if (options == null)
                 return;
 
@@ -247,10 +252,13 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 return;
             }
 
-            if (options.CustomValidationCallback != null) {
-                var (isValid, message) = await options.CustomValidationCallback(this).ConfigureAwait(false);
-                if (!isValid) {
-                    MarkInvalid($"Query is not valid: {message}");
+            if (options.CustomRules != null && options.CustomRules.Count > 0) {
+                foreach (var rule in options.CustomRules) {
+                    var result = await rule(this, rootNode).ConfigureAwait(false);
+                    if (result.IsValid)
+                        continue;
+
+                    MarkInvalid($"Query is not valid: {result.Message}");
                     return;
                 }
             }

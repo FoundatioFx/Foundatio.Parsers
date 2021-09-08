@@ -33,7 +33,6 @@ namespace Foundatio.Parsers.LuceneQueries {
             return InternalValidateAsync(sort, context, options);
         }
 
-
         private static async Task<QueryValidationInfo> InternalValidateAsync(string query, IQueryVisitorContextWithValidation context, QueryValidationOptions options = null) {
             var parser = new LuceneQueryParser();
             try {
