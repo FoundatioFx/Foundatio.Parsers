@@ -10,7 +10,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public delegate Task<string> IncludeResolver(string name);
     
     public class IncludeVisitor : ChainableMutatingQueryVisitor {
-        private readonly LuceneQueryParser _parser = new LuceneQueryParser();
+        private readonly LuceneQueryParser _parser = new();
         private readonly ShouldSkipIncludeFunc _shouldSkipInclude;
 
         public IncludeVisitor(ShouldSkipIncludeFunc shouldSkipInclude = null) {
@@ -37,7 +37,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         }
 
         public static Task<IQueryNode> RunAsync(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
-            return new IncludeVisitor(shouldSkipInclude).AcceptAsync(node, context ?? new QueryVisitorContextWithIncludeResolver { IncludeResolver = includeResolver });
+            return new IncludeVisitor(shouldSkipInclude).AcceptAsync(node, context ?? new QueryVisitorContext { IncludeResolver = includeResolver });
         }
 
         public static IQueryNode Run(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {

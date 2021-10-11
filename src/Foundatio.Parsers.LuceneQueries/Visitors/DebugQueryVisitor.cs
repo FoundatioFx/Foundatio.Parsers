@@ -8,7 +8,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string> {
-        private readonly StringBuilder _builder = new StringBuilder();
+        private readonly StringBuilder _builder = new();
         private readonly IndentedTextWriter _writer;
 
         public DebugQueryVisitor() {
@@ -111,8 +111,10 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             _writer.Indent++;
             foreach (var kvp in node.Data) {
                 _writer.Write(kvp.Key);
-                _writer.Write(": ");
-                _writer.WriteLine(kvp.Value.ToString());
+                if (kvp.Value != null) {
+                    _writer.Write(": ");
+                    _writer.WriteLine(kvp.Value.ToString());
+                }
             }
             _writer.Indent--;
         }

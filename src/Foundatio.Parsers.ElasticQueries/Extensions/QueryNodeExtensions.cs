@@ -1,15 +1,20 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions {
     public static class QueryNodeExtensions {
         private const string QueryKey = "@Query";
-        public static QueryBase GetQuery(this IQueryNode node, Func<QueryBase> getDefaultValue = null) {
-            if (!node.Data.TryGetValue(QueryKey, out object value))
-                return getDefaultValue?.Invoke();
+        public static Task<QueryBase> GetQueryAsync(this IQueryNode node, Func<Task<QueryBase>> getDefaultValue = null) {
+            if (!node.Data.TryGetValue(QueryKey, out object value)) {
+                if (getDefaultValue == null)
+                    return Task.FromResult<QueryBase>(null);
 
-            return value as QueryBase;
+                return getDefaultValue?.Invoke();
+            }
+
+            return Task.FromResult(value as QueryBase);
         }
 
         public static void SetQuery(this IQueryNode node, QueryBase container) {
@@ -30,11 +35,15 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         private const string AggregationKey = "@Aggregation";
-        public static AggregationBase GetAggregation(this IQueryNode node, Func<AggregationBase> getDefaultValue = null) {
-            if (!node.Data.TryGetValue(AggregationKey, out object value))
-                return getDefaultValue?.Invoke();
+        public static Task<AggregationBase> GetAggregationAsync(this IQueryNode node, Func<Task<AggregationBase>> getDefaultValue = null) {
+            if (!node.Data.TryGetValue(AggregationKey, out object value)) {
+                if (getDefaultValue == null)
+                    return Task.FromResult<AggregationBase>(null);
 
-            return value as AggregationBase;
+                return getDefaultValue?.Invoke();
+            }
+
+            return Task.FromResult(value as AggregationBase);
         }
 
         public static void SetAggregation(this IQueryNode node, AggregationBase aggregation) {

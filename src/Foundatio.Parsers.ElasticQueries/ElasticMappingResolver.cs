@@ -12,10 +12,10 @@ namespace Foundatio.Parsers.ElasticQueries {
         private ITypeMapping _serverMapping;
         private readonly ITypeMapping _codeMapping;
         private readonly Inferrer _inferrer;
-        private readonly ConcurrentDictionary<string, FieldMapping> _mappingCache = new ConcurrentDictionary<string, FieldMapping>();
+        private readonly ConcurrentDictionary<string, FieldMapping> _mappingCache = new();
         private readonly ILogger _logger;
 
-        public static ElasticMappingResolver NullInstance = new ElasticMappingResolver(() => null);
+        public static ElasticMappingResolver NullInstance = new(() => null);
 
         public ElasticMappingResolver(Func<ITypeMapping> getMapping, Inferrer inferrer = null, ILogger logger = null) {
             GetServerMappingFunc = getMapping;
@@ -77,7 +77,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                     if (currentProperties != null)
                         fieldMapping = currentProperties.Values.FirstOrDefault(m => {
                             var propertyName = _inferrer.PropertyName(m?.Name);
-                            return propertyName == null ? false : propertyName.Equals(fieldPart, StringComparison.OrdinalIgnoreCase);
+                            return propertyName != null && propertyName.Equals(fieldPart, StringComparison.OrdinalIgnoreCase);
                         });
 
                     // no mapping found, call GetServerMapping again in case it hasn't been called recently and there are possibly new mappings
@@ -273,67 +273,37 @@ namespace Foundatio.Parsers.ElasticQueries {
             if (property?.Type == null)
                 return FieldType.None;
 
-            switch (property.Type) {
-                case "geo_point":
-                    return FieldType.GeoPoint;
-                case "geo_shape":
-                    return FieldType.GeoShape;
-                case "ip":
-                    return FieldType.Ip;
-                case "binary":
-                    return FieldType.Binary;
-                case "keyword":
-                    return FieldType.Keyword;
-                case "string":
-                case "text":
-                    return FieldType.Text;
-                case "date":
-                    return FieldType.Date;
-                case "boolean":
-                    return FieldType.Boolean;
-                case "completion":
-                    return FieldType.Completion;
-                case "nested":
-                    return FieldType.Nested;
-                case "object":
-                    return FieldType.Object;
-                case "murmur3":
-                    return FieldType.Murmur3Hash;
-                case "token_count":
-                    return FieldType.TokenCount;
-                case "percolator":
-                    return FieldType.Percolator;
-                case "integer":
-                    return FieldType.Integer;
-                case "long":
-                    return FieldType.Long;
-                case "short":
-                    return FieldType.Short;
-                case "byte":
-                    return FieldType.Byte;
-                case "float":
-                    return FieldType.Float;
-                case "half_float":
-                    return FieldType.HalfFloat;
-                case "scaled_float":
-                    return FieldType.ScaledFloat;
-                case "double":
-                    return FieldType.Double;
-                case "integer_range":
-                    return FieldType.IntegerRange;
-                case "float_range":
-                    return FieldType.FloatRange;
-                case "long_range":
-                    return FieldType.LongRange;
-                case "double_range":
-                    return FieldType.DoubleRange;
-                case "date_range":
-                    return FieldType.DateRange;
-                case "ip_range":
-                    return FieldType.IpRange;
-                default:
-                    return FieldType.None;
-            }
+            return property.Type switch {
+                "geo_point" => FieldType.GeoPoint,
+                "geo_shape" => FieldType.GeoShape,
+                "ip" => FieldType.Ip,
+                "binary" => FieldType.Binary,
+                "keyword" => FieldType.Keyword,
+                "string" or "text" => FieldType.Text,
+                "date" => FieldType.Date,
+                "boolean" => FieldType.Boolean,
+                "completion" => FieldType.Completion,
+                "nested" => FieldType.Nested,
+                "object" => FieldType.Object,
+                "murmur3" => FieldType.Murmur3Hash,
+                "token_count" => FieldType.TokenCount,
+                "percolator" => FieldType.Percolator,
+                "integer" => FieldType.Integer,
+                "long" => FieldType.Long,
+                "short" => FieldType.Short,
+                "byte" => FieldType.Byte,
+                "float" => FieldType.Float,
+                "half_float" => FieldType.HalfFloat,
+                "scaled_float" => FieldType.ScaledFloat,
+                "double" => FieldType.Double,
+                "integer_range" => FieldType.IntegerRange,
+                "float_range" => FieldType.FloatRange,
+                "long_range" => FieldType.LongRange,
+                "double_range" => FieldType.DoubleRange,
+                "date_range" => FieldType.DateRange,
+                "ip_range" => FieldType.IpRange,
+                _ => FieldType.None,
+            };
         }
 
         private IProperties MergeProperties(IProperties codeProperties, IProperties serverProperties) {
@@ -356,7 +326,7 @@ namespace Foundatio.Parsers.ElasticQueries {
                 if (_inferrer != null) {
                     // resolve field alias
                     foreach (var kvp in codeProperties) {
-                        if (!(kvp.Value is IFieldAliasProperty aliasProperty))
+                        if (kvp.Value is not IFieldAliasProperty aliasProperty)
                             continue;
 
                         mergedCodeProperties[kvp.Key] = new FieldAliasProperty {
@@ -424,7 +394,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, ILogger logger = null) where T : class {
-            logger = logger ?? NullLogger.Instance;
+            logger ??= NullLogger.Instance;
 
             return Create(mappingBuilder, client.Infer, () => {
                 client.Indices.Refresh(Indices.Index<T>());
@@ -438,7 +408,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, string index, ILogger logger = null) where T : class {
-            logger = logger ?? NullLogger.Instance;
+            logger ??= NullLogger.Instance;
 
             return Create(mappingBuilder, client.Infer, () => {
                 client.Indices.Refresh(index);
@@ -458,7 +428,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public static ElasticMappingResolver Create<T>(IElasticClient client, ILogger logger = null) {
-            logger = logger ?? NullLogger.Instance;
+            logger ??= NullLogger.Instance;
 
             return Create(() => {
                 client.Indices.Refresh(Indices.Index<T>());
@@ -472,7 +442,7 @@ namespace Foundatio.Parsers.ElasticQueries {
         }
 
         public static ElasticMappingResolver Create(IElasticClient client, string index, ILogger logger = null) {
-            logger = logger ?? NullLogger.Instance;
+            logger ??= NullLogger.Instance;
 
             return Create(() => {
                 client.Indices.Refresh(index);

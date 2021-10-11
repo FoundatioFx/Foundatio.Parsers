@@ -13,16 +13,14 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             await base.VisitAsync(node, context).ConfigureAwait(false);
 
-            if (!(context is IElasticQueryVisitorContext elasticContext))
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            var container = GetParentContainer(node, context);
+            var container = await GetParentContainerAsync(node, context);
             var termsAggregation = container as ITermsAggregation;
-            var dateHistogramAggregation = container as IDateHistogramAggregation;
-            var topHitsAggregation = container as ITopHitsAggregation;
 
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
-                var aggregation = child.GetAggregation(() => child.GetDefaultAggregation(context));
+                var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
                 if (aggregation == null) {
                     var termNode = child as TermNode;
                     if (termNode != null && termsAggregation != null) {
@@ -42,7 +40,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                         }
                     }
 
-                    if (termNode != null && topHitsAggregation != null) {
+                    if (termNode != null && container is ITopHitsAggregation topHitsAggregation) {
                         var filter = node.GetSourceFilter(() => new SourceFilter());
                         if (termNode.Field == "@exclude") {
                             if (filter.Excludes == null)
@@ -58,7 +56,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                         topHitsAggregation.Source = filter;
                     }
 
-                    if (termNode != null && dateHistogramAggregation != null) {
+                    if (termNode != null && container is IDateHistogramAggregation dateHistogramAggregation) {
                         if (termNode.Field == "@missing") {
                             DateTime? missingValue = null;
                             if (!String.IsNullOrEmpty(termNode.Term) && DateTime.TryParse(termNode.Term, out var parsedMissingDate))
@@ -76,7 +74,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 if (container is BucketAggregationBase bucketContainer) {
                     if (bucketContainer.Aggregations == null)
                         bucketContainer.Aggregations = new AggregationDictionary();
-                    
+
                     bucketContainer.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
                 }
 
@@ -95,18 +93,18 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
                 node.SetAggregation(container);
         }
 
-        private AggregationBase GetParentContainer(IQueryNode node, IQueryVisitorContext context) {
+        private async Task<AggregationBase> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context) {
             AggregationBase container = null;
             var currentNode = node;
             while (container == null && currentNode != null) {
                 IQueryNode n = currentNode;
-                container = n.GetAggregation(() => {
-                    var result = n.GetDefaultAggregation(context);
+                container = await n.GetAggregationAsync(async () => {
+                    var result = await n.GetDefaultAggregationAsync(context);
                     if (result != null)
                         n.SetAggregation(result);
 
                     return result;
-                }) as AggregationBase;
+                });
 
                 if (currentNode.Parent != null)
                     currentNode = currentNode.Parent;

@@ -19,17 +19,17 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
             // Merge all non-field terms together into a single match or multi-match query
             // Merge all nested queries for the same nested field together
 
-            if (!(context is IElasticQueryVisitorContext elasticContext))
+            if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            QueryBase query = node.GetQuery(() => node.GetDefaultQuery(context));
+            QueryBase query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
             QueryBase container = query;
             var nested = query as NestedQuery;
             if (nested != null && node.Parent != null)
                 container = null;
 
             foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
-                var childQuery = child.GetQuery(() => child.GetDefaultQuery(context));
+                var childQuery = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).ConfigureAwait(false);
                 if (childQuery == null) continue;
 
                 var op = node.GetOperator(elasticContext);

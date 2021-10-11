@@ -135,6 +135,25 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         }
 
         [Fact]
+        public void CanParseEmptyQuotes() {
+#if ENABLE_TRACING
+            var tracer = new LoggingTracer(_logger, reportPerformance: true);
+#else
+            var tracer = NullTracer.Instance;
+#endif
+            var parser = new LuceneQueryParser {
+                Tracer = tracer
+            };
+
+            var result = parser.Parse("\"\"");
+            var ast = DebugQueryVisitor.Run(result);
+
+            Assert.IsType<TermNode>(result.Left);
+            Assert.True((result.Left as TermNode).IsQuotedTerm);
+            Assert.Empty((result.Left as TermNode).Term);
+        }
+
+        [Fact]
         public void MultipleOperatorsIsNotValid() {
             var sut = new LuceneQueryParser();
 
@@ -184,7 +203,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
                 var result = sut.Parse("\"something\"\"");
                 var ast = DebugQueryVisitor.Run(result);
             });
-            Assert.Contains("Unexpected character", ex.Message);
+            Assert.Contains("Unterminated quoted string", ex.Message);
         }
 
         [Fact]

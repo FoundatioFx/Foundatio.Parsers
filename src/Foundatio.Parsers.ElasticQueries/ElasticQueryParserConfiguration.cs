@@ -17,14 +17,17 @@ namespace Foundatio.Parsers.ElasticQueries {
             AddAggregationVisitor(new AssignOperationTypeVisitor(), 0);
             AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
             AddVisitor(new FieldResolverQueryVisitor(), 10);
+            AddVisitor(new ElasticFieldResolverVisitor(), 20);
         }
 
         public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
         public string[] DefaultFields { get; private set; }
         public QueryFieldResolver FieldResolver { get; private set; }
         public IncludeResolver IncludeResolver { get; private set; }
+        public RuntimeFieldResolver RuntimeFieldResolver { get; private set; }
+        public bool? EnableRuntimeFieldResolver { get; private set; }
         public ElasticMappingResolver MappingResolver { get; private set; }
-        public Func<QueryValidationInfo, Task<bool>> Validator { get; private set; }
+        public QueryValidationOptions ValidationOptions { get; private set; }
         public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
         public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
@@ -69,6 +72,19 @@ namespace Foundatio.Parsers.ElasticQueries {
             return AddVisitor(new IncludeVisitor(shouldSkipInclude), priority);
         }
 
+        public ElasticQueryParserConfiguration UseOptInRuntimeFieldResolver(RuntimeFieldResolver fieldResolver) {
+            EnableRuntimeFieldResolver = false;
+            RuntimeFieldResolver = fieldResolver;
+
+            return this;
+        }
+
+        public ElasticQueryParserConfiguration UseRuntimeFieldResolver(RuntimeFieldResolver fieldResolver) {
+            RuntimeFieldResolver = fieldResolver;
+
+            return this;
+        }
+
         public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
             return UseIncludes(name => Task.FromResult(resolveInclude(name)), shouldSkipInclude, priority);
         }
@@ -77,10 +93,10 @@ namespace Foundatio.Parsers.ElasticQueries {
             return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, shouldSkipInclude, priority);
         }
 
-        public ElasticQueryParserConfiguration UseValidation(Func<QueryValidationInfo, Task<bool>> validator, int priority = 0) {
-            Validator = validator;
+        public ElasticQueryParserConfiguration UseValidation(QueryValidationOptions options, int priority = 30) {
+            ValidationOptions = options;
 
-            return AddVisitor(new ValidationVisitor { ShouldThrow = true }, priority);
+            return AddVisitor(new ElasticValidationVisitor(), priority);
         }
 
         public ElasticQueryParserConfiguration UseNested(int priority = 300) {

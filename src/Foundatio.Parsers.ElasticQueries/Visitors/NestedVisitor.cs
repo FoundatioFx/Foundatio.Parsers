@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
@@ -25,7 +24,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         private string GetNestedProperty(string fullName, IQueryVisitorContext context) {
             string[] nameParts = fullName?.Split('.').ToArray();
             
-            if (nameParts == null || !(context is IElasticQueryVisitorContext elasticContext) || nameParts.Length == 0)
+            if (nameParts == null || context is not IElasticQueryVisitorContext elasticContext || nameParts.Length == 0)
                 return null;
 
             string fieldName = String.Empty;

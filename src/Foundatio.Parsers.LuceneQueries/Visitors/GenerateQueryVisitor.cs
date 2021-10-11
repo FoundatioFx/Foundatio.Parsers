@@ -5,7 +5,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class GenerateQueryVisitor : QueryNodeVisitorWithResultBase<string> {
-        private readonly StringBuilder _builder = new StringBuilder();
+        private readonly StringBuilder _builder = new();
 
         public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             _builder.Append(node.ToString(context != null ? context.DefaultOperator : GroupOperator.Default));

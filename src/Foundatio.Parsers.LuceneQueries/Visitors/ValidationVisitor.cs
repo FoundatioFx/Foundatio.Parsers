@@ -5,11 +5,10 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors {
     public class ValidationVisitor : ChainableQueryVisitor {
-        public bool ShouldThrow { get; set; }
-
         public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
             var validationInfo = context.GetValidationInfo();
 
@@ -30,10 +29,10 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             var validationInfo = context.GetValidationInfo();
             AddField(validationInfo, node, context);
             AddOperation(validationInfo, node.GetOperationType(), node.Field);
-            
+
             // aggregations must have a field
             if (context.QueryType == QueryType.Aggregation && String.IsNullOrEmpty(node.Field))
-                validationInfo.IsValid = false;
+                validationInfo.MarkInvalid("Aggregations must have a field");
         }
 
         public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
@@ -43,7 +42,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             
             // aggregations must have a field
             if (context.QueryType == QueryType.Aggregation && String.IsNullOrEmpty(node.Field))
-                validationInfo.IsValid = false;
+                validationInfo.MarkInvalid("Aggregations must have a field");
         }
 
         public override void Visit(ExistsNode node, IQueryVisitorContext context) {
@@ -60,8 +59,16 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
 
         private void AddField(QueryValidationInfo validationInfo, IFieldQueryNode node, IQueryVisitorContext context) {
             if (!String.IsNullOrEmpty(node.Field)) {
-                if (!node.Field.StartsWith("@"))
-                    validationInfo.ReferencedFields.Add(node.Field);
+                if (node.Field.StartsWith("@"))
+                    return;
+
+                validationInfo.ReferencedFields.Add(node.Field);
+                var validationOptions = context.GetValidationOptions();
+                if (validationOptions == null || !validationOptions.ShouldResolveFields)
+                    return;
+
+                if (!CanResolveField(node.Field, context))
+                    validationInfo.UnresolvedFields.Add(node.Field);
             } else {
                 var fields = node.GetDefaultFields(context.DefaultFields);
                 if (fields == null || fields.Length == 0)
@@ -69,6 +76,20 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 else
                     foreach (string defaultField in fields)
                         validationInfo.ReferencedFields.Add(defaultField);
+            }
+        }
+
+        protected virtual bool CanResolveField(string field, IQueryVisitorContext context) {
+            var resolver = context.GetFieldResolver();
+            if (resolver == null)
+                throw new InvalidOperationException("Field resolver not configured when using ShouldResolveFields query validation option.");
+
+            try {
+                var resolvedField = resolver(field);
+                return resolvedField != null;
+            } catch {
+                // TODO: This should be logged but not blow up
+                return false;
             }
         }
 
@@ -89,17 +110,21 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             await node.AcceptAsync(this, context).ConfigureAwait(false);
             var validationInfo = context.GetValidationInfo();
             validationInfo.QueryType = context.QueryType;
-            var validator = context.GetValidator();
-            if (validator != null && ShouldThrow && !await validator(validationInfo))
-                throw new QueryValidationException("Invalid query.", validationInfo);
+            var options = context.GetValidationOptions();
+            if (options != null) {
+                await validationInfo.ApplyOptionsAsync(options, node);
+
+                if (options.ShouldThrow && !validationInfo.IsValid)
+                    throw new QueryValidationException($"Invalid query: {validationInfo.Message}", validationInfo);
+            }
             
             return node;
         }
 
-        public static async Task<QueryValidationInfo> RunAsync(IQueryNode node, IQueryVisitorContextWithValidator context = null) {
+        public static async Task<QueryValidationInfo> RunAsync(IQueryNode node, IQueryVisitorContextWithValidation context = null) {
             if (context == null)
-                context = new QueryVisitorContextWithValidator();
-            
+                context = new QueryVisitorContext();
+
             var visitor = new ChainedQueryVisitor();
             if (context.QueryType == QueryType.Aggregation)
                 visitor.AddVisitor(new AssignOperationTypeVisitor());
@@ -111,38 +136,79 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             return context.GetValidationInfo();
         }
 
-        public static QueryValidationInfo Run(IQueryNode node, IQueryVisitorContextWithValidator context = null) {
+        public static QueryValidationInfo Run(IQueryNode node, IQueryVisitorContextWithValidation context = null) {
             return RunAsync(node, context).GetAwaiter().GetResult();
         }
 
-        public static async Task<bool> RunAsync(IQueryNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidator context = null) {
+        public static async Task<QueryValidationInfo> RunAsync(IQueryNode node, QueryValidationOptions options, IQueryVisitorContextWithValidation context = null) {
             if (context == null)
-                context = new QueryVisitorContextWithValidator();
+                context = new QueryVisitorContext();
+
+            if (options != null)
+                context.SetValidationOptions(options);
 
             await new ValidationVisitor().AcceptAsync(node, context);
             var validationInfo = context.GetValidationInfo();
-
-            return await validator(validationInfo);
+            return validationInfo;
         }
 
-        public static bool Run(IQueryNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidator context = null) {
-            return RunAsync(node, validator, context).GetAwaiter().GetResult();
+        public static QueryValidationInfo Run(IQueryNode node, Func<QueryValidationInfo, Task<bool>> validator, IQueryVisitorContextWithValidation context = null) {
+            var options = new QueryValidationOptions();
+            options.CustomRules.Add(async (i, n) => await validator(i) ? new QueryValidationRuleResult() : new QueryValidationRuleResult());
+            return RunAsync(node, options, context).GetAwaiter().GetResult();
         }
 
-        public static Task<bool> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidator context = null) {
-            var fieldSet = new HashSet<string>(allowedFields, StringComparer.OrdinalIgnoreCase);
-            return RunAsync(node, info => Task.FromResult(info.ReferencedFields.Any(f => !fieldSet.Contains(f))), context);
+        public static QueryValidationInfo Run(IQueryNode node, QueryValidationRule validator, IQueryVisitorContextWithValidation context = null) {
+            var options = new QueryValidationOptions();
+            options.CustomRules.Add(validator);
+            return RunAsync(node, options, context).GetAwaiter().GetResult();
         }
 
-        public static bool Run(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidator context = null) {
+        public static Task<QueryValidationInfo> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null) {
+            var options = new QueryValidationOptions();
+            foreach (var field in allowedFields)
+                options.AllowedFields.Add(field);
+            return RunAsync(node, options, context);
+        }
+
+        public static QueryValidationInfo Run(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null) {
             return RunAsync(node, allowedFields, context).GetAwaiter().GetResult();
         }
     }
 
+    public class QueryValidationOptions {
+        private bool _allowUnresolvedFields;
+
+        public bool ShouldThrow { get; set; }
+        public ICollection<string> AllowedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public bool ShouldResolveFields { get; set; }
+        public bool AllowUnresolvedFields {
+            get => _allowUnresolvedFields;
+            set {
+                _allowUnresolvedFields = value;
+                if (!_allowUnresolvedFields)
+                    ShouldResolveFields = true;
+            }
+        }
+        public ICollection<string> AllowedOperations { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public int AllowedMaxNodeDepth { get; set; }
+        public ICollection<QueryValidationRule> CustomRules { get; } = new List<QueryValidationRule>();
+    }
+
+    public delegate Task<QueryValidationRuleResult> QueryValidationRule(QueryValidationInfo validationInfo, IQueryNode root);
+
+    public class QueryValidationRuleResult {
+        public bool IsValid {  get; set; }
+        public string Message { get; set; }
+    }
+
+    [DebuggerDisplay("IsValid: {IsValid} Message: {Message} Type: {QueryType}")]
     public class QueryValidationInfo {
         public string QueryType { get; set; }
-        public bool IsValid { get; set; } = true;
+        public bool IsValid { get; private set; } = true;
+        public string Message { get; set;}
         public ICollection<string> ReferencedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public ICollection<string> UnresolvedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public int MaxNodeDepth { get; set; } = 1;
         public ConcurrentDictionary<string, ICollection<string>> Operations { get; } = new ConcurrentDictionary<string, ICollection<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -153,6 +219,53 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
                 _currentNodeDepth = value;
                 if (_currentNodeDepth > MaxNodeDepth)
                     MaxNodeDepth = _currentNodeDepth;
+            }
+        }
+
+        public void MarkInvalid(string message) {
+            IsValid = false;
+            Message = message;
+        }
+
+        internal async Task ApplyOptionsAsync(QueryValidationOptions options, IQueryNode rootNode) {
+            if (options == null)
+                return;
+
+            if (options.AllowedFields.Count > 0) {
+                var nonAllowedFields = ReferencedFields.Where(f => !String.IsNullOrEmpty(f) && !options.AllowedFields.Contains(f)).ToArray();
+                if (nonAllowedFields.Length > 0) {
+                    MarkInvalid($"Query uses fields ({String.Join(",", nonAllowedFields)}) that are not allowed to be used.");
+                    return;
+                }
+            }
+
+            if (options.AllowedOperations.Count > 0) {
+                var nonAllowedOperations = Operations.Where(f => !options.AllowedOperations.Contains(f.Key)).ToArray();
+                if (nonAllowedOperations.Length > 0) {
+                    MarkInvalid($"Query uses aggregation operations ({String.Join(",", nonAllowedOperations)}) that are not allowed to be used.");
+                    return;
+                }
+            }
+
+            if (!options.AllowUnresolvedFields && UnresolvedFields.Count > 0) {
+                MarkInvalid($"Query uses fields ({String.Join(",", UnresolvedFields)}) that can't be resolved.");
+                return;
+            }
+
+            if (options.CustomRules != null && options.CustomRules.Count > 0) {
+                foreach (var rule in options.CustomRules) {
+                    var result = await rule(this, rootNode).ConfigureAwait(false);
+                    if (result.IsValid)
+                        continue;
+
+                    MarkInvalid($"Query is not valid: {result.Message}");
+                    return;
+                }
+            }
+
+            if (options.AllowedMaxNodeDepth > 0 && MaxNodeDepth > options.AllowedMaxNodeDepth) {
+                MarkInvalid($"Query has a node depth {MaxNodeDepth} greater than the allowed maximum {options.AllowedMaxNodeDepth}.");
+                return;
             }
         }
     }

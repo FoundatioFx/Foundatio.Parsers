@@ -49,6 +49,9 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             var field1Property = resolver.GetMappingProperty("Field1");
             Assert.IsType<TextProperty>(field1Property);
 
+            var unknownProperty = resolver.GetMappingProperty("UnknowN.test.doesNotExist");
+            Assert.Null(unknownProperty);
+
             var field1 = resolver.GetResolvedField("FielD1");
             Assert.Equal("field1", field1);
 
@@ -108,7 +111,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             Assert.IsType<ObjectProperty>(nestedDataProperty);
         }
 
-        private Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath) {
+        private static Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath) {
             return objectPath;
         }
     }

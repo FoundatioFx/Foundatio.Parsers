@@ -111,6 +111,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         [InlineData("xy/z")] // not treated like a regex since the term does not start with a /
         [InlineData("quik~2c")]
         [InlineData("ab~2z")]
+        [InlineData("Author:Smith AND Title_idx:\"\"")]
         public Task ValidQueries(string query) {
             return ParseAndValidateQuery(query, query, true);
         }
