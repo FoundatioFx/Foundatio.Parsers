@@ -212,7 +212,7 @@ range_unquoted_term
     }
 
 quoted_term
-  = '"' term:(('\\"' / [^"])+ "") ('"' / #error{ "Unterminated quoted string" })
+  = '"' term:(('\\"' / [^"])* "") ('"' / #error{ "Unterminated quoted string" })
     {
         term
     }
