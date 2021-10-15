@@ -108,6 +108,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         [InlineData("Hello (world)")]
         [InlineData("Hello \"world\"")]
         [InlineData("+Hello +world")]
+        [InlineData("ANDmammoth")]
         [InlineData("xy/z")] // not treated like a regex since the term does not start with a /
         [InlineData("quik~2c")]
         [InlineData("ab~2z")]

@@ -1,4 +1,6 @@
-﻿using System;
+﻿#define ENABLE_TRACING
+
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -34,6 +36,37 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
                 _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
                 string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
                 Assert.Equal(query, generatedQuery);
+            } catch (FormatException ex) {
+                _logger.LogInformation(tracer.ToString());
+                var cursor = ex.Data["cursor"] as Cursor;
+                throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            }
+        }
+
+        [Fact]
+        public async Task CanUseSpaceInFieldNames() {
+            string query = @"a\ b:c";
+#if ENABLE_TRACING
+            var tracer = new LoggingTracer(_logger, reportPerformance: true);
+#else
+            var tracer = NullTracer.Instance;
+#endif
+            var parser = new LuceneQueryParser {
+                Tracer = tracer
+            };
+
+            try {
+                var result = await parser.ParseAsync(query);
+
+                _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+                string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
+                Assert.Equal(query, generatedQuery);
+
+                var groupNode = result as GroupNode;
+                Assert.NotNull(groupNode);
+                var leftNode = groupNode.Left as TermNode;
+                Assert.NotNull(leftNode);
+                Assert.Equal("a b", leftNode.UnescapedField);
             } catch (FormatException ex) {
                 _logger.LogInformation(tracer.ToString());
                 var cursor = ex.Data["cursor"] as Cursor;

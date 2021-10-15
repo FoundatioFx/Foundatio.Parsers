@@ -8,6 +8,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public bool? IsNegated { get; set; }
         public string Prefix { get; set; }
         public string Field { get; set; }
+        public string UnescapedField => Field?.Unescape();
         public string Term { get; set; }
         public string UnescapedTerm => Term?.Unescape();
         public bool IsQuotedTerm { get; set; }

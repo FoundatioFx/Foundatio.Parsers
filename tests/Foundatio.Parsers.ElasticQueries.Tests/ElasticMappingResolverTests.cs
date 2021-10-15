@@ -33,7 +33,8 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
                 new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = new MyType[] {
                     new MyType { Field1 = "banana", Data = {
                         { "number-0001", 23 },
-                        { "text-0001", "Hey" }
+                        { "text-0001", "Hey" },
+                        { "spaced field", "hey" }
                     }}
                 }},
                 new MyNestedType { Field1 = "value2", Field2 = "value2" },
@@ -45,6 +46,15 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
 
             var dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001");
             Assert.Equal("nested.data.text-0001.keyword", dynamicTextAggregation);
+
+            var dynamicSpacedAggregation = resolver.GetAggregationsFieldName("nested.data.spaced field");
+            Assert.Equal("nested.data.spaced field.keyword", dynamicSpacedAggregation);
+
+            var dynamicSpacedSort = resolver.GetSortFieldName("nested.data.spaced field");
+            Assert.Equal("nested.data.spaced field.keyword", dynamicSpacedSort);
+
+            var dynamicSpacedField = resolver.GetResolvedField("nested.data.spaced field");
+            Assert.Equal("nested.data.spaced field", dynamicSpacedField);
 
             var field1Property = resolver.GetMappingProperty("Field1");
             Assert.IsType<TextProperty>(field1Property);

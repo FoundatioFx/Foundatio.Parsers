@@ -28,6 +28,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public GroupOperator Operator { get; set; } = GroupOperator.Default;
         public bool HasParens { get; set; }
         public string Field { get; set; }
+        public string UnescapedField => Field?.Unescape();
         public bool? IsNegated { get; set; }
         public string Prefix { get; set; }
         public string Boost { get; set; }

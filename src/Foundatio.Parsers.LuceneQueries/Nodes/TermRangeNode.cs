@@ -7,6 +7,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
     public class TermRangeNode : QueryNodeBase, IFieldQueryNode {
         public bool? IsNegated { get; set; }
         public string Field { get; set; }
+        public string UnescapedField => Field?.Unescape();
         public string Prefix { get; set; }
         public string Min { get; set; }
         public string UnescapedMin => Min?.Unescape();

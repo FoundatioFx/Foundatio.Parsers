@@ -191,7 +191,7 @@ term<TermNode>
 
 // https://lucene.apache.org/core/2_9_4/queryparsersyntax.html#Escaping%20Special%20Characters
 escape_sequence
-  = '\\' [\+\-\!\(\)\{\}\[\]\^\"\~\*\?\:\\\/]
+  = '\\' [ \+\-\!\(\)\{\}\[\]\^\"\~\*\?\:\\\/]
 
 name_term
   = term:(([^: \\\t\r\n\f\{\}\(\)"^~\[\]] / escape_sequence)+ "")
@@ -382,10 +382,6 @@ not_exp
 
 operator_exp<GroupOperator>
   = _* op:operator _+
-    {
-        op
-    }
-  / _* op:operator EOF
     {
         op
     }

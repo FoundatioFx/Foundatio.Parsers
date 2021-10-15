@@ -16,6 +16,7 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         bool? IsNegated { get; set; }
         string Prefix { get; set; }
         string Field { get; set; }
+        string UnescapedField { get; }
     }
 
     public interface IFieldQueryWithProximityAndBoostNode : IFieldQueryNode {

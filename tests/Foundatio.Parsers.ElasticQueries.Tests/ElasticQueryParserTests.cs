@@ -1368,7 +1368,45 @@ namespace Foundatio.Parsers.ElasticQueries.Tests {
             Assert.Equal(expectedResponse.Total, actualResponse.Total);
         }
 
-        [Fact(Skip = "This currently isn't supported")]
+        [Fact]
+        public void CanHandleSpacedFields() {
+            var client = GetClient();
+            var index = CreateRandomIndex<MyNestedType>(client);
+
+            client.IndexMany(new[] {
+                new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = new MyType[] {
+                    new MyType { Field1 = "banana", Data = {
+                        { "number-0001", 23 },
+                        { "text-0001", "Hey" },
+                        { "spaced field", "hey" }
+                    }}
+                }},
+                new MyNestedType { Field1 = "value2", Field2 = "value2" },
+                new MyNestedType { Field1 = "value1", Field2 = "value4" }
+            }, index);
+            client.Indices.Refresh(index);
+
+            var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(client, index));
+            var sort = processor.BuildSortAsync("nested.data.spaced\\ field").Result;
+            var query = processor.BuildQueryAsync("nested.data.spaced\\ field:hey").Result;
+            var aggs = processor.BuildAggregationsAsync("terms:nested.data.spaced\\ field").Result;
+            var actualResponse = client.Search<MyType>(d => d.Index(index).Sort(sort).Query(q => query).Aggregations(a => aggs));
+            string actualRequest = actualResponse.GetRequest();
+            _logger.LogInformation("Actual: {Request}", actualRequest);
+            var expectedResponse = client.Search<MyType>(d => d.Index(index)
+                .Sort(s => s
+                    .Field(f => f.Field("nested.data.spaced field.keyword").UnmappedType(FieldType.Keyword).Ascending()))
+                .Query(q => q.Bool(b => b.Filter(f => f
+                    .Match(f => f.Field("nested.data.spaced field").Query("hey")))))
+                .Aggregations(a => a
+                    .Terms("terms_nested.data.spaced field", f => f.Field("nested.data.spaced field.keyword").Meta(m2 => m2.Add("@field_type", "text")))));
+            string expectedRequest = expectedResponse.GetRequest();
+            _logger.LogInformation("Expected: {Request}", expectedRequest);
+            Assert.Equal(expectedRequest, actualRequest);
+            Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        }
+
+        [Fact]
         public void CanParseMixedCaseSort() {
             var index = Guid.NewGuid().ToString("N");
             var client = GetClient();

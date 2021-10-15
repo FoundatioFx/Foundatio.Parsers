@@ -29,7 +29,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
             QueryBase query;
-            string field = node.Field;
+            string field = node.UnescapedField;
             var defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
             if (field == null && defaultFields != null && defaultFields.Length == 1)
                 field = defaultFields[0];
@@ -87,7 +87,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            string field = node.Field;
+            string field = node.UnescapedField;
             if (elasticContext.MappingResolver.IsDatePropertyType(field)) {
                 var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()) };
                 if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*") {
@@ -126,14 +126,14 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
         }
 
         public static QueryBase GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context) {
-            return new ExistsQuery { Field = node.Field };
+            return new ExistsQuery { Field = node.UnescapedField };
         }
 
         public static QueryBase GetDefaultQuery(this MissingNode node, IQueryVisitorContext context) {
             return new BoolQuery {
                 MustNot = new QueryContainer[] {
                     new ExistsQuery {
-                        Field =  node.Field
+                        Field =  node.UnescapedField
                     }
                 }
             };

@@ -30,22 +30,23 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left != null)
                 return null;
 
-            string field = elasticContext.MappingResolver.GetAggregationsFieldName(node.Field);
+            string field = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
             var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
+            string originalField = node.GetOriginalField().Unescape();
 
             switch (node.GetOperationType()) {
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()), context);
+                    return GetDateHistogramAggregation("date_" + originalField, field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()), context);
 
                 case AggregationType.Histogram:
-                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), field, node.UnescapedProximity, node.UnescapedBoost, context);
+                    return GetHistogramAggregation("histogram_" + originalField, field, node.UnescapedProximity, node.UnescapedBoost, context);
 
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.UnescapedProximity))
                         Enum.TryParse(node.UnescapedProximity, out precision);
 
-                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
+                    return new GeoHashGridAggregation("geogrid_" + originalField) {
                         Field = field,
                         Precision = precision,
                         Aggregations = new AverageAggregation("avg_lat", null) {
@@ -56,7 +57,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     };
 
                 case AggregationType.Terms:
-                    var agg = new TermsAggregation("terms_" + node.GetOriginalField()) {
+                    var agg = new TermsAggregation("terms_" + originalField) {
                         Field = field, 
                         Size = node.GetProximityAsInt32(), 
                         MinimumDocumentCount = node.GetBoostAsInt32(), 
@@ -79,53 +80,54 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
             if (context is not IElasticQueryVisitorContext elasticContext)
                 throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-            string aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.Field);
-            var property = elasticContext.MappingResolver.GetMappingProperty(node.Field, true);
+            string aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+            var property = elasticContext.MappingResolver.GetMappingProperty(node.UnescapedField, true);
             string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost: node.GetTimeZone(await elasticContext.GetTimeZoneAsync());
+            string originalField = node.GetOriginalField().Unescape();
 
             switch (node.GetOperationType()) {
                 case AggregationType.Min:
-                    return new MinAggregation("min_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
+                    return new MinAggregation("min_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
 
                 case AggregationType.Max:
-                    return new MaxAggregation("max_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
+                    return new MaxAggregation("max_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
 
                 case AggregationType.Avg:
-                    return new AverageAggregation("avg_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                    return new AverageAggregation("avg_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
 
                 case AggregationType.Sum:
-                    return new SumAggregation("sum_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                    return new SumAggregation("sum_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
 
                 case AggregationType.Stats:
-                    return new StatsAggregation("stats_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                    return new StatsAggregation("stats_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
 
                 case AggregationType.ExtendedStats:
-                    return new ExtendedStatsAggregation("exstats_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                    return new ExtendedStatsAggregation("exstats_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
 
                 case AggregationType.Cardinality:
-                    return new CardinalityAggregation("cardinality_" + node.GetOriginalField(), aggField) { Missing = node.GetProximityAsDouble(), PrecisionThreshold = node.GetBoostAsInt32() };
+                    return new CardinalityAggregation("cardinality_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), PrecisionThreshold = node.GetBoostAsInt32() };
 
                 case AggregationType.TopHits:
                     return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
 
                 case AggregationType.Missing:
-                    return new MissingAggregation("missing_" + node.GetOriginalField()) { Field = aggField };
+                    return new MissingAggregation("missing_" + originalField) { Field = aggField };
 
                 case AggregationType.DateHistogram:
-                    return GetDateHistogramAggregation("date_" + node.GetOriginalField(), aggField, node.UnescapedProximity, node.UnescapedBoost, context);
+                    return GetDateHistogramAggregation("date_" + originalField, aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
                 case AggregationType.Histogram:
-                    return GetHistogramAggregation("histogram_" + node.GetOriginalField(), aggField, node.UnescapedProximity, node.UnescapedBoost, context);
+                    return GetHistogramAggregation("histogram_" + originalField, aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
                 case AggregationType.Percentiles:
-                    return GetPercentilesAggregation("percentiles_" + node.GetOriginalField(), aggField, node.UnescapedProximity, node.UnescapedBoost, context);
+                    return GetPercentilesAggregation("percentiles_" + originalField, aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
                 case AggregationType.GeoHashGrid:
                     var precision = GeoHashPrecision.Precision1;
                     if (!String.IsNullOrEmpty(node.UnescapedProximity))
                         Enum.TryParse(node.UnescapedProximity, out precision);
 
-                    return new GeoHashGridAggregation("geogrid_" + node.GetOriginalField()) {
+                    return new GeoHashGridAggregation("geogrid_" + originalField) {
                         Field = aggField,
                         Precision = precision,
                         Aggregations = new AverageAggregation("avg_lat", null) {
@@ -136,7 +138,7 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions {
                     };
 
                 case AggregationType.Terms:
-                    var agg = new TermsAggregation("terms_" + node.GetOriginalField()) {
+                    var agg = new TermsAggregation("terms_" + originalField) {
                         Field = aggField, 
                         Size = node.GetProximityAsInt32(), 
                         MinimumDocumentCount = node.GetBoostAsInt32(), 
