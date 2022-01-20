@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Xunit;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -94,6 +94,8 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         [InlineData("NOT Test")]
         [InlineData("! Test")]
         [InlineData("!Test")]
+        [InlineData("One - Two")]
+        [InlineData("One -Two")]
         [InlineData(@"type:\(11\)2\+")]
         [InlineData(@"""\""now""")]
         [InlineData("title:(+return +\"pink panther\")")]

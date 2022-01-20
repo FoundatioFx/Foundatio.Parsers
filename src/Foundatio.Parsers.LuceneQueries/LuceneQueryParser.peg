@@ -393,7 +393,7 @@ operator<GroupOperator> -lexical
   / "&&" { GroupOperator.And }
 
 prefix_operator_exp
-  = _* op:prefix_operator
+  = _* op:prefix_operator !_
     {
         op
     }

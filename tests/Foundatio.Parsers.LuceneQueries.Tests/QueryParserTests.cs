@@ -207,17 +207,6 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         }
 
         [Fact]
-        public void PrefixWithoutImmediateExpressionIsInvalid() {
-            var sut = new LuceneQueryParser();
-
-            var ex = Assert.Throws<FormatException>(() => {
-                var result = sut.Parse("something + other");
-                var ast = DebugQueryVisitor.Run(result);
-            });
-            Assert.Contains("Unexpected character '+'.", ex.Message);
-        }
-
-        [Fact]
         public void UnterminatedQuotedStringIsNotValid() {
             var sut = new LuceneQueryParser();
 
