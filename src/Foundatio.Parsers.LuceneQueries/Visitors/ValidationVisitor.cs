@@ -30,6 +30,10 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             AddField(validationInfo, node, context);
             AddOperation(validationInfo, node.GetOperationType(), node.Field);
 
+            var validationOptions = context.GetValidationOptions();
+            if (validationOptions != null && !validationOptions.AllowLeadingWildcards && node.Term != null && (node.Term.StartsWith("*") || node.Term.StartsWith("?")))
+                validationInfo.MarkInvalid("Terms must not start with a wildcard: " + node.Term);
+
             // aggregations must have a field
             if (context.QueryType == QueryType.Aggregation && String.IsNullOrEmpty(node.Field))
                 validationInfo.MarkInvalid("Aggregations must have a field");
@@ -39,7 +43,14 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
             var validationInfo = context.GetValidationInfo();
             AddField(validationInfo, node, context);
             AddOperation(validationInfo, node.GetOperationType(), node.Field);
+
+            var validationOptions = context.GetValidationOptions();
+            if (validationOptions != null && !validationOptions.AllowLeadingWildcards && node.Min != null && (node.Min.StartsWith("*") || node.Min.StartsWith("?")))
+                validationInfo.MarkInvalid("Terms must not start with a wildcard: " + node.Min);
             
+            if (validationOptions != null && !validationOptions.AllowLeadingWildcards && node.Max != null && (node.Max.StartsWith("*") || node.Max.StartsWith("?")))
+                validationInfo.MarkInvalid("Terms must not start with a wildcard: " + node.Max);
+
             // aggregations must have a field
             if (context.QueryType == QueryType.Aggregation && String.IsNullOrEmpty(node.Field))
                 validationInfo.MarkInvalid("Aggregations must have a field");
@@ -182,6 +193,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors {
         public bool ShouldThrow { get; set; }
         public ICollection<string> AllowedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public bool ShouldResolveFields { get; set; }
+        public bool AllowLeadingWildcards { get; set; }
         public bool AllowUnresolvedFields {
             get => _allowUnresolvedFields;
             set {

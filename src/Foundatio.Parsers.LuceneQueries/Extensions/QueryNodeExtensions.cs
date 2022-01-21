@@ -30,7 +30,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
             if (node == null)
                 return false;
             
-            return (node.IsNegated.HasValue && node.IsNegated.Value == true) || (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-");
+            return (node.IsNegated.HasValue && node.IsNegated.Value == true) || (!String.IsNullOrEmpty(node.Prefix) && (node.Prefix == "-" || node.Prefix == "!"));
         }
         
         public static bool IsRequired(this IFieldQueryNode node) {
@@ -113,7 +113,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions {
         public static void InvertNegation(this IFieldQueryNode node) {
             if (node.IsNegated.HasValue)
                 node.IsNegated = !node.IsNegated.Value;
-            else if (!String.IsNullOrEmpty(node.Prefix) && node.Prefix == "-")
+            else if (!String.IsNullOrEmpty(node.Prefix) && (node.Prefix == "-" || node.Prefix == "!"))
                 node.Prefix = null;
             else
                 node.IsNegated = true;

@@ -277,6 +277,7 @@ prefix_operator_exp
 prefix_operator -lexical
   = '+'
   / '-'
+  / '!'
 
 _
   = [ \t\r\n\f]+

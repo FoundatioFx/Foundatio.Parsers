@@ -2,6 +2,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Xunit;
@@ -165,6 +166,37 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
             Assert.IsType<GroupNode>(result.Left);
             Assert.True((result.Left as GroupNode).HasParens);
             Assert.True((result.Left as GroupNode).IsNegated);
+        }
+
+        [Fact]
+        public void CanParsePrefix() {
+            var sut = new LuceneQueryParser();
+
+            var result = sut.Parse(@"""jakarta apache"" !""Apache Lucene""");
+            var ast = DebugQueryVisitor.Run(result);
+
+            var left = result.Left as TermNode;
+            var right = result.Right as TermNode;
+            Assert.NotNull(left);
+            Assert.NotNull(right);
+            Assert.Equal("jakarta apache", left.Term);
+            Assert.Null(left.Prefix);
+            Assert.False(left.IsExcluded());
+            Assert.Equal("Apache Lucene", right.Term);
+            Assert.Equal("!", right.Prefix);
+            Assert.True(right.IsExcluded());
+
+            result = sut.Parse(@"""jakarta apache"" -""Apache Lucene""");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermNode;
+            right = result.Right as TermNode;
+            Assert.NotNull(left);
+            Assert.NotNull(right);
+            Assert.Equal("jakarta apache", left.Term);
+            Assert.Equal("Apache Lucene", right.Term);
+            Assert.Equal("-", right.Prefix);
+            Assert.True(right.IsExcluded());
         }
 
         [Fact]

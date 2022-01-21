@@ -39,6 +39,19 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         }
 
         [Fact]
+        public async Task AllowLeadingWildcards() {
+            var options = new QueryValidationOptions();
+            options.AllowLeadingWildcards = false;
+            var info = await QueryValidator.ValidateQueryAsync(@"blah allowedfield:*alue", options);
+            Assert.False(info.IsValid);
+            Assert.Contains("wildcard", info.Message);
+
+            options.AllowLeadingWildcards = true;
+            info = await QueryValidator.ValidateQueryAsync(@"blah allowedfield:*alue", options);
+            Assert.True(info.IsValid);
+        }
+
+        [Fact]
         public async Task AllowedOperations() {
             var options = new QueryValidationOptions();
             options.AllowedOperations.Add("terms");
