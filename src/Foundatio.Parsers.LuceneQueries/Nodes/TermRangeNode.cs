@@ -11,8 +11,10 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
         public string Prefix { get; set; }
         public string Min { get; set; }
         public string UnescapedMin => Min?.Unescape();
+        public bool IsMinQuotedTerm { get; set; }
         public string Max { get; set; }
         public string UnescapedMax => Max?.Unescape();
+        public bool IsMaxQuotedTerm { get; set; }
         public string Operator { get; set; }
         public string Delimiter { get; set; }
         public bool? MinInclusive { get; set; }
@@ -34,8 +36,12 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (Min != null)
                 target.Min = Min;
 
+            target.IsMinQuotedTerm = IsMinQuotedTerm;
+
             if (Max != null)
                 target.Max = Max;
+
+            target.IsMaxQuotedTerm = IsMaxQuotedTerm;
 
             if (Operator != null)
                 target.Operator = Operator;
@@ -88,12 +94,18 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes {
             if (MinInclusive.HasValue && String.IsNullOrEmpty(Operator))
                 builder.Append(MinInclusive.Value ? "[" : "{");
 
-            builder.Append(Min);
+            if (IsMinQuotedTerm)
+                builder.Append("\"" + Min + "\"");
+            else
+                builder.Append(Min);
 
             if (!String.IsNullOrEmpty(Min) && !String.IsNullOrEmpty(Max) && String.IsNullOrEmpty(Operator))
                 builder.Append(Delimiter ?? " TO ");
 
-            builder.Append(Max);
+            if (IsMaxQuotedTerm)
+                builder.Append("\"" + Max + "\"");
+            else
+                builder.Append(Max);
 
             if (MaxInclusive.HasValue && String.IsNullOrEmpty(Operator))
                 builder.Append(MaxInclusive.Value ? "]" : "}");

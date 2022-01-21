@@ -11,6 +11,12 @@
         public string Field { get; set; }
         public string Prefix { get; set; }
     }
+
+    public class TermInfo {
+        public string Term { get; set; }
+        public bool IsQuoted { get; set; }
+        public bool IsRegex { get; set; }
+    }
 }
 
 start<GroupNode>
@@ -127,7 +133,7 @@ field_exp<IQueryNode>
 
 fieldname<FieldInfo> -lexical
   = op:prefix_operator_exp? fieldname:name_term _* ':' _*
-      {{
+    {{
         var result = new FieldInfo { Field = fieldname };
 
         result.Prefix = op.SingleOrDefault();
@@ -136,43 +142,9 @@ fieldname<FieldInfo> -lexical
     }}
 
 term<TermNode>
-  = not:not_exp? op:prefix_operator_exp? !operator_exp term:quoted_term proximity:proximity_modifier? boost:boost_modifier? _*
+  = not:not_exp? op:prefix_operator_exp? !operator_exp term:(quoted_term / regex_term / unquoted_term) proximity:proximity_modifier? boost:boost_modifier? _*
       {{
-        var result = new TermNode { Term = term, IsQuotedTerm = true };
-
-        if (proximity.Count > 0)
-            result.Proximity = proximity.SingleOrDefault();
-
-        if (boost.Count > 0)
-            result.Boost = boost.SingleOrDefault();
-
-        if (not.Any())
-          result.IsNegated = true;
-        
-        result.Prefix = op.SingleOrDefault();
-
-        return result;
-    }}
-  / not:not_exp? op:prefix_operator_exp? !operator_exp term:regex_term proximity:proximity_modifier? boost:boost_modifier? _*
-    {{
-        var result = new TermNode { Term = term, IsRegexTerm = true };
-
-        if (proximity.Count > 0)
-            result.Proximity = proximity.SingleOrDefault();
-
-        if (boost.Count > 0)
-            result.Boost = boost.SingleOrDefault();
-
-        if (not.Any())
-          result.IsNegated = true;
-        
-        result.Prefix = op.SingleOrDefault();
-
-        return result;
-    }}
-  / not:not_exp? op:prefix_operator_exp? !operator_exp term:unquoted_term proximity:proximity_modifier? boost:boost_modifier? _*
-    {{
-        var result = new TermNode { Term = term };
+        var result = new TermNode { Term = term.Term, IsQuotedTerm = term.IsQuoted, IsRegexTerm = term.IsRegex };
 
         if (proximity.Count > 0)
             result.Proximity = proximity.SingleOrDefault();
@@ -199,34 +171,34 @@ name_term
         term
     }
 
-unquoted_term
+unquoted_term<TermInfo>
   = term:(([^: \\\t\r\n\f\{\}\(\)"^~\[\]] / escape_sequence)+ "")
     {
-        term
+        new TermInfo { Term = term }
     }
 
-range_unquoted_term
+range_unquoted_term<TermInfo>
   = term:((([^: \\\.\t\r\n\f\{\}\(\)"^~\[\]] / [\.][^\.] / escape_sequence)+ "") / '*')
     {
-        term
+        new TermInfo { Term = term }
     }
 
-quoted_term
+quoted_term<TermInfo>
   = '"' term:(('\\"' / [^"])* "") ('"' / #error{ "Unterminated quoted string" })
     {
-        term
+        new TermInfo { Term = term, IsQuoted = true }
     }
 
-regex_term
+regex_term<TermInfo>
   = '/' term:(('\\/' / [^/])+ "") ('/' / #error{ "Unterminated regex" })
     {
-        term
+        new TermInfo { Term = term, IsRegex = true }
     }
 
 boost_modifier<string>
   = '^' boost:(quoted_term / unquoted_term)
     {
-        boost
+        boost.Term
     }
 
 proximity_modifier<string>
@@ -236,13 +208,15 @@ proximity_modifier<string>
     }
 
 range_operator_exp<TermRangeNode>
-  = '[' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* ']' proximity:proximity_modifier? boost:boost_modifier?
+  = left:('[' / '{') _* term_min:(range_unquoted_term / quoted_term) delim:range_delimiter_exp term_max:(range_unquoted_term / quoted_term) _* right:(']' / '}') proximity:proximity_modifier? boost:boost_modifier?
     {{
         var result = new TermRangeNode {
-            Min = term_min,
-            Max = term_max,
-            MinInclusive = true,
-            MaxInclusive = true,
+            Min = term_min.Term,
+            IsMinQuotedTerm = term_min.IsQuoted,
+            Max = term_max.Term,
+            IsMaxQuotedTerm = term_max.IsQuoted,
+            MinInclusive = left.SingleOrDefault() == '[' ? true : false,
+            MaxInclusive = right.SingleOrDefault() == ']' ? true : false,
             Delimiter = delim
         };
 
@@ -254,114 +228,16 @@ range_operator_exp<TermRangeNode>
 
         return result;
     }}
-  / '{' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* '}' proximity:proximity_modifier? boost:boost_modifier?
+  / op:(">=" / ">" / "<=" / "<") _* term:(range_unquoted_term / quoted_term) proximity:proximity_modifier? boost:boost_modifier?
     {{
         var result = new TermRangeNode {
-            Min = term_min,
-            Max = term_max,
-            MinInclusive = false,
-            MaxInclusive = false,
-            Delimiter = delim
-        };
-
-        if (proximity.Count > 0)
-            result.Proximity = proximity.SingleOrDefault();
-
-        if (boost.Count > 0)
-            result.Boost = boost.SingleOrDefault();
-
-        return result;
-    }}
-  / '{' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* ']' proximity:proximity_modifier? boost:boost_modifier?
-    {{
-        var result = new TermRangeNode {
-            Min = term_min,
-            Max = term_max,
-            MinInclusive = false,
-            MaxInclusive = true,
-            Delimiter = delim
-        };
-
-        if (proximity.Count > 0)
-            result.Proximity = proximity.SingleOrDefault();
-
-        if (boost.Count > 0)
-            result.Boost = boost.SingleOrDefault();
-
-        return result;
-    }}
-  / '[' _* term_min:range_unquoted_term delim:range_delimiter_exp term_max:range_unquoted_term _* '}' proximity:proximity_modifier? boost:boost_modifier?
-    {{
-        var result = new TermRangeNode {
-            Min = term_min,
-            Max = term_max,
-            MinInclusive = true,
-            MaxInclusive = false,
-            Delimiter = delim
-        };
-
-        if (proximity.Count > 0)
-            result.Proximity = proximity.SingleOrDefault();
-
-        if (boost.Count > 0)
-            result.Boost = boost.SingleOrDefault();
-
-        return result;
-    }}
-  / '>=' _* term_min:range_unquoted_term proximity:proximity_modifier? boost:boost_modifier?
-    {{
-        var result = new TermRangeNode {
-            Min = term_min,
-            MinInclusive = true,
-            Operator = ">="
-        };
-
-        if (proximity.Count > 0)
-            result.Proximity = proximity.SingleOrDefault();
-
-        if (boost.Count > 0)
-            result.Boost = boost.SingleOrDefault();
-
-        return result;
-    }}
-  / '>' _* term_min:range_unquoted_term proximity:proximity_modifier? boost:boost_modifier?
-    {{
-        var result = new TermRangeNode {
-            Min = term_min,
-            MinInclusive = false,
-            Operator = ">"
-        };
-
-        if (proximity.Count > 0)
-            result.Proximity = proximity.SingleOrDefault();
-
-        if (boost.Count > 0)
-            result.Boost = boost.SingleOrDefault();
-
-        return result;
-    }}
-  / '<=' _* term_max:range_unquoted_term proximity:proximity_modifier? boost:boost_modifier?
-    {{
-        var result = new TermRangeNode {
-            Max = term_max,
-            MaxInclusive = true,
-            Operator = "<="
-        };
-
-        if (proximity.Count > 0)
-            result.Proximity = proximity.SingleOrDefault();
-
-        if (boost.Count > 0)
-            result.Boost = boost.SingleOrDefault();
-
-        return result;
-    }}
-  / '<' _* term_max:range_unquoted_term proximity:proximity_modifier? boost:boost_modifier?
-    {{
-        var result = new TermRangeNode {
-            Max = term_max,
-            MaxInclusive = false,
-            Operator = "<"
+            Min = op.StartsWith(">") ? term.Term : null,
+            MinInclusive = op == ">=",
+            IsMinQuotedTerm = op.StartsWith(">") && term.IsQuoted,
+            Max = op.StartsWith("<") ? term.Term : null,
+            MaxInclusive = op == "<=",
+            IsMaxQuotedTerm = op.StartsWith("<") && term.IsQuoted,
+            Operator = op
         };
 
         if (proximity.Count > 0)

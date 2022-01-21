@@ -1,3 +1,5 @@
+﻿#define ENABLE_TRACING
+
 using System;
 using System.Threading.Tasks;
 using Foundatio.Xunit;
@@ -115,6 +117,7 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         [InlineData("quik~2c")]
         [InlineData("ab~2z")]
         [InlineData("Author:Smith AND Title_idx:\"\"")]
+        [InlineData(@"first_occurrence:[""2022-01-20T14:00:00.0000000Z"" TO ""2022-01-21T02:33:06.5975418Z""] (project:537650f3b77efe23a47914f4 (status:open OR status:regressed))")]
         public Task ValidQueries(string query) {
             return ParseAndValidateQuery(query, query, true);
         }

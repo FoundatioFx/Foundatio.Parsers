@@ -168,6 +168,129 @@ namespace Foundatio.Parsers.LuceneQueries.Tests {
         }
 
         [Fact]
+        public void CanParseRanges() {
+            var sut = new LuceneQueryParser();
+
+            var result = sut.Parse("[1 TO 2]");
+            var ast = DebugQueryVisitor.Run(result);
+
+            var left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.True(left.MinInclusive);
+            Assert.False(left.IsMinQuotedTerm);
+            Assert.True(left.MaxInclusive);
+            Assert.False(left.IsMaxQuotedTerm);
+
+            result = sut.Parse("{1 TO 2]");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.False(left.MinInclusive);
+            Assert.True(left.MaxInclusive);
+
+            result = sut.Parse("{1 TO 2}");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.False(left.MinInclusive);
+            Assert.False(left.MaxInclusive);
+
+            result = sut.Parse("[1 TO 2}");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.True(left.MinInclusive);
+            Assert.False(left.MaxInclusive);
+
+            result = sut.Parse(@"[ ""1"" TO ""2""]");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.True(left.MinInclusive);
+            Assert.True(left.IsMinQuotedTerm);
+            Assert.True(left.MaxInclusive);
+            Assert.True(left.IsMaxQuotedTerm);
+            Assert.Equal("1", left.Min);
+            Assert.Equal("2", left.Max);
+
+            result = sut.Parse(@">1");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.False(left.MinInclusive);
+            Assert.False(left.IsMinQuotedTerm);
+            Assert.False(left.MaxInclusive);
+            Assert.False(left.IsMaxQuotedTerm);
+            Assert.Equal("1", left.Min);
+            Assert.Null(left.Max);
+
+            result = sut.Parse(@">=1");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.True(left.MinInclusive);
+            Assert.False(left.IsMinQuotedTerm);
+            Assert.False(left.MaxInclusive);
+            Assert.False(left.IsMaxQuotedTerm);
+            Assert.Equal("1", left.Min);
+            Assert.Null(left.Max);
+
+            result = sut.Parse(@"<1");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.False(left.MinInclusive);
+            Assert.False(left.IsMinQuotedTerm);
+            Assert.False(left.MaxInclusive);
+            Assert.False(left.IsMaxQuotedTerm);
+            Assert.Null(left.Min);
+            Assert.Equal("1", left.Max);
+
+            result = sut.Parse(@"<=1");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.False(left.MinInclusive);
+            Assert.False(left.IsMinQuotedTerm);
+            Assert.True(left.MaxInclusive);
+            Assert.False(left.IsMaxQuotedTerm);
+            Assert.Null(left.Min);
+            Assert.Equal("1", left.Max);
+
+            result = sut.Parse(@">""1""");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.False(left.MinInclusive);
+            Assert.True(left.IsMinQuotedTerm);
+            Assert.False(left.MaxInclusive);
+            Assert.False(left.IsMaxQuotedTerm);
+            Assert.Equal("1", left.Min);
+            Assert.Null(left.Max);
+
+            result = sut.Parse(@"<""1""");
+            ast = DebugQueryVisitor.Run(result);
+
+            left = result.Left as TermRangeNode;
+            Assert.NotNull(left);
+            Assert.False(left.MinInclusive);
+            Assert.False(left.IsMinQuotedTerm);
+            Assert.False(left.MaxInclusive);
+            Assert.True(left.IsMaxQuotedTerm);
+            Assert.Null(left.Min);
+            Assert.Equal("1", left.Max);
+        }
+
+        [Fact]
         public void CanParseEmptyQuotes() {
 #if ENABLE_TRACING
             var tracer = new LoggingTracer(_logger, reportPerformance: true);
