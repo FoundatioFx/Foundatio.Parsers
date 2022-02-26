@@ -2,7 +2,8 @@
   <Import Project="..\..\build\common.props" />
   <ItemGroup>
     <PackageReference Include="Exceptionless.DateTimeExtensions" Version="3.4.0" />
-    <PackageReference Include="NEST" Version="7.16.0" />
+    <PackageReference Include="NEST" Version="7.17.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0" />
   </ItemGroup>
   <ItemGroup>

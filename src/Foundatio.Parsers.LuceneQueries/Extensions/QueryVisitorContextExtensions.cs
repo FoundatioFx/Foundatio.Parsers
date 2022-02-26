@@ -1,127 +1,186 @@
 ﻿using System;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace Foundatio.Parsers.LuceneQueries.Extensions {
-    public static class QueryVisitorContextExtensions {
-        public static QueryFieldResolver GetFieldResolver(this IQueryVisitorContext context) {
-            var resolverContext = context as IQueryVisitorContextWithFieldResolver;
-            return resolverContext?.FieldResolver;
+namespace Foundatio.Parsers.LuceneQueries.Extensions;
+
+public static class QueryVisitorContextExtensions {
+    public static QueryFieldResolver GetFieldResolver(this IQueryVisitorContext context) {
+        var resolverContext = context as IQueryVisitorContextWithFieldResolver;
+        return resolverContext?.FieldResolver;
+    }
+
+    public static T SetFieldResolver<T>(this T context, Func<string, string> resolver) where T : IQueryVisitorContext {
+        if (context is not IQueryVisitorContextWithFieldResolver resolverContext)
+            throw new ArgumentException("Context must be of type IQueryVisitorContextWithFieldResolver", nameof(context));
+
+        resolverContext.FieldResolver = (field, _) => Task.FromResult(resolver(field));
+
+        return context;
+    }
+
+    public static T SetFieldResolver<T>(this T context, QueryFieldResolver resolver) where T : IQueryVisitorContext {
+        if (context is not IQueryVisitorContextWithFieldResolver resolverContext)
+            throw new ArgumentException("Context must be of type IQueryVisitorContextWithFieldResolver", nameof(context));
+
+        resolverContext.FieldResolver = resolver;
+
+        return context;
+    }
+
+    public static IncludeResolver GetIncludeResolver(this IQueryVisitorContext context) {
+        if (context is not IQueryVisitorContextWithIncludeResolver includeContext)
+            throw new ArgumentException("Context must be of type IQueryVisitorContextWithIncludeResolver", nameof(context));
+
+        return includeContext.IncludeResolver;
+    }
+
+    public static T SetIncludeResolver<T>(this T context, IncludeResolver includeResolver) where T : IQueryVisitorContext {
+        if (context is not IQueryVisitorContextWithIncludeResolver includeContext)
+            throw new ArgumentException("Context must be of type IQueryVisitorContextWithIncludeResolver", nameof(context));
+
+        includeContext.IncludeResolver = includeResolver;
+
+        return context;
+    }
+
+    private const string ValidationOptionsKey = "@ValidationOptions";
+    public static QueryValidationOptions GetValidationOptions(this IQueryVisitorContext context) {
+        if (context is not IQueryVisitorContextWithValidation validatorContext) {
+            var validationOptions = context.GetValue<QueryValidationOptions>(ValidationOptionsKey);
+            if (validationOptions == null) {
+                validationOptions = new QueryValidationOptions();
+                context.SetValue(ValidationOptionsKey, validationOptions);
+            }
+
+            return validationOptions;
         }
+        
+        return validatorContext.ValidationOptions ??= new QueryValidationOptions();
+    }
 
-        public static T SetFieldResolver<T>(this T context, QueryFieldResolver resolver) where T: IQueryVisitorContext {
-            if (context is not IQueryVisitorContextWithFieldResolver resolverContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithFieldResolver", nameof(context));
+    public static bool HasValidationOptions(this IQueryVisitorContext context) {
+        if (context is not IQueryVisitorContextWithValidation validatorContext)
+            return context.Data.ContainsKey(ValidationOptionsKey);
 
-            resolverContext.FieldResolver = resolver;
+        return validatorContext.ValidationOptions != null;
+    }
 
+    public static T SetValidationOptions<T>(this T context, QueryValidationOptions options) where T : IQueryVisitorContext {
+        if (options == null)
+            return context;
+
+        if (context is not IQueryVisitorContextWithValidation validatorContext) {
+            context.SetValue(ValidationOptionsKey, options);
             return context;
         }
 
-        public static IncludeResolver GetIncludeResolver(this IQueryVisitorContext context) {
-            if (context is not IQueryVisitorContextWithIncludeResolver includeContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithIncludeResolver", nameof(context));
+        validatorContext.ValidationOptions = options;
 
-            return includeContext.IncludeResolver;
+        return context;
+    }
+
+    private const string ValidationResultKey = "@ValidationResult";
+    public static QueryValidationResult GetValidationResult(this IQueryVisitorContext context) {
+        if (context is not IQueryVisitorContextWithValidation validatorContext) {
+            var validationResult = context.GetValue<QueryValidationResult>(ValidationResultKey);
+            if (validationResult == null) {
+                validationResult = new QueryValidationResult();
+                context.SetValue(ValidationResultKey, validationResult);
+            }
+
+            return validationResult;
         }
 
-        public static T SetIncludeResolver<T>(this T context, IncludeResolver includeResolver) where T : IQueryVisitorContext {
-            if (context is not IQueryVisitorContextWithIncludeResolver includeContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithIncludeResolver", nameof(context));
+        return validatorContext.ValidationResult ??= new QueryValidationResult();
+    }
 
-            includeContext.IncludeResolver = includeResolver;
+    public static void AddValidationError(this IQueryVisitorContext context, string message, int index = -1) {
+        context.GetValidationResult().ValidationErrors.Add(new QueryValidationError(message, index));
+    }
 
-            return context;
-        }
+    public static bool IsValid(this IQueryVisitorContext context) {
+        return context.GetValidationResult().IsValid;
+    }
 
-        public static QueryValidationOptions GetValidationOptions(this IQueryVisitorContext context) {
-            if (context is not IQueryVisitorContextWithValidation validatorContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidation", nameof(context));
+    public static ICollection<QueryValidationError> GetValidationErrors(this IQueryVisitorContext context) {
+        return context.GetValidationResult().ValidationErrors ?? new List<QueryValidationError>();
+    }
 
-            return validatorContext.ValidationOptions;
-        }
+    public static string GetValidationMessage(this IQueryVisitorContext context) {
+        return context.GetValidationResult().Message;
+    }
 
-        public static T SetValidationOptions<T>(this T context, QueryValidationOptions options) where T : IQueryVisitorContext {
-            if (context is not IQueryVisitorContextWithValidation validatorContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidation", nameof(context));
+    public static T SetDefaultFields<T>(this T context, string[] defaultFields) where T : IQueryVisitorContext {
+        context.DefaultFields = defaultFields;
 
-            validatorContext.ValidationOptions = options;
+        return context;
+    }
 
-            return context;
-        }
+    public static T SetDefaultOperator<T>(this T context, GroupOperator defaultOperator) where T : IQueryVisitorContext {
+        context.DefaultOperator = defaultOperator;
 
-        public static QueryValidationInfo GetValidationInfo(this IQueryVisitorContext context) {
-            if (context is not IQueryVisitorContextWithValidation validatorContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidation", nameof(context));
+        return context;
+    }
 
-            return validatorContext.ValidationInfo ??= new QueryValidationInfo();
-        }
+    public static T SetValue<T>(this T context, string key, object value) where T : IQueryVisitorContext {
+        context.Data[key] = value;
 
-        public static T SetValidationInfo<T>(this T context, QueryValidationInfo validationInfo) where T : IQueryVisitorContext {
-            if (context is not IQueryVisitorContextWithValidation validatorContext)
-                throw new ArgumentException("Context must be of type IQueryVisitorContextWithValidation", nameof(context));
+        return context;
+    }
 
-            validatorContext.ValidationInfo = validationInfo;
+    public static T GetValue<T>(this IQueryVisitorContext context, string key) {
+        if (context.Data.TryGetValue(key, out var value) && value is T typedValue)
+            return typedValue;
 
-            return context;
-        }
+        return default;
+    }
 
-        public static T SetDefaultFields<T>(this T context, string[] defaultFields) where T : IQueryVisitorContext {
-            context.DefaultFields = defaultFields;
-
-            return context;
-        }
-
-
-        public static T SetDefaultOperator<T>(this T context, GroupOperator defaultOperator) where T : IQueryVisitorContext {
-            context.DefaultOperator = defaultOperator;
-
-            return context;
-        }
-
-        public static T SetValue<T>(this T context, string key, object value) where T : IQueryVisitorContext {
-            context.Data[key] = value;
-
-            return context;
-        }
-
-        public static T GetValue<T>(this IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out var value) && value is T typedValue)
+    public static ICollection<T> GetCollection<T>(this IQueryVisitorContext context, string key) {
+        if (context.Data.TryGetValue(key, out var value)) {
+            if (value is ICollection<T> typedValue)
                 return typedValue;
 
-            return default;
+            throw new InvalidOperationException($"Context data already contains a value for \"{key}\" that is not a collection of the requested type.");
         }
 
-        public static DateTime? GetDate(this IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out var value) && value is DateTime date)
-                return date;
+        var collection = new List<T>();
+        SetValue(context, key, collection);
 
-            return null;
-        }
+        return collection;
+    }
 
-        public static string GetString(this IQueryVisitorContext context, string key) {
-            if (context.Data.TryGetValue(key, out var value) && value is string str)
-                return str;
+    public static DateTime? GetDate(this IQueryVisitorContext context, string key) {
+        if (context.Data.TryGetValue(key, out var value) && value is DateTime date)
+            return date;
 
-            return null;
-        }
+        return null;
+    }
 
-        public static bool GetBoolean(this IQueryVisitorContext context, string key, bool defaultValue = false) {
-            if (context.Data.TryGetValue(key, out var value) && value is bool b)
-                return b;
+    public static string GetString(this IQueryVisitorContext context, string key) {
+        if (context.Data.TryGetValue(key, out var value) && value is string str)
+            return str;
 
-            return defaultValue;
-        }
+        return null;
+    }
 
-        private const string AlternateInvertedCriteriaKey = "AlternateInvertedCriteria";
-        public static T SetAlternateInvertedCriteria<T>(this T context, IQueryNode criteria) where T : IQueryVisitorContext {
-            context.Data[AlternateInvertedCriteriaKey] = criteria;
+    public static bool GetBoolean(this IQueryVisitorContext context, string key, bool defaultValue = false) {
+        if (context.Data.TryGetValue(key, out var value) && value is bool b)
+            return b;
 
-            return context;
-        }
+        return defaultValue;
+    }
 
-        public static IQueryNode GetAlternateInvertedCriteria(this IQueryVisitorContext context) {
-            return context.GetValue<IQueryNode>(AlternateInvertedCriteriaKey);
-        }
+    private const string AlternateInvertedCriteriaKey = "@AlternateInvertedCriteria";
+    public static T SetAlternateInvertedCriteria<T>(this T context, IQueryNode criteria) where T : IQueryVisitorContext {
+        context.Data[AlternateInvertedCriteriaKey] = criteria;
+
+        return context;
+    }
+
+    public static IQueryNode GetAlternateInvertedCriteria(this IQueryVisitorContext context) {
+        return context.GetValue<IQueryNode>(AlternateInvertedCriteriaKey);
     }
 }

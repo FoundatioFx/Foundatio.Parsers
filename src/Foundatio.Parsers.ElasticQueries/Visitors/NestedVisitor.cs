@@ -6,39 +6,39 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
 
-namespace Foundatio.Parsers.ElasticQueries.Visitors {
-    public class NestedVisitor: ChainableQueryVisitor {
-        public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-            if (String.IsNullOrEmpty(node.Field))
-                return base.VisitAsync(node, context);
-            
-            var nestedProperty = GetNestedProperty(node.Field, context);
-            if (nestedProperty == null)
-                return base.VisitAsync(node, context);
+namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
-            node.SetQuery(new NestedQuery { Path = nestedProperty });
-            
+public class NestedVisitor : ChainableQueryVisitor {
+    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+        if (String.IsNullOrEmpty(node.Field))
             return base.VisitAsync(node, context);
-        }
 
-        private string GetNestedProperty(string fullName, IQueryVisitorContext context) {
-            string[] nameParts = fullName?.Split('.').ToArray();
-            
-            if (nameParts == null || context is not IElasticQueryVisitorContext elasticContext || nameParts.Length == 0)
-                return null;
+        var nestedProperty = GetNestedProperty(node.Field, context);
+        if (nestedProperty == null)
+            return base.VisitAsync(node, context);
 
-            string fieldName = String.Empty;
-            for (int i = 0; i < nameParts.Length; i++) {
-                if (i > 0)
-                    fieldName += ".";
+        node.SetQuery(new NestedQuery { Path = nestedProperty });
 
-                fieldName += nameParts[i];
+        return base.VisitAsync(node, context);
+    }
 
-                if (elasticContext.MappingResolver.IsNestedPropertyType(fieldName))
-                    return fieldName;
-            }
+    private string GetNestedProperty(string fullName, IQueryVisitorContext context) {
+        string[] nameParts = fullName?.Split('.').ToArray();
 
+        if (nameParts == null || context is not IElasticQueryVisitorContext elasticContext || nameParts.Length == 0)
             return null;
+
+        string fieldName = String.Empty;
+        for (int i = 0; i < nameParts.Length; i++) {
+            if (i > 0)
+                fieldName += ".";
+
+            fieldName += nameParts[i];
+
+            if (elasticContext.MappingResolver.IsNestedPropertyType(fieldName))
+                return fieldName;
         }
+
+        return null;
     }
 }

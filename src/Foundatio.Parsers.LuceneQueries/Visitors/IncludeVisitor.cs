@@ -4,56 +4,69 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using System.Collections.Generic;
 
-namespace Foundatio.Parsers.LuceneQueries.Visitors {
+namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
-    public delegate bool ShouldSkipIncludeFunc(TermNode node, IQueryVisitorContext context);
-    public delegate Task<string> IncludeResolver(string name);
-    
-    public class IncludeVisitor : ChainableMutatingQueryVisitor {
-        private readonly LuceneQueryParser _parser = new();
-        private readonly ShouldSkipIncludeFunc _shouldSkipInclude;
+public delegate bool ShouldSkipIncludeFunc(TermNode node, IQueryVisitorContext context);
+public delegate Task<string> IncludeResolver(string name);
 
-        public IncludeVisitor(ShouldSkipIncludeFunc shouldSkipInclude = null) {
-            _shouldSkipInclude = shouldSkipInclude;
+public class IncludeVisitor : ChainableMutatingQueryVisitor {
+    private readonly LuceneQueryParser _parser = new();
+    private readonly ShouldSkipIncludeFunc _shouldSkipInclude;
+
+    public IncludeVisitor(ShouldSkipIncludeFunc shouldSkipInclude = null) {
+        _shouldSkipInclude = shouldSkipInclude;
+    }
+
+    public override async Task<IQueryNode> VisitAsync(TermNode node, IQueryVisitorContext context) {
+        if (node.Field != "@include" || (_shouldSkipInclude != null && _shouldSkipInclude(node, context)))
+            return node;
+
+        var includeResolver = context.GetIncludeResolver();
+        if (includeResolver == null)
+            return node;
+
+        var includes = context.GetValidationResult().ReferencedIncludes;
+        if (includes.Contains(node.Term)) {
+            context.AddValidationError("Recursive include");
+            return node;
         }
 
-        public override async Task<IQueryNode> VisitAsync(TermNode node, IQueryVisitorContext context) {
-            if (node.Field != "@include" || (_shouldSkipInclude != null && _shouldSkipInclude(node, context)))
-                return node;
-
-            var includeResolver = context.GetIncludeResolver();
-            if (includeResolver == null)
-                return node;
-
-            string includedQuery = await includeResolver(node.Term).ConfigureAwait(false);
-            if (String.IsNullOrEmpty(includedQuery))
-                return node;
-
-            var result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
-            result.HasParens = true;
-            await VisitAsync(result, context).ConfigureAwait(false);
-
-            return node.ReplaceSelf(result);
+        includes.Add(node.Term);
+        string includedQuery = await includeResolver(node.Term).ConfigureAwait(false);
+        if (includedQuery == null) {
+            // unresolved include
         }
 
-        public static Task<IQueryNode> RunAsync(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
-            return new IncludeVisitor(shouldSkipInclude).AcceptAsync(node, context ?? new QueryVisitorContext { IncludeResolver = includeResolver });
-        }
+        if (String.IsNullOrEmpty(includedQuery))
+            return node;
 
-        public static IQueryNode Run(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
-            return RunAsync(node, includeResolver, context, shouldSkipInclude).GetAwaiter().GetResult();
-        }
+        var result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
+        result.HasParens = true;
+        await VisitAsync(result, context).ConfigureAwait(false);
 
-        public static IQueryNode Run(IQueryNode node, Func<string, string> includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
-            return RunAsync(node, name => Task.FromResult(includeResolver(name)), context, shouldSkipInclude).GetAwaiter().GetResult();
-        }
+        return node.ReplaceSelf(result);
+    }
 
-        public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> includes, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
-            return RunAsync(node, name => Task.FromResult(includes.ContainsKey(name) ? includes[name] : null), context, shouldSkipInclude);
-        }
+    public static Task<IQueryNode> RunAsync(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
+        context ??= new QueryVisitorContext();
+        context.SetIncludeResolver(includeResolver);
 
-        public static IQueryNode Run(IQueryNode node, IDictionary<string, string> includes, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
-            return RunAsync(node, includes, context, shouldSkipInclude).GetAwaiter().GetResult();
-        }
+        return new IncludeVisitor(shouldSkipInclude).AcceptAsync(node, context ?? new QueryVisitorContext { IncludeResolver = includeResolver });
+    }
+
+    public static IQueryNode Run(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
+        return RunAsync(node, includeResolver, context, shouldSkipInclude).GetAwaiter().GetResult();
+    }
+
+    public static IQueryNode Run(IQueryNode node, Func<string, string> includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
+        return RunAsync(node, name => Task.FromResult(includeResolver(name)), context, shouldSkipInclude).GetAwaiter().GetResult();
+    }
+
+    public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> includes, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
+        return RunAsync(node, name => Task.FromResult(includes.ContainsKey(name) ? includes[name] : null), context, shouldSkipInclude);
+    }
+
+    public static IQueryNode Run(IQueryNode node, IDictionary<string, string> includes, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {
+        return RunAsync(node, includes, context, shouldSkipInclude).GetAwaiter().GetResult();
     }
 }
