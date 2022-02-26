@@ -99,8 +99,8 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture> {
         Assert.Equal(expected, invertedQuery);
 
         var total = await Client.CountAsync<InvertTest>();
-        var results = await Client.SearchAsync<InvertTest>(s => s.TrackTotalHits(true).Query(q => q.Bool(b => b.Filter(f => f.QueryString(qs => qs.Query(query))))));
-        var invertedResults = await Client.SearchAsync<InvertTest>(s => s.TrackTotalHits(true).Query(q => q.Bool(b => b.Filter(f => f.QueryString(qs => qs.Query(invertedQuery))))));
+        var results = await Client.SearchAsync<InvertTest>(s => s.QueryOnQueryString(query).TrackTotalHits(true));
+        var invertedResults = await Client.SearchAsync<InvertTest>(s => s.QueryOnQueryString(invertedQuery).TrackTotalHits(true));
 
         Assert.Equal(total.Count, results.Total + invertedResults.Total);
     }
