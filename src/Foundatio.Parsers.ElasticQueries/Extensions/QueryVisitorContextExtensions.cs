@@ -9,6 +9,38 @@ using Nest;
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class QueryVisitorContextExtensions {
+    public static bool? IsRuntimeFieldResolverEnabled<T>(this T context) where T : IQueryVisitorContext {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+        return elasticContext.EnableRuntimeFieldResolver;
+    }
+
+    public static RuntimeFieldResolver GetRuntimeFieldResolver(this IQueryVisitorContext context) {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+        return elasticContext.RuntimeFieldResolver;
+    }
+
+    public static T EnableRuntimeFieldResolver<T>(this T context, bool enabled = true) where T : IQueryVisitorContext {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+        elasticContext.EnableRuntimeFieldResolver = enabled;
+
+        return context;
+    }
+
+    public static T SetRuntimeFieldResolver<T>(this T context, RuntimeFieldResolver resolver) where T : IQueryVisitorContext {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+        elasticContext.RuntimeFieldResolver = resolver;
+
+        return context;
+    }
+
     public static Task<string> GetTimeZoneAsync(this IQueryVisitorContext context) {
         var elasticContext = context as IElasticQueryVisitorContext;
         if (elasticContext?.DefaultTimeZone != null)

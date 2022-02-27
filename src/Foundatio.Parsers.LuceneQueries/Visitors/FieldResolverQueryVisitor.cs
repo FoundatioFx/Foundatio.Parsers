@@ -54,7 +54,7 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor {
             return;
         }
 
-        if (!resolvedField.Equals(node.Field, StringComparison.OrdinalIgnoreCase)) {
+        if (!resolvedField.Equals(node.Field)) {
             node.SetOriginalField(node.Field);
             node.Field = resolvedField;
         }
@@ -71,6 +71,10 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor {
 
     public static Task<IQueryNode> RunAsync(IQueryNode node, Func<string, string> resolver, IQueryVisitorContextWithFieldResolver context = null) {
         return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext { FieldResolver = (field, _) => Task.FromResult(resolver(field)) });
+    }
+
+    public static IQueryNode Run(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver context = null) {
+        return RunAsync(node, resolver, context).GetAwaiter().GetResult();
     }
 
     public static IQueryNode Run(IQueryNode node, Func<string, string> resolver, IQueryVisitorContextWithFieldResolver context = null) {

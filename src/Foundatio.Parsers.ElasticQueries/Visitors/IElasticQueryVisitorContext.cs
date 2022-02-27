@@ -9,6 +9,8 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors {
         bool UseScoring { get; set; }
         ElasticMappingResolver MappingResolver { get; set; }
         ICollection<ElasticRuntimeField> RuntimeFields { get; }
+        bool? EnableRuntimeFieldResolver { get; set; }
+        RuntimeFieldResolver RuntimeFieldResolver { get; set; }
     }
 }
 

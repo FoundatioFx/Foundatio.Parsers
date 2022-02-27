@@ -46,6 +46,12 @@ public class ElasticQueryParser : LuceneQueryParser {
     }
 
     private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context) {
+        if (Configuration.EnableRuntimeFieldResolver.HasValue && !context.IsRuntimeFieldResolverEnabled().HasValue)
+            context.EnableRuntimeFieldResolver(Configuration.EnableRuntimeFieldResolver.Value);
+
+        if (Configuration.RuntimeFieldResolver != null && context.GetRuntimeFieldResolver() == null)
+            context.SetRuntimeFieldResolver(Configuration.RuntimeFieldResolver);
+
         context.SetMappingResolver(Configuration.MappingResolver);
 
         var contextResolver = context.GetFieldResolver();
@@ -93,8 +99,8 @@ public class ElasticQueryParser : LuceneQueryParser {
         }
 
         // try to use the runtime field resolver to dynamically discover a new runtime field and, if so, add it to the list of runtime fields
-        if ((Configuration.EnableRuntimeFieldResolver.HasValue == false || Configuration.EnableRuntimeFieldResolver.Value) && Configuration.RuntimeFieldResolver != null) {
-            var newRuntimeField = await Configuration.RuntimeFieldResolver(field);
+        if ((elasticContext.EnableRuntimeFieldResolver.HasValue == false || elasticContext.EnableRuntimeFieldResolver.Value) && elasticContext.RuntimeFieldResolver != null) {
+            var newRuntimeField = await elasticContext.RuntimeFieldResolver(field);
             if (newRuntimeField != null) {
                 elasticContext.RuntimeFields.Add(newRuntimeField);
                 return newRuntimeField.Name;
