@@ -95,7 +95,7 @@ public class ElasticQueryParserConfiguration {
         return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, shouldSkipInclude, priority);
     }
 
-    public ElasticQueryParserConfiguration UseValidation(QueryValidationOptions options) {
+    public ElasticQueryParserConfiguration SetValidationOptions(QueryValidationOptions options) {
         ValidationOptions = options;
         return this;
     }

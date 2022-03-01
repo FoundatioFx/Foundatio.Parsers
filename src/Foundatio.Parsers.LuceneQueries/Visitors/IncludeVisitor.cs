@@ -27,7 +27,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor {
 
         var includes = context.GetValidationResult().ReferencedIncludes;
         if (includes.Contains(node.Term)) {
-            context.AddValidationError("Recursive include");
+            context.AddValidationError($"Recursive include ({node.Term})");
             return node;
         }
 

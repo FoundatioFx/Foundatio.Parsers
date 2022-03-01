@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using System.Linq;
+using Pegasus.Common;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
@@ -22,27 +23,34 @@ public class ElasticQueryParser : LuceneQueryParser {
     public ElasticQueryParserConfiguration Configuration { get; }
 
     public override async Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null) {
-        if (String.IsNullOrEmpty(query))
-            throw new ArgumentNullException(nameof(query));
+        query ??= String.Empty;
 
         if (context == null)
             context = new ElasticQueryVisitorContext();
 
         SetupQueryVisitorContextDefaults(context);
-        var result = await base.ParseAsync(query, context).ConfigureAwait(false);
-        switch (context.QueryType) {
-            case QueryTypes.Aggregation:
-                result = await Configuration.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
-                break;
-            case QueryTypes.Query:
-                result = await Configuration.QueryVisitor.AcceptAsync(result, context).ConfigureAwait(false);
-                break;
-            case QueryTypes.Sort:
-                result = await Configuration.SortVisitor.AcceptAsync(result, context).ConfigureAwait(false);
-                break;
-        }
+        try {
+            var result = await base.ParseAsync(query, context).ConfigureAwait(false);
+            switch (context.QueryType) {
+                case QueryTypes.Aggregation:
+                    result = await Configuration.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    break;
+                case QueryTypes.Query:
+                    result = await Configuration.QueryVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    break;
+                case QueryTypes.Sort:
+                    result = await Configuration.SortVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    break;
+            }
 
-        return result;
+            return result;
+        } catch (FormatException ex) {
+            var cursor = ex.Data["cursor"] as Cursor;
+            context.GetValidationResult().QueryType = context.QueryType;
+            context.AddValidationError(ex.Message, cursor.Column);
+
+            return null;
+        }
     }
 
     private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context) {
@@ -127,7 +135,10 @@ public class ElasticQueryParser : LuceneQueryParser {
             context = new ElasticQueryVisitorContext();
 
         context.QueryType = QueryTypes.Query;
+
         var result = await ParseAsync(query, context).ConfigureAwait(false);
+        context.ThrowIfInvalid();
+
         return await BuildQueryAsync(result, context).ConfigureAwait(false);
     }
 
@@ -162,7 +173,10 @@ public class ElasticQueryParser : LuceneQueryParser {
             context = new ElasticQueryVisitorContext();
 
         context.QueryType = QueryTypes.Aggregation;
+
         var result = await ParseAsync(aggregations, context).ConfigureAwait(false);
+        context.ThrowIfInvalid();
+
         return await BuildAggregationsAsync(result, context).ConfigureAwait(false);
     }
 
@@ -192,7 +206,10 @@ public class ElasticQueryParser : LuceneQueryParser {
             context = new ElasticQueryVisitorContext();
 
         context.QueryType = QueryTypes.Sort;
+
         var result = await ParseAsync(sort, context).ConfigureAwait(false);
+        context.ThrowIfInvalid();
+
         return await BuildSortAsync(result, context).ConfigureAwait(false);
     }
 

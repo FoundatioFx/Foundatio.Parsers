@@ -456,7 +456,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     public static IEnumerable<object[]> AggregationTestCases => new[] {
-            new object[] { null, false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
+            new object[] { null, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
+            new object[] { String.Empty, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
             new object[] { "avg", false, 1, new HashSet<string> { ""}, new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { null } } } },
             new object[] { "avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
             new object[] { "avg:value", true, 1,
@@ -495,30 +496,21 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth = -1, HashSet<string> fields = null, Dictionary<string, ICollection<string>> operations = null) {
-        IQueryNode queryNode;
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
-        try {
-            queryNode = await parser.ParseAsync(query, context);
-        } catch (Exception ex) {
-            _logger.LogError(ex, "Error parsing query: {Message}", ex.Message);
-            if (isValid)
-                throw;
+        var queryNode = await parser.ParseAsync(query, context);
 
-            return;
-        }
+        var result = context.GetValidationResult();
+        Assert.Equal(QueryTypes.Aggregation, result.QueryType);
+        if (!result.IsValid)
+            _logger.LogInformation(result.Message);
 
-        var info = context.GetValidationResult();
-        Assert.Equal(QueryTypes.Aggregation, info.QueryType);
-        if (!info.IsValid)
-            _logger.LogInformation(info.Message);
-
-        Assert.Equal(isValid, info.IsValid);
+        Assert.Equal(isValid, result.IsValid);
         if (maxNodeDepth >= 0)
-            Assert.Equal(maxNodeDepth, info.MaxNodeDepth);
+            Assert.Equal(maxNodeDepth, result.MaxNodeDepth);
         if (fields != null)
-            Assert.Equal(fields, info.ReferencedFields);
+            Assert.Equal(fields, result.ReferencedFields);
 
         if (operations != null)
-            Assert.Equal(operations, info.Operations.ToDictionary(pair => pair.Key, pair => pair.Value));
+            Assert.Equal(operations, result.Operations.ToDictionary(pair => pair.Key, pair => pair.Value));
     }
 }

@@ -106,6 +106,16 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
+    public void CanHandleEmpty() {
+        var sut = new LuceneQueryParser();
+
+        var result = sut.Parse(String.Empty);
+        Assert.NotNull(result);
+        Assert.Null(result.Left);
+        Assert.Null(result.Right);
+    }
+
+    [Fact]
     public void CanHandleUnterminatedRegex() {
         var sut = new LuceneQueryParser();
 

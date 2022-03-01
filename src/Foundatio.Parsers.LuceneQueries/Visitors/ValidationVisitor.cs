@@ -9,25 +9,25 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
 public class ValidationVisitor : ChainableQueryVisitor {
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-        var validationInfo = context.GetValidationResult();
+        var validationResult = context.GetValidationResult();
 
         if (node.HasParens)
-            validationInfo.CurrentNodeDepth++;
+            validationResult.CurrentNodeDepth++;
 
         if (!String.IsNullOrEmpty(node.Field))
-            AddField(validationInfo, node, context);
+            AddField(validationResult, node, context);
 
-        AddOperation(validationInfo, node.GetOperationType(), node.Field);
+        AddOperation(validationResult, node.GetOperationType(), node.Field);
         await base.VisitAsync(node, context).ConfigureAwait(false);
 
         if (node.HasParens)
-            validationInfo.CurrentNodeDepth--;
+            validationResult.CurrentNodeDepth--;
     }
 
     public override void Visit(TermNode node, IQueryVisitorContext context) {
-        var validationInfo = context.GetValidationResult();
-        AddField(validationInfo, node, context);
-        AddOperation(validationInfo, node.GetOperationType(), node.Field);
+        var validationResult = context.GetValidationResult();
+        AddField(validationResult, node, context);
+        AddOperation(validationResult, node.GetOperationType(), node.Field);
 
         var validationOptions = context.GetValidationOptions();
         if (validationOptions != null && !validationOptions.AllowLeadingWildcards && node.Term != null && (node.Term.StartsWith("*") || node.Term.StartsWith("?")))
@@ -35,46 +35,39 @@ public class ValidationVisitor : ChainableQueryVisitor {
     }
 
     public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
-        var validationInfo = context.GetValidationResult();
-        AddField(validationInfo, node, context);
-        AddOperation(validationInfo, node.GetOperationType(), node.Field);
-
-        var validationOptions = context.GetValidationOptions();
-        if (validationOptions != null && !validationOptions.AllowLeadingWildcards && node.Min != null && (node.Min.StartsWith("*") || node.Min.StartsWith("?")))
-            context.AddValidationError("Terms must not start with a wildcard: " + node.Min);
-
-        if (validationOptions != null && !validationOptions.AllowLeadingWildcards && node.Max != null && (node.Max.StartsWith("*") || node.Max.StartsWith("?")))
-            context.AddValidationError("Terms must not start with a wildcard: " + node.Max);
+        var validationResult = context.GetValidationResult();
+        AddField(validationResult, node, context);
+        AddOperation(validationResult, node.GetOperationType(), node.Field);
     }
 
     public override void Visit(ExistsNode node, IQueryVisitorContext context) {
-        var validationInfo = context.GetValidationResult();
-        AddField(validationInfo, node, context);
-        AddOperation(validationInfo, "exists", node.Field);
+        var validationResult = context.GetValidationResult();
+        AddField(validationResult, node, context);
+        AddOperation(validationResult, "exists", node.Field);
     }
 
     public override void Visit(MissingNode node, IQueryVisitorContext context) {
-        var validationInfo = context.GetValidationResult();
-        AddField(validationInfo, node, context);
-        AddOperation(validationInfo, "missing", node.Field);
+        var validationResult = context.GetValidationResult();
+        AddField(validationResult, node, context);
+        AddOperation(validationResult, "missing", node.Field);
     }
 
-    private void AddField(QueryValidationResult validationInfo, IFieldQueryNode node, IQueryVisitorContext context) {
-        if (validationInfo == null)
+    private void AddField(QueryValidationResult validationResult, IFieldQueryNode node, IQueryVisitorContext context) {
+        if (validationResult == null)
             return;
 
         if (!String.IsNullOrEmpty(node.Field)) {
             if (node.Field.StartsWith("@"))
                 return;
 
-            validationInfo.ReferencedFields.Add(node.Field);
+            validationResult.ReferencedFields.Add(node.Field);
         } else {
             var fields = node.GetDefaultFields(context.DefaultFields);
             if (fields == null || fields.Length == 0)
-                validationInfo.ReferencedFields.Add("");
+                validationResult.ReferencedFields.Add("");
             else
                 foreach (string defaultField in fields)
-                    validationInfo.ReferencedFields.Add(defaultField);
+                    validationResult.ReferencedFields.Add(defaultField);
         }
     }
 
@@ -87,8 +80,8 @@ public class ValidationVisitor : ChainableQueryVisitor {
 
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
         await node.AcceptAsync(this, context).ConfigureAwait(false);
-        var validationInfo = context.GetValidationResult();
-        validationInfo.QueryType = context.QueryType;
+        var validationResult = context.GetValidationResult();
+        validationResult.QueryType = context.QueryType;
         ApplyQueryRestrictions(context);
 
         return node;
@@ -96,28 +89,28 @@ public class ValidationVisitor : ChainableQueryVisitor {
 
     internal void ApplyQueryRestrictions(IQueryVisitorContext context) {
         var options = context.GetValidationOptions();
-        var info = context.GetValidationResult();
+        var result = context.GetValidationResult();
 
         if (options.AllowedFields.Count > 0) {
-            var nonAllowedFields = info.ReferencedFields.Where(f => !String.IsNullOrEmpty(f) && !options.AllowedFields.Contains(f)).ToArray();
+            var nonAllowedFields = result.ReferencedFields.Where(f => !String.IsNullOrEmpty(f) && !options.AllowedFields.Contains(f)).ToArray();
             if (nonAllowedFields.Length > 0)
                 context.AddValidationError($"Query uses field(s) ({String.Join(",", nonAllowedFields)}) that are not allowed to be used.");
         }
 
         if (options.AllowedOperations.Count > 0) {
-            var nonAllowedOperations = info.Operations.Where(f => !options.AllowedOperations.Contains(f.Key)).ToArray();
+            var nonAllowedOperations = result.Operations.Where(f => !options.AllowedOperations.Contains(f.Key)).ToArray();
             if (nonAllowedOperations.Length > 0)
                 context.AddValidationError($"Query uses aggregation operations ({String.Join(",", nonAllowedOperations)}) that are not allowed to be used.");
         }
 
-        if (!options.AllowUnresolvedFields && info.UnresolvedFields.Count > 0)
-            context.AddValidationError($"Query uses field(s) ({String.Join(",", info.UnresolvedFields)}) that can't be resolved.");
+        if (!options.AllowUnresolvedFields && result.UnresolvedFields.Count > 0)
+            context.AddValidationError($"Query uses field(s) ({String.Join(",", result.UnresolvedFields)}) that can't be resolved.");
 
-        if (options.AllowedMaxNodeDepth > 0 && info.MaxNodeDepth > options.AllowedMaxNodeDepth)
-            context.AddValidationError($"Query has a node depth {info.MaxNodeDepth} greater than the allowed maximum {options.AllowedMaxNodeDepth}.");
+        if (options.AllowedMaxNodeDepth > 0 && result.MaxNodeDepth > options.AllowedMaxNodeDepth)
+            context.AddValidationError($"Query has a node depth {result.MaxNodeDepth} greater than the allowed maximum {options.AllowedMaxNodeDepth}.");
 
-        if (options.ShouldThrow && !info.IsValid)
-            throw new QueryValidationException($"Invalid query: {info.Message}", info);
+        if (options.ShouldThrow && !result.IsValid)
+            throw new QueryValidationException($"Invalid query: {result.Message}", result);
     }
 
     public static async Task<QueryValidationResult> RunAsync(IQueryNode node, IQueryVisitorContextWithValidation context = null) {
@@ -147,8 +140,8 @@ public class ValidationVisitor : ChainableQueryVisitor {
             context.SetValidationOptions(options);
 
         await new ValidationVisitor().AcceptAsync(node, context);
-        var validationInfo = context.GetValidationResult();
-        return validationInfo;
+        var validationResult = context.GetValidationResult();
+        return validationResult;
     }
 
     public static Task<QueryValidationResult> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null) {

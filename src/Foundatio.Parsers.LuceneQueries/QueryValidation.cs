@@ -22,7 +22,17 @@ public class QueryValidationResult {
     public string QueryType { get; set; }
     public bool IsValid => ValidationErrors.Count == 0;
     public ICollection<QueryValidationError> ValidationErrors { get; } = new List<QueryValidationError>();
-    public string Message => String.Join("\r\n", ValidationErrors.Select(e => e.ToString()));
+    public string Message {
+        get {
+            if (ValidationErrors.Count == 0)
+                return String.Empty;
+
+            if (ValidationErrors.Count > 1)
+                return String.Join("\r\n", ValidationErrors.Select(e => e.ToString()));
+
+            return ValidationErrors.Single().Message;
+        }
+    }
     public ICollection<string> ReferencedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public ICollection<string> ReferencedIncludes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public ICollection<string> UnresolvedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -77,10 +87,11 @@ public class QueryValidationError {
 }
 
 public class QueryValidationException : Exception {
-    public QueryValidationException(string message, QueryValidationResult validationInfo = null,
+    public QueryValidationException(string message, QueryValidationResult result = null,
         Exception inner = null) : base(message, inner) {
-        ValidationInfo = validationInfo;
+        Result = result;
     }
 
-    public QueryValidationResult ValidationInfo { get; }
+    public QueryValidationResult Result { get; }
+    public ICollection<QueryValidationError> Errors => Result.ValidationErrors;
 }

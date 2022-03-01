@@ -21,6 +21,29 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
+    public async Task CanHandleEmptyAndNullString() {
+        var sut = new ElasticQueryParser();
+
+        var queryResult = await sut.BuildQueryAsync("");
+        Assert.NotNull(queryResult);
+        
+        queryResult = await sut.BuildQueryAsync((string)null);
+        Assert.NotNull(queryResult);
+
+        var aggResult = await sut.BuildAggregationsAsync("");
+        Assert.NotNull(aggResult);
+
+        aggResult = await sut.BuildAggregationsAsync((string)null);
+        Assert.NotNull(aggResult);
+
+        var sortResult = await sut.BuildSortAsync("");
+        Assert.NotNull(sortResult);
+
+        sortResult = await sut.BuildSortAsync((string)null);
+        Assert.NotNull(sortResult);
+    }
+
+    [Fact]
     public void CanUseElasticQueryParser() {
         var sut = new ElasticQueryParser();
 
@@ -1066,7 +1089,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void DateRangeWithWildcardMaxQueryProcessor() {
+    public async Task DateRangeWithWildcardMaxQueryProcessor() {
         var index = CreateRandomIndex<MyType>();
         var res = Client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
         Client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
@@ -1077,13 +1100,13 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
 
         var processor = new ElasticQueryParser(c => c.UseMappings(Client, index));
 
-        var result = processor.BuildQueryAsync("field5:[2017-01-31 TO   *  } OR field1:value1", ctx).Result;
+        var result = await processor.BuildQueryAsync("field5:[2017-01-31 TO   *  } OR field1:value1", ctx);
 
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(q => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualResponse);
 
-        var expectedResponse = Client.Search<MyType>(d => d
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Index(index)
             .Query(f => f
                 .DateRange(m => m.Field(f2 => f2.Field5).GreaterThanOrEquals("2017-01-31").TimeZone("America/Chicago"))
@@ -1193,43 +1216,38 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
         Client.Indices.Refresh(index);
 
         var context = new ElasticQueryVisitorContext();
-        var parser = new ElasticQueryParser(c => c.UseMappings(Client, index).UseValidation(new QueryValidationOptions { AllowUnresolvedFields = false }));
+        var parser = new ElasticQueryParser(c => c.UseMappings(Client, index).SetValidationOptions(new QueryValidationOptions { AllowUnresolvedFields = false }));
         var query = await parser.BuildQueryAsync("field1:value", context);
 
-        var validationInfo = context.GetValidationResult();
-        Assert.True(validationInfo.IsValid);
-        Assert.Single(validationInfo.ReferencedFields, "field1");
-        Assert.Empty(validationInfo.UnresolvedFields);
+        var validationResult = context.GetValidationResult();
+        Assert.True(validationResult.IsValid);
+        Assert.Single(validationResult.ReferencedFields, "field1");
+        Assert.Empty(validationResult.UnresolvedFields);
 
         context = new ElasticQueryVisitorContext();
-        parser = new ElasticQueryParser(c => c.UseMappings(Client, index).UseValidation(new QueryValidationOptions { AllowUnresolvedFields = false }));
-        query = await parser.BuildQueryAsync("field2:value", context);
+        parser = new ElasticQueryParser(c => c.UseMappings(Client, index).SetValidationOptions(new QueryValidationOptions { AllowUnresolvedFields = false }));
+        var ex = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync("field2:value", context));
+        Assert.Contains("resolved", ex.Message);
+        Assert.Contains("field2", ex.Result.ReferencedFields);
+        Assert.Contains("field2", ex.Result.UnresolvedFields);
+        Assert.False(ex.Result.IsValid);
+        Assert.NotNull(ex.Result.Message);
+        Assert.Contains("resolved", ex.Result.Message);
 
-        validationInfo = context.GetValidationResult();
-        Assert.False(validationInfo.IsValid);
-        Assert.Single(validationInfo.ReferencedFields, "field2");
-        Assert.Single(validationInfo.UnresolvedFields, "field2");
+        validationResult = await parser.ValidateQueryAsync("field2:value");
+        Assert.False(validationResult.IsValid);
+        Assert.Single(validationResult.ReferencedFields, "field2");
+        Assert.Single(validationResult.UnresolvedFields, "field2");
 
         var aliasMap = new FieldMap { { "field2", "field1" } };
         context = new ElasticQueryVisitorContext();
-        parser = new ElasticQueryParser(c => c.UseMappings(Client, index).UseFieldMap(aliasMap).UseValidation(new QueryValidationOptions { AllowUnresolvedFields = false }));
+        parser = new ElasticQueryParser(c => c.UseMappings(Client, index).UseFieldMap(aliasMap).SetValidationOptions(new QueryValidationOptions { AllowUnresolvedFields = false }));
         query = await parser.BuildQueryAsync("field2:value", context);
 
-        validationInfo = context.GetValidationResult();
-        Assert.True(validationInfo.IsValid);
-        Assert.Single(validationInfo.ReferencedFields, "field1");
-        Assert.Empty(validationInfo.UnresolvedFields);
-
-        context = new ElasticQueryVisitorContext();
-        //context.RuntimeFieldResolver = f => f == "field2" ? new ElasticRuntimeField { Name = "field2" } : null;
-        parser = new ElasticQueryParser(c => c.UseMappings(Client, index).UseValidation(new QueryValidationOptions { AllowUnresolvedFields = false, ShouldThrow = true }));
-        var ex = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync("field2:value", context));
-        Assert.Contains("resolved", ex.Message);
-        Assert.Contains("field2", ex.ValidationInfo.ReferencedFields);
-        Assert.Contains("field2", ex.ValidationInfo.UnresolvedFields);
-        Assert.False(ex.ValidationInfo.IsValid);
-        Assert.NotNull(ex.ValidationInfo.Message);
-        Assert.Contains("resolved", ex.ValidationInfo.Message);
+        validationResult = context.GetValidationResult();
+        Assert.True(validationResult.IsValid);
+        Assert.Single(validationResult.ReferencedFields, "field1");
+        Assert.Empty(validationResult.UnresolvedFields);
     }
 
     [Fact]

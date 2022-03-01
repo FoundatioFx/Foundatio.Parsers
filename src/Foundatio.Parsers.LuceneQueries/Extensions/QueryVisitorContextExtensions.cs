@@ -97,6 +97,12 @@ public static class QueryVisitorContextExtensions {
         return validatorContext.ValidationResult ??= new QueryValidationResult();
     }
 
+    public static void ThrowIfInvalid(this IQueryVisitorContext context) {
+        var validationResult = context.GetValidationResult();
+        if (!validationResult.IsValid)
+            throw new QueryValidationException($"Invalid query: {validationResult.Message}", validationResult);
+    }
+
     public static void AddValidationError(this IQueryVisitorContext context, string message, int index = -1) {
         context.GetValidationResult().ValidationErrors.Add(new QueryValidationError(message, index));
     }
