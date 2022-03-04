@@ -169,7 +169,7 @@ public class ElasticMappingResolver {
     public string GetSortFieldName(string field) {
         return GetNonAnalyzedFieldName(field, ElasticMapping.SortFieldName);
     }
-
+    
     public string GetSortFieldName(Field field) {
         return GetNonAnalyzedFieldName(GetResolvedField(field), ElasticMapping.SortFieldName);
     }
@@ -179,7 +179,11 @@ public class ElasticMappingResolver {
     }
 
     public string GetAggregationsFieldName(Field field) {
-        return GetNonAnalyzedFieldName(GetResolvedField(field), ElasticMapping.KeywordFieldName);
+        return GetNonAnalyzedFieldName(field, ElasticMapping.KeywordFieldName);
+    }
+
+    public string GetNonAnalyzedFieldName(Field field, string preferredSubField = null) {
+        return GetNonAnalyzedFieldName(GetResolvedField(field), preferredSubField);
     }
 
     public string GetNonAnalyzedFieldName(string field, string preferredSubField = null) {
@@ -188,7 +192,7 @@ public class ElasticMappingResolver {
 
         var mapping = GetMapping(field, true);
 
-        if (mapping.Property == null || !IsPropertyAnalyzed(mapping.Property))
+        if (mapping?.Property == null || !IsPropertyAnalyzed(mapping.Property))
             return field;
 
         var multiFieldProperty = mapping.Property as ICoreProperty;
