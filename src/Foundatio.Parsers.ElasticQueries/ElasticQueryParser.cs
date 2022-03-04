@@ -62,12 +62,19 @@ public class ElasticQueryParser : LuceneQueryParser {
 
         context.SetMappingResolver(Configuration.MappingResolver);
 
-        var contextResolver = context.GetFieldResolver();
-        context.SetFieldResolver(async (field, context) => {
-            if (contextResolver != null)
-                field = await contextResolver(field, context).ConfigureAwait(false);
+        if (!context.Data.ContainsKey("@OriginalContextResolver"))
+            context.SetValue("@OriginalContextResolver", context.GetFieldResolver());
 
-            field = await MappingFieldResolver(field, context).ConfigureAwait(false);
+        context.SetFieldResolver(async (field, context) => {
+            if (context.Data.TryGetValue("@OriginalContextResolver", out var data) && data is QueryFieldResolver resolver)
+                field = (await resolver(field, context).ConfigureAwait(false)) ?? field;
+
+            if (Configuration.FieldResolver != null)
+                field = (await Configuration.FieldResolver(field, context).ConfigureAwait(false)) ?? field;
+
+            var mappingField = await MappingFieldResolver(field, context).ConfigureAwait(false);
+            if (mappingField != null)
+                field = mappingField;
 
             return field;
         });
