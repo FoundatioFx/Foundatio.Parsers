@@ -66,17 +66,24 @@ public class ElasticQueryParser : LuceneQueryParser {
             context.SetValue("@OriginalContextResolver", context.GetFieldResolver());
 
         context.SetFieldResolver(async (field, context) => {
-            if (context.Data.TryGetValue("@OriginalContextResolver", out var data) && data is QueryFieldResolver resolver)
-                field = (await resolver(field, context).ConfigureAwait(false)) ?? field;
+            string resolvedField = null;
+            if (context.Data.TryGetValue("@OriginalContextResolver", out var data) && data is QueryFieldResolver resolver) {
+                var contextResolvedField = await resolver(field, context).ConfigureAwait(false);
+                if (contextResolvedField != null)
+                    resolvedField = contextResolvedField;
+            }
 
-            if (Configuration.FieldResolver != null)
-                field = (await Configuration.FieldResolver(field, context).ConfigureAwait(false)) ?? field;
+            if (Configuration.FieldResolver != null) {
+                var configResolvedField = await Configuration.FieldResolver(resolvedField ?? field, context).ConfigureAwait(false);
+                if (configResolvedField != null)
+                    resolvedField = configResolvedField;
+            }
 
-            var mappingField = await MappingFieldResolver(field, context).ConfigureAwait(false);
-            if (mappingField != null)
-                field = mappingField;
+            var mappingResolvedField = await MappingFieldResolver(resolvedField ?? field, context).ConfigureAwait(false);
+            if (mappingResolvedField != null)
+                resolvedField = mappingResolvedField;
 
-            return field;
+            return resolvedField;
         });
 
         if (Configuration.ValidationOptions != null && !context.HasValidationOptions())
