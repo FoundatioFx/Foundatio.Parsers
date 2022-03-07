@@ -17,7 +17,7 @@ public class QueryValidationOptions {
 
 [DebuggerDisplay("IsValid: {IsValid} Message: {Message} Type: {QueryType}")]
 public class QueryValidationResult {
-    private ConcurrentDictionary<string, ICollection<string>> _operations = new ConcurrentDictionary<string, ICollection<string>>(StringComparer.OrdinalIgnoreCase);
+    private ConcurrentDictionary<string, ICollection<string>> _operations = new(StringComparer.OrdinalIgnoreCase);
 
     public string QueryType { get; set; }
     public bool IsValid => ValidationErrors.Count == 0;
