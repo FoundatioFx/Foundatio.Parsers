@@ -11,6 +11,7 @@ public class QueryValidationOptions {
     public ICollection<string> AllowedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public bool AllowLeadingWildcards { get; set; }
     public bool AllowUnresolvedFields { get; set; } = true;
+    public bool AllowUnresolvedIncludes { get; set; } = false;
     public ICollection<string> AllowedOperations { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public int AllowedMaxNodeDepth { get; set; }
 }
@@ -36,6 +37,7 @@ public class QueryValidationResult {
     public ICollection<string> ReferencedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public ICollection<string> ReferencedIncludes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public ICollection<string> UnresolvedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    public ICollection<string> UnresolvedIncludes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public int MaxNodeDepth { get; set; } = 1;
     public IDictionary<string, ICollection<string>> Operations => _operations;
 

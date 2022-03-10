@@ -68,7 +68,40 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
 
         var context = new QueryVisitorContext();
         var resolved = await IncludeVisitor.RunAsync(result, includes, context);
-        Assert.False(context.IsValid());
+        var validationResult = context.GetValidationResult();
+        Assert.False(validationResult.IsValid);
+        Assert.Contains("Recursive", validationResult.Message);
+        Assert.Contains("include1", validationResult.Message);
+    }
+
+    [Fact]
+    public async Task CanHandleUnresolvedIncludes() {
+        var parser = new LuceneQueryParser();
+        var result = await parser.ParseAsync("field1:value1 @include:include1");
+        var includes = new Dictionary<string, string> {
+            { "include2", "field1:value1" }
+        };
+
+        var context = new QueryVisitorContext();
+        var resolved = await IncludeVisitor.RunAsync(result, includes, context);
+        var validationResult = context.GetValidationResult();
+        Assert.Contains("include1", validationResult.UnresolvedIncludes);
+        Assert.False(validationResult.IsValid);
+        Assert.Contains("Unresolved", validationResult.Message);
+        Assert.Contains("include1", validationResult.Message);
+    }
+
+    [Fact]
+    public async Task CanHandleIncludeUsedMultipleTimes() {
+        var parser = new LuceneQueryParser();
+        var result = await parser.ParseAsync("field1:value1 @include:include1 @include:include1");
+        var includes = new Dictionary<string, string> {
+            { "include1", "field1:value2" }
+        };
+
+        var context = new QueryVisitorContext();
+        var resolved = await IncludeVisitor.RunAsync(result, includes, context);
+        Assert.True(context.IsValid());
     }
 
     [Fact]

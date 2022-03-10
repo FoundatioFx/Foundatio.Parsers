@@ -26,23 +26,30 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor {
             return node;
 
         var includes = context.GetValidationResult().ReferencedIncludes;
-        if (includes.Contains(node.Term)) {
+        includes.Add(node.Term);
+
+        var includeStack = context.GetIncludeStack();
+        if (includeStack.Contains(node.Term)) {
             context.AddValidationError($"Recursive include ({node.Term})");
             return node;
         }
-
-        includes.Add(node.Term);
+        
         string includedQuery = await includeResolver(node.Term).ConfigureAwait(false);
         if (includedQuery == null) {
-            // unresolved include
+            context.AddValidationError($"Unresolved include ({node.Term})");
+            context.GetValidationResult().UnresolvedIncludes.Add(node.Term);
         }
 
         if (String.IsNullOrEmpty(includedQuery))
             return node;
-
+        
+        includeStack.Push(node.Term);
+        
         var result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
         result.HasParens = true;
         await VisitAsync(result, context).ConfigureAwait(false);
+        
+        includeStack.Pop();
 
         return node.ReplaceSelf(result);
     }
@@ -51,7 +58,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor {
         context ??= new QueryVisitorContext();
         context.SetIncludeResolver(includeResolver);
 
-        return new IncludeVisitor(shouldSkipInclude).AcceptAsync(node, context ?? new QueryVisitorContext { IncludeResolver = includeResolver });
+        return new IncludeVisitor(shouldSkipInclude).AcceptAsync(node, context);
     }
 
     public static IQueryNode Run(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {

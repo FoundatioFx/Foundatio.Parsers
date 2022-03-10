@@ -46,6 +46,18 @@ public static class QueryVisitorContextExtensions {
         return context;
     }
 
+    private const string IncludeStackKey = "@IncludeStackKey";
+    internal static Stack<string> GetIncludeStack(this IQueryVisitorContext context) {
+        var includeStack = context.GetValue<Stack<string>>(IncludeStackKey);
+        if (includeStack != null)
+            return includeStack;
+        
+        includeStack = new Stack<string>();
+        context.SetValue(IncludeStackKey, includeStack);
+        
+        return includeStack;
+    }
+
     private const string ValidationOptionsKey = "@ValidationOptions";
     public static QueryValidationOptions GetValidationOptions(this IQueryVisitorContext context) {
         if (context is not IQueryVisitorContextWithValidation validatorContext) {

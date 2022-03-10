@@ -106,6 +106,9 @@ public class ValidationVisitor : ChainableQueryVisitor {
         if (!options.AllowUnresolvedFields && result.UnresolvedFields.Count > 0)
             context.AddValidationError($"Query uses field(s) ({String.Join(",", result.UnresolvedFields)}) that can't be resolved.");
 
+        if (!options.AllowUnresolvedIncludes && result.UnresolvedIncludes.Count > 0)
+            context.AddValidationError($"Query uses includes(s) ({String.Join(",", result.UnresolvedIncludes)}) that can't be resolved.");
+
         if (options.AllowedMaxNodeDepth > 0 && result.MaxNodeDepth > options.AllowedMaxNodeDepth)
             context.AddValidationError($"Query has a node depth {result.MaxNodeDepth} greater than the allowed maximum {options.AllowedMaxNodeDepth}.");
 
