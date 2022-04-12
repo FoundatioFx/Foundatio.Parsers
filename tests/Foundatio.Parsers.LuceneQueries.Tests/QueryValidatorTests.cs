@@ -106,6 +106,14 @@ public class QueryValidatorTests : TestWithLoggingBase {
         Assert.Contains("resolved", ex.Result.Message);
     }
 
+    [Fact]
+    public void CanParseWildcardQuery() {
+        var sut = new LuceneQueryParser();
+        var node = sut.Parse("*");
+        var result = ValidationVisitor.Run(node);
+        Assert.True(result.IsValid);
+    }
+
     // allowed fields
     // allowed operations
     // 

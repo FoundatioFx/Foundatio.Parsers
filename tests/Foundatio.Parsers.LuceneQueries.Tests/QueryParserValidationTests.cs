@@ -18,6 +18,7 @@ public class QueryParserValidationTests : TestWithLoggingBase {
     }
 
     [Theory]
+    [InlineData("*")]
     [InlineData("\":\"")]
     [InlineData("\"quoted string\"")]
     [InlineData("criteria")]

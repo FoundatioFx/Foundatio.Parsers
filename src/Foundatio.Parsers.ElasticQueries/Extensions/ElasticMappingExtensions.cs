@@ -4,7 +4,14 @@ public static class ElasticMapping {
     /// <summary>
     /// Not chainable with AddSortField. Use AddKeywordAndSortFields to add both.
     /// </summary>
-    public static TextPropertyDescriptor<T> AddKeywordField<T>(this TextPropertyDescriptor<T> descriptor, string normalizer = null) where T : class {
+    public static TextPropertyDescriptor<T> AddKeywordField<T>(this TextPropertyDescriptor<T> descriptor) where T : class {
+        return descriptor.AddKeywordField(null);
+    }
+
+    /// <summary>
+    /// Not chainable with AddSortField. Use AddKeywordAndSortFields to add both.
+    /// </summary>
+    public static TextPropertyDescriptor<T> AddKeywordField<T>(this TextPropertyDescriptor<T> descriptor, string normalizer) where T : class {
         return descriptor.Fields(f => f.Keyword(s => s.Name(KeywordFieldName).Normalizer(normalizer).IgnoreAbove(256)));
     }
 
