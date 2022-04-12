@@ -1464,6 +1464,7 @@ public class MyNestedType {
     public string Field2 { get; set; }
     public string Field3 { get; set; }
     public int Field4 { get; set; }
+    public string Field5 { get; set; }
     public IList<MyType> Nested { get; set; } = new List<MyType>();
 }
 

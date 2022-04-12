@@ -20,6 +20,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase {
                 .Text(p1 => p1.Name(n => n.Field1).AddKeywordAndSortFields())
                 .Text(p1 => p1.Name(n => n.Field4).AddKeywordAndSortFields())
                     .FieldAlias(a => a.Path(n => n.Field4).Name("field4alias"))
+                .Text(p1 => p1.Name(n => n.Field5).AddKeywordAndSortFields(true))
             );
     }
 
@@ -56,6 +57,9 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase {
 
         var field1Property = resolver.GetMappingProperty("Field1");
         Assert.IsType<TextProperty>(field1Property);
+
+        var field5Property = resolver.GetAggregationsFieldName("Field5");
+        Assert.Equal("field5.keyword", field5Property);
 
         var unknownProperty = resolver.GetMappingProperty("UnknowN.test.doesNotExist");
         Assert.Null(unknownProperty);
