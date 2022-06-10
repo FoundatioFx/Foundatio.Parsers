@@ -90,9 +90,9 @@ public class ValidationVisitor : ChainableQueryVisitor {
     internal async Task ApplyQueryRestrictions(IQueryVisitorContext context) {
         var options = context.GetValidationOptions();
         var result = context.GetValidationResult();
-        var fieldResolver = context.GetFieldResolver();
 
         if (options.RestrictedFields.Count > 0 && result.ReferencedFields.Count > 0) {
+            var fieldResolver = context.GetFieldResolver();
             var restrictedFields = new List<string>();
             foreach (var field in options.RestrictedFields) {
                 var resolvedField = fieldResolver == null ? field : await fieldResolver(field, context);
