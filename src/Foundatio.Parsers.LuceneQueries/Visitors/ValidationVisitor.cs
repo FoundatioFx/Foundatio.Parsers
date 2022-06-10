@@ -60,7 +60,7 @@ public class ValidationVisitor : ChainableQueryVisitor {
             if (node.Field.StartsWith("@"))
                 return;
 
-            validationResult.ReferencedFields.Add(node.Field);
+            validationResult.ReferencedFields.Add(node.GetOriginalField());
         } else {
             var fields = node.GetDefaultFields(context.DefaultFields);
             if (fields == null || fields.Length == 0)
@@ -82,25 +82,35 @@ public class ValidationVisitor : ChainableQueryVisitor {
         await node.AcceptAsync(this, context).ConfigureAwait(false);
         var validationResult = context.GetValidationResult();
         validationResult.QueryType = context.QueryType;
-        ApplyQueryRestrictions(context);
+        await ApplyQueryRestrictions(context);
 
         return node;
     }
 
-    internal void ApplyQueryRestrictions(IQueryVisitorContext context) {
+    internal async Task ApplyQueryRestrictions(IQueryVisitorContext context) {
         var options = context.GetValidationOptions();
         var result = context.GetValidationResult();
+        var fieldResolver = context.GetFieldResolver();
 
-        if (options.AllowedFields.Count > 0) {
-            var nonAllowedFields = result.ReferencedFields.Where(f => !String.IsNullOrEmpty(f) && !options.AllowedFields.Contains(f)).ToArray();
-            if (nonAllowedFields.Length > 0)
-                context.AddValidationError($"Query uses field(s) ({String.Join(",", nonAllowedFields)}) that are not allowed to be used.");
-        }
-        
-        if (options.RestrictedFields.Count > 0) {
-            var restrictedFields = result.ReferencedFields.Where(f => !String.IsNullOrEmpty(f) && options.RestrictedFields.Contains(f)).ToArray();
-            if (restrictedFields.Length > 0)
+        if (options.RestrictedFields.Count > 0 && result.ReferencedFields.Count > 0) {
+            var restrictedFields = new List<string>();
+            foreach (var field in options.RestrictedFields) {
+                var resolvedField = fieldResolver == null ? field : await fieldResolver(field, context);
+                if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField.Equals(f) || field.Equals(f))))
+                    restrictedFields.Add(field);
+            }
+            if (restrictedFields.Count > 0)
                 context.AddValidationError($"Query uses field(s) ({String.Join(",", restrictedFields)}) that are restricted from use.");
+        }
+
+        if (options.AllowedFields.Count > 0 && result.ReferencedFields.Count > 0) {
+            var nonAllowedFields = result.ReferencedFields.Where(f => !String.IsNullOrEmpty(f)).Distinct().ToList();
+            foreach (var field in options.AllowedFields) {
+                if (nonAllowedFields.Any(f => !String.IsNullOrEmpty(f) && field.Equals(f)))
+                    nonAllowedFields.Remove(field);
+            }
+            if (nonAllowedFields.Count > 0)
+                context.AddValidationError($"Query uses field(s) ({String.Join(",", nonAllowedFields)}) that are not allowed to be used.");
         }
 
         if (options.AllowedOperations.Count > 0) {

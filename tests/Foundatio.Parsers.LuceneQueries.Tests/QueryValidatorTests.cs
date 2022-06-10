@@ -38,12 +38,42 @@ public class QueryValidatorTests : TestWithLoggingBase {
         var info = await QueryValidator.ValidateQueryAsync(@"blah allowedfield:value", options);
         Assert.True(info.IsValid);
     }
+    
+    [Fact]
+    public async Task AllowedFieldsWithAliases() {
+        var options = new QueryValidationOptions();
+        options.AllowedFields.Add("allowedfield");
+        var context = new QueryVisitorContext();
+        var aliasMap = new FieldMap { { "allowedfield", "idx1" } };
+        context.SetFieldResolver(aliasMap.ToHierarchicalFieldResolver());
+        
+        var info = await QueryValidator.ValidateQueryAsync(@"allowedfield:test", options, context);
+        Assert.True(info.IsValid);
+        
+        // do not allow the resolved version in the query; allowed is an explicit list of fields
+        info = await QueryValidator.ValidateQueryAsync(@"idx1:test", options, context);
+        Assert.False(info.IsValid);
+    }
 
     [Fact]
     public async Task RestrictedFields() {
         var options = new QueryValidationOptions();
         options.RestrictedFields.Add("restrictedfield");
         var info = await QueryValidator.ValidateQueryAsync(@"blah restrictedfield:value", options);
+        Assert.False(info.IsValid);
+    }
+    
+    [Fact]
+    public async Task RestrictedFieldsWithAliases() {
+        var options = new QueryValidationOptions();
+        options.RestrictedFields.Add("restrictedField");
+        var context = new QueryVisitorContext();
+        var aliasMap = new FieldMap { { "restrictedField", "idx1" } };
+        context.SetFieldResolver(aliasMap.ToHierarchicalFieldResolver());
+        var info = await QueryValidator.ValidateQueryAsync(@"restrictedField:test", options, context);
+        Assert.False(info.IsValid);
+        
+        info = await QueryValidator.ValidateQueryAsync(@"idx1:test", options, context);
         Assert.False(info.IsValid);
     }
 
