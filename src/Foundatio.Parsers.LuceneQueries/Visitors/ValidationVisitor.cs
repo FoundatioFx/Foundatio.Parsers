@@ -96,11 +96,23 @@ public class ValidationVisitor : ChainableQueryVisitor {
             if (nonAllowedFields.Length > 0)
                 context.AddValidationError($"Query uses field(s) ({String.Join(",", nonAllowedFields)}) that are not allowed to be used.");
         }
+        
+        if (options.RestrictedFields.Count > 0) {
+            var restrictedFields = result.ReferencedFields.Where(f => !String.IsNullOrEmpty(f) && options.RestrictedFields.Contains(f)).ToArray();
+            if (restrictedFields.Length > 0)
+                context.AddValidationError($"Query uses field(s) ({String.Join(",", restrictedFields)}) that are restricted from use.");
+        }
 
         if (options.AllowedOperations.Count > 0) {
             var nonAllowedOperations = result.Operations.Where(f => !options.AllowedOperations.Contains(f.Key)).ToArray();
             if (nonAllowedOperations.Length > 0)
                 context.AddValidationError($"Query uses aggregation operations ({String.Join(",", nonAllowedOperations)}) that are not allowed to be used.");
+        }
+
+        if (options.RestrictedOperations.Count > 0) {
+            var restrictedOperations = result.Operations.Where(f => options.RestrictedOperations.Contains(f.Key)).ToArray();
+            if (restrictedOperations.Length > 0)
+                context.AddValidationError($"Query uses aggregation operations ({String.Join(",", restrictedOperations)}) that are restricted from use.");
         }
 
         if (!options.AllowUnresolvedFields && result.UnresolvedFields.Count > 0)

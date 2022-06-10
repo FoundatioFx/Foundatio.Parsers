@@ -40,6 +40,14 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
+    public async Task RestrictedFields() {
+        var options = new QueryValidationOptions();
+        options.RestrictedFields.Add("restrictedfield");
+        var info = await QueryValidator.ValidateQueryAsync(@"blah restrictedfield:value", options);
+        Assert.False(info.IsValid);
+    }
+
+    [Fact]
     public async Task AllowLeadingWildcards() {
         var options = new QueryValidationOptions();
         options.AllowLeadingWildcards = false;
@@ -66,6 +74,22 @@ public class QueryValidatorTests : TestWithLoggingBase {
         options.AllowedOperations.Add("terms");
         var info = await QueryValidator.ValidateAggregationsAsync(@"terms:blah notallowed:blah", options);
         Assert.False(info.IsValid);
+    }
+
+    [Fact]
+    public async Task RestrictedOperations() {
+        var options = new QueryValidationOptions();
+        options.RestrictedOperations.Add("terms");
+        var info = await QueryValidator.ValidateAggregationsAsync(@"terms:blah", options);
+        Assert.False(info.IsValid);
+    }
+
+    [Fact]
+    public async Task NonRestrictedOperations() {
+        var options = new QueryValidationOptions();
+        options.RestrictedOperations.Add("terms");
+        var info = await QueryValidator.ValidateAggregationsAsync(@"sum:blah", options);
+        Assert.True(info.IsValid);
     }
 
     [Fact]

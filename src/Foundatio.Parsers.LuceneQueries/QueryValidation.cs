@@ -9,10 +9,12 @@ namespace Foundatio.Parsers.LuceneQueries;
 public class QueryValidationOptions {
     public bool ShouldThrow { get; set; }
     public ICollection<string> AllowedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    public ICollection<string> RestrictedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public bool AllowLeadingWildcards { get; set; } = true;
     public bool AllowUnresolvedFields { get; set; } = true;
     public bool AllowUnresolvedIncludes { get; set; } = false;
     public ICollection<string> AllowedOperations { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    public ICollection<string> RestrictedOperations { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public int AllowedMaxNodeDepth { get; set; }
 }
 
