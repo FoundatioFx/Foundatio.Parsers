@@ -1246,7 +1246,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
 
         validationResult = context.GetValidationResult();
         Assert.True(validationResult.IsValid);
-        Assert.Single(validationResult.ReferencedFields, "field1");
+        Assert.Single(validationResult.ReferencedFields, "field2");
         Assert.Empty(validationResult.UnresolvedFields);
     }
 
