@@ -105,25 +105,25 @@ public static class FieldMapExtensions {
         return null;
     }
 
-    public static QueryFieldResolver ToHierarchicalFieldResolver(this IDictionary<string, string> map) {
+    public static QueryFieldResolver ToHierarchicalFieldResolver(this IDictionary<string, string> map, string resultPrefix = null) {
         return (field, _) => {
             if (field == null)
                 return null;
 
             if (map.TryGetValue(field, out string result))
-                return Task.FromResult(result);
+                return Task.FromResult($"{resultPrefix}{result}");
 
             // start at the longest path and go backwards until we find a match in the map
             int currentPart = field.LastIndexOf('.');
             while (currentPart > 0) {
                 string currentName = field.Substring(0, currentPart);
                 if (map.TryGetValue(currentName, out string currentResult))
-                    return Task.FromResult(currentResult + field.Substring(currentPart));
+                    return Task.FromResult($"{resultPrefix}{currentResult}{field.Substring(currentPart)}");
 
                 currentPart = field.LastIndexOf('.', currentPart - 1);
             }
 
-            return Task.FromResult(field);
+            return Task.FromResult($"{resultPrefix}{field}");
         };
     }
 }
