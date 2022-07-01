@@ -123,7 +123,7 @@ public static class FieldMapExtensions {
                 currentPart = field.LastIndexOf('.', currentPart - 1);
             }
 
-            return Task.FromResult($"{resultPrefix}{field}");
+            return Task.FromResult(field);
         };
     }
 }
