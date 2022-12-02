@@ -106,6 +106,10 @@ public class ElasticMappingResolver {
                 }
             }
 
+            // coded properties sometimes have null Name properties
+            if (fieldMapping.Name == null && fieldMapping is IPropertyWithClrOrigin clrOrigin && clrOrigin.ClrOrigin != null)
+                fieldMapping.Name = new PropertyName(clrOrigin.ClrOrigin);
+
             if (depth == 0)
                 resolvedFieldName += _inferrer.PropertyName(fieldMapping.Name);
             else

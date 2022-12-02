@@ -25,6 +25,30 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase {
     }
 
     [Fact]
+    public void CanResolveCodedProperty() {
+        var index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
+
+        Client.IndexMany(new[] {
+                new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = new MyType[] {
+                    new MyType { Field1 = "banana", Data = {
+                        { "number-0001", 23 },
+                        { "text-0001", "Hey" },
+                        { "spaced field", "hey" }
+                    }}
+                }},
+                new MyNestedType { Field1 = "value2", Field2 = "value2" },
+                new MyNestedType { Field1 = "value1", Field2 = "value4" }
+            }, index);
+        Client.Indices.Refresh(index);
+
+        var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
+
+        var payloadProperty = resolver.GetMappingProperty("payload");
+        Assert.IsType<TextProperty>(payloadProperty);
+        Assert.NotNull(payloadProperty.Name);
+    }
+
+    [Fact]
     public void CanResolveProperties() {
         var index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
 
