@@ -33,25 +33,32 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor {
             context.AddValidationError($"Recursive include ({node.Term})");
             return node;
         }
-        
-        string includedQuery = await includeResolver(node.Term).ConfigureAwait(false);
-        if (includedQuery == null) {
-            context.AddValidationError($"Unresolved include ({node.Term})");
+
+        try {
+            string includedQuery = await includeResolver(node.Term).ConfigureAwait(false);
+            if (includedQuery == null) {
+                context.AddValidationError($"Unresolved include ({node.Term})");
+                context.GetValidationResult().UnresolvedIncludes.Add(node.Term);
+            }
+
+            if (String.IsNullOrEmpty(includedQuery))
+                return node;
+
+            includeStack.Push(node.Term);
+
+            var result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
+            result.HasParens = true;
+            await VisitAsync(result, context).ConfigureAwait(false);
+
+            includeStack.Pop();
+
+            return node.ReplaceSelf(result);
+        } catch (Exception ex) {
+            context.AddValidationError($"Error in include resolver callback when resolving include ({node.Term}): {ex.Message}");
             context.GetValidationResult().UnresolvedIncludes.Add(node.Term);
-        }
 
-        if (String.IsNullOrEmpty(includedQuery))
             return node;
-        
-        includeStack.Push(node.Term);
-        
-        var result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
-        result.HasParens = true;
-        await VisitAsync(result, context).ConfigureAwait(false);
-        
-        includeStack.Pop();
-
-        return node.ReplaceSelf(result);
+        }
     }
 
     public static Task<IQueryNode> RunAsync(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver context = null, ShouldSkipIncludeFunc shouldSkipInclude = null) {

@@ -42,35 +42,43 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor {
         if (_globalResolver == null && contextResolver == null)
             return;
 
-        string resolvedField = null;
-        if (contextResolver != null)
-            resolvedField = await contextResolver(node.Field, context).ConfigureAwait(false);
-        if (resolvedField == null && _globalResolver != null)
-            resolvedField = await _globalResolver(node.Field, context).ConfigureAwait(false);
+        try {
+            string resolvedField = null;
+            if (contextResolver != null)
+                resolvedField = await contextResolver(node.Field, context).ConfigureAwait(false);
+            if (resolvedField == null && _globalResolver != null)
+                resolvedField = await _globalResolver(node.Field, context).ConfigureAwait(false);
 
-        if (resolvedField == null) {
-            // add field to unresolved fields list
-            context.GetValidationResult().UnresolvedFields.Add(node.Field);
-            return;
-        }
+            if (resolvedField == null) {
+                // add field to unresolved fields list
+                context.GetValidationResult().UnresolvedFields.Add(node.Field);
+                return;
+            }
 
-        if (!resolvedField.Equals(node.Field)) {
-            node.SetOriginalField(node.Field);
-            node.Field = resolvedField;
+            if (!resolvedField.Equals(node.Field)) {
+                node.SetOriginalField(node.Field);
+                node.Field = resolvedField;
+            }
+        } catch (Exception ex) {
+            context.AddValidationError($"Error in field resolver callback when resolving field ({node.Field}): {ex.Message}");
         }
     }
-
+    
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
         await node.AcceptAsync(this, context).ConfigureAwait(false);
         return node;
     }
 
     public static Task<IQueryNode> RunAsync(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver context = null) {
-        return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext { FieldResolver = resolver });
+        context ??= new QueryVisitorContext();
+        context.SetFieldResolver(resolver);
+        return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
     public static Task<IQueryNode> RunAsync(IQueryNode node, Func<string, string> resolver, IQueryVisitorContextWithFieldResolver context = null) {
-        return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext { FieldResolver = (field, _) => Task.FromResult(resolver(field)) });
+        context ??= new QueryVisitorContext();
+        context.SetFieldResolver((field, _) => Task.FromResult(resolver(field)));
+        return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
     public static IQueryNode Run(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver context = null) {
@@ -82,7 +90,9 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor {
     }
 
     public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver context = null) {
-        return new FieldResolverQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext { FieldResolver = map.ToHierarchicalFieldResolver() });
+        context ??= new QueryVisitorContext();
+        context.SetFieldResolver(map.ToHierarchicalFieldResolver());
+        return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
     public static IQueryNode Run(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver context = null) {

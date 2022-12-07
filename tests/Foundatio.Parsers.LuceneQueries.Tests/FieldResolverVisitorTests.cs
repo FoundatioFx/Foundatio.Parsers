@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Xunit;
 
@@ -160,5 +162,19 @@ public class FieldResolverVisitorTests {
         var result = await parser.ParseAsync("field1.nested:value");
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, f => f == "field1.nested" ? "field2.nested" : null);
         Assert.Equal("field2.nested:value", aliased.ToString());
+    }
+
+    [Fact]
+    public async Task CanHandleFieldResolverErrorAsync() {
+        var parser = new LuceneQueryParser();
+        var result = await parser.ParseAsync("field1.nested:value");
+
+        var context = new QueryVisitorContext();
+        var aliased = await FieldResolverQueryVisitor.RunAsync(result, f => throw new ApplicationException("Bam"), context);
+        var validationResult = context.GetValidationResult();
+
+        Assert.False(validationResult.IsValid);
+        Assert.Contains("Error resolving", validationResult.Message);
+        Assert.Contains("field1.nested", validationResult.Message);
     }
 }

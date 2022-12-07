@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Xunit;
 using Foundatio.Parsers.LuceneQueries.Extensions;
+using System;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
@@ -88,6 +89,20 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
         Assert.Contains("include1", validationResult.UnresolvedIncludes);
         Assert.False(validationResult.IsValid);
         Assert.Contains("Unresolved", validationResult.Message);
+        Assert.Contains("include1", validationResult.Message);
+    }
+
+    [Fact]
+    public async Task CanHandleIncludeResolverError() {
+        var parser = new LuceneQueryParser();
+        var result = await parser.ParseAsync("field1:value1 @include:include1");
+
+        var context = new QueryVisitorContext();
+        var resolved = await IncludeVisitor.RunAsync(result, i => throw new ApplicationException("Bam"), context);
+        var validationResult = context.GetValidationResult();
+        Assert.Contains("include1", validationResult.UnresolvedIncludes);
+        Assert.False(validationResult.IsValid);
+        Assert.Contains("Error resolving", validationResult.Message);
         Assert.Contains("include1", validationResult.Message);
     }
 
