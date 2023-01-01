@@ -102,7 +102,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
         var validationResult = context.GetValidationResult();
         Assert.Contains("include1", validationResult.UnresolvedIncludes);
         Assert.False(validationResult.IsValid);
-        Assert.Contains("Error resolving", validationResult.Message);
+        Assert.Contains("Error in include resolver", validationResult.Message);
         Assert.Contains("include1", validationResult.Message);
     }
 

@@ -174,7 +174,7 @@ public class FieldResolverVisitorTests {
         var validationResult = context.GetValidationResult();
 
         Assert.False(validationResult.IsValid);
-        Assert.Contains("Error resolving", validationResult.Message);
+        Assert.Contains("Error in field resolver", validationResult.Message);
         Assert.Contains("field1.nested", validationResult.Message);
     }
 }
