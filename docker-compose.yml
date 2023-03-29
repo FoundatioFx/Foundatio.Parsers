@@ -21,9 +21,9 @@ services:
       - 5601:5601
     networks:
       - foundatio
-  
+
   ready:
-    image: dadarek/wait-for-dependencies
+    image: andrewlock/wait-for-dependencies
     command: elasticsearch:9200
     depends_on:
       - elasticsearch
