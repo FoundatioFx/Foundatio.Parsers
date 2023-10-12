@@ -91,7 +91,7 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
             builder.Append("(");
 
         if (Left != null)
-            builder.Append(Left);
+            builder.Append(Left is GroupNode ? ((GroupNode) Left).ToString(defaultOperator) : Left.ToString());
 
         if (Left != null && Right != null) {
             if (op == GroupOperator.And)
@@ -103,7 +103,7 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
         }
 
         if (Right != null)
-            builder.Append(Right);
+            builder.Append(Right is GroupNode ? ((GroupNode)Right).ToString(defaultOperator) : Right.ToString());
 
         if (HasParens)
             builder.Append(")");
