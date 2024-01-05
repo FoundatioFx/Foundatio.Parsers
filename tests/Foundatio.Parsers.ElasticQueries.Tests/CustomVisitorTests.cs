@@ -12,13 +12,16 @@ using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
-public class CustomVisitorTests : ElasticsearchTestBase {
-    public CustomVisitorTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture) {
+public class CustomVisitorTests : ElasticsearchTestBase
+{
+    public CustomVisitorTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture)
+    {
         Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     [Fact]
-    public void CanResolveSimpleCustomFilter() {
+    public void CanResolveSimpleCustomFilter()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Id = "1" }, i => i.Index(index));
 
@@ -42,7 +45,8 @@ public class CustomVisitorTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanResolveCustomFilterContainingIncludes() {
+    public void CanResolveCustomFilterContainingIncludes()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Id = "1" }, i => i.Index(index));
 
@@ -66,7 +70,8 @@ public class CustomVisitorTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanResolveIncludeToCustomFilterContainingIgnoredInclude() {
+    public void CanResolveIncludeToCustomFilterContainingIgnoredInclude()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Id = "1" }, i => i.Index(index));
 
@@ -89,9 +94,11 @@ public class CustomVisitorTests : ElasticsearchTestBase {
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
-    private bool ShouldSkipInclude(TermNode node, IQueryVisitorContext context) {
+    private bool ShouldSkipInclude(TermNode node, IQueryVisitorContext context)
+    {
         var current = node.Parent;
-        while (current != null) {
+        while (current != null)
+        {
             if (current is GroupNode groupNode && groupNode.Field == "@custom")
                 return true;
 
@@ -101,7 +108,8 @@ public class CustomVisitorTests : ElasticsearchTestBase {
         return false;
     }
 
-    private static Task<string> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch) {
+    private static Task<string> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch)
+    {
         if (String.Equals(expected, actual))
             return Task.FromResult(resolvedFilterIfMatch);
 
@@ -109,7 +117,8 @@ public class CustomVisitorTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanResolveMultipleCustomFilters() {
+    public void CanResolveMultipleCustomFilters()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Id = "1" }, i => i.Index(index));
 
@@ -154,9 +163,12 @@ public class CustomVisitorTests : ElasticsearchTestBase {
 /// <summary>
 /// Let's resolve a custom id based on a node groups filter: @custom:(filter)
 /// </summary>
-public sealed class CustomFilterVisitor : ChainableQueryVisitor {
-    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
-        if (node.Field == "@custom" && node.Left != null) {
+public sealed class CustomFilterVisitor : ChainableQueryVisitor
+{
+    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    {
+        if (node.Field == "@custom" && node.Left != null)
+        {
             string term = ToTerm(node);
             var ids = await GetIdsAsync(term);
             if (ids != null && ids.Count > 0)
@@ -171,9 +183,11 @@ public sealed class CustomFilterVisitor : ChainableQueryVisitor {
         await base.VisitAsync(node, context);
     }
 
-    private static Task<List<string>> GetIdsAsync(string term) {
+    private static Task<List<string>> GetIdsAsync(string term)
+    {
         var ids = new List<string>();
-        switch (term?.ToLowerInvariant()) {
+        switch (term?.ToLowerInvariant())
+        {
             case "one":
                 ids.Add("1");
                 break;
@@ -188,13 +202,15 @@ public sealed class CustomFilterVisitor : ChainableQueryVisitor {
         return Task.FromResult(ids);
     }
 
-    private static string ToTerm(GroupNode node) {
+    private static string ToTerm(GroupNode node)
+    {
         var builder = new StringBuilder();
 
         if (node.Left != null)
             builder.Append(node.Left);
 
-        if (node.Right != null) {
+        if (node.Right != null)
+        {
             builder.Append(" ");
             builder.Append(node.Right);
         }

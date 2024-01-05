@@ -9,13 +9,16 @@ using Xunit.Abstractions;
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
 [Trait("TestType", "Unit")]
-public class QueryValidatorTests : TestWithLoggingBase {
-    public QueryValidatorTests(ITestOutputHelper output) : base(output) {
+public class QueryValidatorTests : TestWithLoggingBase
+{
+    public QueryValidatorTests(ITestOutputHelper output) : base(output)
+    {
         Log.MinimumLevel = LogLevel.Trace;
     }
 
     [Fact]
-    public async Task InvalidSyntax() {
+    public async Task InvalidSyntax()
+    {
         var info = await QueryValidator.ValidateQueryAsync(@":");
         Assert.False(info.IsValid);
         Assert.NotNull(info.Message);
@@ -23,7 +26,8 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task ThrowInvalidSyntax() {
+    public async Task ThrowInvalidSyntax()
+    {
         var ex = await Assert.ThrowsAsync<QueryValidationException>(() => QueryValidator.ValidateQueryAndThrowAsync(@":"));
         Assert.Contains("Unexpected", ex.Message);
         Assert.False(ex.Result.IsValid);
@@ -32,39 +36,43 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task AllowedFields() {
+    public async Task AllowedFields()
+    {
         var options = new QueryValidationOptions();
         options.AllowedFields.Add("allowedfield");
         var info = await QueryValidator.ValidateQueryAsync(@"blah allowedfield:value", options);
         Assert.True(info.IsValid);
     }
-    
+
     [Fact]
-    public async Task AllowedFieldsWithAliases() {
+    public async Task AllowedFieldsWithAliases()
+    {
         var options = new QueryValidationOptions();
         options.AllowedFields.Add("allowedfield");
         var context = new QueryVisitorContext();
         var aliasMap = new FieldMap { { "allowedfield", "idx1" } };
         context.SetFieldResolver(aliasMap.ToHierarchicalFieldResolver());
-        
+
         var info = await QueryValidator.ValidateQueryAsync(@"allowedfield:test", options, context);
         Assert.True(info.IsValid);
-        
+
         // do not allow the resolved version in the query; allowed is an explicit list of fields
         info = await QueryValidator.ValidateQueryAsync(@"idx1:test", options, context);
         Assert.False(info.IsValid);
     }
 
     [Fact]
-    public async Task RestrictedFields() {
+    public async Task RestrictedFields()
+    {
         var options = new QueryValidationOptions();
         options.RestrictedFields.Add("restrictedfield");
         var info = await QueryValidator.ValidateQueryAsync(@"blah restrictedfield:value", options);
         Assert.False(info.IsValid);
     }
-    
+
     [Fact]
-    public async Task RestrictedFieldsWithAliases() {
+    public async Task RestrictedFieldsWithAliases()
+    {
         var options = new QueryValidationOptions();
         options.RestrictedFields.Add("restrictedField");
         var context = new QueryVisitorContext();
@@ -72,13 +80,14 @@ public class QueryValidatorTests : TestWithLoggingBase {
         context.SetFieldResolver(aliasMap.ToHierarchicalFieldResolver());
         var info = await QueryValidator.ValidateQueryAsync(@"restrictedField:test", options, context);
         Assert.False(info.IsValid);
-        
+
         info = await QueryValidator.ValidateQueryAsync(@"idx1:test", options, context);
         Assert.False(info.IsValid);
     }
 
     [Fact]
-    public async Task AllowLeadingWildcards() {
+    public async Task AllowLeadingWildcards()
+    {
         var options = new QueryValidationOptions();
         options.AllowLeadingWildcards = false;
         var info = await QueryValidator.ValidateQueryAsync(@"blah allowedfield:*alue", options);
@@ -91,7 +100,8 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task AllowedOperations() {
+    public async Task AllowedOperations()
+    {
         var options = new QueryValidationOptions();
         options.AllowedOperations.Add("terms");
         var info = await QueryValidator.ValidateAggregationsAsync(@"terms:blah", options);
@@ -99,7 +109,8 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task NonAllowedOperations() {
+    public async Task NonAllowedOperations()
+    {
         var options = new QueryValidationOptions();
         options.AllowedOperations.Add("terms");
         var info = await QueryValidator.ValidateAggregationsAsync(@"terms:blah notallowed:blah", options);
@@ -107,7 +118,8 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task RestrictedOperations() {
+    public async Task RestrictedOperations()
+    {
         var options = new QueryValidationOptions();
         options.RestrictedOperations.Add("terms");
         var info = await QueryValidator.ValidateAggregationsAsync(@"terms:blah", options);
@@ -115,7 +127,8 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task NonRestrictedOperations() {
+    public async Task NonRestrictedOperations()
+    {
         var options = new QueryValidationOptions();
         options.RestrictedOperations.Add("terms");
         var info = await QueryValidator.ValidateAggregationsAsync(@"sum:blah", options);
@@ -123,8 +136,10 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task ResolvedFields() {
-        var options = new QueryValidationOptions {
+    public async Task ResolvedFields()
+    {
+        var options = new QueryValidationOptions
+        {
             AllowUnresolvedFields = false
         };
         var context = new QueryVisitorContext();
@@ -134,8 +149,10 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task NonResolvedFields() {
-        var options = new QueryValidationOptions {
+    public async Task NonResolvedFields()
+    {
+        var options = new QueryValidationOptions
+        {
             AllowUnresolvedFields = false
         };
         var context = new QueryVisitorContext();
@@ -146,8 +163,10 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task NonResolvedThrowsFields() {
-        var options = new QueryValidationOptions {
+    public async Task NonResolvedThrowsFields()
+    {
+        var options = new QueryValidationOptions
+        {
             AllowUnresolvedFields = false
         };
         var context = new QueryVisitorContext();
@@ -161,7 +180,8 @@ public class QueryValidatorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public void CanParseWildcardQuery() {
+    public void CanParseWildcardQuery()
+    {
         var sut = new LuceneQueryParser();
         var node = sut.Parse("*");
         var result = ValidationVisitor.Run(node);

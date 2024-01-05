@@ -1,22 +1,25 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Xunit;
 using Xunit;
 using Xunit.Abstractions;
-using System.Threading.Tasks;
-using Foundatio.Parsers.LuceneQueries.Nodes;
-using Foundatio.Xunit;
-using Foundatio.Parsers.LuceneQueries.Extensions;
-using System;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
-public class IncludeQueryVisitorTests : TestWithLoggingBase {
-    public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output) {
+public class IncludeQueryVisitorTests : TestWithLoggingBase
+{
+    public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output)
+    {
         Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     [Fact]
-    public async Task CanExpandIncludesAsync() {
+    public async Task CanExpandIncludesAsync()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("@include:other");
         var includes = new Dictionary<string, string> { { "other", "field:value" } };
@@ -25,7 +28,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanSkipIncludes() {
+    public async Task CanSkipIncludes()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("outter @include:other @skipped:(other stuff @include:other)");
         var includes = new Dictionary<string, string> {
@@ -46,9 +50,11 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
         Assert.Equal("outter @skipped:(other stuff @include:nested)", resolved.ToString());
     }
 
-    private bool ShouldSkipInclude(TermNode node, IQueryVisitorContext context) {
+    private bool ShouldSkipInclude(TermNode node, IQueryVisitorContext context)
+    {
         var current = node.Parent;
-        while (current != null) {
+        while (current != null)
+        {
             if (current is GroupNode groupNode && groupNode.Field == "@skipped")
                 return true;
 
@@ -59,7 +65,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanHandleRecursiveInclude() {
+    public async Task CanHandleRecursiveInclude()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value1 @include:include1");
         var includes = new Dictionary<string, string> {
@@ -76,7 +83,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanHandleUnresolvedIncludes() {
+    public async Task CanHandleUnresolvedIncludes()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value1 @include:include1");
         var includes = new Dictionary<string, string> {
@@ -93,7 +101,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanHandleIncludeResolverError() {
+    public async Task CanHandleIncludeResolverError()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value1 @include:include1");
 
@@ -107,7 +116,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanHandleIncludeUsedMultipleTimes() {
+    public async Task CanHandleIncludeUsedMultipleTimes()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value1 @include:include1 @include:include1");
         var includes = new Dictionary<string, string> {
@@ -120,7 +130,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanExpandIncludesWithOtherCriteriaAsync() {
+    public async Task CanExpandIncludesWithOtherCriteriaAsync()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value1 @include:other");
         var includes = new Dictionary<string, string> { { "other", "field:value" } };
@@ -129,7 +140,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanExpandIncludesWithOtherCriteriaAndGroupingAsync() {
+    public async Task CanExpandIncludesWithOtherCriteriaAndGroupingAsync()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value1 OR (@include:other field2:value2)");
         var includes = new Dictionary<string, string> { { "other", "field:value" } };
@@ -138,7 +150,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanExpandNestedIncludesAsync() {
+    public async Task CanExpandNestedIncludesAsync()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("@include:other");
         var includes = new Dictionary<string, string> {

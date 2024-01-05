@@ -7,8 +7,10 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
-public class RemoveFieldsQueryVisitor : ChainableQueryVisitor {
-    public RemoveFieldsQueryVisitor(IEnumerable<string> fieldsToRemove) {
+public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
+{
+    public RemoveFieldsQueryVisitor(IEnumerable<string> fieldsToRemove)
+    {
         if (fieldsToRemove == null)
             throw new ArgumentNullException(nameof(fieldsToRemove));
 
@@ -16,7 +18,8 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor {
         ShouldRemoveField = f => fieldsToRemoveList.Contains(f, StringComparer.OrdinalIgnoreCase);
     }
 
-    public RemoveFieldsQueryVisitor(Func<string, bool> shouldRemoveFieldFunc) {
+    public RemoveFieldsQueryVisitor(Func<string, bool> shouldRemoveFieldFunc)
+    {
         if (shouldRemoveFieldFunc == null)
             throw new ArgumentNullException(nameof(shouldRemoveFieldFunc));
 
@@ -25,8 +28,10 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor {
 
     public Func<string, bool> ShouldRemoveField { get; }
 
-    public override Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context) {
-        if (node is IFieldQueryNode fieldNode && fieldNode.Field != null && ShouldRemoveField(fieldNode.Field)) {
+    public override Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context)
+    {
+        if (node is IFieldQueryNode fieldNode && fieldNode.Field != null && ShouldRemoveField(fieldNode.Field))
+        {
             node.RemoveSelf();
             return Task.FromResult<IQueryNode>(null);
         }
@@ -34,26 +39,31 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor {
         return base.VisitAsync(node, context);
     }
 
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    {
         await node.AcceptAsync(this, context);
         return node;
     }
 
-    public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null) {
+    public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null)
+    {
         var result = await new RemoveFieldsQueryVisitor(nonInvertedFields).AcceptAsync(node, context);
         return result.ToString();
     }
 
-    public static async Task<string> RunAsync(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext context = null) {
+    public static async Task<string> RunAsync(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext context = null)
+    {
         var result = await new RemoveFieldsQueryVisitor(shouldRemoveFieldFunc).AcceptAsync(node, context);
         return result.ToString();
     }
 
-    public static string Run(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null) {
+    public static string Run(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null)
+    {
         return RunAsync(node, nonInvertedFields, context).GetAwaiter().GetResult();
     }
 
-    public static string Run(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext context = null) {
+    public static string Run(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext context = null)
+    {
         return RunAsync(node, shouldRemoveFieldFunc, context).GetAwaiter().GetResult();
     }
 }

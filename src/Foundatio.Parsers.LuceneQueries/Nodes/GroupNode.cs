@@ -5,11 +5,14 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes;
 
-public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
+public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode
+{
     private IQueryNode _left;
-    public IQueryNode Left {
+    public IQueryNode Left
+    {
         get => _left;
-        set {
+        set
+        {
             _left = value;
             if (_left != null)
                 _left.Parent = this;
@@ -17,9 +20,11 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
     }
 
     private IQueryNode _right;
-    public IQueryNode Right {
+    public IQueryNode Right
+    {
         get => _right;
-        set {
+        set
+        {
             _right = value;
             if (_right != null)
                 _right.Parent = this;
@@ -37,7 +42,8 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
     public string Proximity { get; set; }
     public string UnescapedProximity => Proximity?.Unescape();
 
-    public GroupNode CopyTo(GroupNode target) {
+    public GroupNode CopyTo(GroupNode target)
+    {
         if (Left != null)
             target.Left = Left.Clone();
 
@@ -68,11 +74,13 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
         return target;
     }
 
-    public override string ToString() {
+    public override string ToString()
+    {
         return ToString(GroupOperator.Default);
     }
 
-    public string ToString(GroupOperator defaultOperator) {
+    public string ToString(GroupOperator defaultOperator)
+    {
         if (Left == null && Right == null)
             return String.Empty;
 
@@ -91,9 +99,10 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
             builder.Append("(");
 
         if (Left != null)
-            builder.Append(Left is GroupNode ? ((GroupNode) Left).ToString(defaultOperator) : Left.ToString());
+            builder.Append(Left is GroupNode ? ((GroupNode)Left).ToString(defaultOperator) : Left.ToString());
 
-        if (Left != null && Right != null) {
+        if (Left != null && Right != null)
+        {
             if (op == GroupOperator.And)
                 builder.Append(" AND ");
             else if (op == GroupOperator.Or)
@@ -117,15 +126,18 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
         return builder.ToString();
     }
 
-    public override IQueryNode Clone() {
+    public override IQueryNode Clone()
+    {
         var clone = new GroupNode();
         CopyTo(clone);
 
         return clone;
     }
 
-    public override IEnumerable<IQueryNode> Children {
-        get {
+    public override IEnumerable<IQueryNode> Children
+    {
+        get
+        {
             var children = new List<IQueryNode>();
             if (Left != null)
                 children.Add(Left);
@@ -137,7 +149,8 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
     }
 }
 
-public enum GroupOperator {
+public enum GroupOperator
+{
     Default,
     And,
     Or

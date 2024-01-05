@@ -8,7 +8,8 @@ using Pegasus.Common.Tracing;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
-public class LoggingTracer : ITracer {
+public class LoggingTracer : ITracer
+{
     private readonly ILogger _logger;
     private readonly bool _reportPerformance;
     private readonly RuleStats _cacheHitStats = new();
@@ -16,18 +17,21 @@ public class LoggingTracer : ITracer {
     private readonly Dictionary<string, RuleStats> _stats = new();
     private int _indentLevel;
 
-    public LoggingTracer(ILogger logger, bool reportPerformance = false) {
+    public LoggingTracer(ILogger logger, bool reportPerformance = false)
+    {
         _logger = logger;
         _reportPerformance = reportPerformance;
     }
 
-    public void TraceCacheHit<T>(string ruleName, Cursor cursor, CacheKey cacheKey, IParseResult<T> parseResult) {
+    public void TraceCacheHit<T>(string ruleName, Cursor cursor, CacheKey cacheKey, IParseResult<T> parseResult)
+    {
         _ruleStack.Peek().CacheHit = true;
         _stats[ruleName].CacheHits++;
         TraceInfo(ruleName, cursor, "Cache hit.");
     }
 
-    public void TraceCacheMiss(string ruleName, Cursor cursor, CacheKey cacheKey) {
+    public void TraceCacheMiss(string ruleName, Cursor cursor, CacheKey cacheKey)
+    {
         _ruleStack.Peek().CacheHit = false;
         _stats[ruleName].CacheMisses++;
         TraceInfo(ruleName, cursor, "Cache miss.");
@@ -35,18 +39,22 @@ public class LoggingTracer : ITracer {
 
     public void TraceInfo(string ruleName, Cursor cursor, string info) => _logger.LogInformation($"{GetIndent()}{ruleName} at ({cursor.Line},{cursor.Column}): {info}");
 
-    private string GetIndent() {
+    private string GetIndent()
+    {
         return new string(' ', _indentLevel * 3);
     }
 
-    public void TraceRuleEnter(string ruleName, Cursor cursor) {
-        _ruleStack.Push(new RuleStackEntry {
+    public void TraceRuleEnter(string ruleName, Cursor cursor)
+    {
+        _ruleStack.Push(new RuleStackEntry
+        {
             RuleName = ruleName,
             Cursor = cursor,
             Stopwatch = Stopwatch.StartNew(),
         });
 
-        if (!_stats.TryGetValue(ruleName, out var ruleStats)) {
+        if (!_stats.TryGetValue(ruleName, out var ruleStats))
+        {
             ruleStats = _stats[ruleName] = new RuleStats();
         }
 
@@ -59,17 +67,21 @@ public class LoggingTracer : ITracer {
         _indentLevel++;
     }
 
-    public void TraceRuleExit<T>(string ruleName, Cursor cursor, IParseResult<T> parseResult) {
+    public void TraceRuleExit<T>(string ruleName, Cursor cursor, IParseResult<T> parseResult)
+    {
         var success = parseResult != null;
         var entry = _ruleStack.Pop();
         entry.Stopwatch.Stop();
         var ticks = entry.Stopwatch.ElapsedTicks;
         _indentLevel--;
 
-        if (entry.CacheHit ?? false) {
+        if (entry.CacheHit ?? false)
+        {
             _cacheHitStats.Invocations += 1;
             _cacheHitStats.TotalTicks += ticks;
-        } else {
+        }
+        else
+        {
             _stats[ruleName].TotalTicks += ticks;
         }
 
@@ -78,12 +90,14 @@ public class LoggingTracer : ITracer {
         if (!_reportPerformance)
             return;
 
-        if (_ruleStack.Count == 0) {
+        if (_ruleStack.Count == 0)
+        {
             var cacheHitTicks = _cacheHitStats.Invocations == 0
                 ? 1.35
                 : (double)_cacheHitStats.TotalTicks / _cacheHitStats.Invocations;
 
-            ReportPerformance(TimeSpan.FromTicks((long)Math.Round(cacheHitTicks)), _stats.Select(stat => {
+            ReportPerformance(TimeSpan.FromTicks((long)Math.Round(cacheHitTicks)), _stats.Select(stat =>
+            {
                 var stats = stat.Value;
                 var isCached = stats.CacheMisses > 0;
                 var cacheHits = isCached ? stats.CacheHits : stats.Locations.Values.Where(v => v > 1).Select(v => v - 1).Sum();
@@ -94,7 +108,8 @@ public class LoggingTracer : ITracer {
                 var estimatedTimeWithCache = (cacheMisses * averageTicks) + ((cacheHits + cacheMisses) * cacheHitTicks);
                 var estimatedTimeSaved = estimatedTimeWithoutCache - estimatedTimeWithCache;
 
-                return new RulePerformanceInfo {
+                return new RulePerformanceInfo
+                {
                     Name = stat.Key,
                     Invocations = stats.Invocations,
                     AverageTime = TimeSpan.FromTicks((long)Math.Round(averageTicks)),
@@ -107,29 +122,38 @@ public class LoggingTracer : ITracer {
         }
     }
 
-    protected virtual void ReportPerformance(TimeSpan averageCacheHitDuration, RulePerformanceInfo[] stats) {
+    protected virtual void ReportPerformance(TimeSpan averageCacheHitDuration, RulePerformanceInfo[] stats)
+    {
         _logger.LogInformation($"Average Cache Hit Duration: {averageCacheHitDuration}");
-        foreach (var stat in stats) {
+        foreach (var stat in stats)
+        {
             _logger.LogInformation($"Rule: {stat.Name}");
 
             _logger.LogInformation($"  Invocations: {stat.Invocations}");
             _logger.LogInformation($"  Average Duration: {stat.AverageTime}");
             _logger.LogInformation($"  Is Cached: {stat.IsCached}");
 
-            if (stat.IsCached) {
+            if (stat.IsCached)
+            {
                 _logger.LogInformation($"    Cache Hits: {stat.CacheHits}");
                 _logger.LogInformation($"    Cache Misses: {stat.CacheMisses}");
-            } else {
+            }
+            else
+            {
                 _logger.LogInformation($"    Redundant Invocations: {stat.CacheHits}");
             }
 
-            if (stat.IsCached || stat.CacheHits > 0) {
+            if (stat.IsCached || stat.CacheHits > 0)
+            {
                 _logger.LogInformation($"  Estimated Time Saved: {stat.EstimatedTotalTimeSaved}");
             }
 
-            if (!stat.IsCached && stat.EstimatedTotalTimeSaved > TimeSpan.Zero) {
+            if (!stat.IsCached && stat.EstimatedTotalTimeSaved > TimeSpan.Zero)
+            {
                 _logger.LogInformation($"  Recommendation: Add the -memoize flag to `{stat.Name}`. (Saves {stat.EstimatedTotalTimeSaved})");
-            } else if (stat.IsCached && stat.EstimatedTotalTimeSaved < -TimeSpan.FromMilliseconds(10)) {
+            }
+            else if (stat.IsCached && stat.EstimatedTotalTimeSaved < -TimeSpan.FromMilliseconds(10))
+            {
                 _logger.LogInformation($"  Recommendation: Remove -memoize flag from `{stat.Name}`. (Saves {stat.EstimatedTotalTimeSaved.Negate()})");
             }
         }
@@ -138,7 +162,8 @@ public class LoggingTracer : ITracer {
     /// <summary>
     /// Summarizes the performance of a specific rule.
     /// </summary>
-    protected class RulePerformanceInfo {
+    protected class RulePerformanceInfo
+    {
         /// <summary>
         /// Gets the average duration of each invocation.
         /// </summary>
@@ -175,7 +200,8 @@ public class LoggingTracer : ITracer {
         public string Name { get; internal set; }
     }
 
-    private class RuleStackEntry {
+    private class RuleStackEntry
+    {
         public bool? CacheHit { get; set; }
 
         public Cursor Cursor { get; set; }
@@ -185,7 +211,8 @@ public class LoggingTracer : ITracer {
         public Stopwatch Stopwatch { get; set; }
     }
 
-    private class RuleStats {
+    private class RuleStats
+    {
         public int CacheHits { get; set; }
 
         public int CacheMisses { get; set; }

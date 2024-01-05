@@ -1,18 +1,21 @@
-﻿using Foundatio.Parsers.LuceneQueries.Visitors;
+﻿using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Xunit;
 using Xunit;
 using Xunit.Abstractions;
-using System.Threading.Tasks;
-using Foundatio.Xunit;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
-public class RemoveFieldsQueryVisitorTests : TestWithLoggingBase {
-    public RemoveFieldsQueryVisitorTests(ITestOutputHelper output) : base(output) {
+public class RemoveFieldsQueryVisitorTests : TestWithLoggingBase
+{
+    public RemoveFieldsQueryVisitorTests(ITestOutputHelper output) : base(output)
+    {
         Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     [Fact]
-    public async Task CanRemoveField() {
+    public async Task CanRemoveField()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value");
         var queryResult = await RemoveFieldsQueryVisitor.RunAsync(result, new[] { "field1" });
@@ -21,7 +24,8 @@ public class RemoveFieldsQueryVisitorTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanRemoveFieldWithFunc() {
+    public async Task CanRemoveFieldWithFunc()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value");
         var queryResult = await RemoveFieldsQueryVisitor.RunAsync(result, f => f == "field3");

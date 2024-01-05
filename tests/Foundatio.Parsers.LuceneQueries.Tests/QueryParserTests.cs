@@ -14,30 +14,37 @@ using Xunit.Abstractions;
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
 [Trait("TestType", "Unit")]
-public class QueryParserTests : TestWithLoggingBase {
-    public QueryParserTests(ITestOutputHelper output) : base(output) {
+public class QueryParserTests : TestWithLoggingBase
+{
+    public QueryParserTests(ITestOutputHelper output) : base(output)
+    {
         Log.MinimumLevel = LogLevel.Trace;
     }
 
     [Fact]
-    public async Task CanUseForwardSlashes() {
+    public async Task CanUseForwardSlashes()
+    {
         string query = @"hey/now";
 #if ENABLE_TRACING
         var tracer = new LoggingTracer(_logger, reportPerformance: true);
 #else
             var tracer = NullTracer.Instance;
 #endif
-        var parser = new LuceneQueryParser {
+        var parser = new LuceneQueryParser
+        {
             Tracer = tracer
         };
 
-        try {
+        try
+        {
             var result = await parser.ParseAsync(query);
 
             _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             _logger.LogInformation(tracer.ToString());
             var cursor = ex.Data["cursor"] as Cursor;
             throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
@@ -45,18 +52,21 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanUseSpaceInFieldNames() {
+    public async Task CanUseSpaceInFieldNames()
+    {
         string query = @"a\ b:c";
 #if ENABLE_TRACING
         var tracer = new LoggingTracer(_logger, reportPerformance: true);
 #else
             var tracer = NullTracer.Instance;
 #endif
-        var parser = new LuceneQueryParser {
+        var parser = new LuceneQueryParser
+        {
             Tracer = tracer
         };
 
-        try {
+        try
+        {
             var result = await parser.ParseAsync(query);
 
             _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
@@ -68,7 +78,9 @@ public class QueryParserTests : TestWithLoggingBase {
             var leftNode = groupNode.Left as TermNode;
             Assert.NotNull(leftNode);
             Assert.Equal("a b", leftNode.UnescapedField);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             _logger.LogInformation(tracer.ToString());
             var cursor = ex.Data["cursor"] as Cursor;
             throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
@@ -76,18 +88,21 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanParseRegex() {
+    public async Task CanParseRegex()
+    {
         string query = @"/\(\[A-Za-z\/\]+\).*?/";
 #if ENABLE_TRACING
         var tracer = new LoggingTracer(_logger, reportPerformance: true);
 #else
             var tracer = NullTracer.Instance;
 #endif
-        var parser = new LuceneQueryParser {
+        var parser = new LuceneQueryParser
+        {
             Tracer = tracer
         };
 
-        try {
+        try
+        {
             var result = await parser.ParseAsync(query);
 
             _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
@@ -99,14 +114,17 @@ public class QueryParserTests : TestWithLoggingBase {
             var leftNode = groupNode.Left as TermNode;
             Assert.NotNull(leftNode);
             Assert.True(leftNode.IsRegexTerm);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             var cursor = ex.Data["cursor"] as Cursor;
             throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
         }
     }
 
     [Fact]
-    public void CanHandleEmpty() {
+    public void CanHandleEmpty()
+    {
         var sut = new LuceneQueryParser();
 
         var result = sut.Parse(String.Empty);
@@ -116,10 +134,12 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public void CanHandleUnterminatedRegex() {
+    public void CanHandleUnterminatedRegex()
+    {
         var sut = new LuceneQueryParser();
 
-        var ex = Assert.Throws<FormatException>(() => {
+        var ex = Assert.Throws<FormatException>(() =>
+        {
             var result = sut.Parse(@"/\(\[A-Za-z\/\]+\).*?");
             var ast = DebugQueryVisitor.Run(result);
         });
@@ -127,18 +147,21 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanParseFieldRegex() {
+    public async Task CanParseFieldRegex()
+    {
         string query = @"myfield:/\(\[A-Za-z\]+\).*?/";
 #if ENABLE_TRACING
         var tracer = new LoggingTracer(_logger, reportPerformance: true);
 #else
             var tracer = NullTracer.Instance;
 #endif
-        var parser = new LuceneQueryParser {
+        var parser = new LuceneQueryParser
+        {
             Tracer = tracer
         };
 
-        try {
+        try
+        {
             var result = await parser.ParseAsync(query);
 
             _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
@@ -151,23 +174,28 @@ public class QueryParserTests : TestWithLoggingBase {
             Assert.NotNull(leftNode);
             Assert.Equal("myfield", leftNode.Field);
             Assert.True(leftNode.IsRegexTerm);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             var cursor = ex.Data["cursor"] as Cursor;
             throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
         }
     }
 
     [Fact]
-    public void CanParseQueryConcurrently() {
+    public void CanParseQueryConcurrently()
+    {
         var parser = new LuceneQueryParser();
-        Parallel.For(0, 100, i => {
+        Parallel.For(0, 100, i =>
+        {
             var result = parser.Parse("criteria   some:criteria blah:(more      stuff)");
             Assert.NotNull(result);
         });
     }
 
     [Fact]
-    public void CanParseNotBeforeParens() {
+    public void CanParseNotBeforeParens()
+    {
         var sut = new LuceneQueryParser();
 
         var result = sut.Parse("NOT (dog parrot)");
@@ -179,7 +207,8 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public void CanParsePrefix() {
+    public void CanParsePrefix()
+    {
         var sut = new LuceneQueryParser();
 
         var result = sut.Parse(@"""jakarta apache"" !""Apache Lucene""");
@@ -210,7 +239,8 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public void CanParseRanges() {
+    public void CanParseRanges()
+    {
         var sut = new LuceneQueryParser();
 
         var result = sut.Parse("[1 TO 2]");
@@ -333,13 +363,15 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public void CanParseEmptyQuotes() {
+    public void CanParseEmptyQuotes()
+    {
 #if ENABLE_TRACING
         var tracer = new LoggingTracer(_logger, reportPerformance: true);
 #else
             var tracer = NullTracer.Instance;
 #endif
-        var parser = new LuceneQueryParser {
+        var parser = new LuceneQueryParser
+        {
             Tracer = tracer
         };
 
@@ -352,30 +384,36 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public void MultipleOperatorsIsNotValid() {
+    public void MultipleOperatorsIsNotValid()
+    {
         var sut = new LuceneQueryParser();
 
-        Assert.Throws<FormatException>(() => {
+        Assert.Throws<FormatException>(() =>
+        {
             var result = sut.Parse("something AND NOT OR otherthing");
             var ast = DebugQueryVisitor.Run(result);
         });
     }
 
     [Fact]
-    public void DoubleOperatorsIsNotValid() {
+    public void DoubleOperatorsIsNotValid()
+    {
         var sut = new LuceneQueryParser();
 
-        Assert.Throws<FormatException>(() => {
+        Assert.Throws<FormatException>(() =>
+        {
             var result = sut.Parse("something AND OR otherthing");
             var ast = DebugQueryVisitor.Run(result);
         });
     }
 
     [Fact]
-    public void UnterminatedQuotedStringIsNotValid() {
+    public void UnterminatedQuotedStringIsNotValid()
+    {
         var sut = new LuceneQueryParser();
 
-        var ex = Assert.Throws<FormatException>(() => {
+        var ex = Assert.Throws<FormatException>(() =>
+        {
             var result = sut.Parse("\"something");
             var ast = DebugQueryVisitor.Run(result);
         });
@@ -383,10 +421,12 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public void DoubleUnterminatedQuotedStringIsNotValid() {
+    public void DoubleUnterminatedQuotedStringIsNotValid()
+    {
         var sut = new LuceneQueryParser();
 
-        var ex = Assert.Throws<FormatException>(() => {
+        var ex = Assert.Throws<FormatException>(() =>
+        {
             var result = sut.Parse("\"something\"\"");
             var ast = DebugQueryVisitor.Run(result);
         });
@@ -394,17 +434,20 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public void UnterminatedParensIsNotValid() {
+    public void UnterminatedParensIsNotValid()
+    {
         var sut = new LuceneQueryParser();
 
-        var ex = Assert.Throws<FormatException>(() => {
+        var ex = Assert.Throws<FormatException>(() =>
+        {
             var result = sut.Parse("(something");
         });
         Assert.Contains("Missing closing paren ')' for group expression", ex.Message);
     }
 
     [Fact]
-    public async Task CanGenerateSingleQueryAsync() {
+    public async Task CanGenerateSingleQueryAsync()
+    {
         string query = "datehistogram:(date~2^-5\\:30 min:date max:date)";
         string expected = "datehistogram:(date~2^-5\\:30 min:date max:date)";
         var parser = new LuceneQueryParser();
@@ -420,10 +463,12 @@ public class QueryParserTests : TestWithLoggingBase {
     }
 }
 
-public class TestQueryVisitor : ChainableQueryVisitor {
+public class TestQueryVisitor : ChainableQueryVisitor
+{
     public int GroupNodeCount { get; private set; } = 0;
 
-    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    {
         GroupNodeCount++;
         return base.VisitAsync(node, context);
     }

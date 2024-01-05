@@ -6,12 +6,15 @@ using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
-public class ElasticMappingResolverTests : ElasticsearchTestBase {
-    public ElasticMappingResolverTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture) {
+public class ElasticMappingResolverTests : ElasticsearchTestBase
+{
+    public ElasticMappingResolverTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture)
+    {
         Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
-    private ITypeMapping MapMyNestedType(TypeMappingDescriptor<MyNestedType> m) {
+    private ITypeMapping MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
+    {
         return m
             .AutoMap<MyNestedType>()
             .Dynamic()
@@ -25,7 +28,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanResolveCodedProperty() {
+    public void CanResolveCodedProperty()
+    {
         var index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
 
         Client.IndexMany(new[] {
@@ -49,7 +53,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanResolveProperties() {
+    public void CanResolveProperties()
+    {
         var index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
 
         Client.IndexMany(new[] {
@@ -147,7 +152,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase {
         Assert.IsType<ObjectProperty>(nestedDataProperty);
     }
 
-    private static Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath) {
+    private static Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath)
+    {
         return objectPath;
     }
 }

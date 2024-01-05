@@ -1,17 +1,19 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
-using System.Collections.Generic;
-using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
-public class CombineAggregationsVisitor : ChainableQueryVisitor {
-    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+public class CombineAggregationsVisitor : ChainableQueryVisitor
+{
+    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    {
         await base.VisitAsync(node, context).ConfigureAwait(false);
 
         if (context is not IElasticQueryVisitorContext elasticContext)
@@ -20,19 +22,29 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor {
         var container = await GetParentContainerAsync(node, context);
         var termsAggregation = container as ITermsAggregation;
 
-        foreach (var child in node.Children.OfType<IFieldQueryNode>()) {
+        foreach (var child in node.Children.OfType<IFieldQueryNode>())
+        {
             var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
-            if (aggregation == null) {
+            if (aggregation == null)
+            {
                 var termNode = child as TermNode;
-                if (termNode != null && termsAggregation != null) {
+                if (termNode != null && termsAggregation != null)
+                {
                     // TODO: Move these to the default aggs method using a visitor to walk down the tree to gather them but not going into any sub groups
-                    if (termNode.Field == "@exclude") {
+                    if (termNode.Field == "@exclude")
+                    {
                         termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm);
-                    } else if (termNode.Field == "@include") {
+                    }
+                    else if (termNode.Field == "@include")
+                    {
                         termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm);
-                    } else if (termNode.Field == "@missing") {
+                    }
+                    else if (termNode.Field == "@missing")
+                    {
                         termsAggregation.Missing = termNode.UnescapedTerm;
-                    } else if (termNode.Field == "@min") {
+                    }
+                    else if (termNode.Field == "@min")
+                    {
                         int? minCount = null;
                         if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
                             minCount = parsedMinCount;
@@ -41,14 +53,18 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor {
                     }
                 }
 
-                if (termNode != null && container is ITopHitsAggregation topHitsAggregation) {
+                if (termNode != null && container is ITopHitsAggregation topHitsAggregation)
+                {
                     var filter = node.GetSourceFilter(() => new SourceFilter());
-                    if (termNode.Field == "@exclude") {
+                    if (termNode.Field == "@exclude")
+                    {
                         if (filter.Excludes == null)
                             filter.Excludes = termNode.UnescapedTerm;
                         else
                             filter.Excludes.And(termNode.UnescapedTerm);
-                    } else if (termNode.Field == "@include") {
+                    }
+                    else if (termNode.Field == "@include")
+                    {
                         if (filter.Includes == null)
                             filter.Includes = termNode.UnescapedTerm;
                         else
@@ -57,14 +73,18 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor {
                     topHitsAggregation.Source = filter;
                 }
 
-                if (termNode != null && container is IDateHistogramAggregation dateHistogramAggregation) {
-                    if (termNode.Field == "@missing") {
+                if (termNode != null && container is IDateHistogramAggregation dateHistogramAggregation)
+                {
+                    if (termNode.Field == "@missing")
+                    {
                         DateTime? missingValue = null;
                         if (!String.IsNullOrEmpty(termNode.Term) && DateTime.TryParse(termNode.Term, out var parsedMissingDate))
                             missingValue = parsedMissingDate;
 
                         dateHistogramAggregation.Missing = missingValue;
-                    } else if (termNode.Field == "@offset") {
+                    }
+                    else if (termNode.Field == "@offset")
+                    {
                         dateHistogramAggregation.Offset = termNode.IsExcluded() ? "-" + termNode.Term : termNode.Term;
                     }
                 }
@@ -72,18 +92,21 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor {
                 continue;
             }
 
-            if (container is BucketAggregationBase bucketContainer) {
+            if (container is BucketAggregationBase bucketContainer)
+            {
                 if (bucketContainer.Aggregations == null)
                     bucketContainer.Aggregations = new AggregationDictionary();
 
                 bucketContainer.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
             }
 
-            if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+")) {
+            if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+"))
+            {
                 if (termsAggregation.Order == null)
                     termsAggregation.Order = new List<TermsOrder>();
 
-                termsAggregation.Order.Add(new TermsOrder {
+                termsAggregation.Order.Add(new TermsOrder
+                {
                     Key = ((IAggregation)aggregation).Name,
                     Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
                 });
@@ -94,12 +117,15 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor {
             node.SetAggregation(container);
     }
 
-    private async Task<AggregationBase> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context) {
+    private async Task<AggregationBase> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context)
+    {
         AggregationBase container = null;
         var currentNode = node;
-        while (container == null && currentNode != null) {
+        while (container == null && currentNode != null)
+        {
             IQueryNode n = currentNode;
-            container = await n.GetAggregationAsync(async () => {
+            container = await n.GetAggregationAsync(async () =>
+            {
                 var result = await n.GetDefaultAggregationAsync(context);
                 if (result != null)
                     n.SetAggregation(result);
@@ -113,7 +139,8 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor {
                 break;
         }
 
-        if (container == null) {
+        if (container == null)
+        {
             container = new ChildrenAggregation(null, null);
             currentNode.SetAggregation(container);
         }

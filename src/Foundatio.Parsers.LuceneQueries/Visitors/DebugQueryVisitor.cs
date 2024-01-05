@@ -7,15 +7,18 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
-public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string> {
+public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string>
+{
     private readonly StringBuilder _builder = new();
     private readonly IndentedTextWriter _writer;
 
-    public DebugQueryVisitor() {
+    public DebugQueryVisitor()
+    {
         _writer = new IndentedTextWriter(new StringWriter(_builder));
     }
 
-    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    {
         await _writer.WriteLineAsync("Group:").ConfigureAwait(false);
         _writer.Indent++;
         _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
@@ -41,7 +44,8 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string> {
         _writer.Indent--;
     }
 
-    public override void Visit(TermNode node, IQueryVisitorContext context) {
+    public override void Visit(TermNode node, IQueryVisitorContext context)
+    {
         _writer.WriteLine("Term: ");
         _writer.Indent++;
         _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
@@ -59,7 +63,8 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string> {
         _writer.Indent--;
     }
 
-    public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
+    public override void Visit(TermRangeNode node, IQueryVisitorContext context)
+    {
         _writer.WriteLine("Term Range: ");
         _writer.Indent++;
         _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
@@ -77,7 +82,8 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string> {
         _writer.Indent--;
     }
 
-    public override void Visit(ExistsNode node, IQueryVisitorContext context) {
+    public override void Visit(ExistsNode node, IQueryVisitorContext context)
+    {
         _writer.WriteLine("Exists: ");
         _writer.Indent++;
         _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
@@ -90,7 +96,8 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string> {
         _writer.Indent--;
     }
 
-    public override void Visit(MissingNode node, IQueryVisitorContext context) {
+    public override void Visit(MissingNode node, IQueryVisitorContext context)
+    {
         _writer.WriteLine("Missing: ");
         _writer.Indent++;
         _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
@@ -103,15 +110,18 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string> {
         _writer.Indent--;
     }
 
-    private void WriteData(QueryNodeBase node) {
+    private void WriteData(QueryNodeBase node)
+    {
         if (node.Data.Count <= 0)
             return;
 
         _writer.WriteLine("Data:");
         _writer.Indent++;
-        foreach (var kvp in node.Data) {
+        foreach (var kvp in node.Data)
+        {
             _writer.Write(kvp.Key);
-            if (kvp.Value != null) {
+            if (kvp.Value != null)
+            {
                 _writer.Write(": ");
                 _writer.WriteLine(kvp.Value.ToString());
             }
@@ -119,16 +129,19 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string> {
         _writer.Indent--;
     }
 
-    public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+    public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    {
         await node.AcceptAsync(this, context);
         return _builder.ToString();
     }
 
-    public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext context = null) {
+    public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    {
         return new DebugQueryVisitor().AcceptAsync(node, context);
     }
 
-    public static string Run(IQueryNode node, IQueryVisitorContext context = null) {
+    public static string Run(IQueryNode node, IQueryVisitorContext context = null)
+    {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }
 }

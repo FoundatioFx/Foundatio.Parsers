@@ -3,7 +3,8 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
-public class QueryVisitorContext : IQueryVisitorContext, IQueryVisitorContextWithFieldResolver, IQueryVisitorContextWithIncludeResolver, IQueryVisitorContextWithValidation {
+public class QueryVisitorContext : IQueryVisitorContext, IQueryVisitorContextWithFieldResolver, IQueryVisitorContextWithIncludeResolver, IQueryVisitorContextWithValidation
+{
     public GroupOperator DefaultOperator { get; set; } = GroupOperator.And;
     public string[] DefaultFields { get; set; }
     public string QueryType { get; set; } = QueryTypes.Query;

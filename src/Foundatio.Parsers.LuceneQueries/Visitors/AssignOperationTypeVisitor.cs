@@ -5,12 +5,15 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
-public class AssignOperationTypeVisitor : ChainableQueryVisitor {
-    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+public class AssignOperationTypeVisitor : ChainableQueryVisitor
+{
+    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    {
         if (String.IsNullOrEmpty(node.Field))
             return base.VisitAsync(node, context);
 
-        if (node.Left is not TermNode leftTerm) {
+        if (node.Left is not TermNode leftTerm)
+        {
             context.AddValidationError($"Aggregations ({node.Field}) must specify a field.");
             return Task.CompletedTask;
         }
@@ -30,8 +33,10 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor {
         return base.VisitAsync(node, context);
     }
 
-    public override void Visit(TermNode node, IQueryVisitorContext context) {
-        if (String.IsNullOrEmpty(node.Field) && !String.IsNullOrEmpty(node.Term)) {
+    public override void Visit(TermNode node, IQueryVisitorContext context)
+    {
+        if (String.IsNullOrEmpty(node.Field) && !String.IsNullOrEmpty(node.Term))
+        {
             context.AddValidationError($"Aggregations ({node.Term}) must specify a field.");
             node.SetOperationType(node.Term);
             return;
@@ -49,7 +54,8 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor {
     }
 }
 
-public static class AggregationType {
+public static class AggregationType
+{
     public const string Min = "min";
     public const string Max = "max";
     public const string Avg = "avg";

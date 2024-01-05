@@ -1,17 +1,19 @@
 ﻿using System;
-using Foundatio.Parsers.LuceneQueries.Visitors;
-using Xunit;
-using Xunit.Abstractions;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Xunit;
-using Pegasus.Common.Tracing;
 using Microsoft.Extensions.Logging;
+using Pegasus.Common.Tracing;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
-public class CleanupQueryVisitorTests : TestWithLoggingBase {
-    public CleanupQueryVisitorTests(ITestOutputHelper output) : base(output) {
+public class CleanupQueryVisitorTests : TestWithLoggingBase
+{
+    public CleanupQueryVisitorTests(ITestOutputHelper output) : base(output)
+    {
         Log.MinimumLevel = LogLevel.Trace;
     }
 
@@ -27,24 +29,30 @@ public class CleanupQueryVisitorTests : TestWithLoggingBase {
     [InlineData("NOT (value)", "NOT value")]
     [InlineData("NOT (status:fixed)", "NOT status:fixed")]
     [InlineData("project:123 NOT (status:open OR status:regressed)", "project:123 NOT (status:open OR status:regressed)")]
-    public Task CanCleanupQuery(string query, string expected) {
+    public Task CanCleanupQuery(string query, string expected)
+    {
         return CleanupAndValidateQuery(query, expected, true);
     }
 
-    private async Task CleanupAndValidateQuery(string query, string expected, bool isValid) {
+    private async Task CleanupAndValidateQuery(string query, string expected, bool isValid)
+    {
 #if ENABLE_TRACING
             var tracer = new LoggingTracer(_logger, reportPerformance: true);
 #else
         var tracer = NullTracer.Instance;
 #endif
-        var parser = new LuceneQueryParser {
+        var parser = new LuceneQueryParser
+        {
             Tracer = tracer
         };
 
         IQueryNode result;
-        try {
+        try
+        {
             result = await parser.ParseAsync(query);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             Assert.False(isValid, ex.Message);
             return;
         }

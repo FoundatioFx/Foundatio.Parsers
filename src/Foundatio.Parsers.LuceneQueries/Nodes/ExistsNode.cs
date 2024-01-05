@@ -4,13 +4,15 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes;
 
-public class ExistsNode : QueryNodeBase, IFieldQueryNode {
+public class ExistsNode : QueryNodeBase, IFieldQueryNode
+{
     public bool? IsNegated { get; set; }
     public string Prefix { get; set; }
     public string Field { get; set; }
     public string UnescapedField => Field?.Unescape();
 
-    public ExistsNode CopyTo(ExistsNode target) {
+    public ExistsNode CopyTo(ExistsNode target)
+    {
         if (IsNegated.HasValue)
             target.IsNegated = IsNegated;
 
@@ -26,13 +28,15 @@ public class ExistsNode : QueryNodeBase, IFieldQueryNode {
         return target;
     }
 
-    public override IQueryNode Clone() {
+    public override IQueryNode Clone()
+    {
         var clone = new ExistsNode();
         CopyTo(clone);
         return clone;
     }
 
-    public override string ToString() {
+    public override string ToString()
+    {
         var builder = new StringBuilder();
 
         if (IsNegated.HasValue && IsNegated.Value)

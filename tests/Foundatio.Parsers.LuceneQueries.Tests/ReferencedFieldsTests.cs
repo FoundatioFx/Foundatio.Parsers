@@ -1,18 +1,21 @@
-﻿using Xunit;
-using Xunit.Abstractions;
-using System.Threading.Tasks;
-using Foundatio.Xunit;
+﻿using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Xunit;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
-public class ReferencedFieldsTests : TestWithLoggingBase {
-    public ReferencedFieldsTests(ITestOutputHelper output) : base(output) {
+public class ReferencedFieldsTests : TestWithLoggingBase
+{
+    public ReferencedFieldsTests(ITestOutputHelper output) : base(output)
+    {
         Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     [Fact]
-    public async Task CanGetReferencedFields() {
+    public async Task CanGetReferencedFields()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value");
         var fields = result.GetReferencedFields();
@@ -38,7 +41,8 @@ public class ReferencedFieldsTests : TestWithLoggingBase {
     }
 
     [Fact]
-    public async Task CanGetTopLevelReferencedFields() {
+    public async Task CanGetTopLevelReferencedFields()
+    {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value");
         var fields = result.GetReferencedFields(currentGroupOnly: true);

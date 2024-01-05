@@ -2,18 +2,20 @@
 
 using System;
 using System.Threading.Tasks;
-using Foundatio.Xunit;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Xunit;
 using Microsoft.Extensions.Logging;
+using Pegasus.Common;
 using Xunit;
 using Xunit.Abstractions;
-using Pegasus.Common;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
-public class QueryParserValidationTests : TestWithLoggingBase {
-    public QueryParserValidationTests(ITestOutputHelper output) : base(output) {
+public class QueryParserValidationTests : TestWithLoggingBase
+{
+    public QueryParserValidationTests(ITestOutputHelper output) : base(output)
+    {
         Log.MinimumLevel = LogLevel.Trace;
     }
 
@@ -121,7 +123,8 @@ public class QueryParserValidationTests : TestWithLoggingBase {
     [InlineData("ab~2z")]
     [InlineData("Author:Smith AND Title_idx:\"\"")]
     [InlineData(@"first_occurrence:[""2022-01-20T14:00:00.0000000Z"" TO ""2022-01-21T02:33:06.5975418Z""] (project:537650f3b77efe23a47914f4 (status:open OR status:regressed))")]
-    public Task ValidQueries(string query) {
+    public Task ValidQueries(string query)
+    {
         return ParseAndValidateQuery(query, query, true);
     }
 
@@ -135,7 +138,8 @@ public class QueryParserValidationTests : TestWithLoggingBase {
     [InlineData("Hello \"world")] // qouted term is left unterminated
     [InlineData("Hello + world")]
     [InlineData("/abc")] // regex sequence is left unterminated
-    public Task InvalidQueries(string query) {
+    public Task InvalidQueries(string query)
+    {
         return ParseAndValidateQuery(query, query, false);
     }
 
@@ -148,24 +152,30 @@ public class QueryParserValidationTests : TestWithLoggingBase {
     [InlineData(@"( ( cat AND dog ))", @"((cat AND dog))")]
     [InlineData(@"date^""America/Chicago_Other""", @"date^America/Chicago_Other")]
     [InlineData("  \t", "")]
-    public Task ValidButDifferentQueries(string query, string expected) {
+    public Task ValidButDifferentQueries(string query, string expected)
+    {
         return ParseAndValidateQuery(query, expected, true);
     }
 
-    private async Task ParseAndValidateQuery(string query, string expected, bool isValid) {
+    private async Task ParseAndValidateQuery(string query, string expected, bool isValid)
+    {
 #if ENABLE_TRACING
         var tracer = new LoggingTracer(_logger, reportPerformance: true);
 #else
             var tracer = NullTracer.Instance;
 #endif
-        var parser = new LuceneQueryParser {
+        var parser = new LuceneQueryParser
+        {
             Tracer = tracer
         };
 
         IQueryNode result;
-        try {
+        try
+        {
             result = await parser.ParseAsync(query);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             Assert.False(isValid, ex.Message);
             return;
         }
@@ -194,7 +204,8 @@ public class QueryParserValidationTests : TestWithLoggingBase {
     [InlineData(":")]
     [InlineData("\\")]
     [InlineData("/")]
-    public async Task CanParseEscapedQuery(string escaped) {
+    public async Task CanParseEscapedQuery(string escaped)
+    {
         // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#_reserved_characters
         // + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
         string query = @"\" + escaped;
@@ -203,18 +214,22 @@ public class QueryParserValidationTests : TestWithLoggingBase {
 #else
             var tracer = NullTracer.Instance;
 #endif
-        var parser = new LuceneQueryParser {
+        var parser = new LuceneQueryParser
+        {
             Tracer = tracer
         };
 
-        try {
+        try
+        {
             _logger.LogInformation($"Attempting: {escaped}");
             var result = await parser.ParseAsync(query);
 
             _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             var cursor = ex.Data["cursor"] as Cursor;
             throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
         }

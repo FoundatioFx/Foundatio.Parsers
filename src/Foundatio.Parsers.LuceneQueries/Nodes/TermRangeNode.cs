@@ -5,7 +5,8 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes;
 
-public class TermRangeNode : QueryNodeBase, IFieldQueryNode {
+public class TermRangeNode : QueryNodeBase, IFieldQueryNode
+{
     public bool? IsNegated { get; set; }
     public string Field { get; set; }
     public string UnescapedField => Field?.Unescape();
@@ -24,7 +25,8 @@ public class TermRangeNode : QueryNodeBase, IFieldQueryNode {
     public string UnescapedBoost => Boost?.Unescape();
     public string Proximity { get; set; }
 
-    public TermRangeNode CopyTo(TermRangeNode target) {
+    public TermRangeNode CopyTo(TermRangeNode target)
+    {
         if (Field != null)
             target.Field = Field;
 
@@ -68,13 +70,15 @@ public class TermRangeNode : QueryNodeBase, IFieldQueryNode {
         return target;
     }
 
-    public override IQueryNode Clone() {
+    public override IQueryNode Clone()
+    {
         var clone = new TermRangeNode();
         CopyTo(clone);
         return clone;
     }
 
-    public override string ToString() {
+    public override string ToString()
+    {
         var builder = new StringBuilder();
 
         if (IsNegated.HasValue && IsNegated.Value)
@@ -82,7 +86,8 @@ public class TermRangeNode : QueryNodeBase, IFieldQueryNode {
 
         builder.Append(Prefix);
 
-        if (!String.IsNullOrEmpty(Field)) {
+        if (!String.IsNullOrEmpty(Field))
+        {
             builder.Append(Field);
             builder.Append(":");
         }

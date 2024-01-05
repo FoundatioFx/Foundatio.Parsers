@@ -6,8 +6,10 @@ using Pegasus.Common;
 
 namespace Foundatio.Parsers.LuceneQueries;
 
-public class QueryValidator {
-    public static Task<QueryValidationResult> ValidateQueryAsync(string query, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null) {
+public class QueryValidator
+{
+    public static Task<QueryValidationResult> ValidateQueryAsync(string query, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    {
         if (context == null)
             context = new QueryVisitorContext();
 
@@ -16,7 +18,8 @@ public class QueryValidator {
         return InternalValidateAsync(query, context, options);
     }
 
-    public static Task<QueryValidationResult> ValidateAggregationsAsync(string aggregations, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null) {
+    public static Task<QueryValidationResult> ValidateAggregationsAsync(string aggregations, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    {
         if (context == null)
             context = new QueryVisitorContext();
 
@@ -25,7 +28,8 @@ public class QueryValidator {
         return InternalValidateAsync(aggregations, context, options);
     }
 
-    public static Task<QueryValidationResult> ValidateSortAsync(string sort, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null) {
+    public static Task<QueryValidationResult> ValidateSortAsync(string sort, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    {
         if (context == null)
             context = new QueryVisitorContext();
 
@@ -34,9 +38,11 @@ public class QueryValidator {
         return InternalValidateAsync(sort, context, options);
     }
 
-    private static async Task<QueryValidationResult> InternalValidateAsync(string query, IQueryVisitorContextWithValidation context, QueryValidationOptions options = null) {
+    private static async Task<QueryValidationResult> InternalValidateAsync(string query, IQueryVisitorContextWithValidation context, QueryValidationOptions options = null)
+    {
         var parser = new LuceneQueryParser();
-        try {
+        try
+        {
             var node = await parser.ParseAsync(query);
             if (context == null)
                 context = new QueryVisitorContext();
@@ -53,7 +59,9 @@ public class QueryValidator {
                 node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
 
             return await ValidationVisitor.RunAsync(node, context);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             var cursor = ex.Data["cursor"] as Cursor;
             context.AddValidationError(ex.Message, cursor.Column);
 
@@ -61,7 +69,8 @@ public class QueryValidator {
         }
     }
 
-    public static Task<QueryValidationResult> ValidateQueryAndThrowAsync(string query, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null) {
+    public static Task<QueryValidationResult> ValidateQueryAndThrowAsync(string query, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    {
         if (context == null)
             context = new QueryVisitorContext();
 
@@ -70,7 +79,8 @@ public class QueryValidator {
         return InternalValidateAndThrowAsync(query, context, options);
     }
 
-    public static Task<QueryValidationResult> ValidateAggregationsAndThrowAsync(string aggregations, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null) {
+    public static Task<QueryValidationResult> ValidateAggregationsAndThrowAsync(string aggregations, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    {
         if (context == null)
             context = new QueryVisitorContext();
 
@@ -79,7 +89,8 @@ public class QueryValidator {
         return InternalValidateAndThrowAsync(aggregations, context, options);
     }
 
-    public static Task<QueryValidationResult> ValidateSortAndThrowAsync(string sort, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null) {
+    public static Task<QueryValidationResult> ValidateSortAndThrowAsync(string sort, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    {
         if (context == null)
             context = new QueryVisitorContext();
 
@@ -88,9 +99,11 @@ public class QueryValidator {
         return InternalValidateAndThrowAsync(sort, context, options);
     }
 
-    private static async Task<QueryValidationResult> InternalValidateAndThrowAsync(string query, IQueryVisitorContextWithValidation context, QueryValidationOptions options = null) {
+    private static async Task<QueryValidationResult> InternalValidateAndThrowAsync(string query, IQueryVisitorContextWithValidation context, QueryValidationOptions options = null)
+    {
         var parser = new LuceneQueryParser();
-        try {
+        try
+        {
             var node = await parser.ParseAsync(query);
             if (context == null)
                 context = new QueryVisitorContext();
@@ -108,7 +121,9 @@ public class QueryValidator {
                 node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
 
             return await ValidationVisitor.RunAsync(node, context);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             var cursor = ex.Data["cursor"] as Cursor;
             context.AddValidationError(ex.Message, cursor.Column);
 

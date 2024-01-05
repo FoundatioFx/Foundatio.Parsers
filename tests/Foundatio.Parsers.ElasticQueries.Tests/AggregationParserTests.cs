@@ -16,11 +16,13 @@ using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
-public class AggregationParserTests : ElasticsearchTestBase {
+public class AggregationParserTests : ElasticsearchTestBase
+{
     public AggregationParserTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture) { }
 
     [Fact]
-    public async Task ProcessSingleAggregationAsync() {
+    public async Task ProcessSingleAggregationAsync()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
@@ -50,7 +52,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public async Task ProcessSingleAggregationWithAliasAsync() {
+    public async Task ProcessSingleAggregationWithAliasAsync()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
@@ -81,7 +84,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public async Task ProcessAnalyzedAggregationWithAliasAsync() {
+    public async Task ProcessAnalyzedAggregationWithAliasAsync()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
             .Text(f => f.Name(n => n.Field1)
                 .Fields(k => k.Keyword(m => m.Name("keyword"))))
@@ -116,7 +120,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public async Task ProcessAggregationsAsync() {
+    public async Task ProcessAggregationsAsync()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
@@ -157,7 +162,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public async Task ProcessNestedAggregationsWithAliasesAsync() {
+    public async Task ProcessNestedAggregationsWithAliasesAsync()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
             .GeoPoint(g => g.Name(f => f.Field3))
             .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
@@ -189,7 +195,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public async Task ProcessSingleAggregationWithAlias() {
+    public async Task ProcessSingleAggregationWithAlias()
+    {
         var index = CreateRandomIndex<MyType>();
 
         Client.IndexMany(new[] {
@@ -218,7 +225,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public async Task ProcessAggregationsWithAliasesAsync() {
+    public async Task ProcessAggregationsWithAliasesAsync()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
             .GeoPoint(g => g.Name(f => f.Field3))
             .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
@@ -261,7 +269,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void ProcessTermAggregations() {
+    public void ProcessTermAggregations()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
         Client.Indices.Refresh(index);
@@ -289,7 +298,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void ProcessHistogramIntervalAggregations() {
+    public void ProcessHistogramIntervalAggregations()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
         Client.Indices.Refresh(index);
@@ -315,7 +325,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void ProcessTermTopHitsAggregations() {
+    public void ProcessTermTopHitsAggregations()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
         Client.Indices.Refresh(index);
@@ -342,7 +353,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void ProcessSortedTermAggregations() {
+    public void ProcessSortedTermAggregations()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] { new MyType { Field1 = "value1" } }, index);
         Client.Indices.Refresh(index);
@@ -371,7 +383,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void ProcessDateHistogramAggregations() {
+    public void ProcessDateHistogramAggregations()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] { new MyType { Field5 = SystemClock.UtcNow } }, index);
         Client.Indices.Refresh(index);
@@ -404,7 +417,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanSpecifyDefaultValuesAggregations() {
+    public void CanSpecifyDefaultValuesAggregations()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] { new MyType { Field1 = "test" }, new MyType { Field4 = 1 } }, index);
         Client.Indices.Refresh(index);
@@ -432,7 +446,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public Task GeoGridDoesNotResolveLocationForAggregation() {
+    public Task GeoGridDoesNotResolveLocationForAggregation()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Properties(p => p
             .GeoPoint(g => g.Name(f => f.Field1))
             .FieldAlias(a => a.Name("geo").Path(f => f.Field1))));
@@ -450,7 +465,8 @@ public class AggregationParserTests : ElasticsearchTestBase {
     [InlineData("avg:value", true)]
     [InlineData("    avg     :   value", true)]
     [InlineData("avg:value cardinality:value sum:value min:value max:value", true)]
-    public Task CanParseAggregations(string query, bool isValid) {
+    public Task CanParseAggregations(string query, bool isValid)
+    {
         var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         return GetAggregationQueryInfoAsync(parser, query, isValid);
     }
@@ -490,12 +506,14 @@ public class AggregationParserTests : ElasticsearchTestBase {
 
     [Theory]
     [MemberData(nameof(AggregationTestCases))]
-    public Task GetElasticAggregationQueryInfoAsync(string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations) {
+    public Task GetElasticAggregationQueryInfoAsync(string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations)
+    {
         var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         return GetAggregationQueryInfoAsync(parser, query, isValid, maxNodeDepth, fields, operations);
     }
 
-    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth = -1, HashSet<string> fields = null, Dictionary<string, ICollection<string>> operations = null) {
+    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth = -1, HashSet<string> fields = null, Dictionary<string, ICollection<string>> operations = null)
+    {
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var queryNode = await parser.ParseAsync(query, context);
 

@@ -5,7 +5,8 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 
 namespace Foundatio.Parsers.LuceneQueries.Nodes;
 
-public class TermNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
+public class TermNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode
+{
     public bool? IsNegated { get; set; }
     public string Prefix { get; set; }
     public string Field { get; set; }
@@ -19,7 +20,8 @@ public class TermNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
     public string Proximity { get; set; }
     public string UnescapedProximity => Proximity?.Unescape();
 
-    public TermNode CopyTo(TermNode target) {
+    public TermNode CopyTo(TermNode target)
+    {
         if (IsNegated.HasValue)
             target.IsNegated = IsNegated;
 
@@ -47,7 +49,8 @@ public class TermNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
         return target;
     }
 
-    public override string ToString() {
+    public override string ToString()
+    {
         var builder = new StringBuilder();
 
         if (IsNegated.HasValue && IsNegated.Value)
@@ -55,7 +58,8 @@ public class TermNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
 
         builder.Append(Prefix);
 
-        if (!String.IsNullOrEmpty(Field)) {
+        if (!String.IsNullOrEmpty(Field))
+        {
             builder.Append(Field);
             builder.Append(":");
         }
@@ -76,7 +80,8 @@ public class TermNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode {
         return builder.ToString();
     }
 
-    public override IQueryNode Clone() {
+    public override IQueryNode Clone()
+    {
         var clone = new TermNode();
         CopyTo(clone);
         return clone;

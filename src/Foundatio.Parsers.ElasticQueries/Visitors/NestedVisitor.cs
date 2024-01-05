@@ -8,8 +8,10 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
-public class NestedVisitor : ChainableQueryVisitor {
-    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+public class NestedVisitor : ChainableQueryVisitor
+{
+    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    {
         if (String.IsNullOrEmpty(node.Field))
             return base.VisitAsync(node, context);
 
@@ -22,14 +24,16 @@ public class NestedVisitor : ChainableQueryVisitor {
         return base.VisitAsync(node, context);
     }
 
-    private string GetNestedProperty(string fullName, IQueryVisitorContext context) {
+    private string GetNestedProperty(string fullName, IQueryVisitorContext context)
+    {
         string[] nameParts = fullName?.Split('.').ToArray();
 
         if (nameParts == null || context is not IElasticQueryVisitorContext elasticContext || nameParts.Length == 0)
             return null;
 
         string fieldName = String.Empty;
-        for (int i = 0; i < nameParts.Length; i++) {
+        for (int i = 0; i < nameParts.Length; i++)
+        {
             if (i > 0)
                 fieldName += ".";
 

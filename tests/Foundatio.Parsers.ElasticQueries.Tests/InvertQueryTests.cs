@@ -1,85 +1,101 @@
 ﻿using System;
-using Foundatio.Parsers.LuceneQueries.Visitors;
-using Xunit;
-using System.Threading.Tasks;
-using Foundatio.Parsers.LuceneQueries.Nodes;
-using Foundatio.Parsers.LuceneQueries.Extensions;
-using Microsoft.Extensions.Logging;
-using Foundatio.Parsers.LuceneQueries;
-using Nest;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
+using Microsoft.Extensions.Logging;
+using Nest;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
-public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture> {
+public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture>
+{
     public const string OrgId = "1";
     public const string AltOrgId = "2";
 
-    public InvertQueryTests(ITestOutputHelper output, SampleDataFixture fixture) : base(output, fixture) {}
+    public InvertQueryTests(ITestOutputHelper output, SampleDataFixture fixture) : base(output, fixture) { }
 
     [Fact]
-    public Task CanInvertTermQuery() {
+    public Task CanInvertTermQuery()
+    {
         return InvertAndValidateQuery("deleted", "(NOT deleted)", null, true);
     }
 
     [Fact]
-    public Task CanInvertFieldQuery() {
+    public Task CanInvertFieldQuery()
+    {
         return InvertAndValidateQuery("status:open", "(NOT status:open)", null, true);
     }
 
     [Fact]
-    public Task CanInvertNotFieldQuery() {
+    public Task CanInvertNotFieldQuery()
+    {
         return InvertAndValidateQuery("NOT status:open", "status:open", null, true);
     }
 
     [Fact]
-    public Task CanInvertMultipleTermsQuery() {
+    public Task CanInvertMultipleTermsQuery()
+    {
         return InvertAndValidateQuery("field1:value field2:value field3:value", "(NOT (field1:value field2:value field3:value))", null, true);
     }
 
     [Fact]
-    public Task CanInvertOrGroupQuery() {
+    public Task CanInvertOrGroupQuery()
+    {
         return InvertAndValidateQuery("(field1:value OR field2:value)", "(NOT (field1:value OR field2:value))", null, true);
     }
 
     [Fact]
-    public Task CanInvertFieldWithNonInvertedFieldQuery() {
+    public Task CanInvertFieldWithNonInvertedFieldQuery()
+    {
         return InvertAndValidateQuery("field:value organizationId:value", "(NOT field:value) organizationId:value", null, true);
     }
 
     [Fact]
-    public Task CanInvertAlternateCriteria() {
+    public Task CanInvertAlternateCriteria()
+    {
         return InvertAndValidateQuery("value", "(is_deleted:true OR (NOT value))", "is_deleted:true", true);
     }
 
     [Fact]
-    public Task CanInvertAlternateCriteriaAndNonInvertedField() {
+    public Task CanInvertAlternateCriteriaAndNonInvertedField()
+    {
         return InvertAndValidateQuery("organizationId:value field1:value", "organizationId:value (is_deleted:true OR (NOT field1:value))", "is_deleted:true", true);
     }
 
     [Fact]
-    public Task CanInvertNonInvertedFieldAndOrGroup() {
+    public Task CanInvertNonInvertedFieldAndOrGroup()
+    {
         return InvertAndValidateQuery("organizationId:value (field1:value OR field2:value)", "organizationId:value (NOT (field1:value OR field2:value))", null, true);
     }
 
     [Fact]
-    public Task CanInvertAlternateCriteriaAndNonInvertedFieldAndOrGroup() {
+    public Task CanInvertAlternateCriteriaAndNonInvertedFieldAndOrGroup()
+    {
         return InvertAndValidateQuery("organizationId:value (field1:value OR field2:value)", "organizationId:value (is_deleted:true OR (NOT (field1:value OR field2:value)))", "is_deleted:true", true);
     }
 
     [Fact]
-    public Task CanInvertGroupNonInvertedField() {
+    public Task CanInvertGroupNonInvertedField()
+    {
         return InvertAndValidateQuery("(field1:value organizationId:value) field2:value", "((NOT field1:value) organizationId:value) (NOT field2:value)", null, true);
     }
 
-    private async Task InvertAndValidateQuery(string query, string expected, string alternateInvertedCriteria, bool isValid) {
+    private async Task InvertAndValidateQuery(string query, string expected, string alternateInvertedCriteria, bool isValid)
+    {
         var parser = new LuceneQueryParser();
 
         IQueryNode result;
-        try {
+        try
+        {
             result = await parser.ParseAsync(query);
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             Assert.False(isValid, ex.Message);
             return;
         }
@@ -87,7 +103,8 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture> {
         var invertQueryVisitor = new InvertQueryVisitor(new[] { "organizationId" });
         var context = new QueryVisitorContext();
 
-        if (!String.IsNullOrWhiteSpace(alternateInvertedCriteria)) {
+        if (!String.IsNullOrWhiteSpace(alternateInvertedCriteria))
+        {
             var invertedAlternate = await parser.ParseAsync(alternateInvertedCriteria);
             context.SetAlternateInvertedCriteria(invertedAlternate);
         }
@@ -106,7 +123,8 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture> {
     }
 }
 
-public class InvertTest {
+public class InvertTest
+{
     public const string OrgId = "1";
     public const string AltOrgId = "2";
 
@@ -117,8 +135,10 @@ public class InvertTest {
     public bool IsDeleted { get; set; }
 }
 
-public class SampleDataFixture : ElasticsearchFixture {
-    public override async Task InitializeAsync() {
+public class SampleDataFixture : ElasticsearchFixture
+{
+    public override async Task InitializeAsync()
+    {
         await base.InitializeAsync();
 
         const string indexName = "test_invert";
@@ -134,29 +154,37 @@ public class SampleDataFixture : ElasticsearchFixture {
         var records = new List<InvertTest>();
         int id = 1;
 
-        for (int i = 0; i < 10000; i++, id++) {
+        for (int i = 0; i < 10000; i++, id++)
+        {
             records.Add(new InvertTest { Id = id.ToString(), OrganizationId = InvertTest.OrgId, Description = $"Description {i}", Status = "open", IsDeleted = false });
         }
-        for (int i = 0; i < 1000; i++, id++) {
+        for (int i = 0; i < 1000; i++, id++)
+        {
             records.Add(new InvertTest { Id = id.ToString(), OrganizationId = InvertTest.OrgId, Description = $"Deleted Description {i}", Status = "open", IsDeleted = true });
         }
-        for (int i = 0; i < 100; i++, id++) {
+        for (int i = 0; i < 100; i++, id++)
+        {
             records.Add(new InvertTest { Id = id.ToString(), OrganizationId = InvertTest.OrgId, Description = $"Regressed Description {i}", Status = "regressed", IsDeleted = false });
         }
-        for (int i = 0; i < 100; i++, id++) {
+        for (int i = 0; i < 100; i++, id++)
+        {
             records.Add(new InvertTest { Id = id.ToString(), OrganizationId = InvertTest.OrgId, Description = $"Ignored Description {i}", Status = "ignored", IsDeleted = false });
         }
 
-        for (int i = 0; i < 10000; i++, id++) {
+        for (int i = 0; i < 10000; i++, id++)
+        {
             records.Add(new InvertTest { Id = id.ToString(), OrganizationId = InvertTest.AltOrgId, Description = $"Alt Description {i}", Status = "open", IsDeleted = false });
         }
-        for (int i = 0; i < 1000; i++, id++) {
+        for (int i = 0; i < 1000; i++, id++)
+        {
             records.Add(new InvertTest { Id = id.ToString(), OrganizationId = InvertTest.AltOrgId, Description = $"Deleted Alt Description {i}", Status = "open", IsDeleted = true });
         }
-        for (int i = 0; i < 100; i++, id++) {
+        for (int i = 0; i < 100; i++, id++)
+        {
             records.Add(new InvertTest { Id = id.ToString(), OrganizationId = InvertTest.AltOrgId, Description = $"Regressed Alt Description {i}", Status = "regressed", IsDeleted = false });
         }
-        for (int i = 0; i < 100; i++, id++) {
+        for (int i = 0; i < 100; i++, id++)
+        {
             records.Add(new InvertTest { Id = id.ToString(), OrganizationId = InvertTest.AltOrgId, Description = $"Ignored Alt Description {i}", Status = "ignored", IsDeleted = false });
         }
 

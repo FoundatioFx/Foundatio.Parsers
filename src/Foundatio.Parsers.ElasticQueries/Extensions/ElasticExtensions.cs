@@ -12,8 +12,10 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
-public static class ElasticExtensions {
-    public static TermsInclude AddValue(this TermsInclude include, string value) {
+public static class ElasticExtensions
+{
+    public static TermsInclude AddValue(this TermsInclude include, string value)
+    {
         if (include?.Values == null)
             return new TermsInclude(new[] { value });
 
@@ -23,7 +25,8 @@ public static class ElasticExtensions {
         return new TermsInclude(values);
     }
 
-    public static TermsExclude AddValue(this TermsExclude exclude, string value) {
+    public static TermsExclude AddValue(this TermsExclude exclude, string value)
+    {
         if (exclude?.Values == null)
             return new TermsExclude(new[] { value });
 
@@ -34,7 +37,8 @@ public static class ElasticExtensions {
     }
 
     // TODO: Handle IFailureReason/BulkIndexByScrollFailure and other bulk response types.
-    public static string GetErrorMessage(this IElasticsearchResponse elasticResponse, string message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false) {
+    public static string GetErrorMessage(this IElasticsearchResponse elasticResponse, string message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
+    {
         if (elasticResponse == null)
             return String.Empty;
 
@@ -59,7 +63,8 @@ public static class ElasticExtensions {
         if (elasticResponse.ApiCall != null)
             sb.AppendLine($"[{elasticResponse.ApiCall.HttpStatusCode}] {elasticResponse.ApiCall.HttpMethod} {elasticResponse.ApiCall.Uri?.PathAndQuery}");
 
-        if (elasticResponse.ApiCall?.RequestBodyInBytes != null) {
+        if (elasticResponse.ApiCall?.RequestBodyInBytes != null)
+        {
             string body = Encoding.UTF8.GetString(elasticResponse.ApiCall?.RequestBodyInBytes);
             if (normalize)
                 body = JsonUtility.Normalize(body);
@@ -67,12 +72,14 @@ public static class ElasticExtensions {
         }
 
         var apiCall = response.ApiCall;
-        if (includeResponse && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000) {
+        if (includeResponse && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
+        {
             string body = Encoding.UTF8.GetString(apiCall?.ResponseBodyInBytes);
             if (normalize)
                 body = JsonUtility.Normalize(body);
 
-            if (!String.IsNullOrWhiteSpace(body)) {
+            if (!String.IsNullOrWhiteSpace(body))
+            {
                 sb.AppendLine("##### Response #####");
                 sb.AppendLine(body);
             }
@@ -81,15 +88,18 @@ public static class ElasticExtensions {
         return sb.ToString();
     }
 
-    public static string GetRequest(this IElasticsearchResponse elasticResponse, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false) {
+    public static string GetRequest(this IElasticsearchResponse elasticResponse, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
+    {
         return GetErrorMessage(elasticResponse, null, normalize, includeResponse, includeDebugInformation);
     }
 
-    public static async Task<bool> WaitForReadyAsync(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null) {
+    public static async Task<bool> WaitForReadyAsync(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null)
+    {
         var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;
 
-        while (!cancellationToken.IsCancellationRequested) {
+        while (!cancellationToken.IsCancellationRequested)
+        {
             var pingResponse = await client.PingAsync(ct: cancellationToken);
             if (pingResponse.IsValid)
                 return true;
@@ -106,11 +116,13 @@ public static class ElasticExtensions {
         return false;
     }
 
-    public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null) {
+    public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null)
+    {
         var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;
 
-        while (!cancellationToken.IsCancellationRequested) {
+        while (!cancellationToken.IsCancellationRequested)
+        {
             var pingResponse = client.Ping();
             if (pingResponse.IsValid)
                 return true;
@@ -128,19 +140,24 @@ public static class ElasticExtensions {
     }
 }
 
-internal class JsonUtility {
-    public static string Normalize(string jsonStr) {
+internal class JsonUtility
+{
+    public static string Normalize(string jsonStr)
+    {
         using var doc = JsonDocument.Parse(jsonStr);
         return Normalize(doc.RootElement);
     }
 
-    public static string Normalize(JsonElement element) {
+    public static string Normalize(JsonElement element)
+    {
         var ms = new MemoryStream();
-        var opts = new JsonWriterOptions {
+        var opts = new JsonWriterOptions
+        {
             Indented = true,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
-        using (var writer = new Utf8JsonWriter(ms, opts)) {
+        using (var writer = new Utf8JsonWriter(ms, opts))
+        {
             Write(element, writer);
         }
 
@@ -149,12 +166,15 @@ internal class JsonUtility {
         return str;
     }
 
-    private static void Write(JsonElement element, Utf8JsonWriter writer) {
-        switch (element.ValueKind) {
+    private static void Write(JsonElement element, Utf8JsonWriter writer)
+    {
+        switch (element.ValueKind)
+        {
             case JsonValueKind.Object:
                 writer.WriteStartObject();
 
-                foreach (var x in element.EnumerateObject().OrderBy(prop => prop.Name)) {
+                foreach (var x in element.EnumerateObject().OrderBy(prop => prop.Name))
+                {
                     writer.WritePropertyName(x.Name);
                     Write(x.Value, writer);
                 }
@@ -164,7 +184,8 @@ internal class JsonUtility {
 
             case JsonValueKind.Array:
                 writer.WriteStartArray();
-                foreach (var x in element.EnumerateArray()) {
+                foreach (var x in element.EnumerateArray())
+                {
                     Write(x, writer);
                 }
                 writer.WriteEndArray();

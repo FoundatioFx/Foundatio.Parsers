@@ -7,15 +7,18 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
-public static class DefaultSortNodeExtensions {
-    public static IFieldSort GetDefaultSort(this TermNode node, IQueryVisitorContext context) {
+public static class DefaultSortNodeExtensions
+{
+    public static IFieldSort GetDefaultSort(this TermNode node, IQueryVisitorContext context)
+    {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
         string field = elasticContext.MappingResolver.GetSortFieldName(node.UnescapedField);
         var fieldType = elasticContext.MappingResolver.GetFieldType(field);
 
-        var sort = new FieldSort {
+        var sort = new FieldSort
+        {
             Field = field,
             UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType,
             Order = node.IsNodeOrGroupNegated() ? SortOrder.Descending : SortOrder.Ascending

@@ -8,14 +8,17 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
-public class GeoVisitor : ChainableQueryVisitor {
+public class GeoVisitor : ChainableQueryVisitor
+{
     private readonly Func<string, Task<string>> _resolveGeoLocation;
 
-    public GeoVisitor(Func<string, Task<string>> resolveGeoLocation = null) {
+    public GeoVisitor(Func<string, Task<string>> resolveGeoLocation = null)
+    {
         _resolveGeoLocation = resolveGeoLocation;
     }
 
-    public override async Task VisitAsync(TermNode node, IQueryVisitorContext context) {
+    public override async Task VisitAsync(TermNode node, IQueryVisitorContext context)
+    {
         if (context.QueryType != QueryTypes.Query || context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
             return;
 
@@ -24,7 +27,8 @@ public class GeoVisitor : ChainableQueryVisitor {
         node.SetQuery(query);
     }
 
-    public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
+    public override void Visit(TermRangeNode node, IQueryVisitorContext context)
+    {
         if (context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
             return;
 

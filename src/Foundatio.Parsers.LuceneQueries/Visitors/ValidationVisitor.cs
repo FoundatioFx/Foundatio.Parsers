@@ -1,14 +1,16 @@
 ﻿using System;
-using System.Threading.Tasks;
-using Foundatio.Parsers.LuceneQueries.Nodes;
-using Foundatio.Parsers.LuceneQueries.Extensions;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
-public class ValidationVisitor : ChainableQueryVisitor {
-    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+public class ValidationVisitor : ChainableQueryVisitor
+{
+    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    {
         var validationResult = context.GetValidationResult();
 
         if (node.HasParens)
@@ -24,7 +26,8 @@ public class ValidationVisitor : ChainableQueryVisitor {
             validationResult.CurrentNodeDepth--;
     }
 
-    public override void Visit(TermNode node, IQueryVisitorContext context) {
+    public override void Visit(TermNode node, IQueryVisitorContext context)
+    {
         var validationResult = context.GetValidationResult();
         AddField(validationResult, node, context);
         AddOperation(validationResult, node.GetOperationType(), node.Field);
@@ -34,34 +37,41 @@ public class ValidationVisitor : ChainableQueryVisitor {
             context.AddValidationError("Terms must not start with a wildcard: " + node.Term);
     }
 
-    public override void Visit(TermRangeNode node, IQueryVisitorContext context) {
+    public override void Visit(TermRangeNode node, IQueryVisitorContext context)
+    {
         var validationResult = context.GetValidationResult();
         AddField(validationResult, node, context);
         AddOperation(validationResult, node.GetOperationType(), node.Field);
     }
 
-    public override void Visit(ExistsNode node, IQueryVisitorContext context) {
+    public override void Visit(ExistsNode node, IQueryVisitorContext context)
+    {
         var validationResult = context.GetValidationResult();
         AddField(validationResult, node, context);
         AddOperation(validationResult, "exists", node.Field);
     }
 
-    public override void Visit(MissingNode node, IQueryVisitorContext context) {
+    public override void Visit(MissingNode node, IQueryVisitorContext context)
+    {
         var validationResult = context.GetValidationResult();
         AddField(validationResult, node, context);
         AddOperation(validationResult, "missing", node.Field);
     }
 
-    private void AddField(QueryValidationResult validationResult, IFieldQueryNode node, IQueryVisitorContext context) {
+    private void AddField(QueryValidationResult validationResult, IFieldQueryNode node, IQueryVisitorContext context)
+    {
         if (validationResult == null)
             return;
 
-        if (!String.IsNullOrEmpty(node.Field)) {
+        if (!String.IsNullOrEmpty(node.Field))
+        {
             if (node.Field.StartsWith("@"))
                 return;
 
             validationResult.ReferencedFields.Add(node.GetOriginalField());
-        } else {
+        }
+        else
+        {
             var fields = node.GetDefaultFields(context.DefaultFields);
             if (fields == null || fields.Length == 0)
                 validationResult.ReferencedFields.Add("");
@@ -71,14 +81,16 @@ public class ValidationVisitor : ChainableQueryVisitor {
         }
     }
 
-    private void AddOperation(QueryValidationResult info, string operation, string field) {
+    private void AddOperation(QueryValidationResult info, string operation, string field)
+    {
         if (String.IsNullOrEmpty(operation))
             return;
 
         info.AddOperation(operation, field);
     }
 
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context) {
+    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    {
         await node.AcceptAsync(this, context).ConfigureAwait(false);
         var validationResult = context.GetValidationResult();
         validationResult.QueryType = context.QueryType;
@@ -87,14 +99,17 @@ public class ValidationVisitor : ChainableQueryVisitor {
         return node;
     }
 
-    internal async Task ApplyQueryRestrictions(IQueryVisitorContext context) {
+    internal async Task ApplyQueryRestrictions(IQueryVisitorContext context)
+    {
         var options = context.GetValidationOptions();
         var result = context.GetValidationResult();
 
-        if (options.RestrictedFields.Count > 0 && result.ReferencedFields.Count > 0) {
+        if (options.RestrictedFields.Count > 0 && result.ReferencedFields.Count > 0)
+        {
             var fieldResolver = context.GetFieldResolver();
             var restrictedFields = new List<string>();
-            foreach (var field in options.RestrictedFields) {
+            foreach (var field in options.RestrictedFields)
+            {
                 var resolvedField = fieldResolver == null ? field : await fieldResolver(field, context);
                 if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField.Equals(f) || field.Equals(f))))
                     restrictedFields.Add(field);
@@ -103,9 +118,11 @@ public class ValidationVisitor : ChainableQueryVisitor {
                 context.AddValidationError($"Query uses field(s) ({String.Join(",", restrictedFields)}) that are restricted from use.");
         }
 
-        if (options.AllowedFields.Count > 0 && result.ReferencedFields.Count > 0) {
+        if (options.AllowedFields.Count > 0 && result.ReferencedFields.Count > 0)
+        {
             var nonAllowedFields = result.ReferencedFields.Where(f => !String.IsNullOrEmpty(f)).Distinct().ToList();
-            foreach (var field in options.AllowedFields) {
+            foreach (var field in options.AllowedFields)
+            {
                 if (nonAllowedFields.Any(f => !String.IsNullOrEmpty(f) && field.Equals(f)))
                     nonAllowedFields.Remove(field);
             }
@@ -113,13 +130,15 @@ public class ValidationVisitor : ChainableQueryVisitor {
                 context.AddValidationError($"Query uses field(s) ({String.Join(",", nonAllowedFields)}) that are not allowed to be used.");
         }
 
-        if (options.AllowedOperations.Count > 0) {
+        if (options.AllowedOperations.Count > 0)
+        {
             var nonAllowedOperations = result.Operations.Where(f => !options.AllowedOperations.Contains(f.Key)).ToArray();
             if (nonAllowedOperations.Length > 0)
                 context.AddValidationError($"Query uses aggregation operations ({String.Join(",", nonAllowedOperations)}) that are not allowed to be used.");
         }
 
-        if (options.RestrictedOperations.Count > 0) {
+        if (options.RestrictedOperations.Count > 0)
+        {
             var restrictedOperations = result.Operations.Where(f => options.RestrictedOperations.Contains(f.Key)).ToArray();
             if (restrictedOperations.Length > 0)
                 context.AddValidationError($"Query uses aggregation operations ({String.Join(",", restrictedOperations)}) that are restricted from use.");
@@ -138,7 +157,8 @@ public class ValidationVisitor : ChainableQueryVisitor {
             throw new QueryValidationException($"Invalid query: {result.Message}", result);
     }
 
-    public static async Task<QueryValidationResult> RunAsync(IQueryNode node, IQueryVisitorContextWithValidation context = null) {
+    public static async Task<QueryValidationResult> RunAsync(IQueryNode node, IQueryVisitorContextWithValidation context = null)
+    {
         if (context == null)
             context = new QueryVisitorContext();
 
@@ -153,11 +173,13 @@ public class ValidationVisitor : ChainableQueryVisitor {
         return context.GetValidationResult();
     }
 
-    public static QueryValidationResult Run(IQueryNode node, IQueryVisitorContextWithValidation context = null) {
+    public static QueryValidationResult Run(IQueryNode node, IQueryVisitorContextWithValidation context = null)
+    {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }
 
-    public static async Task<QueryValidationResult> RunAsync(IQueryNode node, QueryValidationOptions options, IQueryVisitorContextWithValidation context = null) {
+    public static async Task<QueryValidationResult> RunAsync(IQueryNode node, QueryValidationOptions options, IQueryVisitorContextWithValidation context = null)
+    {
         if (context == null)
             context = new QueryVisitorContext();
 
@@ -169,14 +191,16 @@ public class ValidationVisitor : ChainableQueryVisitor {
         return validationResult;
     }
 
-    public static Task<QueryValidationResult> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null) {
+    public static Task<QueryValidationResult> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null)
+    {
         var options = new QueryValidationOptions();
         foreach (var field in allowedFields)
             options.AllowedFields.Add(field);
         return RunAsync(node, options, context);
     }
 
-    public static QueryValidationResult Run(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null) {
+    public static QueryValidationResult Run(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null)
+    {
         return RunAsync(node, allowedFields, context).GetAwaiter().GetResult();
     }
 }

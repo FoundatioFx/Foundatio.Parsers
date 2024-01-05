@@ -6,7 +6,8 @@ using System.Linq;
 
 namespace Foundatio.Parsers.LuceneQueries;
 
-public class QueryValidationOptions {
+public class QueryValidationOptions
+{
     public bool ShouldThrow { get; set; }
     public ICollection<string> AllowedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public ICollection<string> RestrictedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -19,14 +20,17 @@ public class QueryValidationOptions {
 }
 
 [DebuggerDisplay("IsValid: {IsValid} Message: {Message} Type: {QueryType}")]
-public class QueryValidationResult {
+public class QueryValidationResult
+{
     private ConcurrentDictionary<string, ICollection<string>> _operations = new(StringComparer.OrdinalIgnoreCase);
 
     public string QueryType { get; set; }
     public bool IsValid => ValidationErrors.Count == 0;
     public ICollection<QueryValidationError> ValidationErrors { get; } = new List<QueryValidationError>();
-    public string Message {
-        get {
+    public string Message
+    {
+        get
+        {
             if (ValidationErrors.Count == 0)
                 return String.Empty;
 
@@ -46,19 +50,23 @@ public class QueryValidationResult {
     public static implicit operator bool(QueryValidationResult info) => info.IsValid;
 
     private int _currentNodeDepth = 1;
-    internal int CurrentNodeDepth {
+    internal int CurrentNodeDepth
+    {
         get => _currentNodeDepth;
-        set {
+        set
+        {
             _currentNodeDepth = value;
             if (_currentNodeDepth > MaxNodeDepth)
                 MaxNodeDepth = _currentNodeDepth;
         }
     }
 
-    internal void AddOperation(string operation, string field) {
+    internal void AddOperation(string operation, string field)
+    {
         _operations.AddOrUpdate(operation,
             op => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { field },
-            (op, collection) => {
+            (op, collection) =>
+            {
                 collection.Add(field);
                 return collection;
             }
@@ -66,8 +74,10 @@ public class QueryValidationResult {
     }
 }
 
-public class QueryValidationError {
-    public QueryValidationError(string message, int index = -1) {
+public class QueryValidationError
+{
+    public QueryValidationError(string message, int index = -1)
+    {
         Message = message;
         Index = index;
     }
@@ -82,7 +92,8 @@ public class QueryValidationError {
     /// </summary>
     public int Index { get; } = -1;
 
-    public override string ToString() {
+    public override string ToString()
+    {
         if (Index > 0)
             return $"[{Index}] {Message}";
 
@@ -90,9 +101,11 @@ public class QueryValidationError {
     }
 }
 
-public class QueryValidationException : Exception {
+public class QueryValidationException : Exception
+{
     public QueryValidationException(string message, QueryValidationResult result = null,
-        Exception inner = null) : base(message, inner) {
+        Exception inner = null) : base(message, inner)
+    {
         Result = result;
     }
 

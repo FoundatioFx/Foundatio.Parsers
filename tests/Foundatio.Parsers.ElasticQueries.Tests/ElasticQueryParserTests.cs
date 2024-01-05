@@ -1,32 +1,35 @@
-﻿using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.ElasticQueries.Visitors;
-using Foundatio.Parsers.LuceneQueries.Nodes;
-using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.ElasticQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
+using Nest;
 using Xunit;
 using Xunit.Abstractions;
-using System.Threading.Tasks;
-using Foundatio.Parsers.LuceneQueries.Extensions;
-using Foundatio.Parsers.LuceneQueries;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
-public class ElasticQueryParserTests : ElasticsearchTestBase {
-    public ElasticQueryParserTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture) {
+public class ElasticQueryParserTests : ElasticsearchTestBase
+{
+    public ElasticQueryParserTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture)
+    {
         Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     [Fact]
-    public async Task CanHandleEmptyAndNullString() {
+    public async Task CanHandleEmptyAndNullString()
+    {
         var sut = new ElasticQueryParser();
 
         var queryResult = await sut.BuildQueryAsync("");
         Assert.NotNull(queryResult);
-        
+
         queryResult = await sut.BuildQueryAsync((string)null);
         Assert.NotNull(queryResult);
 
@@ -44,7 +47,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanUseElasticQueryParser() {
+    public void CanUseElasticQueryParser()
+    {
         var sut = new ElasticQueryParser();
 
         var result = sut.Parse("NOT (dog parrot)");
@@ -55,7 +59,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanUseElasticQueryParserWithVisitor() {
+    public void CanUseElasticQueryParserWithVisitor()
+    {
         var testQueryVisitor = new TestQueryVisitor();
         var sut = new ElasticQueryParser(c => c.AddQueryVisitor(testQueryVisitor));
         var context = new ElasticQueryVisitorContext();
@@ -69,7 +74,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void SimpleFilterProcessor() {
+    public void SimpleFilterProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
@@ -93,7 +99,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void IncludeProcessor() {
+    public void IncludeProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
@@ -124,7 +131,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void ShouldGenerateORedTermsQuery() {
+    public void ShouldGenerateORedTermsQuery()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index));
         Client.Indices.Refresh(index);
@@ -147,7 +155,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void ShouldHandleMultipleTermsForAnalyzedFields() {
+    public void ShouldHandleMultipleTermsForAnalyzedFields()
+    {
         var index = CreateRandomIndex<MyType>(d => d
             .Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))
                 .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
@@ -216,7 +225,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanGetMappingsFromCode() {
+    public void CanGetMappingsFromCode()
+    {
         TypeMappingDescriptor<MyType> GetCodeMappings(TypeMappingDescriptor<MyType> d) =>
             d.Dynamic()
                 .Properties(p => p
@@ -245,7 +255,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void EscapeFilterProcessor() {
+    public void EscapeFilterProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "\"now there\"", Field2 = "value2" },
@@ -274,7 +285,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanHandleEscapedQueryWithWildcards() {
+    public void CanHandleEscapedQueryWithWildcards()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "one/two/three" }
@@ -301,7 +313,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanHandleEscapedQuery() {
+    public void CanHandleEscapedQuery()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "one/two/three" }
@@ -328,7 +341,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void ExistsFilterProcessor() {
+    public void ExistsFilterProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
@@ -354,7 +368,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void MissingFilterProcessor() {
+    public void MissingFilterProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
@@ -381,7 +396,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void MinMaxWithDateHistogramAggregation() {
+    public void MinMaxWithDateHistogramAggregation()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now },
@@ -451,7 +467,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     [InlineData("1y", DateInterval.Year)]
     [InlineData("year", DateInterval.Year)]
     [Theory]
-    public async Task CanUseDateHistogramAggregationInterval(string interval, object expectedInterval = null) {
+    public async Task CanUseDateHistogramAggregationInterval(string interval, object expectedInterval = null)
+    {
         var index = CreateRandomIndex<MyType>();
         await Client.IndexManyAsync(new[] { new MyType { Field5 = DateTime.Now } }, index);
         await Client.Indices.RefreshAsync(index);
@@ -464,7 +481,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = Client.Search<MyType>(i => i.Index(index).Aggregations(f => f
-            .DateHistogram("date_field5", d => {
+            .DateHistogram("date_field5", d =>
+            {
                 d.Field(d2 => d2.Field5);
 
                 if (expectedInterval is DateInterval dateInterval)
@@ -488,7 +506,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanDoNestDateHistogram() {
+    public void CanDoNestDateHistogram()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] { new MyType { Field5 = DateTime.Now } }, index);
         Client.Indices.Refresh(index);
@@ -501,7 +520,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void DateAggregation() {
+    public void DateAggregation()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now },
@@ -527,7 +547,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void SimpleQueryProcessor() {
+    public void SimpleQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>(t => t
             .Properties(p => p
                 .Text(e => e.Name(n => n.Field3).Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))));
@@ -598,7 +619,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void NegativeQueryProcessor() {
+    public void NegativeQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
@@ -669,7 +691,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void NestedQueryProcessor() {
+    public void NestedQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
@@ -697,7 +720,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void NestedQuery() {
+    public void NestedQuery()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
@@ -726,7 +750,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void MixedCaseTermFilterQueryProcessor() {
+    public void MixedCaseTermFilterQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index(index));
 
@@ -745,7 +770,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void MultipleWordsTermFilterQueryProcessor() {
+    public void MultipleWordsTermFilterQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Field1 = "Blake Niemyjski" }, i => i.Index(index));
 
@@ -764,7 +790,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanTranslateTermQueryProcessor() {
+    public void CanTranslateTermQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Field1 = "Testing.Casing" }, i => i.Index(index));
 
@@ -784,7 +811,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void GroupedOrFilterProcessor() {
+    public void GroupedOrFilterProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         Client.IndexMany(new[] {
                 new MyType { Field1 = "value1", Field2 = "value2" },
@@ -812,7 +840,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void NestedFilterProcessor() {
+    public void NestedFilterProcessor()
+    {
         var index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
             .Text(e => e.Name(n => n.Field1).Index())
             .Text(e => e.Name(n => n.Field2).Index())
@@ -882,7 +911,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void NestedFilterProcessor2() {
+    public void NestedFilterProcessor2()
+    {
         var index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
             .Text(e => e.Name(n => n.Field1).Index())
             .Text(e => e.Name(n => n.Field2).Index())
@@ -929,7 +959,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanGenerateMatchQuery() {
+    public void CanGenerateMatchQuery()
+    {
         var index = CreateRandomIndex<MyType>(m => m.Properties(p => p
             .Text(f => f.Name(e => e.Field1)
                 .Fields(f1 => f1
@@ -951,7 +982,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanBuildAliasQueryProcessor() {
+    public void CanBuildAliasQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>(m => m.Properties(p => p
             .Object<Dictionary<string, object>>(f => f.Name(e => e.Data).Properties(p2 => p2
                 .Text(e => e.Name("@browser_version"))
@@ -973,7 +1005,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void NonAnalyzedPrefixQuery() {
+    public void NonAnalyzedPrefixQuery()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
         Client.Index(new MyType { Field1 = "value123" }, i => i.Index(index));
         Client.Indices.Refresh(index);
@@ -997,7 +1030,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void RangeQueryProcessor() {
+    public void RangeQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         var res = Client.Index(new MyType { Field1 = "value1", Field4 = 1 }, i => i.Index(index));
         Client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
@@ -1029,7 +1063,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void DateRangeWithWildcardMinQueryProcessor() {
+    public void DateRangeWithWildcardMinQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         var res = Client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
         Client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
@@ -1060,7 +1095,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void DateRangeWithDateMathQueryProcessor() {
+    public void DateRangeWithDateMathQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         var res = Client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
         Client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
@@ -1089,7 +1125,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public async Task DateRangeWithWildcardMaxQueryProcessor() {
+    public async Task DateRangeWithWildcardMaxQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         var res = Client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
         Client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
@@ -1119,7 +1156,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void DateRangeWithTimeZone() {
+    public void DateRangeWithTimeZone()
+    {
         var index = CreateRandomIndex<MyType>();
         var res = Client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
         Client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
@@ -1149,7 +1187,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void DateRangeQueryProcessor() {
+    public void DateRangeQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>();
         var res = Client.Index(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
         Client.Index(new MyType { Field4 = 2 }, i => i.Index(index));
@@ -1180,7 +1219,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void SimpleGeoRangeQuery() {
+    public void SimpleGeoRangeQuery()
+    {
         var index = CreateRandomIndex<MyType>(m => m.Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
         var res = Client.Index(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" },
             i => i.Index(index));
@@ -1210,7 +1250,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public async Task CanUseValidationToGetUnresolvedFields() {
+    public async Task CanUseValidationToGetUnresolvedFields()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
         Client.Index(new MyType { Field1 = "value123" }, i => i.Index(index));
         Client.Indices.Refresh(index);
@@ -1251,7 +1292,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanSortByUnmappedField() {
+    public void CanSortByUnmappedField()
+    {
         var index = CreateRandomIndex<MyType>(m => m.Dynamic());
 
         var processor = new ElasticQueryParser(c => c.UseMappings(Client, index));
@@ -1274,7 +1316,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanParseSort() {
+    public void CanParseSort()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))
                 .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
                 .Text(e => e.Name(m => m.Field2).Fields(f2 => f2.Keyword(e1 => e1.Name("keyword")).Keyword(e2 => e2.Name("sort"))))
@@ -1312,7 +1355,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanHandleSpacedFields() {
+    public void CanHandleSpacedFields()
+    {
         var index = CreateRandomIndex<MyNestedType>();
 
         Client.IndexMany(new[] {
@@ -1349,7 +1393,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void CanParseMixedCaseSort() {
+    public void CanParseMixedCaseSort()
+    {
         var index = CreateRandomIndex<MyType>(d => d.Properties(p => p
             .Text(e => e.Name(m => m.MultiWord).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
         ));
@@ -1373,7 +1418,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public void GeoRangeQueryProcessor() {
+    public void GeoRangeQueryProcessor()
+    {
         var index = CreateRandomIndex<MyType>(m => m.Properties(p => p
                 .GeoPoint(g => g.Name(f => f.Field3))
                 .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))));
@@ -1415,7 +1461,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
     }
 
     [Fact]
-    public async Task CanExpandElasticIncludesAsync() {
+    public async Task CanExpandElasticIncludesAsync()
+    {
         var client = new ElasticClient(new ConnectionSettings().DisableDirectStreaming().PrettyJson());
         var aliases = new FieldMap { { "field", "aliased" }, { "included", "aliasedincluded" } };
 
@@ -1442,13 +1489,15 @@ public class ElasticQueryParserTests : ElasticsearchTestBase {
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
-    private async Task<string> GetIncludeAsync(string name) {
+    private async Task<string> GetIncludeAsync(string name)
+    {
         await Task.Delay(150);
         return "included:value";
     }
 }
 
-public class MyType {
+public class MyType
+{
     public string Id { get; set; }
     public string Field1 { get; set; }
     public string Field2 { get; set; }
@@ -1459,7 +1508,8 @@ public class MyType {
     public Dictionary<string, object> Data { get; set; } = new Dictionary<string, object>();
 }
 
-public class MyNestedType {
+public class MyNestedType
+{
     public string Field1 { get; set; }
     public string Field2 { get; set; }
     public string Field3 { get; set; }
@@ -1469,9 +1519,11 @@ public class MyNestedType {
     public IList<MyType> Nested { get; set; } = new List<MyType>();
 }
 
-public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryVisitor {
+public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryVisitor
+{
 
-    public override void Visit(TermNode node, IQueryVisitorContext context) {
+    public override void Visit(TermNode node, IQueryVisitorContext context)
+    {
         if (!String.Equals(node.Field, "fixed", StringComparison.OrdinalIgnoreCase))
             return;
 
@@ -1483,10 +1535,12 @@ public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryV
     }
 }
 
-public class TestQueryVisitor : ChainableQueryVisitor {
+public class TestQueryVisitor : ChainableQueryVisitor
+{
     public int GroupNodeCount { get; private set; } = 0;
 
-    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context) {
+    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    {
         GroupNodeCount++;
         return base.VisitAsync(node, context);
     }
