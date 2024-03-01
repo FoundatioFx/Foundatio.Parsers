@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <!--<DefineConstants>ENABLE_TRACING</DefineConstants>-->
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\Foundatio.Parsers.SqlQueries\Foundatio.Parsers.SqlQueries.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.2" />
+    </ItemGroup>
+
+</Project>

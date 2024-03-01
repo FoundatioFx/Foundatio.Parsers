@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\build\common.props" />
+  <ItemGroup>
+    <PackageReference Include="Exceptionless.DateTimeExtensions" Version="3.4.3" />
+    <PackageReference Include="System.Text.Json" Version="6.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0" />
+  </ItemGroup>
+  <ItemGroup>
+      <ProjectReference Include="..\..\src\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj" />
+  </ItemGroup>
+</Project>
