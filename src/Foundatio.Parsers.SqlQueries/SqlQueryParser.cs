@@ -17,14 +17,14 @@ public class SqlQueryParser : LuceneQueryParser {
     }
 
     public SqlQueryParserConfiguration Configuration { get; }
-    
+
     public override async Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null) {
         query ??= String.Empty;
 
         if (context == null)
             context = new SqlQueryVisitorContext();
 
-        //SetupQueryVisitorContextDefaults(context);
+        SetupQueryVisitorContextDefaults(context);
         try {
             var result = await base.ParseAsync(query, context).ConfigureAwait(false);
             switch (context.QueryType) {
@@ -46,6 +46,48 @@ public class SqlQueryParser : LuceneQueryParser {
             context.AddValidationError(ex.Message, cursor.Column);
 
             return null;
+        }
+    }
+
+    private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context)
+    {
+        //context.SetMappingResolver(Configuration.MappingResolver);
+
+        if (!context.Data.ContainsKey("@OriginalContextResolver"))
+            context.SetValue("@OriginalContextResolver", context.GetFieldResolver());
+
+        context.SetFieldResolver(async (field, context) =>
+        {
+            string resolvedField = null;
+            if (context.Data.TryGetValue("@OriginalContextResolver", out var data) && data is QueryFieldResolver resolver)
+            {
+                var contextResolvedField = await resolver(field, context).ConfigureAwait(false);
+                if (contextResolvedField != null)
+                    resolvedField = contextResolvedField;
+            }
+
+            if (Configuration.FieldResolver != null)
+            {
+                var configResolvedField = await Configuration.FieldResolver(resolvedField ?? field, context).ConfigureAwait(false);
+                if (configResolvedField != null)
+                    resolvedField = configResolvedField;
+            }
+
+            //var mappingResolvedField = await MappingFieldResolver(resolvedField ?? field, context).ConfigureAwait(false);
+            //if (mappingResolvedField != null)
+            //    resolvedField = mappingResolvedField;
+
+            return resolvedField;
+        });
+
+        if (Configuration.ValidationOptions != null && !context.HasValidationOptions())
+            context.SetValidationOptions(Configuration.ValidationOptions);
+
+        if (context.QueryType == QueryTypes.Query)
+        {
+            context.SetDefaultFields(Configuration.DefaultFields);
+            if (Configuration.IncludeResolver != null && context.GetIncludeResolver() == null)
+                context.SetIncludeResolver(Configuration.IncludeResolver);
         }
     }
 }
