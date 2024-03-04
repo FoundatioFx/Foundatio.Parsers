@@ -47,18 +47,19 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         });
         await context.SaveChangesAsync();
 
-        // "age:30"
         var parser = new SqlQueryParser();
+        parser.Configuration.UseFieldMap(new Dictionary<string, string> {{ "age", "DataValues.Any(DataDefinitionId = 1 AND NumberValue = " }});
         // translate AST to dynamic linq
         // lookup custom fields and convert to sql
         // know what data type each column is in order to know if it support range operators
-        var node = await parser.ParseAsync("""title:"software developer" age:30""");
+        var node = await parser.ParseAsync("""company.name:acme age:30""");
 
-        string sqlExpected = context.Employees.Where(e => e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
-        string sqlActual = context.Employees.Where("""DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
+
+        string sqlExpected = context.Employees.Where(e => e.Company.Name == "acme" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
+        string sqlActual = context.Employees.Where("""company.name = "acme" AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
-        var employees = await context.Employees.Where(e => e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
+        var employees = await context.Employees.Where(e => e.Title == "software developer" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
             .ToListAsync();
 
         Assert.Single(employees);
