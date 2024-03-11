@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -11,29 +12,29 @@ public class GenerateSqlVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node.ToString(context != null ? context.DefaultOperator : GroupOperator.Default));
+        _builder.Append(node.ToSqlString(context?.DefaultOperator ?? GroupOperator.Default));
 
         return Task.CompletedTask;
     }
 
     public override void Visit(TermNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node);
+        _builder.Append(node.ToSqlString());
     }
 
     public override void Visit(TermRangeNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node);
+        _builder.Append(node.ToSqlString());
     }
 
     public override void Visit(ExistsNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node);
+        _builder.Append(node.ToSqlString());
     }
 
     public override void Visit(MissingNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node);
+        _builder.Append(node.ToSqlString());
     }
 
     public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context)

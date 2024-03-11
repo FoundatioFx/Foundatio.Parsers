@@ -48,12 +48,12 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         await context.SaveChangesAsync();
 
         var parser = new SqlQueryParser();
-        parser.Configuration.UseFieldMap(new Dictionary<string, string> {{ "age", "DataValues.Any(DataDefinitionId = 1 AND NumberValue = " }});
+        parser.Configuration.UseFieldMap(new Dictionary<string, string> {{ "age", "DataValues.Any(DataDefinitionId = 1 AND NumberValue" }});
         // translate AST to dynamic linq
         // lookup custom fields and convert to sql
         // know what data type each column is in order to know if it support range operators
         var node = await parser.ParseAsync("""company.name:acme age:30""");
-
+        string sql = await GenerateSqlVisitor.RunAsync(node);
 
         string sqlExpected = context.Employees.Where(e => e.Company.Name == "acme" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
         string sqlActual = context.Employees.Where("""company.name = "acme" AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
