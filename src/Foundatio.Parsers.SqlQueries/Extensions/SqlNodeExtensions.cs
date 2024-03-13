@@ -10,6 +10,10 @@ public static class SqlNodeExtensions
 {
     public static string ToSqlString(this GroupNode node, ISqlQueryVisitorContext context)
     {
+        // support overriding the generated query
+        if (node.TryGetQuery(out string query))
+            return query;
+
         if (node.Left == null && node.Right == null)
             return String.Empty;
 
@@ -60,6 +64,10 @@ public static class SqlNodeExtensions
         if (String.IsNullOrEmpty(node.Field))
             throw new ArgumentException("Field is required for exists node queries.");
 
+        // support overriding the generated query
+        if (node.TryGetQuery(out string query))
+            return query;
+
         var builder = new StringBuilder();
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
@@ -78,6 +86,10 @@ public static class SqlNodeExtensions
 
         if (!String.IsNullOrEmpty(node.Prefix))
             throw new ArgumentException("Prefix is not supported for term range queries.");
+
+        // support overriding the generated query
+        if (node.TryGetQuery(out string query))
+            return query;
 
         var builder = new StringBuilder();
 
@@ -98,6 +110,46 @@ public static class SqlNodeExtensions
         if (!String.IsNullOrEmpty(node.Prefix))
             throw new ArgumentException("Prefix is not supported for term range queries.");
 
+        // TODO: This needs to resolve the field recursively
+        var field = context.Fields.FirstOrDefault(f => f.Field.Equals(node.Field, StringComparison.OrdinalIgnoreCase));
+
+        // TODO: Remove this hard coded
+        if (field != null && field.Data.TryGetValue("DataDefinitionId", out object value) && value is int dataDefinitionId)
+        {
+            var customFieldBuilder = new StringBuilder();
+
+            customFieldBuilder.Append("DataValues.Any(DataDefinitionId = ");
+            customFieldBuilder.Append(dataDefinitionId);
+            customFieldBuilder.Append(" AND ");
+            if (field is { IsNumber: true })
+                customFieldBuilder.Append("NumberValue");
+            else if (field is { IsBoolean: true })
+                customFieldBuilder.Append("BooleanValue");
+            else if (field is { IsDate: true })
+                customFieldBuilder.Append("DateValue");
+            else
+                customFieldBuilder.Append("StringValue");
+
+            customFieldBuilder.Append(" = ");
+            if (field is { IsNumber: true } or { IsBoolean: true })
+            {
+                customFieldBuilder.Append(node.Term);
+            }
+            else
+            {
+                customFieldBuilder.Append("\"");
+                customFieldBuilder.Append(node.Term);
+                customFieldBuilder.Append("\"");
+            }
+            customFieldBuilder.Append(")");
+
+            node.SetQuery(customFieldBuilder.ToString());
+        }
+
+        // support overriding the generated query
+        if (node.TryGetQuery(out string query))
+            return query;
+
         var builder = new StringBuilder();
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
@@ -109,8 +161,6 @@ public static class SqlNodeExtensions
         else
             builder.Append(" = ");
 
-        // TODO: This needs to resolve the field recursively
-        var field = context.Fields.FirstOrDefault(f => f.Field.Equals(node.Field, StringComparison.OrdinalIgnoreCase));
         if (field != null && (field.IsNumber || field.IsBoolean))
             builder.Append(node.Term);
         else
@@ -127,6 +177,10 @@ public static class SqlNodeExtensions
             throw new ArgumentException("Boost is not supported for term range queries.");
         if (!String.IsNullOrEmpty(node.Proximity))
             throw new ArgumentException("Proximity is not supported for term range queries.");
+
+        // support overriding the generated query
+        if (node.TryGetQuery(out string query))
+            return query;
 
         var builder = new StringBuilder();
 
@@ -170,5 +224,27 @@ public static class SqlNodeExtensions
             TermRangeNode termRangeNode => termRangeNode.ToSqlString(context),
             _ => throw new NotSupportedException($"Node type {node.GetType().Name} is not supported.")
         };
+    }
+
+    private const string QueryKey = "Query";
+    public static void SetQuery(this IQueryNode node, string query)
+    {
+        node.Data[QueryKey] = query;
+    }
+
+    public static string GetQuery(this IQueryNode node)
+    {
+        return node.Data.TryGetValue(QueryKey, out object query) ? query as string : null;
+    }
+
+    public static bool TryGetQuery(this IQueryNode node, out string query)
+    {
+        query = null;
+        return node.Data.TryGetValue(QueryKey, out object value) && (query = value as string) != null;
+    }
+
+    public static void RemoveQuery(this IQueryNode node)
+    {
+        node.Data.Remove(QueryKey);
     }
 }

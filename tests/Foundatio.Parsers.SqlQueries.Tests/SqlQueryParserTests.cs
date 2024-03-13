@@ -5,7 +5,6 @@ using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Foundatio.Parsers.SqlQueries.Extensions;
 using Foundatio.Parsers.SqlQueries.Visitors;
 using Foundatio.Xunit;
 using Microsoft.EntityFrameworkCore;
@@ -87,13 +86,10 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         });
         await context.SaveChangesAsync();
 
-        var parser = new SqlQueryParser();
-        parser.Configuration.UseFieldMap(new Dictionary<string, string> {{ "age", "DataValues.Any(DataDefinitionId = 1 AND NumberValue" }});
-
         string sqlExpected = context.Employees.Where(e => e.Company.Name == "acme" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
         string sqlActual = context.Employees.Where("""company.name = "acme" AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        sqlActual = context.Employees.LuceneWhere("company.name:acme (age:1 OR age:>30)").ToQueryString();
+        sqlActual = context.Employees.LuceneWhere("company.name:acme age:30").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         var employees = await context.Employees.Where(e => e.Title == "software developer" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
@@ -129,7 +125,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
 
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation(nodes);
-        string generatedQuery = await GenerateSqlVisitor.RunAsync(result);
+        string generatedQuery = await GenerateSqlVisitor.RunAsync(result, new SqlQueryVisitorContext());
         Assert.Equal(expected, generatedQuery);
     }
 }

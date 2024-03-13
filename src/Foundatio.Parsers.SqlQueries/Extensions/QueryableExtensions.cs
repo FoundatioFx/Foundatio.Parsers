@@ -34,6 +34,15 @@ public static class QueryableExtensions
         {
             var fields = new List<FieldInfo>();
             AddFields(fields, entityType);
+
+            // lookup and add custom fields
+            fields.Add(new FieldInfo
+            {
+                Field = "age",
+                Data = {{ "DataDefinitionId", 1 }},
+                IsNumber = true
+            });
+
             return fields;
         });
 

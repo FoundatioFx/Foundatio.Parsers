@@ -15,5 +15,6 @@ public class FieldInfo
     public bool IsNumber { get; set; }
     public bool IsDate { get; set; }
     public bool IsBoolean { get; set; }
+    public IDictionary<string, object> Data { get; set; } = new Dictionary<string, object>();
     public List<FieldInfo> Children { get; set; }
 }

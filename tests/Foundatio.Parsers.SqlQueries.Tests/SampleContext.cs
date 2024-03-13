@@ -16,7 +16,7 @@ public class SampleContext : DbContext {
         base.OnModelCreating(modelBuilder);
 
         // Employee
-        modelBuilder.Entity<Employee>().HasIndex(e => new { e.FullName, e.Title, e.Age });
+        modelBuilder.Entity<Employee>().HasIndex(e => new { e.FullName, e.Title });
 
         // Company
         modelBuilder.Entity<Company>().HasIndex(e => new { e.Name, e.Description });
@@ -40,7 +40,6 @@ public class Employee {
     public int Id { get; set; }
     public string FullName { get; set; }
     public string Title { get; set; }
-    public int Age { get; set; }
     public int CompanyId { get; set; }
     public Company Company { get; set; }
     public List<DataValue> DataValues { get; set; }
