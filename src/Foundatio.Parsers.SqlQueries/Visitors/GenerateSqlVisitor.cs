@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.SqlQueries.Extensions;
 
 namespace Foundatio.Parsers.SqlQueries.Visitors;
 
@@ -12,29 +13,44 @@ public class GenerateSqlVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node.ToSqlString(context?.DefaultOperator ?? GroupOperator.Default));
+        if (context is not ISqlQueryVisitorContext sqlContext)
+            throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
+
+        _builder.Append(node.ToSqlString(sqlContext));
 
         return Task.CompletedTask;
     }
 
     public override void Visit(TermNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node.ToSqlString());
+        if (context is not ISqlQueryVisitorContext sqlContext)
+            throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
+
+        _builder.Append(node.ToSqlString(sqlContext));
     }
 
     public override void Visit(TermRangeNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node.ToSqlString());
+        if (context is not ISqlQueryVisitorContext sqlContext)
+            throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
+
+        _builder.Append(node.ToSqlString(sqlContext));
     }
 
     public override void Visit(ExistsNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node.ToSqlString());
+        if (context is not ISqlQueryVisitorContext sqlContext)
+            throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
+
+        _builder.Append(node.ToSqlString(sqlContext));
     }
 
     public override void Visit(MissingNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node.ToSqlString());
+        if (context is not ISqlQueryVisitorContext sqlContext)
+            throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
+
+        _builder.Append(node.ToSqlString(sqlContext));
     }
 
     public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context)

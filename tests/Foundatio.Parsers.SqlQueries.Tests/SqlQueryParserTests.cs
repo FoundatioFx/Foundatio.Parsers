@@ -4,10 +4,13 @@ using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.SqlQueries.Extensions;
 using Foundatio.Parsers.SqlQueries.Visitors;
 using Foundatio.Xunit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Pegasus.Common.Tracing;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -18,12 +21,49 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         Log.MinimumLevel = LogLevel.Trace;
     }
 
+    [Theory]
+    [InlineData("field:[1 TO 5]", "(field >= 1 AND field <= 5)")]
+    [InlineData("field:{1 TO 5}", "(field > 1 AND field < 5)")]
+    [InlineData("field:[1 TO 5}", "(field >= 1 AND field < 5)")]
+    [InlineData("field:>5", "field > 5")]
+    [InlineData("field:>=5", "field >= 5")]
+    [InlineData("field:<5", "field < 5")]
+    [InlineData("field:<=5", "field <= 5")]
+    // [InlineData("date:>now")]
+    // [InlineData("date:<now")]
+    // [InlineData("_exists_:title")]
+    // [InlineData("_missing_:title")]
+    // [InlineData("date:[now/d-4d TO now/d+1d}")]
+    // [InlineData("(date:[now/d-4d TO now/d+1d})")]
+    // [InlineData("data.date:>now")]
+    // [InlineData("data.date:[now/d-4d TO now/d+1d}")]
+    // [InlineData("data.date:[2012-01-01 TO 2012-12-31]")]
+    // [InlineData("data.date:[* TO 2012-12-31]")]
+    // [InlineData("data.date:[2012-01-01 TO *]")]
+    // [InlineData("(data.date:[now/d-4d TO now/d+1d})")]
+    // [InlineData("count:>1")]
+    // [InlineData("count:>=1")]
+    // [InlineData("count:[1..5}")]
+    // [InlineData(@"count:a\:a")]
+    // [InlineData(@"count:a\:a more:stuff")]
+    // [InlineData("data.count:[1..5}")]
+    // [InlineData("age:[1 TO 2]")]
+    // [InlineData("data.Windows-identity:ejsmith")]
+    // [InlineData("data.age:[* TO 10]")]
+    // [InlineData("hidden:true")]
+    public Task ValidQueries(string query, string expected)
+    {
+        return ParseAndValidateQuery(query, expected, true);
+    }
+
     [Fact]
     public async Task CanGenerateSql() {
         var contextOptions = new DbContextOptionsBuilder<SampleContext>()
             .UseSqlServer("Server=localhost;User Id=sa;Password=P@ssword1;Timeout=5;Initial Catalog=foundatio;Encrypt=False")
             .Options;
+
         await using var context = new SampleContext(contextOptions);
+        await context.Database.EnsureDeletedAsync();
         await context.Database.EnsureCreatedAsync();
 
         var company = new Company {
@@ -49,14 +89,11 @@ public class SqlQueryParserTests : TestWithLoggingBase {
 
         var parser = new SqlQueryParser();
         parser.Configuration.UseFieldMap(new Dictionary<string, string> {{ "age", "DataValues.Any(DataDefinitionId = 1 AND NumberValue" }});
-        // translate AST to dynamic linq
-        // lookup custom fields and convert to sql
-        // know what data type each column is in order to know if it support range operators
-        var node = await parser.ParseAsync("""company.name:acme age:30""");
-        string sql = await GenerateSqlVisitor.RunAsync(node);
 
         string sqlExpected = context.Employees.Where(e => e.Company.Name == "acme" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
         string sqlActual = context.Employees.Where("""company.name = "acme" AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        sqlActual = context.Employees.LuceneWhere("company.name:acme (age:1 OR age:>30)").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         var employees = await context.Employees.Where(e => e.Title == "software developer" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
@@ -66,162 +103,33 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         var employee = employees.Single();
         Assert.Equal("John Doe", employee.FullName);
     }
-}
 
-public class SampleContext : DbContext {
-    public SampleContext(DbContextOptions<SampleContext> options) : base(options) { }
-    public DbSet<Employee> Employees => Set<Employee>();
-    public DbSet<Company> Companies => Set<Company>();
-    public DbSet<DataDefinition> DataDefinitions => Set<DataDefinition>();
-    public DbSet<DataValue> DataValues => Set<DataValue>();
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    private async Task ParseAndValidateQuery(string query, string expected, bool isValid)
     {
-        base.OnModelCreating(modelBuilder);
-
-        // DataDefinition
-        modelBuilder.Entity<DataDefinition>().Property(c => c.DataType).IsRequired();
-        modelBuilder.Entity<DataDefinition>().HasIndex(c => new { c.CompanyId, c.Key }).IsUnique();
-
-        // DataValue
-        modelBuilder.Entity<DataValue>().HasIndex(c => new { c.DataDefinitionId, c.CompanyId, c.EmployeeId }).HasFilter(null).IsUnique();
-        modelBuilder.Entity<DataValue>().Property(e => e.StringValue).HasMaxLength(4000).IsSparse();
-        modelBuilder.Entity<DataValue>().Property(e => e.DateValue).IsSparse();
-        modelBuilder.Entity<DataValue>().Property(e => e.MoneyValue).IsSparse().HasColumnType("money").HasPrecision(2);
-        modelBuilder.Entity<DataValue>().Property(e => e.BooleanValue).IsSparse();
-        modelBuilder.Entity<DataValue>().Property(e => e.NumberValue).HasColumnType("decimal").HasPrecision(15,3).IsSparse();
-    }
-}
-
-public class Employee {
-    public int Id { get; set; }
-    public string FullName { get; set; }
-    public string Title { get; set; }
-    public int CompanyId { get; set; }
-    public Company Company { get; set; }
-    public List<DataValue> DataValues { get; set; }
-}
-
-public class Company {
-    public int Id { get; set; }
-    public string Name { get; set; }
-    public string Description { get; set; }
-    public List<Employee> Employees { get; set; }
-    public List<DataDefinition> DataDefinitions { get; set; }
-}
-
-public class DataValue
-{
-    public int Id { get; set; }
-    public int DataDefinitionId { get; set; }
-    public int CompanyId { get; set; }
-    public int EmployeeId { get; set; }
-
-    // store the values separately as sparse columns for querying purposes
-    public string StringValue { get; set; }
-    public DateTime? DateValue { get; set; }
-    public decimal? MoneyValue { get; set; }
-    public bool? BooleanValue { get; set; }
-    public decimal? NumberValue { get; set; }
-
-    public DataDefinition Definition { get; set; } = null;
-
-    public object GetValue(DataType? dataType = null)
-    {
-        if (!dataType.HasValue && Definition != null)
-            dataType = Definition.DataType;
-
-        if (dataType.HasValue)
+#if ENABLE_TRACING
+        var tracer = new LoggingTracer(_logger, reportPerformance: true);
+#else
+        var tracer = NullTracer.Instance;
+#endif
+        var parser = new SqlQueryParser
         {
-            return dataType switch
-            {
-                DataType.String => StringValue,
-                DataType.Date => DateValue,
-                DataType.Number => NumberValue,
-                DataType.Boolean => BooleanValue,
-                DataType.Money => MoneyValue,
-                DataType.Percent => NumberValue,
-                _ => null
-            };
+            Tracer = tracer
+        };
+
+        IQueryNode result;
+        try
+        {
+            result = await parser.ParseAsync(query);
         }
-
-        if (MoneyValue.HasValue)
-            return MoneyValue.Value;
-        if (BooleanValue.HasValue)
-            return BooleanValue.Value;
-        if (NumberValue.HasValue)
-            return NumberValue.Value;
-        if (DateValue.HasValue)
-            return DateValue.Value;
-
-        return StringValue ?? null;
-    }
-
-    public void ClearValue()
-    {
-        StringValue = null;
-        DateValue = null;
-        NumberValue = null;
-        BooleanValue = null;
-        MoneyValue = null;
-    }
-
-    public void SetValue(object value, DataType? dataType = null)
-    {
-        ClearValue();
-
-        if (value == null)
+        catch (FormatException ex)
+        {
+            Assert.False(isValid, ex.Message);
             return;
-
-        switch (dataType ?? Definition!.DataType)
-        {
-            case DataType.String:
-                StringValue = value.ToString();
-                break;
-            case DataType.Date:
-                if (DateTime.TryParse(value.ToString(), out DateTime dateResult))
-                    DateValue = dateResult;
-                break;
-            case DataType.Number:
-            case DataType.Percent:
-                if (Decimal.TryParse(value.ToString(), out decimal numberResult))
-                    NumberValue = numberResult;
-                break;
-            case DataType.Boolean:
-                if (Boolean.TryParse(value.ToString(), out bool boolResult))
-                    BooleanValue = boolResult;
-                break;
-            case DataType.Money:
-                if (Decimal.TryParse(value.ToString(), out decimal decimalResult))
-                    MoneyValue = decimalResult;
-                break;
         }
+
+        string nodes = await DebugQueryVisitor.RunAsync(result);
+        _logger.LogInformation(nodes);
+        string generatedQuery = await GenerateSqlVisitor.RunAsync(result);
+        Assert.Equal(expected, generatedQuery);
     }
-
-    // relationships
-    [DeleteBehavior(DeleteBehavior.NoAction)]
-    public Employee Employee { get; set; } = null;
-}
-
-public class DataDefinition
-{
-    public int Id { get; set; }
-    public int CompanyId { get; set; }
-
-    public DataType DataType { get; set; }
-    public string Key { get; set; } = String.Empty;
-
-    // relationships
-    [DeleteBehavior(DeleteBehavior.Cascade)]
-    public Company Company { get; set; } = null;
-}
-
-public enum DataType
-{
-    String,
-    Number,
-    Boolean,
-    Date,
-    Money,
-    Percent
 }

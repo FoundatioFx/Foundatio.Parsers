@@ -1,11 +1,19 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.SqlQueries.Visitors;
 
 public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorContext {
-    public Func<Task<string>> DefaultTimeZone { get; set; }
-    public bool UseScoring { get; set; }
-    //public ElasticMappingResolver MappingResolver { get; set; }
+    public List<FieldInfo> Fields { get; set; }
+}
+
+[DebuggerDisplay("{Field} IsNumber: {IsNumber} IsDate: {IsDate} IsBoolean: {IsBoolean} Children: {Children?.Count}")]
+public class FieldInfo
+{
+    public string Field { get; set; }
+    public bool IsNumber { get; set; }
+    public bool IsDate { get; set; }
+    public bool IsBoolean { get; set; }
+    public List<FieldInfo> Children { get; set; }
 }
