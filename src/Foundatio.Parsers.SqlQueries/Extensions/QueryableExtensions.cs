@@ -36,7 +36,7 @@ public static class QueryableExtensions
     {
         if (source is DbSet<T> dbSet)
         {
-            return LuceneWhere(source, dbSet.EntityType, dbSet.GetService<SqlQueryParser>(), query);
+            return LuceneWhere(source, query, dbSet.EntityType, dbSet.GetService<SqlQueryParser>());
         }
 
         var dbContext = GetDbContext(source);
@@ -46,15 +46,15 @@ public static class QueryableExtensions
         var entityType = dbContext.Model.FindEntityType(typeof(T));
         var parser = dbContext.GetService<SqlQueryParser>();
 
-        return LuceneWhere(source, entityType, parser, query);
+        return LuceneWhere(source, query, entityType, parser);
     }
 
-    public static IQueryable<T> LuceneWhere<T>(this IQueryable<T> source, DbSet<T> dbSet, string query) where T : class
+    public static IQueryable<T> LuceneWhere<T>(this IQueryable<T> source, string query, DbSet<T> dbSet) where T : class
     {
-        return LuceneWhere(source, dbSet.EntityType, dbSet.GetService<SqlQueryParser>(), query);
+        return LuceneWhere(source, query, dbSet.EntityType, dbSet.GetService<SqlQueryParser>());
     }
 
-    public static IQueryable<T> LuceneWhere<T>(this IQueryable<T> source, IEntityType entityType, SqlQueryParser parser, string query) where T : class
+    public static IQueryable<T> LuceneWhere<T>(this IQueryable<T> source, string query, IEntityType entityType, SqlQueryParser parser) where T : class
     {
         var fields = _entityFieldCache.GetOrAdd(entityType, e =>
         {

@@ -120,7 +120,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         Assert.Equal(sqlExpected, sqlActual);
 
         var q = db.Employees.AsNoTracking();
-        sqlActual = q.LuceneWhere("company.name:acme age:30").ToQueryString();
+        sqlActual = q.LuceneWhere("company.name:acme age:30", db.Employees).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         Assert.Throws<ValidationException>(() => db.Employees.LuceneWhere("company.description:acme").ToQueryString());
