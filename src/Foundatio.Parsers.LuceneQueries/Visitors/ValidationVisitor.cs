@@ -123,6 +123,9 @@ public class ValidationVisitor : ChainableQueryVisitor
             var nonAllowedFields = new List<string>();
             foreach (var field in result.ReferencedFields)
             {
+                if (String.IsNullOrWhiteSpace(field))
+                    continue;
+                
                 if (!options.AllowedFields.Contains(field, StringComparer.OrdinalIgnoreCase))
                     nonAllowedFields.Add(field);
             }
