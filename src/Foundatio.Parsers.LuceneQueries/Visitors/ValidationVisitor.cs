@@ -33,7 +33,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         AddOperation(validationResult, node.GetOperationType(), node.Field);
 
         var validationOptions = context.GetValidationOptions();
-        if (validationOptions != null && !validationOptions.AllowLeadingWildcards && node.Term != null && (node.Term.StartsWith("*") || node.Term.StartsWith("?")))
+        if (validationOptions is { AllowLeadingWildcards: false } && node.Term != null && (node.Term.StartsWith("*") || node.Term.StartsWith("?")))
             context.AddValidationError("Terms must not start with a wildcard: " + node.Term);
     }
 
@@ -72,7 +72,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         }
         else
         {
-            var fields = node.GetDefaultFields(context.DefaultFields);
+            string[] fields = node.GetDefaultFields(context.DefaultFields);
             if (fields == null || fields.Length == 0)
                 validationResult.ReferencedFields.Add("");
             else
@@ -120,11 +120,11 @@ public class ValidationVisitor : ChainableQueryVisitor
 
         if (options.AllowedFields.Count > 0 && result.ReferencedFields.Count > 0)
         {
-            var nonAllowedFields = result.ReferencedFields.Where(f => !String.IsNullOrEmpty(f)).Distinct().ToList();
-            foreach (var field in options.AllowedFields)
+            var nonAllowedFields = new List<string>();
+            foreach (var field in result.ReferencedFields)
             {
-                if (nonAllowedFields.Any(f => !String.IsNullOrEmpty(f) && field.Equals(f)))
-                    nonAllowedFields.Remove(field);
+                if (!options.AllowedFields.Contains(field, StringComparer.OrdinalIgnoreCase))
+                    nonAllowedFields.Add(field);
             }
             if (nonAllowedFields.Count > 0)
                 context.AddValidationError($"Query uses field(s) ({String.Join(",", nonAllowedFields)}) that are not allowed to be used.");

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.SqlQueries.Visitors;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -12,23 +14,22 @@ public class SqlQueryParserConfiguration {
     private ILogger _logger = NullLogger.Instance;
 
     public SqlQueryParserConfiguration() {
-        //AddQueryVisitor(new CombineQueriesVisitor(), 10000);
         AddSortVisitor(new TermToFieldVisitor(), 0);
-        AddAggregationVisitor(new AssignOperationTypeVisitor(), 0);
-        //AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
         AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver != null ? FieldResolver(field, context) : Task.FromResult<string>(null)), 10);
         AddVisitor(new ValidationVisitor(), 30);
     }
 
     public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
     public string[] DefaultFields { get; private set; }
+
     public QueryFieldResolver FieldResolver { get; private set; }
+    public EntityTypeDynamicFieldsResolver EntityTypeDynamicFieldResolver { get; private set; }
     public IncludeResolver IncludeResolver { get; private set; }
     //public ElasticMappingResolver MappingResolver { get; private set; }
     public QueryValidationOptions ValidationOptions { get; private set; }
-    public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
-    public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
-    public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
+    public ChainedQueryVisitor SortVisitor { get; } = new();
+    public ChainedQueryVisitor QueryVisitor { get; } = new();
+    public ChainedQueryVisitor AggregationVisitor { get; } = new();
 
     public SqlQueryParserConfiguration SetLoggerFactory(ILoggerFactory loggerFactory) {
         LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
@@ -39,6 +40,11 @@ public class SqlQueryParserConfiguration {
 
     public SqlQueryParserConfiguration SetDefaultFields(string[] fields) {
         DefaultFields = fields;
+        return this;
+    }
+
+    public SqlQueryParserConfiguration UseEntityTypeDynamicFieldResolver(EntityTypeDynamicFieldsResolver resolver) {
+        EntityTypeDynamicFieldResolver = resolver;
         return this;
     }
 
@@ -221,3 +227,5 @@ public class SqlQueryParserConfiguration {
 
     #endregion
 }
+
+public delegate List<FieldInfo> EntityTypeDynamicFieldsResolver(IEntityType entityType);

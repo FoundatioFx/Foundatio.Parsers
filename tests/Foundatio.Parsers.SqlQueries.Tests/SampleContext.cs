@@ -19,7 +19,7 @@ public class SampleContext : DbContext {
         modelBuilder.Entity<Employee>().HasIndex(e => new { e.FullName, e.Title });
 
         // Company
-        modelBuilder.Entity<Company>().HasIndex(e => new { e.Name, e.Description });
+        modelBuilder.Entity<Company>().HasIndex(e => new { e.Name });
 
         // DataDefinition
         modelBuilder.Entity<DataDefinition>().Property(c => c.DataType).IsRequired();

@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.SqlQueries.Visitors;
 
@@ -62,7 +64,7 @@ public static class SqlNodeExtensions
     public static string ToSqlString(this ExistsNode node, ISqlQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
-            throw new ArgumentException("Field is required for exists node queries.");
+            context.AddValidationError("Field is required for exists node queries.");
 
         // support overriding the generated query
         if (node.TryGetQuery(out string query))
@@ -82,10 +84,10 @@ public static class SqlNodeExtensions
     public static string ToSqlString(this MissingNode node, ISqlQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
-            throw new ArgumentException("Field is required for missing node queries.");
+            context.AddValidationError("Field is required for missing node queries.");
 
         if (!String.IsNullOrEmpty(node.Prefix))
-            throw new ArgumentException("Prefix is not supported for term range queries.");
+            context.AddValidationError("Prefix is not supported for term range queries.");
 
         // support overriding the generated query
         if (node.TryGetQuery(out string query))
@@ -102,53 +104,24 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
+    public static FieldInfo GetFieldInfo(List<FieldInfo> fields, string field)
+    {
+        return fields.FirstOrDefault(f => f.Field.Equals(field, StringComparison.OrdinalIgnoreCase));
+    }
+
     public static string ToSqlString(this TermNode node, ISqlQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
-            throw new ArgumentException("Field is required for term node queries.");
+            context.AddValidationError("Field is required for term node queries.");
 
         if (!String.IsNullOrEmpty(node.Prefix))
-            throw new ArgumentException("Prefix is not supported for term range queries.");
-
-        // TODO: This needs to resolve the field recursively
-        var field = context.Fields.FirstOrDefault(f => f.Field.Equals(node.Field, StringComparison.OrdinalIgnoreCase));
-
-        // TODO: Remove this hard coded
-        if (field != null && field.Data.TryGetValue("DataDefinitionId", out object value) && value is int dataDefinitionId)
-        {
-            var customFieldBuilder = new StringBuilder();
-
-            customFieldBuilder.Append("DataValues.Any(DataDefinitionId = ");
-            customFieldBuilder.Append(dataDefinitionId);
-            customFieldBuilder.Append(" AND ");
-            if (field is { IsNumber: true })
-                customFieldBuilder.Append("NumberValue");
-            else if (field is { IsBoolean: true })
-                customFieldBuilder.Append("BooleanValue");
-            else if (field is { IsDate: true })
-                customFieldBuilder.Append("DateValue");
-            else
-                customFieldBuilder.Append("StringValue");
-
-            customFieldBuilder.Append(" = ");
-            if (field is { IsNumber: true } or { IsBoolean: true })
-            {
-                customFieldBuilder.Append(node.Term);
-            }
-            else
-            {
-                customFieldBuilder.Append("\"");
-                customFieldBuilder.Append(node.Term);
-                customFieldBuilder.Append("\"");
-            }
-            customFieldBuilder.Append(")");
-
-            node.SetQuery(customFieldBuilder.ToString());
-        }
+            context.AddValidationError("Prefix is not supported for term range queries.");
 
         // support overriding the generated query
         if (node.TryGetQuery(out string query))
             return query;
+
+        var field = GetFieldInfo(context.Fields, node.Field);
 
         var builder = new StringBuilder();
 
@@ -172,15 +145,19 @@ public static class SqlNodeExtensions
     public static string ToSqlString(this TermRangeNode node, ISqlQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
-            throw new ArgumentException("Field is required for term range queries.");
+            context.AddValidationError("Field is required for term range queries.");
         if (!String.IsNullOrEmpty(node.Boost))
-            throw new ArgumentException("Boost is not supported for term range queries.");
+            context.AddValidationError("Boost is not supported for term range queries.");
         if (!String.IsNullOrEmpty(node.Proximity))
-            throw new ArgumentException("Proximity is not supported for term range queries.");
+            context.AddValidationError("Proximity is not supported for term range queries.");
 
         // support overriding the generated query
         if (node.TryGetQuery(out string query))
             return query;
+
+        var field = GetFieldInfo(context.Fields, node.Field);
+        if (!field.IsNumber && !field.IsDate)
+            context.AddValidationError("Field must be a number or date for term range queries.");
 
         var builder = new StringBuilder();
 
