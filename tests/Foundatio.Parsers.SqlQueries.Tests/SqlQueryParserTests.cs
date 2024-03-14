@@ -119,6 +119,10 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         sqlActual = db.Employees.LuceneWhere("company.name:acme age:30").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
+        var q = db.Employees.AsNoTracking();
+        sqlActual = q.LuceneWhere("company.name:acme age:30").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+
         Assert.Throws<ValidationException>(() => db.Employees.LuceneWhere("company.description:acme").ToQueryString());
 
         var employees = await db.Employees.Where(e => e.Title == "software developer" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
