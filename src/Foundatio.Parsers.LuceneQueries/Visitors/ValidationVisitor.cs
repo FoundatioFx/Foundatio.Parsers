@@ -125,7 +125,7 @@ public class ValidationVisitor : ChainableQueryVisitor
             {
                 if (String.IsNullOrWhiteSpace(field))
                     continue;
-                
+
                 if (!options.AllowedFields.Contains(field, StringComparer.OrdinalIgnoreCase))
                     nonAllowedFields.Add(field);
             }

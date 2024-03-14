@@ -106,7 +106,11 @@ public static class SqlNodeExtensions
 
     public static FieldInfo GetFieldInfo(List<FieldInfo> fields, string field)
     {
-        return fields.FirstOrDefault(f => f.Field.Equals(field, StringComparison.OrdinalIgnoreCase));
+        if (fields == null)
+            return new FieldInfo { Field = field };
+
+        return fields.FirstOrDefault(f => f.Field.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
+               new FieldInfo { Field = field };
     }
 
     public static string ToSqlString(this TermNode node, ISqlQueryVisitorContext context)
