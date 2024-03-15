@@ -5,11 +5,11 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 namespace Foundatio.Parsers.SqlQueries.Visitors;
 
 public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorContext {
-    public List<FieldInfo> Fields { get; set; }
+    public List<EntityFieldInfo> Fields { get; set; }
 }
 
 [DebuggerDisplay("{Field} IsNumber: {IsNumber} IsDate: {IsDate} IsBoolean: {IsBoolean} Children: {Children?.Count}")]
-public class FieldInfo
+public class EntityFieldInfo
 {
     public string Field { get; set; }
     public bool IsNumber { get; set; }

@@ -228,4 +228,4 @@ public class SqlQueryParserConfiguration {
     #endregion
 }
 
-public delegate List<FieldInfo> EntityTypeDynamicFieldsResolver(IEntityType entityType);
+public delegate List<EntityFieldInfo> EntityTypeDynamicFieldsResolver(IEntityType entityType);

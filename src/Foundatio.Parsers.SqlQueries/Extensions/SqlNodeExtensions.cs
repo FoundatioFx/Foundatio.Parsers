@@ -104,13 +104,13 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
-    public static FieldInfo GetFieldInfo(List<FieldInfo> fields, string field)
+    public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo> fields, string field)
     {
         if (fields == null)
-            return new FieldInfo { Field = field };
+            return new EntityFieldInfo { Field = field };
 
         return fields.FirstOrDefault(f => f.Field.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
-               new FieldInfo { Field = field };
+               new EntityFieldInfo { Field = field };
     }
 
     public static string ToSqlString(this TermNode node, ISqlQueryVisitorContext context)

@@ -1,10 +1,16 @@
 ﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.SqlQueries.Extensions;
 using Foundatio.Parsers.SqlQueries.Visitors;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Pegasus.Common;
 
 namespace Foundatio.Parsers.SqlQueries;
@@ -46,6 +52,63 @@ public class SqlQueryParser : LuceneQueryParser {
             context.AddValidationError(ex.Message, cursor.Column);
 
             return null;
+        }
+    }
+
+    private static readonly ConcurrentDictionary<IEntityType, List<EntityFieldInfo>> _entityFieldCache = new();
+    public string ToDynamicSql(string filter, IEntityType entityType) {
+        var fields = _entityFieldCache.GetOrAdd(entityType, e =>
+        {
+            var fields = new List<EntityFieldInfo>();
+            AddFields(fields, e);
+
+            var dynamicFields = Configuration.EntityTypeDynamicFieldResolver?.Invoke(e) ?? [];
+            fields.AddRange(dynamicFields);
+
+            return fields;
+        });
+        var validationOptions = new QueryValidationOptions();
+        foreach (string field in fields.Select(f => f.Field))
+            validationOptions.AllowedFields.Add(field);
+
+        Configuration.SetValidationOptions(validationOptions);
+        var context = new SqlQueryVisitorContext { Fields = fields };
+        var node = Parse(filter, context);
+        var result = ValidationVisitor.Run(node, context);
+        if (!result.IsValid)
+            throw new ValidationException("Invalid query: " + result.Message);
+
+        return GenerateSqlVisitor.Run(node, context);
+    }
+
+    private static void AddFields(List<EntityFieldInfo> fields, IEntityType entityType, List<IEntityType> visited = null, string prefix = null)
+    {
+        visited ??= [];
+        if (visited.Contains(entityType))
+            return;
+
+        prefix ??= "";
+
+        visited.Add(entityType);
+
+        foreach (var property in entityType.GetProperties())
+        {
+            if (property.IsIndex() || property.IsKey())
+                fields.Add(new EntityFieldInfo
+                {
+                    Field = prefix + property.Name,
+                    IsNumber = property.ClrType.UnwrapNullable().IsNumeric(),
+                    IsDate = property.ClrType.UnwrapNullable().IsDateTime(),
+                    IsBoolean = property.ClrType.UnwrapNullable().IsBoolean()
+                });
+        }
+
+        foreach (var nav in entityType.GetNavigations())
+        {
+            if (visited.Contains(nav.TargetEntityType))
+                continue;
+
+            AddFields(fields, nav.TargetEntityType, visited, prefix + nav.Name + ".");
         }
     }
 

@@ -72,10 +72,10 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         parser.Configuration.AddQueryVisitor(new DynamicFieldVisitor());
         parser.Configuration.UseEntityTypeDynamicFieldResolver(entityType =>
         {
-            var dynamicFields = new List<FieldInfo>();
+            var dynamicFields = new List<EntityFieldInfo>();
             if (entityType.ClrType == typeof(Employee))
             {
-                dynamicFields.Add(new FieldInfo { Field = "age", IsNumber = true, Data = {{ "DataDefinitionId", 1 }}});
+                dynamicFields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = {{ "DataDefinitionId", 1 }}});
             }
             return dynamicFields;
         });
