@@ -26,9 +26,7 @@ public class SqlQueryParser : LuceneQueryParser {
 
     public override async Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null) {
         query ??= String.Empty;
-
-        if (context == null)
-            context = new SqlQueryVisitorContext();
+        context ??= new SqlQueryVisitorContext();
 
         SetupQueryVisitorContextDefaults(context);
         try {
@@ -56,32 +54,49 @@ public class SqlQueryParser : LuceneQueryParser {
     }
 
     private static readonly ConcurrentDictionary<IEntityType, List<EntityFieldInfo>> _entityFieldCache = new();
-    public string ToDynamicSql(string filter, IEntityType entityType) {
-        var fields = _entityFieldCache.GetOrAdd(entityType, e =>
+
+    public async Task<QueryValidationResult> ValidateAsync(string query, IEntityType entityType)
+    {
+        var context = await GetContextAsync(entityType);
+        var node = await ParseAsync(query, context);
+        return await ValidationVisitor.RunAsync(node, context);
+    }
+
+    public async Task<string> ToSqlAsync(string query, IEntityType entityType)
+    {
+        var context = await GetContextAsync(entityType);
+        var node = await ParseAsync(query, context);
+        var result = await ValidationVisitor.RunAsync(node, context);
+        if (!result.IsValid)
+            throw new ValidationException("Invalid query: " + result.Message);
+
+        return await GenerateSqlVisitor.RunAsync(node, context);
+    }
+
+    private async Task<SqlQueryVisitorContext> GetContextAsync(IEntityType entityType)
+    {
+        if (!_entityFieldCache.TryGetValue(entityType, out var fields))
         {
-            var fields = new List<EntityFieldInfo>();
-            AddFields(fields, e);
+            fields = new List<EntityFieldInfo>();
+            AddFields(fields, entityType);
 
-            var dynamicFields = Configuration.EntityTypeDynamicFieldResolver?.Invoke(e) ?? [];
-            fields.AddRange(dynamicFields);
+            if (Configuration.EntityTypeDynamicFieldResolver != null)
+            {
+                var dynamicFields = await Configuration.EntityTypeDynamicFieldResolver!.Invoke(entityType) ?? [];
+                fields.AddRange(dynamicFields);
+            }
 
-            return fields;
-        });
+            _entityFieldCache.TryAdd(entityType, fields);
+        }
         var validationOptions = new QueryValidationOptions();
         foreach (string field in fields.Select(f => f.Field))
             validationOptions.AllowedFields.Add(field);
 
         Configuration.SetValidationOptions(validationOptions);
-        var context = new SqlQueryVisitorContext { Fields = fields };
-        var node = Parse(filter, context);
-        var result = ValidationVisitor.Run(node, context);
-        if (!result.IsValid)
-            throw new ValidationException("Invalid query: " + result.Message);
-
-        return GenerateSqlVisitor.Run(node, context);
+        return new SqlQueryVisitorContext { Fields = fields };
     }
 
-    private static void AddFields(List<EntityFieldInfo> fields, IEntityType entityType, List<IEntityType> visited = null, string prefix = null)
+    private void AddFields(List<EntityFieldInfo> fields, IEntityType entityType, List<IEntityType> visited = null, string prefix = null)
     {
         visited ??= [];
         if (visited.Contains(entityType))
@@ -93,7 +108,7 @@ public class SqlQueryParser : LuceneQueryParser {
 
         foreach (var property in entityType.GetProperties())
         {
-            if (property.IsIndex() || property.IsKey())
+            if (Configuration.EntityTypePropertyFilter(property))
                 fields.Add(new EntityFieldInfo
                 {
                     Field = prefix + property.Name,
@@ -114,8 +129,6 @@ public class SqlQueryParser : LuceneQueryParser {
 
     private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context)
     {
-        //context.SetMappingResolver(Configuration.MappingResolver);
-
         if (!context.Data.ContainsKey("@OriginalContextResolver"))
             context.SetValue("@OriginalContextResolver", context.GetFieldResolver());
 
@@ -135,10 +148,6 @@ public class SqlQueryParser : LuceneQueryParser {
                 if (configResolvedField != null)
                     resolvedField = configResolvedField;
             }
-
-            //var mappingResolvedField = await MappingFieldResolver(resolvedField ?? field, context).ConfigureAwait(false);
-            //if (mappingResolvedField != null)
-            //    resolvedField = mappingResolvedField;
 
             return resolvedField;
         });

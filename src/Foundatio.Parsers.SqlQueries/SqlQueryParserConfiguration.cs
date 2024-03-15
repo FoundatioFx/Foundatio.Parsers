@@ -24,6 +24,7 @@ public class SqlQueryParserConfiguration {
 
     public QueryFieldResolver FieldResolver { get; private set; }
     public EntityTypeDynamicFieldsResolver EntityTypeDynamicFieldResolver { get; private set; }
+    public EntityTypePropertyFilter EntityTypePropertyFilter { get; private set; } = static _ => true;
     public IncludeResolver IncludeResolver { get; private set; }
     //public ElasticMappingResolver MappingResolver { get; private set; }
     public QueryValidationOptions ValidationOptions { get; private set; }
@@ -45,6 +46,11 @@ public class SqlQueryParserConfiguration {
 
     public SqlQueryParserConfiguration UseEntityTypeDynamicFieldResolver(EntityTypeDynamicFieldsResolver resolver) {
         EntityTypeDynamicFieldResolver = resolver;
+        return this;
+    }
+
+    public SqlQueryParserConfiguration UseEntityTypePropertyFilter(EntityTypePropertyFilter filter) {
+        EntityTypePropertyFilter = filter;
         return this;
     }
 
@@ -228,4 +234,5 @@ public class SqlQueryParserConfiguration {
     #endregion
 }
 
-public delegate List<EntityFieldInfo> EntityTypeDynamicFieldsResolver(IEntityType entityType);
+public delegate Task<ICollection<EntityFieldInfo>> EntityTypeDynamicFieldsResolver(IEntityType entityType);
+public delegate bool EntityTypePropertyFilter(IProperty property);
