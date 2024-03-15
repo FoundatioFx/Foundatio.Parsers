@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Foundatio.Parsers.SqlQueries.Visitors;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -23,10 +22,8 @@ public class SqlQueryParserConfiguration {
     public string[] DefaultFields { get; private set; }
 
     public QueryFieldResolver FieldResolver { get; private set; }
-    public EntityTypeDynamicFieldsResolver EntityTypeDynamicFieldResolver { get; private set; }
     public EntityTypePropertyFilter EntityTypePropertyFilter { get; private set; } = static _ => true;
     public IncludeResolver IncludeResolver { get; private set; }
-    //public ElasticMappingResolver MappingResolver { get; private set; }
     public QueryValidationOptions ValidationOptions { get; private set; }
     public ChainedQueryVisitor SortVisitor { get; } = new();
     public ChainedQueryVisitor QueryVisitor { get; } = new();
@@ -41,11 +38,6 @@ public class SqlQueryParserConfiguration {
 
     public SqlQueryParserConfiguration SetDefaultFields(string[] fields) {
         DefaultFields = fields;
-        return this;
-    }
-
-    public SqlQueryParserConfiguration UseEntityTypeDynamicFieldResolver(EntityTypeDynamicFieldsResolver resolver) {
-        EntityTypeDynamicFieldResolver = resolver;
         return this;
     }
 
@@ -234,5 +226,4 @@ public class SqlQueryParserConfiguration {
     #endregion
 }
 
-public delegate Task<ICollection<EntityFieldInfo>> EntityTypeDynamicFieldsResolver(IEntityType entityType);
 public delegate bool EntityTypePropertyFilter(IProperty property);

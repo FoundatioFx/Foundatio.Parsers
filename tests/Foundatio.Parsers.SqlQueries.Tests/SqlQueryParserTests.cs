@@ -70,15 +70,6 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         }, ServiceLifetime.Scoped, ServiceLifetime.Singleton);
         var parser = new SqlQueryParser();
         parser.Configuration.AddQueryVisitor(new DynamicFieldVisitor());
-        parser.Configuration.UseEntityTypeDynamicFieldResolver(async entityType =>
-        {
-            var dynamicFields = new List<EntityFieldInfo>();
-            if (entityType.ClrType == typeof(Employee))
-            {
-                dynamicFields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = {{ "DataDefinitionId", 1 }}});
-            }
-            return dynamicFields;
-        });
         parser.Configuration.UseEntityTypePropertyFilter(p =>
         {
             if (p.DeclaringType.ClrType == typeof(Company) && p.Name == "Description")
@@ -120,19 +111,23 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         });
         await db.SaveChangesAsync();
 
+        var context = parser.GetContext(db.Employees.EntityType);
+        context.Fields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = {{ "DataDefinitionId", 1 }}});
+        context.ValidationOptions.AllowedFields.Add("age");
+
         string sqlExpected = db.Employees.Where(e => e.Company.Name == "acme" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
         string sqlActual = db.Employees.Where("""company.name = "acme" AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToSqlAsync("company.name:acme age:30", db.Employees.EntityType);
+        string sql = await parser.ToSqlAsync("company.name:acme age:30", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         var q = db.Employees.AsNoTracking();
-        sql = await parser.ToSqlAsync("company.name:acme age:30", db.Employees.EntityType);
+        sql = await parser.ToSqlAsync("company.name:acme age:30", context);
         sqlActual = q.Where(sql, db.Employees).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
-        await Assert.ThrowsAsync<ValidationException>(() => parser.ToSqlAsync("company.description:acme", db.Employees.EntityType));
+        await Assert.ThrowsAsync<ValidationException>(() => parser.ToSqlAsync("company.description:acme", context));
 
         var employees = await db.Employees.Where(e => e.Title == "software developer" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
             .ToListAsync();

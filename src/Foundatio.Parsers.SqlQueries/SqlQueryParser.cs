@@ -54,17 +54,14 @@ public class SqlQueryParser : LuceneQueryParser {
     }
 
     private static readonly ConcurrentDictionary<IEntityType, List<EntityFieldInfo>> _entityFieldCache = new();
-
-    public async Task<QueryValidationResult> ValidateAsync(string query, IEntityType entityType)
+    public async Task<QueryValidationResult> ValidateAsync(string query, SqlQueryVisitorContext context)
     {
-        var context = await GetContextAsync(entityType);
         var node = await ParseAsync(query, context);
         return await ValidationVisitor.RunAsync(node, context);
     }
 
-    public async Task<string> ToSqlAsync(string query, IEntityType entityType)
+    public async Task<string> ToSqlAsync(string query, SqlQueryVisitorContext context)
     {
-        var context = await GetContextAsync(entityType);
         var node = await ParseAsync(query, context);
         var result = await ValidationVisitor.RunAsync(node, context);
         if (!result.IsValid)
@@ -73,30 +70,28 @@ public class SqlQueryParser : LuceneQueryParser {
         return await GenerateSqlVisitor.RunAsync(node, context);
     }
 
-    private async Task<SqlQueryVisitorContext> GetContextAsync(IEntityType entityType)
+    public SqlQueryVisitorContext GetContext(IEntityType entityType)
     {
         if (!_entityFieldCache.TryGetValue(entityType, out var fields))
         {
             fields = new List<EntityFieldInfo>();
-            AddFields(fields, entityType);
-
-            if (Configuration.EntityTypeDynamicFieldResolver != null)
-            {
-                var dynamicFields = await Configuration.EntityTypeDynamicFieldResolver!.Invoke(entityType) ?? [];
-                fields.AddRange(dynamicFields);
-            }
-
+            AddEntityFields(fields, entityType);
             _entityFieldCache.TryAdd(entityType, fields);
         }
+
         var validationOptions = new QueryValidationOptions();
         foreach (string field in fields.Select(f => f.Field))
             validationOptions.AllowedFields.Add(field);
 
         Configuration.SetValidationOptions(validationOptions);
-        return new SqlQueryVisitorContext { Fields = fields };
+        return new SqlQueryVisitorContext
+        {
+            Fields = fields,
+            ValidationOptions = validationOptions
+        };
     }
 
-    private void AddFields(List<EntityFieldInfo> fields, IEntityType entityType, List<IEntityType> visited = null, string prefix = null)
+    private void AddEntityFields(List<EntityFieldInfo> fields, IEntityType entityType, List<IEntityType> visited = null, string prefix = null)
     {
         visited ??= [];
         if (visited.Contains(entityType))
@@ -123,7 +118,7 @@ public class SqlQueryParser : LuceneQueryParser {
             if (visited.Contains(nav.TargetEntityType))
                 continue;
 
-            AddFields(fields, nav.TargetEntityType, visited, prefix + nav.Name + ".");
+            AddEntityFields(fields, nav.TargetEntityType, visited, prefix + nav.Name + ".");
         }
     }
 
