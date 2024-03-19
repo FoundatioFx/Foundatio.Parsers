@@ -86,7 +86,7 @@ public class SqlQueryParser : LuceneQueryParser {
         Configuration.SetValidationOptions(validationOptions);
         return new SqlQueryVisitorContext
         {
-            Fields = fields,
+            Fields = fields.ToList(),
             ValidationOptions = validationOptions
         };
     }
