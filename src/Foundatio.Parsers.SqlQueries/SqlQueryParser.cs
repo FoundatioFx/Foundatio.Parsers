@@ -79,6 +79,9 @@ public class SqlQueryParser : LuceneQueryParser {
             _entityFieldCache.TryAdd(entityType, fields);
         }
 
+        // make copy of fields list to avoid modifying the cached list
+        fields = fields.ToList();
+
         var validationOptions = new QueryValidationOptions();
         foreach (string field in fields.Select(f => f.Field))
             validationOptions.AllowedFields.Add(field);
@@ -86,7 +89,7 @@ public class SqlQueryParser : LuceneQueryParser {
         Configuration.SetValidationOptions(validationOptions);
         return new SqlQueryVisitorContext
         {
-            Fields = fields.ToList(),
+            Fields = fields,
             ValidationOptions = validationOptions
         };
     }
@@ -115,7 +118,7 @@ public class SqlQueryParser : LuceneQueryParser {
 
         foreach (var nav in entityType.GetNavigations())
         {
-            if (visited.Contains(nav.TargetEntityType))
+            if (visited.Contains(nav.TargetEntityType) || !Configuration.EntityTypeFilter(nav.TargetEntityType))
                 continue;
 
             AddEntityFields(fields, nav.TargetEntityType, visited, prefix + nav.Name + ".");
