@@ -124,9 +124,6 @@ public class SqlQueryParser : LuceneQueryParser {
             });
         }
 
-        if (isCollection)
-            return;
-
         foreach (var nav in entityType.GetNavigations())
         {
             string propertyPath = prefix + nav.Name;
