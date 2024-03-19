@@ -66,9 +66,9 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         var sp = GetServiceProvider();
         await using var db = await GetSampleContextWithDataAsync(sp);
         var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["FullName", "Title"]);
 
         var context = parser.GetContext(db.Employees.EntityType);
-        parser.Configuration.SetDefaultFields(["FullName", "Title"]);
 
         string sqlExpected = db.Employees.Where(e => e.FullName.Contains("John") || e.Title.Contains("John")).ToQueryString();
         string sqlActual = db.Employees.Where("""FullName.Contains("John") || Title.Contains("John")""").ToQueryString();
@@ -91,6 +91,24 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         string sqlActual = db.Employees.Where("""created > DateTime.Parse("2024-01-01")""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToSqlAsync("created:>2024-01-01", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
+    public async Task CanUseCollectionDefaultFields()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["Companies.Name"]);
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name.Contains("acme"))).ToQueryString();
+        string sqlActual = db.Employees.Where("""Companies.Any(Name.Contains("acme"))""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToSqlAsync("acme", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
     }

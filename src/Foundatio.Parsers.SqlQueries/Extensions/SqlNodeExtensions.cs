@@ -132,8 +132,23 @@ public static class SqlNodeExtensions
             {
                 builder.Append(index == 0 ? "(" : " OR ");
 
-                string defaultField = context.DefaultFields[index];
-                builder.Append(defaultField).Append(".Contains(\"").Append(node.Term).Append("\")");
+                var defaultField = GetFieldInfo(context.Fields, context.DefaultFields[index]);
+                if (defaultField.IsCollection)
+                {
+                    var dotIndex = defaultField.Field.LastIndexOf('.');
+                    var collectionField = defaultField.Field.Substring(0, dotIndex);
+                    var fieldName = defaultField.Field.Substring(dotIndex + 1);
+
+                    builder.Append(collectionField);
+                    builder.Append(".Any(");
+                    builder.Append(fieldName);
+                    builder.Append(".Contains(\"").Append(node.Term).Append("\")");
+                    builder.Append(")");
+                }
+                else
+                {
+                    builder.Append(defaultField.Field).Append(".Contains(\"").Append(node.Term).Append("\")");
+                }
 
                 if (index == context.DefaultFields.Length - 1)
                     builder.Append(")");
