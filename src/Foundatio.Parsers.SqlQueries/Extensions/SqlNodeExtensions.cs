@@ -138,12 +138,19 @@ public static class SqlNodeExtensions
         else
             builder.Append(" = ");
 
-        if (field != null && (field.IsNumber || field.IsBoolean))
-            builder.Append(node.Term);
-        else
-            builder.Append("\"" + node.Term + "\"");
+        AppendField(builder, field, node.Term);
 
         return builder.ToString();
+    }
+
+    private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term)
+    {
+        if (field  != null && (field.IsNumber || field.IsBoolean))
+            builder.Append(term);
+        else if (field is { IsDate: true })
+            builder.Append("DateTime.Parse(\"" + term + "\")");
+        else
+            builder.Append("\"" + term + "\"");
     }
 
     public static string ToSqlString(this TermRangeNode node, ISqlQueryVisitorContext context)
@@ -175,7 +182,7 @@ public static class SqlNodeExtensions
         {
             builder.Append(node.Field);
             builder.Append(node.MinInclusive == true ? " >= " : " > ");
-            builder.Append(node.Min);
+            AppendField(builder, field, node.Min);
         }
 
         if (node.Min != null && node.Max != null)
@@ -185,7 +192,7 @@ public static class SqlNodeExtensions
         {
             builder.Append(node.Field);
             builder.Append(node.MaxInclusive == true ? " <= " : " < ");
-            builder.Append(node.Max);
+            AppendField(builder, field, node.Max);
         }
 
         if (node.Min != null && node.Max != null)

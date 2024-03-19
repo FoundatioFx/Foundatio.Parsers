@@ -61,26 +61,75 @@ public class SqlQueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
+    public async Task CanUseDateFilter()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+        context.Fields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = {{ "DataDefinitionId", 1 }}});
+        context.ValidationOptions.AllowedFields.Add("age");
+
+        string sqlExpected = db.Employees.Where(e => e.Created > new DateTime(2024, 1, 1)).ToQueryString();
+        string sqlActual = db.Employees.Where("""created > DateTime.Parse("2024-01-01")""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToSqlAsync("created:>2024-01-01", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
     public async Task CanGenerateSql()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+        context.Fields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = {{ "DataDefinitionId", 1 }}});
+        context.ValidationOptions.AllowedFields.Add("age");
+
+        string sqlExpected = db.Employees.Where(e => e.Company.Name == "acme" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
+        string sqlActual = db.Employees.Where("""company.name = "acme" AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToSqlAsync("company.name:acme age:30", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+
+        var q = db.Employees.AsNoTracking();
+        sql = await parser.ToSqlAsync("company.name:acme age:30", context);
+        sqlActual = q.Where(sql, db.Employees).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+
+        await Assert.ThrowsAsync<ValidationException>(() => parser.ToSqlAsync("company.description:acme", context));
+
+        var employees = await db.Employees.Where(e => e.Title == "software developer" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
+            .ToListAsync();
+
+        Assert.Single(employees);
+        var employee = employees.Single();
+        Assert.Equal("John Doe", employee.FullName);
+    }
+
+    public IServiceProvider GetServiceProvider()
     {
         var services = new ServiceCollection();
         services.AddDbContext<SampleContext>((_, x) =>
         {
-            x.UseSqlServer("Server=localhost;User Id=sa;Password=P@ssword1;Timeout=5;Initial Catalog=foundatio;Encrypt=False", o => o.MigrationsAssembly("ConcordServicing.Web"));
+            x.UseSqlServer("Server=localhost;User Id=sa;Password=P@ssword1;Timeout=5;Initial Catalog=foundatio;Encrypt=False");
         }, ServiceLifetime.Scoped, ServiceLifetime.Singleton);
         var parser = new SqlQueryParser();
+        parser.Configuration.UseEntityTypePropertyFilter(p => p.Name != nameof(Company.Description));
         parser.Configuration.AddQueryVisitor(new DynamicFieldVisitor());
-        parser.Configuration.UseEntityTypePropertyFilter(p =>
-        {
-            if (p.DeclaringType.ClrType == typeof(Company) && p.Name == "Description")
-                return false;
-
-            return true;
-        });
         services.AddSingleton(parser);
-        var sp = services.BuildServiceProvider();
+        return services.BuildServiceProvider();
+    }
 
-        await using var db = sp.GetRequiredService<SampleContext>();
+    public async Task<SampleContext> GetSampleContextWithDataAsync(IServiceProvider sp)
+    {
+        var db = sp.GetRequiredService<SampleContext>();
+        var parser = sp.GetRequiredService<SqlQueryParser>();
 
         var dbParser = db.GetService<SqlQueryParser>();
         Assert.Same(parser, dbParser);
@@ -111,30 +160,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         });
         await db.SaveChangesAsync();
 
-        var context = parser.GetContext(db.Employees.EntityType);
-        context.Fields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = {{ "DataDefinitionId", 1 }}});
-        context.ValidationOptions.AllowedFields.Add("age");
-
-        string sqlExpected = db.Employees.Where(e => e.Company.Name == "acme" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
-        string sqlActual = db.Employees.Where("""company.name = "acme" AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
-        Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToSqlAsync("company.name:acme age:30", context);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        Assert.Equal(sqlExpected, sqlActual);
-
-        var q = db.Employees.AsNoTracking();
-        sql = await parser.ToSqlAsync("company.name:acme age:30", context);
-        sqlActual = q.Where(sql, db.Employees).ToQueryString();
-        Assert.Equal(sqlExpected, sqlActual);
-
-        await Assert.ThrowsAsync<ValidationException>(() => parser.ToSqlAsync("company.description:acme", context));
-
-        var employees = await db.Employees.Where(e => e.Title == "software developer" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
-            .ToListAsync();
-
-        Assert.Single(employees);
-        var employee = employees.Single();
-        Assert.Equal("John Doe", employee.FullName);
+        return db;
     }
 
     private async Task ParseAndValidateQuery(string query, string expected, bool isValid)
