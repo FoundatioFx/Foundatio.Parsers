@@ -10,12 +10,13 @@ public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorConte
     public IEntityType EntityType { get; set; }
 }
 
-[DebuggerDisplay("{Field} IsNumber: {IsNumber} IsDate: {IsDate} IsBoolean: {IsBoolean} Children: {Children?.Count}")]
+[DebuggerDisplay("{Field} IsNumber: {IsNumber} IsDate: {IsDate} IsBoolean: {IsBoolean} IsCollection: {IsCollection}")]
 public class EntityFieldInfo
 {
     public string Field { get; set; }
     public bool IsNumber { get; set; }
     public bool IsDate { get; set; }
     public bool IsBoolean { get; set; }
+    public bool IsCollection { get; set; }
     public IDictionary<string, object> Data { get; set; } = new Dictionary<string, object>();
 }

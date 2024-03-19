@@ -40,8 +40,7 @@ public class Employee {
     public int Id { get; set; }
     public string FullName { get; set; }
     public string Title { get; set; }
-    public int CompanyId { get; set; }
-    public Company Company { get; set; }
+    public List<Company> Companies { get; set; }
     public List<DataValue> DataValues { get; set; }
     public DateTime Created { get; set; } = DateTime.Now;
 }

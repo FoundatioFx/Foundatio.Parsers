@@ -151,20 +151,45 @@ public static class SqlNodeExtensions
         if (node.IsNegated.HasValue && node.IsNegated.Value)
             builder.Append("NOT ");
 
-        builder.Append(node.Field);
-        if (node.IsNegated.HasValue && node.IsNegated.Value)
-            builder.Append(" != ");
-        else
-            builder.Append(" = ");
+        if (field.IsCollection)
+        {
+            var index = node.Field.LastIndexOf('.');
+            var collectionField = node.Field.Substring(0, index);
+            var fieldName = node.Field.Substring(index + 1);
 
-        AppendField(builder, field, node.Term);
+            builder.Append(collectionField);
+            builder.Append(".Any(");
+            builder.Append(fieldName);
+
+            if (node.IsNegated.HasValue && node.IsNegated.Value)
+                builder.Append(" != ");
+            else
+                builder.Append(" = ");
+
+            AppendField(builder, field, node.Term);
+
+            builder.Append(")");
+        }
+        else
+        {
+            builder.Append(node.Field);
+            if (node.IsNegated.HasValue && node.IsNegated.Value)
+                builder.Append(" != ");
+            else
+                builder.Append(" = ");
+
+            AppendField(builder, field, node.Term);
+        }
 
         return builder.ToString();
     }
 
     private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term)
     {
-        if (field  != null && (field.IsNumber || field.IsBoolean))
+        if (field == null)
+            return;
+
+        if (field.IsNumber || field.IsBoolean)
             builder.Append(term);
         else if (field is { IsDate: true })
             builder.Append("DateTime.Parse(\"" + term + "\")");

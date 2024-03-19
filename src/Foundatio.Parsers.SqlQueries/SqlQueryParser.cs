@@ -94,35 +94,58 @@ public class SqlQueryParser : LuceneQueryParser {
         };
     }
 
-    private void AddEntityFields(List<EntityFieldInfo> fields, IEntityType entityType, List<IEntityType> visited = null, string prefix = null)
+    private void AddEntityFields(List<EntityFieldInfo> fields, IEntityType entityType, Stack<IEntityType> entityTypeStack = null, string prefix = null, bool isCollection = false, int depth = 0)
     {
-        visited ??= [];
-        if (visited.Contains(entityType))
+        entityTypeStack ??= new Stack<IEntityType>();
+
+        if (depth > 0 && entityTypeStack.Contains(entityType))
+            return;
+
+        entityTypeStack.Push(entityType);
+
+        if (depth > Configuration.MaxFieldDepth)
             return;
 
         prefix ??= "";
 
-        visited.Add(entityType);
-
         foreach (var property in entityType.GetProperties())
         {
-            if (Configuration.EntityTypePropertyFilter(property))
-                fields.Add(new EntityFieldInfo
-                {
-                    Field = prefix + property.Name,
-                    IsNumber = property.ClrType.UnwrapNullable().IsNumeric(),
-                    IsDate = property.ClrType.UnwrapNullable().IsDateTime(),
-                    IsBoolean = property.ClrType.UnwrapNullable().IsBoolean()
-                });
+            string propertyPath = prefix + property.Name;
+            if (!Configuration.EntityTypePropertyFilter(property))
+                continue;
+
+            fields.Add(new EntityFieldInfo
+            {
+                Field = propertyPath,
+                IsNumber = property.ClrType.UnwrapNullable().IsNumeric(),
+                IsDate = property.ClrType.UnwrapNullable().IsDateTime(),
+                IsBoolean = property.ClrType.UnwrapNullable().IsBoolean(),
+                IsCollection = isCollection
+            });
         }
+
+        if (isCollection)
+            return;
 
         foreach (var nav in entityType.GetNavigations())
         {
-            if (visited.Contains(nav.TargetEntityType) || !Configuration.EntityTypeNavigationFilter(nav))
+            string propertyPath = prefix + nav.Name;
+            if (!Configuration.EntityTypeNavigationFilter(nav))
                 continue;
 
-            AddEntityFields(fields, nav.TargetEntityType, visited, prefix + nav.Name + ".");
+            AddEntityFields(fields, nav.TargetEntityType, entityTypeStack, propertyPath + ".", false, depth + 1);
         }
+
+        foreach (var skipNav in entityType.GetSkipNavigations())
+        {
+            string propertyPath = prefix + skipNav.Name;
+            if (!Configuration.EntityTypeSkipNavigationFilter(skipNav))
+                continue;
+
+            AddEntityFields(fields, skipNav.TargetEntityType, entityTypeStack, propertyPath + ".", true, depth + 1);
+        }
+
+        entityTypeStack.Pop();
     }
 
     private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context)

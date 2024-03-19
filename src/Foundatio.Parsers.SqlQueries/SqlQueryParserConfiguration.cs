@@ -21,9 +21,11 @@ public class SqlQueryParserConfiguration {
     public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
     public string[] DefaultFields { get; private set; }
 
+    public int MaxFieldDepth { get; private set; } = 10;
     public QueryFieldResolver FieldResolver { get; private set; }
     public EntityTypePropertyFilter EntityTypePropertyFilter { get; private set; } = static _ => true;
     public EntityTypeNavigationFilter EntityTypeNavigationFilter { get; private set; } = static _ => true;
+    public EntityTypeSkipNavigationFilter EntityTypeSkipNavigationFilter { get; private set; } = static _ => true;
     public IncludeResolver IncludeResolver { get; private set; }
     public QueryValidationOptions ValidationOptions { get; private set; }
     public ChainedQueryVisitor SortVisitor { get; } = new();
@@ -42,6 +44,11 @@ public class SqlQueryParserConfiguration {
         return this;
     }
 
+    public SqlQueryParserConfiguration SetFieldDepth(int maxFieldDepth) {
+        MaxFieldDepth = maxFieldDepth;
+        return this;
+    }
+
     public SqlQueryParserConfiguration UseEntityTypePropertyFilter(EntityTypePropertyFilter filter) {
         EntityTypePropertyFilter = filter;
         return this;
@@ -49,6 +56,11 @@ public class SqlQueryParserConfiguration {
 
     public SqlQueryParserConfiguration UseEntityTypeNavigationFilter(EntityTypeNavigationFilter filter) {
         EntityTypeNavigationFilter = filter;
+        return this;
+    }
+
+    public SqlQueryParserConfiguration UseEntityTypeSkipNavigationFilter(EntityTypeSkipNavigationFilter filter) {
+        EntityTypeSkipNavigationFilter = filter;
         return this;
     }
 
@@ -233,4 +245,5 @@ public class SqlQueryParserConfiguration {
 }
 
 public delegate bool EntityTypeNavigationFilter(INavigation navigation);
+public delegate bool EntityTypeSkipNavigationFilter(ISkipNavigation navigation);
 public delegate bool EntityTypePropertyFilter(IProperty property);
