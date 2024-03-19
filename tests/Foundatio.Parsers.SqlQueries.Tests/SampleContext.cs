@@ -43,6 +43,7 @@ public class Employee {
     public int CompanyId { get; set; }
     public Company Company { get; set; }
     public List<DataValue> DataValues { get; set; }
+    public DateTime Created { get; set; } = DateTime.Now;
 }
 
 public class Company {

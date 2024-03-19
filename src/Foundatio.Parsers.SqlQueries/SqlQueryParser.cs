@@ -118,7 +118,7 @@ public class SqlQueryParser : LuceneQueryParser {
 
         foreach (var nav in entityType.GetNavigations())
         {
-            if (visited.Contains(nav.TargetEntityType) || !Configuration.EntityTypeFilter(nav.TargetEntityType))
+            if (visited.Contains(nav.TargetEntityType) || !Configuration.EntityTypeNavigationFilter(nav))
                 continue;
 
             AddEntityFields(fields, nav.TargetEntityType, visited, prefix + nav.Name + ".");
