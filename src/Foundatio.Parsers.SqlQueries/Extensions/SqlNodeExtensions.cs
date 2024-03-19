@@ -115,19 +115,38 @@ public static class SqlNodeExtensions
 
     public static string ToSqlString(this TermNode node, ISqlQueryVisitorContext context)
     {
-        if (String.IsNullOrEmpty(node.Field))
-            context.AddValidationError("Field is required for term node queries.");
-
         if (!String.IsNullOrEmpty(node.Prefix))
             context.AddValidationError("Prefix is not supported for term range queries.");
+
+        var builder = new StringBuilder();
+
+        if (String.IsNullOrEmpty(node.Field))
+        {
+            if (context.DefaultFields == null || context.DefaultFields.Length == 0)
+            {
+                context.AddValidationError("Field or DefaultFields is required for term queries.");
+                return String.Empty;
+            }
+
+            for (int index = 0; index < context.DefaultFields.Length; index++)
+            {
+                builder.Append(index == 0 ? "(" : " OR ");
+
+                string defaultField = context.DefaultFields[index];
+                builder.Append(defaultField).Append(".Contains(\"").Append(node.Term).Append("\")");
+
+                if (index == context.DefaultFields.Length - 1)
+                    builder.Append(")");
+            }
+
+            return builder.ToString();
+        }
 
         // support overriding the generated query
         if (node.TryGetQuery(out string query))
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
-
-        var builder = new StringBuilder();
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
             builder.Append("NOT ");

@@ -61,6 +61,24 @@ public class SqlQueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
+    public async Task CanSearchDefaultFields()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+        parser.Configuration.SetDefaultFields(["FullName", "Title"]);
+
+        string sqlExpected = db.Employees.Where(e => e.FullName.Contains("John") || e.Title.Contains("John")).ToQueryString();
+        string sqlActual = db.Employees.Where("""FullName.Contains("John") || Title.Contains("John")""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToSqlAsync("John", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
     public async Task CanUseDateFilter()
     {
         var sp = GetServiceProvider();
@@ -68,8 +86,6 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
         var context = parser.GetContext(db.Employees.EntityType);
-        context.Fields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = {{ "DataDefinitionId", 1 }}});
-        context.ValidationOptions.AllowedFields.Add("age");
 
         string sqlExpected = db.Employees.Where(e => e.Created > new DateTime(2024, 1, 1)).ToQueryString();
         string sqlActual = db.Employees.Where("""created > DateTime.Parse("2024-01-01")""").ToQueryString();
@@ -188,7 +204,12 @@ public class SqlQueryParserTests : TestWithLoggingBase {
 
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation(nodes);
-        string generatedQuery = await GenerateSqlVisitor.RunAsync(result, new SqlQueryVisitorContext());
+        var context = new SqlQueryVisitorContext { Fields =
+            [
+                new EntityFieldInfo { Field = "field", IsNumber = true }
+            ]
+        };
+        string generatedQuery = await GenerateSqlVisitor.RunAsync(result, context);
         Assert.Equal(expected, generatedQuery);
     }
 }
