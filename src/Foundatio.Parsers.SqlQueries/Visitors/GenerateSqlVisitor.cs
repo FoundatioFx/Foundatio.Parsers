@@ -16,7 +16,7 @@ public class GenerateSqlVisitor : QueryNodeVisitorWithResultBase<string>
         if (context is not ISqlQueryVisitorContext sqlContext)
             throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
 
-        _builder.Append(node.ToSqlString(sqlContext));
+        _builder.Append(node.ToDynamicLinqString(sqlContext));
 
         return Task.CompletedTask;
     }
@@ -26,7 +26,7 @@ public class GenerateSqlVisitor : QueryNodeVisitorWithResultBase<string>
         if (context is not ISqlQueryVisitorContext sqlContext)
             throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
 
-        _builder.Append(node.ToSqlString(sqlContext));
+        _builder.Append(node.ToDynamicLinqString(sqlContext));
     }
 
     public override void Visit(TermRangeNode node, IQueryVisitorContext context)
@@ -34,7 +34,7 @@ public class GenerateSqlVisitor : QueryNodeVisitorWithResultBase<string>
         if (context is not ISqlQueryVisitorContext sqlContext)
             throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
 
-        _builder.Append(node.ToSqlString(sqlContext));
+        _builder.Append(node.ToDynamicLinqString(sqlContext));
     }
 
     public override void Visit(ExistsNode node, IQueryVisitorContext context)
@@ -42,7 +42,7 @@ public class GenerateSqlVisitor : QueryNodeVisitorWithResultBase<string>
         if (context is not ISqlQueryVisitorContext sqlContext)
             throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
 
-        _builder.Append(node.ToSqlString(sqlContext));
+        _builder.Append(node.ToDynamicLinqString(sqlContext));
     }
 
     public override void Visit(MissingNode node, IQueryVisitorContext context)
@@ -50,7 +50,7 @@ public class GenerateSqlVisitor : QueryNodeVisitorWithResultBase<string>
         if (context is not ISqlQueryVisitorContext sqlContext)
             throw new InvalidOperationException("The context must be an ISqlQueryVisitorContext.");
 
-        _builder.Append(node.ToSqlString(sqlContext));
+        _builder.Append(node.ToDynamicLinqString(sqlContext));
     }
 
     public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context)

@@ -73,7 +73,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         string sqlExpected = db.Employees.Where(e => e.FullName.Contains("John") || e.Title.Contains("John")).ToQueryString();
         string sqlActual = db.Employees.Where("""FullName.Contains("John") || Title.Contains("John")""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToSqlAsync("John", context);
+        string sql = await parser.ToDynamicLinqAsync("John", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
     }
@@ -90,7 +90,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         string sqlExpected = db.Employees.Where(e => e.Created > new DateTime(2024, 1, 1)).ToQueryString();
         string sqlActual = db.Employees.Where("""created > DateTime.Parse("2024-01-01")""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToSqlAsync("created:>2024-01-01", context);
+        string sql = await parser.ToDynamicLinqAsync("created:>2024-01-01", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
     }
@@ -108,7 +108,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name.Contains("acme"))).ToQueryString();
         string sqlActual = db.Employees.Where("""Companies.Any(Name.Contains("acme"))""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToSqlAsync("acme", context);
+        string sql = await parser.ToDynamicLinqAsync("acme", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
     }
@@ -127,16 +127,16 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name == "acme") && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
         string sqlActual = db.Employees.Where("""Companies.Any(Name = "acme") AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToSqlAsync("companies.name:acme age:30", context);
+        string sql = await parser.ToDynamicLinqAsync("companies.name:acme age:30", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         var q = db.Employees.AsNoTracking();
-        sql = await parser.ToSqlAsync("companies.name:acme age:30", context);
+        sql = await parser.ToDynamicLinqAsync("companies.name:acme age:30", context);
         sqlActual = q.Where(sql, db.Employees).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
-        await Assert.ThrowsAsync<ValidationException>(() => parser.ToSqlAsync("companies.description:acme", context));
+        await Assert.ThrowsAsync<ValidationException>(() => parser.ToDynamicLinqAsync("companies.description:acme", context));
 
         var employees = await db.Employees.Where(e => e.Title == "software developer" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
             .ToListAsync();

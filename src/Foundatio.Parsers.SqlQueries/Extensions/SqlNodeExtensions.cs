@@ -10,7 +10,7 @@ namespace Foundatio.Parsers.SqlQueries.Extensions;
 
 public static class SqlNodeExtensions
 {
-    public static string ToSqlString(this GroupNode node, ISqlQueryVisitorContext context)
+    public static string ToDynamicLinqString(this GroupNode node, ISqlQueryVisitorContext context)
     {
         // support overriding the generated query
         if (node.TryGetQuery(out string query))
@@ -36,7 +36,7 @@ public static class SqlNodeExtensions
             builder.Append("(");
 
         if (node.Left != null)
-            builder.Append(node.Left is GroupNode groupNode ? groupNode.ToSqlString(context) : node.Left.ToSqlString(context));
+            builder.Append(node.Left is GroupNode groupNode ? groupNode.ToDynamicLinqString(context) : node.Left.ToDynamicLinqString(context));
 
         if (node.Left != null && node.Right != null)
         {
@@ -47,7 +47,7 @@ public static class SqlNodeExtensions
         }
 
         if (node.Right != null)
-            builder.Append(node.Right is GroupNode groupNode ? groupNode.ToSqlString(context) : node.Right.ToSqlString(context));
+            builder.Append(node.Right is GroupNode groupNode ? groupNode.ToDynamicLinqString(context) : node.Right.ToDynamicLinqString(context));
 
         if (node.HasParens)
             builder.Append(")");
@@ -61,7 +61,7 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
-    public static string ToSqlString(this ExistsNode node, ISqlQueryVisitorContext context)
+    public static string ToDynamicLinqString(this ExistsNode node, ISqlQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
             context.AddValidationError("Field is required for exists node queries.");
@@ -81,7 +81,7 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
-    public static string ToSqlString(this MissingNode node, ISqlQueryVisitorContext context)
+    public static string ToDynamicLinqString(this MissingNode node, ISqlQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
             context.AddValidationError("Field is required for missing node queries.");
@@ -113,7 +113,7 @@ public static class SqlNodeExtensions
                new EntityFieldInfo { Field = field };
     }
 
-    public static string ToSqlString(this TermNode node, ISqlQueryVisitorContext context)
+    public static string ToDynamicLinqString(this TermNode node, ISqlQueryVisitorContext context)
     {
         if (!String.IsNullOrEmpty(node.Prefix))
             context.AddValidationError("Prefix is not supported for term range queries.");
@@ -212,7 +212,7 @@ public static class SqlNodeExtensions
             builder.Append("\"" + term + "\"");
     }
 
-    public static string ToSqlString(this TermRangeNode node, ISqlQueryVisitorContext context)
+    public static string ToDynamicLinqString(this TermRangeNode node, ISqlQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
             context.AddValidationError("Field is required for term range queries.");
@@ -260,15 +260,15 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
-    public static string ToSqlString(this IQueryNode node, ISqlQueryVisitorContext context)
+    public static string ToDynamicLinqString(this IQueryNode node, ISqlQueryVisitorContext context)
     {
         return node switch
         {
-            GroupNode groupNode => groupNode.ToSqlString(context),
-            ExistsNode existsNode => existsNode.ToSqlString(context),
-            MissingNode missingNode => missingNode.ToSqlString(context),
-            TermNode termNode => termNode.ToSqlString(context),
-            TermRangeNode termRangeNode => termRangeNode.ToSqlString(context),
+            GroupNode groupNode => groupNode.ToDynamicLinqString(context),
+            ExistsNode existsNode => existsNode.ToDynamicLinqString(context),
+            MissingNode missingNode => missingNode.ToDynamicLinqString(context),
+            TermNode termNode => termNode.ToDynamicLinqString(context),
+            TermRangeNode termRangeNode => termRangeNode.ToDynamicLinqString(context),
             _ => throw new NotSupportedException($"Node type {node.GetType().Name} is not supported.")
         };
     }

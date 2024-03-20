@@ -60,7 +60,7 @@ public class SqlQueryParser : LuceneQueryParser {
         return await ValidationVisitor.RunAsync(node, context);
     }
 
-    public async Task<string> ToSqlAsync(string query, SqlQueryVisitorContext context)
+    public async Task<string> ToDynamicLinqAsync(string query, SqlQueryVisitorContext context)
     {
         var node = await ParseAsync(query, context);
         var result = await ValidationVisitor.RunAsync(node, context);
@@ -110,10 +110,10 @@ public class SqlQueryParser : LuceneQueryParser {
 
         foreach (var property in entityType.GetProperties())
         {
-            string propertyPath = prefix + property.Name;
             if (!Configuration.EntityTypePropertyFilter(property))
                 continue;
 
+            string propertyPath = prefix + property.Name;
             fields.Add(new EntityFieldInfo
             {
                 Field = propertyPath,
@@ -126,19 +126,19 @@ public class SqlQueryParser : LuceneQueryParser {
 
         foreach (var nav in entityType.GetNavigations())
         {
-            string propertyPath = prefix + nav.Name;
             if (!Configuration.EntityTypeNavigationFilter(nav))
                 continue;
 
+            string propertyPath = prefix + nav.Name;
             AddEntityFields(fields, nav.TargetEntityType, entityTypeStack, propertyPath + ".", false, depth + 1);
         }
 
         foreach (var skipNav in entityType.GetSkipNavigations())
         {
-            string propertyPath = prefix + skipNav.Name;
             if (!Configuration.EntityTypeSkipNavigationFilter(skipNav))
                 continue;
 
+            string propertyPath = prefix + skipNav.Name;
             AddEntityFields(fields, skipNav.TargetEntityType, entityTypeStack, propertyPath + ".", true, depth + 1);
         }
 
