@@ -10,11 +10,12 @@ public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorConte
     public IEntityType EntityType { get; set; }
 }
 
-[DebuggerDisplay("{Field} IsNumber: {IsNumber} IsDate: {IsDate} IsBoolean: {IsBoolean} IsCollection: {IsCollection}")]
+[DebuggerDisplay("{Field} IsNumber: {IsNumber} IsMoney: {IsMoney} IsDate: {IsDate} IsBoolean: {IsBoolean} IsCollection: {IsCollection}")]
 public class EntityFieldInfo
 {
     public string Field { get; set; }
     public bool IsNumber { get; set; }
+    public bool IsMoney { get; set; }
     public bool IsDate { get; set; }
     public bool IsBoolean { get; set; }
     public bool IsCollection { get; set; }

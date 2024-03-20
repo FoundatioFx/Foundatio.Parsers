@@ -254,6 +254,9 @@ public class DynamicFieldVisitor : ChainableMutatingQueryVisitor
         customFieldBuilder.Append(" AND ");
         switch (field)
         {
+            case { IsMoney: true }:
+                customFieldBuilder.Append("MoneyValue");
+                break;
             case { IsNumber: true }:
                 customFieldBuilder.Append("NumberValue");
                 break;

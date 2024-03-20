@@ -204,7 +204,7 @@ public static class SqlNodeExtensions
         if (field == null)
             return;
 
-        if (field.IsNumber || field.IsBoolean)
+        if (field.IsNumber || field.IsBoolean || field.IsMoney)
             builder.Append(term);
         else if (field is { IsDate: true })
             builder.Append("DateTime.Parse(\"" + term + "\")");
@@ -226,8 +226,8 @@ public static class SqlNodeExtensions
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
-        if (!field.IsNumber && !field.IsDate)
-            context.AddValidationError("Field must be a number or date for term range queries.");
+        if (!field.IsNumber && !field.IsDate && !field.IsMoney)
+            context.AddValidationError("Field must be a number, money or date for term range queries.");
 
         var builder = new StringBuilder();
 
