@@ -63,7 +63,7 @@ public class SqlQueryParser : LuceneQueryParser {
     public async Task<string> ToDynamicLinqAsync(string query, SqlQueryVisitorContext context)
     {
         var node = await ParseAsync(query, context);
-        var result = await ValidationVisitor.RunAsync(node, context);
+        var result = context.GetValidationResult();
         if (!result.IsValid)
             throw new ValidationException("Invalid query: " + result.Message);
 

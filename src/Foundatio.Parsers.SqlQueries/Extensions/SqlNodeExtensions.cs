@@ -205,7 +205,9 @@ public static class SqlNodeExtensions
             return;
 
         if (field.IsNumber || field.IsBoolean || field.IsMoney)
+        {
             builder.Append(term);
+        }
         else if (field is { IsDate: true })
         {
             term = term.Trim();
