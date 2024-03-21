@@ -72,11 +72,11 @@ public static class SqlNodeExtensions
 
         var builder = new StringBuilder();
 
-        if (node.IsNegated.HasValue && node.IsNegated.Value)
-            builder.Append("NOT ");
-
         builder.Append(node.Field);
-        builder.Append(" IS NOT NULL");
+        if (!node.IsNegated.HasValue || !node.IsNegated.Value)
+            builder.Append(" != null");
+        else
+            builder.Append(" == null");
 
         return builder.ToString();
     }
@@ -95,11 +95,11 @@ public static class SqlNodeExtensions
 
         var builder = new StringBuilder();
 
-        if (node.IsNegated.HasValue && node.IsNegated.Value)
-            builder.Append("NOT ");
-
         builder.Append(node.Field);
-        builder.Append(" IS NULL");
+        if (!node.IsNegated.HasValue || !node.IsNegated.Value)
+            builder.Append(" == null");
+        else
+            builder.Append(" != null");
 
         return builder.ToString();
     }
@@ -164,7 +164,7 @@ public static class SqlNodeExtensions
         var field = GetFieldInfo(context.Fields, node.Field);
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
-            builder.Append("NOT ");
+            builder.Append("!");
 
         if (field.IsCollection)
         {
@@ -207,7 +207,37 @@ public static class SqlNodeExtensions
         if (field.IsNumber || field.IsBoolean || field.IsMoney)
             builder.Append(term);
         else if (field is { IsDate: true })
-            builder.Append("DateTime.Parse(\"" + term + "\")");
+        {
+            term = term.Trim();
+            if (term.StartsWith("now", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.Append("DateTime.UtcNow");
+
+                if (term.Length == 3)
+                    return;
+
+                builder.Append(".");
+
+                var method = term[^1..] switch {
+                    "y" => "AddYears",
+                    "M" => "AddMonths",
+                    "d" => "AddDays",
+                    "h" => "AddHours",
+                    "H" => "AddHours",
+                    "m" => "AddMinutes",
+                    "s" => "AddSeconds",
+                    _ => throw new NotSupportedException("Invalid date operation.")
+                };
+
+                var subtract = term.Substring(3, 1) == "-";
+
+                builder.Append(method).Append("(").Append(subtract ? "-" : "").Append(term.Substring(4, term.Length - 5)).Append(")");
+            }
+            else
+            {
+                builder.Append("DateTime.Parse(\"" + term + "\")");
+            }
+        }
         else
             builder.Append("\"" + term + "\"");
     }

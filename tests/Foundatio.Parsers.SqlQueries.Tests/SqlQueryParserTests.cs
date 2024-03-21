@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Linq.Dynamic.Core;
-using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Foundatio.Parsers.SqlQueries.Extensions;
 using Foundatio.Parsers.SqlQueries.Visitors;
 using Foundatio.Xunit;
 using Microsoft.EntityFrameworkCore;
@@ -91,6 +89,57 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         string sqlActual = db.Employees.Where("""created > DateTime.Parse("2024-01-01")""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("created:>2024-01-01", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
+    public async Task CanUseExistsFilter()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.Title != null).ToQueryString();
+        string sqlActual = db.Employees.Where("""Title != null""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("_exists_:title", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
+    public async Task CanUseMissingFilter()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.Title == null).ToQueryString();
+        string sqlActual = db.Employees.Where("""Title == null""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("_missing_:title", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
+    public async Task CanUseDateMathFilter()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.Created > DateTime.UtcNow.AddDays(-90)).ToQueryString();
+        string sqlActual = db.Employees.Where("""created > DateTime.UtcNow.AddDays(-90)""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("created:>now-90d", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
     }
@@ -229,63 +278,5 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         };
         string generatedQuery = await GenerateSqlVisitor.RunAsync(result, context);
         Assert.Equal(expected, generatedQuery);
-    }
-}
-
-public class DynamicFieldVisitor : ChainableMutatingQueryVisitor
-{
-    public override IQueryNode Visit(TermNode node, IQueryVisitorContext context)
-    {
-        if (context is not SqlQueryVisitorContext sqlContext)
-            return node;
-
-        var field = SqlNodeExtensions.GetFieldInfo(sqlContext.Fields, node.Field);
-
-        if (field == null || !field.Data.TryGetValue("DataDefinitionId", out object value) ||
-            value is not int dataDefinitionId)
-        {
-            return node;
-        }
-
-        var customFieldBuilder = new StringBuilder();
-
-        customFieldBuilder.Append("DataValues.Any(DataDefinitionId = ");
-        customFieldBuilder.Append(dataDefinitionId);
-        customFieldBuilder.Append(" AND ");
-        switch (field)
-        {
-            case { IsMoney: true }:
-                customFieldBuilder.Append("MoneyValue");
-                break;
-            case { IsNumber: true }:
-                customFieldBuilder.Append("NumberValue");
-                break;
-            case { IsBoolean: true }:
-                customFieldBuilder.Append("BooleanValue");
-                break;
-            case { IsDate: true }:
-                customFieldBuilder.Append("DateValue");
-                break;
-            default:
-                customFieldBuilder.Append("StringValue");
-                break;
-        }
-
-        customFieldBuilder.Append(" = ");
-        if (field is { IsNumber: true } or { IsBoolean: true })
-        {
-            customFieldBuilder.Append(node.Term);
-        }
-        else
-        {
-            customFieldBuilder.Append("\"");
-            customFieldBuilder.Append(node.Term);
-            customFieldBuilder.Append("\"");
-        }
-        customFieldBuilder.Append(")");
-
-        node.SetQuery(customFieldBuilder.ToString());
-
-        return node;
     }
 }
