@@ -13,15 +13,17 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
 {
     private readonly LuceneQueryParser _parser = new();
     private readonly ShouldSkipIncludeFunc _shouldSkipInclude;
+    private readonly string _includeName;
 
-    public IncludeVisitor(ShouldSkipIncludeFunc shouldSkipInclude = null)
+    public IncludeVisitor(ShouldSkipIncludeFunc shouldSkipInclude = null, string includeName = "include")
     {
         _shouldSkipInclude = shouldSkipInclude;
+        _includeName = includeName;
     }
 
     public override async Task<IQueryNode> VisitAsync(TermNode node, IQueryVisitorContext context)
     {
-        if (node.Field != "@include" || (_shouldSkipInclude != null && _shouldSkipInclude(node, context)))
+        if (node.Field != "@" + _includeName || (_shouldSkipInclude != null && _shouldSkipInclude(node, context)))
             return node;
 
         var includeResolver = context.GetIncludeResolver();
@@ -34,7 +36,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
         var includeStack = context.GetIncludeStack();
         if (includeStack.Contains(node.Term))
         {
-            context.AddValidationError($"Recursive include ({node.Term})");
+            context.AddValidationError($"Recursive {_includeName} ({node.Term})");
             return node;
         }
 
@@ -43,7 +45,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
             string includedQuery = await includeResolver(node.Term).ConfigureAwait(false);
             if (includedQuery == null)
             {
-                context.AddValidationError($"Unresolved include ({node.Term})");
+                context.AddValidationError($"Unresolved {_includeName} ({node.Term})");
                 context.GetValidationResult().UnresolvedIncludes.Add(node.Term);
             }
 
@@ -62,7 +64,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
         }
         catch (Exception ex)
         {
-            context.AddValidationError($"Error in include resolver callback when resolving include ({node.Term}): {ex.Message}");
+            context.AddValidationError($"Error in {_includeName} resolver callback when resolving {_includeName} ({node.Term}): {ex.Message}");
             context.GetValidationResult().UnresolvedIncludes.Add(node.Term);
 
             return node;
