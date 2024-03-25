@@ -78,18 +78,18 @@ public class SqlQueryParserConfiguration {
         return UseFieldResolver(null);
     }
 
-    public SqlQueryParserConfiguration UseIncludes(IncludeResolver includeResolver, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
+    public SqlQueryParserConfiguration UseIncludes(IncludeResolver includeResolver, ShouldSkipIncludeFunc shouldSkipInclude = null, string includeName = "include", int priority = 0) {
         IncludeResolver = includeResolver;
 
-        return AddVisitor(new IncludeVisitor(shouldSkipInclude), priority);
+        return AddVisitor(new IncludeVisitor(shouldSkipInclude, includeName), priority);
     }
 
-    public SqlQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
-        return UseIncludes(name => Task.FromResult(resolveInclude(name)), shouldSkipInclude, priority);
+    public SqlQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, ShouldSkipIncludeFunc shouldSkipInclude = null, string includeName = "include", int priority = 0) {
+        return UseIncludes(name => Task.FromResult(resolveInclude(name)), shouldSkipInclude, includeName, priority);
     }
 
-    public SqlQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0) {
-        return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, shouldSkipInclude, priority);
+    public SqlQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, ShouldSkipIncludeFunc shouldSkipInclude = null, string includeName = "include", int priority = 0) {
+        return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, shouldSkipInclude, includeName, priority);
     }
 
     public SqlQueryParserConfiguration SetValidationOptions(QueryValidationOptions options) {
