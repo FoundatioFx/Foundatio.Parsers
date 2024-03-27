@@ -15,7 +15,7 @@ public class InvertQueryVisitorTests : TestWithLoggingBase
 {
     public InvertQueryVisitorTests(ITestOutputHelper output) : base(output)
     {
-        Log.MinimumLevel = LogLevel.Trace;
+        Log.DefaultMinimumLevel = LogLevel.Trace;
     }
 
     [Fact]

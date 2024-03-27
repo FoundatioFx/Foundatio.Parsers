@@ -16,7 +16,7 @@ public class QueryParserValidationTests : TestWithLoggingBase
 {
     public QueryParserValidationTests(ITestOutputHelper output) : base(output)
     {
-        Log.MinimumLevel = LogLevel.Trace;
+        Log.DefaultMinimumLevel = LogLevel.Trace;
     }
 
     [Theory]
