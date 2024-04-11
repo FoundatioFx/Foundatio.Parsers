@@ -171,6 +171,8 @@ public class SqlQueryParserTests : TestWithLoggingBase {
 
         var context = parser.GetContext(db.Companies.EntityType);
 
+        Assert.Contains(db.Companies.EntityType.GetNavigations(), e => e.TargetEntityType == db.DataDefinitions.EntityType);
+
         string sqlExpected = db.Companies.Where(e => e.DataDefinitions.Any(c => c.Key == "age")).ToQueryString();
         string sqlActual = db.Companies.Where("""DataDefinitions.Any(Key.Equals("age"))""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
@@ -192,6 +194,8 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
         var context = parser.GetContext(db.Companies.EntityType);
+
+        Assert.Contains(db.Companies.EntityType.GetSkipNavigations(), e => e.TargetEntityType == db.Employees.EntityType);
 
         string sqlExpected = db.Companies.Where(e => e.Employees.Any(c => c.Salary.Equals(80_000))).ToQueryString();
         string sqlActual = db.Companies.Where("""Employees.Any(Salary.Equals(80000))""").ToQueryString();
