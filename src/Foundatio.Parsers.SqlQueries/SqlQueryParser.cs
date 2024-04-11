@@ -142,7 +142,7 @@ public class SqlQueryParser : LuceneQueryParser {
 
             string propertyPath = prefix + skipNav.Name;
 
-            AddEntityFields(fields, skipNav.TargetEntityType, entityTypeStack, propertyPath + ".", true, depth + 1);
+            AddEntityFields(fields, skipNav.TargetEntityType, entityTypeStack, propertyPath + ".", skipNav.IsCollection, depth + 1);
         }
 
         entityTypeStack.Pop();
