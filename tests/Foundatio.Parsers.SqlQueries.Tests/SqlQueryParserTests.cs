@@ -163,6 +163,54 @@ public class SqlQueryParserTests : TestWithLoggingBase {
     }
 
     [Fact]
+    public async Task CanUseNavigationFields()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Companies.EntityType);
+
+        Assert.Contains(db.Companies.EntityType.GetNavigations(), e => e.TargetEntityType == db.DataDefinitions.EntityType);
+
+        string sqlExpected = db.Companies.Where(e => e.DataDefinitions.Any(c => c.Key == "age")).ToQueryString();
+        string sqlActual = db.Companies.Where("""DataDefinitions.Any(Key.Equals("age"))""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("datadefinitions.key:age", context);
+        sqlActual = db.Companies.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+
+        var query = db.Companies.AsQueryable();
+        var companies = await query.Where(sql).ToListAsync();
+
+        Assert.Single(companies);
+    }
+
+    [Fact]
+    public async Task CanUseSkipNavigationFields()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Companies.EntityType);
+
+        Assert.Contains(db.Companies.EntityType.GetSkipNavigations(), e => e.TargetEntityType == db.Employees.EntityType);
+
+        string sqlExpected = db.Companies.Where(e => e.Employees.Any(c => c.Salary.Equals(80_000))).ToQueryString();
+        string sqlActual = db.Companies.Where("""Employees.Any(Salary.Equals(80000))""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("employees.salary:80000", context);
+        sqlActual = db.Companies.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+
+        var query = db.Companies.AsQueryable();
+        var companies = await query.Where(sql).ToListAsync();
+
+        Assert.Single(companies);
+    }
+
+    [Fact]
     public async Task CanGenerateSql()
     {
         var sp = GetServiceProvider();
@@ -231,6 +279,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         {
             FullName = "John Doe",
             Title = "Software Developer",
+            Salary = 80_000,
             DataValues = [ new() { Definition = company.DataDefinitions[0], NumberValue = 30 } ],
             Companies = [company]
         });
@@ -238,6 +287,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         {
             FullName = "Jane Doe",
             Title = "Software Developer",
+            Salary = 90_000,
             DataValues = [ new() { Definition = company.DataDefinitions[0], NumberValue = 23 } ],
             Companies = [company]
         });
