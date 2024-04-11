@@ -130,7 +130,9 @@ public class SqlQueryParser : LuceneQueryParser {
                 continue;
 
             string propertyPath = prefix + nav.Name;
-            AddEntityFields(fields, nav.TargetEntityType, entityTypeStack, propertyPath + ".", false, depth + 1);
+            bool isNavCollection = nav is IReadOnlyNavigationBase { IsCollection: true };
+
+            AddEntityFields(fields, nav.TargetEntityType, entityTypeStack, propertyPath + ".", isNavCollection, depth + 1);
         }
 
         foreach (var skipNav in entityType.GetSkipNavigations())
@@ -139,6 +141,7 @@ public class SqlQueryParser : LuceneQueryParser {
                 continue;
 
             string propertyPath = prefix + skipNav.Name;
+
             AddEntityFields(fields, skipNav.TargetEntityType, entityTypeStack, propertyPath + ".", true, depth + 1);
         }
 
