@@ -193,10 +193,10 @@ public class SqlQueryParserTests : TestWithLoggingBase {
 
         var context = parser.GetContext(db.Companies.EntityType);
 
-        string sqlExpected = db.Companies.Where(e => e.Employees.Any(c => c.Salary < 85_000)).ToQueryString();
-        string sqlActual = db.Companies.Where("""Employees.Any(Salary < 85000)""").ToQueryString();
+        string sqlExpected = db.Companies.Where(e => e.Employees.Any(c => c.Salary.Equals(80_000))).ToQueryString();
+        string sqlActual = db.Companies.Where("""Employees.Any(Salary.Equals(80000))""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToDynamicLinqAsync("employees.salary:<85000", context);
+        string sql = await parser.ToDynamicLinqAsync("employees.salary:80000", context);
         sqlActual = db.Companies.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
