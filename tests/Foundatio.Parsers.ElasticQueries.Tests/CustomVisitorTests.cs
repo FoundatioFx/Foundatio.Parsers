@@ -20,7 +20,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanResolveSimpleCustomFilter()
+    public async Task CanResolveSimpleCustomFilter()
     {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Id = "1" }, i => i.Index(index));
@@ -30,7 +30,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new IncludeVisitor())
             .AddVisitor(new CustomFilterVisitor()));
 
-        var result = processor.BuildQueryAsync("@custom:(one)").Result;
+        var result = await processor.BuildQueryAsync("@custom:(one)");
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(q => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -45,7 +45,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanResolveCustomFilterContainingIncludes()
+    public async Task CanResolveCustomFilterContainingIncludes()
     {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Id = "1" }, i => i.Index(index));
@@ -55,7 +55,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new IncludeVisitor())
             .AddVisitor(new CustomFilterVisitor()));
 
-        var result = processor.BuildQueryAsync("@custom:(one @include:3)").Result;
+        var result = await processor.BuildQueryAsync("@custom:(one @include:3)");
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(q => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -70,7 +70,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanResolveIncludeToCustomFilterContainingIgnoredInclude()
+    public async Task CanResolveIncludeToCustomFilterContainingIgnoredInclude()
     {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Id = "1" }, i => i.Index(index));
@@ -80,7 +80,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .UseIncludes(include => ResolveIncludeAsync("test", include, "@custom:(one @include:3)"), ShouldSkipInclude, 0)
             .AddVisitor(new CustomFilterVisitor(), 1));
 
-        var result = processor.BuildQueryAsync("@include:test").Result;
+        var result = await processor.BuildQueryAsync("@include:test");
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(q => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -117,7 +117,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanResolveMultipleCustomFilters()
+    public async Task CanResolveMultipleCustomFilters()
     {
         var index = CreateRandomIndex<MyType>();
         Client.Index(new MyType { Id = "1" }, i => i.Index(index));
@@ -127,7 +127,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new IncludeVisitor())
             .AddVisitor(new CustomFilterVisitor()));
 
-        var result = processor.BuildQueryAsync("@custom:(one) OR (field1:Test @custom:(two))").Result;
+        var result = await processor.BuildQueryAsync("@custom:(one) OR (field1:Test @custom:(two))");
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(q => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);

@@ -22,6 +22,27 @@ services:
     networks:
       - foundatio
 
+  sqlserver:
+    image: mcr.microsoft.com/azure-sql-edge:1.0.7
+    ports:
+      - "1433:1433" # login with sa:P@ssword1
+    environment:
+      - "ACCEPT_EULA=Y"
+      - "SA_PASSWORD=P@ssword1"
+      - "MSSQL_PID=Developer"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/opt/mssql-tools/bin/sqlcmd",
+          "-Usa",
+          "-PP@ssword1",
+          "-Q",
+          "select 1",
+        ]
+      interval: 1s
+      retries: 20
+
   ready:
     image: andrewlock/wait-for-dependencies
     command: elasticsearch:9200
