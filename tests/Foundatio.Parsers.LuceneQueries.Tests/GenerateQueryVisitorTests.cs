@@ -14,7 +14,7 @@ public class GenerateQueryVisitorTests : TestWithLoggingBase
 {
     public GenerateQueryVisitorTests(ITestOutputHelper output) : base(output)
     {
-        Log.MinimumLevel = LogLevel.Trace;
+        Log.DefaultMinimumLevel = LogLevel.Trace;
     }
 
     [Theory]

@@ -16,7 +16,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
 {
     public CustomVisitorTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture)
     {
-        Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        Log.DefaultMinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     [Fact]

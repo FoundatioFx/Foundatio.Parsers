@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
@@ -73,7 +72,7 @@ public class ElasticsearchFixture : IAsyncLifetime
         _client = new Lazy<IElasticClient>(() => GetClient(ConfigureConnectionSettings));
     }
 
-    public TestLoggerFactory Log { get; set; }
+    public TestLogger Log { get; set; }
     public IElasticClient Client => _client.Value;
 
     protected IElasticClient GetClient(Action<ConnectionSettings> configure = null)

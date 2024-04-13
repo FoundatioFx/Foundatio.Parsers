@@ -13,7 +13,7 @@ public class QueryValidatorTests : TestWithLoggingBase
 {
     public QueryValidatorTests(ITestOutputHelper output) : base(output)
     {
-        Log.MinimumLevel = LogLevel.Trace;
+        Log.DefaultMinimumLevel = LogLevel.Trace;
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public class QueryValidatorTests : TestWithLoggingBase
 
     // allowed fields
     // allowed operations
-    // 
+    //
     // as part of a chain of other visitors
     // add tests to elastic that make use of a resolver
 }

@@ -10,7 +10,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
 {
     public ElasticMappingResolverTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture)
     {
-        Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        Log.DefaultMinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     private ITypeMapping MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)

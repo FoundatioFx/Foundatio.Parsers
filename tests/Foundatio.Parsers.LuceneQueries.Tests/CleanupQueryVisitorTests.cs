@@ -14,7 +14,7 @@ public class CleanupQueryVisitorTests : TestWithLoggingBase
 {
     public CleanupQueryVisitorTests(ITestOutputHelper output) : base(output)
     {
-        Log.MinimumLevel = LogLevel.Trace;
+        Log.DefaultMinimumLevel = LogLevel.Trace;
     }
 
     [Theory]

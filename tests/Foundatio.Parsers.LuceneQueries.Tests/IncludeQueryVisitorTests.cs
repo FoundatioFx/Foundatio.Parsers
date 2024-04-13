@@ -14,7 +14,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
 {
     public IncludeQueryVisitorTests(ITestOutputHelper output) : base(output)
     {
-        Log.MinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        Log.DefaultMinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     [Fact]
