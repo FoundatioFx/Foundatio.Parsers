@@ -45,7 +45,7 @@ public class ExistsNode : QueryNodeBase, IFieldQueryNode
         builder.Append(Prefix);
         builder.Append("_exists_");
         builder.Append(":");
-        builder.Append(this.Field);
+        builder.Append(Field);
 
         return builder.ToString();
     }

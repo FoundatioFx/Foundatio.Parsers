@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,7 +8,6 @@ using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Foundatio.Utility;
 using Microsoft.Extensions.Logging;
 using Nest;
 using Xunit;
@@ -386,8 +385,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     public void ProcessDateHistogramAggregations()
     {
         var index = CreateRandomIndex<MyType>();
-        Client.IndexMany(new[] { new MyType { Field5 = SystemClock.UtcNow } }, index);
-        Client.Indices.Refresh(index);
+        await Client.IndexManyAsync(new[] { new MyType { Field5 = DateTime.UtcNow } }, index);
+        await Client.Indices.RefreshAsync(index);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = processor.BuildAggregationsAsync("date:(field5^1h @missing:\"0001-01-01T00:00:00\" min:field5^1h max:field5^1h)").Result;
