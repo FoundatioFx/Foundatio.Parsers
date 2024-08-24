@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,7 +7,6 @@ using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Foundatio.Utility;
 using Microsoft.Extensions.Logging;
 using Nest;
 using Xunit;
@@ -385,7 +384,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessDateHistogramAggregations()
     {
         var index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync(new[] { new MyType { Field5 = SystemClock.UtcNow } }, index);
+        await Client.IndexManyAsync(new[] { new MyType { Field5 = DateTime.UtcNow } }, index);
         await Client.Indices.RefreshAsync(index);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
@@ -525,7 +524,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         if (maxNodeDepth >= 0)
             Assert.Equal(maxNodeDepth, result.MaxNodeDepth);
         if (fields != null)
-            Assert.Equal(fields, (HashSet<string>)result.ReferencedFields);
+            Assert.Equal(fields.ToList(), result.ReferencedFields);
 
         if (operations != null)
             Assert.Equal(operations, result.Operations.ToDictionary(pair => pair.Key, pair => pair.Value));

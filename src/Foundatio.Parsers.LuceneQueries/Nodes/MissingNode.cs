@@ -45,7 +45,7 @@ public class MissingNode : QueryNodeBase, IFieldQueryNode
         builder.Append(Prefix);
         builder.Append("_missing_");
         builder.Append(":");
-        builder.Append(this.Field);
+        builder.Append(Field);
 
         return builder.ToString();
     }

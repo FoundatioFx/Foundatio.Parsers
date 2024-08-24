@@ -20,7 +20,7 @@ namespace Foundatio.Parsers.SqlQueries.Tests;
 
 public class SqlQueryParserTests : TestWithLoggingBase {
     public SqlQueryParserTests(ITestOutputHelper output) : base(output) {
-        Log.MinimumLevel = LogLevel.Trace;
+        Log.DefaultMinimumLevel = LogLevel.Trace;
     }
 
     [Theory]
