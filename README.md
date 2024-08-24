@@ -32,12 +32,12 @@ Debug.WriteLine(DebugQueryVisitor.Run(result));
 Here is the parse result as shown from the `DebugQueryVisitor`
 ```
 Group:
-  Left - Term: 
+  Left - Term:
       TermMax: 2
       TermMin: 1
       MinInclusive: True
       MaxInclusive: True
-      Field: 
+      Field:
           Name: field
 ```
 
@@ -80,7 +80,7 @@ System.Diagnostics.Debug.Assert(query == generatedQuery);
   - Automatically resolves non-analyzed keyword sub-fields for sorting and aggregations
   - Aliases can be defined right on your NEST mappings
     - Supports both root and inner field name aliases
-    
-## Thanks to all the people who have contributed
 
+## Thanks to all the people who have contributed
+ 
 [![contributors](https://contributors-img.web.app/image?repo=FoundatioFx/Foundatio.Parsers)](https://github.com/FoundatioFx/Foundatio.Parsers/graphs/contributors)
