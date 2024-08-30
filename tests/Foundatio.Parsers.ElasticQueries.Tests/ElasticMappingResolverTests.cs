@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq.Expressions;
-using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -13,7 +12,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Log.DefaultMinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
-    private ITypeMapping MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
+    private TypeMapping MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
     {
         return m
             .AutoMap<MyNestedType>()

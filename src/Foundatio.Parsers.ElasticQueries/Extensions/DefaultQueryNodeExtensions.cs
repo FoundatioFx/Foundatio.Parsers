@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class DefaultQueryNodeExtensions
 {
-    public static async Task<QueryBase> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static async Task<Query> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
     {
         if (node is TermNode termNode)
             return termNode.GetDefaultQuery(context);
@@ -27,12 +27,12 @@ public static class DefaultQueryNodeExtensions
         return null;
     }
 
-    public static QueryBase GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
+    public static Query GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        QueryBase query;
+        Query query;
         string field = node.UnescapedField;
         var defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
         if (field == null && defaultFields != null && defaultFields.Length == 1)
@@ -58,17 +58,15 @@ public static class DefaultQueryNodeExtensions
                 {
                     if (node.IsQuotedTerm)
                     {
-                        query = new MatchPhraseQuery
+                        query = new MatchPhraseQuery(fields[0])
                         {
-                            Field = fields[0],
                             Query = node.UnescapedTerm
                         };
                     }
                     else
                     {
-                        query = new MatchQuery
+                        query = new MatchQuery(fields[0])
                         {
-                            Field = fields[0],
                             Query = node.UnescapedTerm
                         };
                     }
@@ -78,10 +76,9 @@ public static class DefaultQueryNodeExtensions
                     query = new MultiMatchQuery
                     {
                         Fields = fields,
-                        Query = node.UnescapedTerm
+                        Query = node.UnescapedTerm,
+                        Type = node.IsQuotedTerm ? TextQueryType.Phrase : null
                     };
-                    if (node.IsQuotedTerm)
-                        ((MultiMatchQuery)query).Type = TextQueryType.Phrase;
                 }
             }
         }
@@ -89,17 +86,15 @@ public static class DefaultQueryNodeExtensions
         {
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
-                query = new PrefixQuery
+                query = new PrefixQuery(field)
                 {
-                    Field = field,
                     Value = node.UnescapedTerm.TrimEnd('*')
                 };
             }
             else
             {
-                query = new TermQuery
+                query = new TermQuery(field)
                 {
-                    Field = field,
                     Value = node.UnescapedTerm
                 };
             }
@@ -108,7 +103,7 @@ public static class DefaultQueryNodeExtensions
         return query;
     }
 
-    public static async Task<QueryBase> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)
+    public static async Task<Query> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -116,58 +111,58 @@ public static class DefaultQueryNodeExtensions
         string field = node.UnescapedField;
         if (elasticContext.MappingResolver.IsDatePropertyType(field))
         {
-            var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()) };
+            var range = new DateRangeQuery(field) { TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()) };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
-                    range.GreaterThan = node.UnescapedMin;
+                    range.Gt = node.UnescapedMin;
                 else
-                    range.GreaterThanOrEqualTo = node.UnescapedMin;
+                    range.Gte = node.UnescapedMin;
             }
 
             if (!String.IsNullOrWhiteSpace(node.UnescapedMax) && node.UnescapedMax != "*")
             {
                 if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
-                    range.LessThan = node.UnescapedMax;
+                    range.Lt = node.UnescapedMax;
                 else
-                    range.LessThanOrEqualTo = node.UnescapedMax;
+                    range.Lte = node.UnescapedMax;
             }
 
             return range;
         }
         else
         {
-            var range = new TermRangeQuery { Field = field };
+            var range = new TermRangeQuery(field);
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
-                    range.GreaterThan = node.UnescapedMin;
+                    range.Gt = node.UnescapedMin;
                 else
-                    range.GreaterThanOrEqualTo = node.UnescapedMin;
+                    range.Gte = node.UnescapedMin;
             }
 
             if (!String.IsNullOrWhiteSpace(node.UnescapedMax) && node.UnescapedMax != "*")
             {
                 if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
-                    range.LessThan = node.UnescapedMax;
+                    range.Lt = node.UnescapedMax;
                 else
-                    range.LessThanOrEqualTo = node.UnescapedMax;
+                    range.Lte = node.UnescapedMax;
             }
 
             return range;
         }
     }
 
-    public static QueryBase GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context)
+    public static Query GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context)
     {
         return new ExistsQuery { Field = node.UnescapedField };
     }
 
-    public static QueryBase GetDefaultQuery(this MissingNode node, IQueryVisitorContext context)
+    public static Query GetDefaultQuery(this MissingNode node, IQueryVisitorContext context)
     {
         return new BoolQuery
         {
-            MustNot = new QueryContainer[] {
+            MustNot = new Query[] {
                     new ExistsQuery {
                         Field =  node.UnescapedField
                     }

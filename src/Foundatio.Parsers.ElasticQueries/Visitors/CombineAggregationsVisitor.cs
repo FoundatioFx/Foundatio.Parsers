@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Aggregations;
+using Elastic.Clients.Elasticsearch.Core.Search;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
@@ -20,7 +22,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
         var container = await GetParentContainerAsync(node, context);
-        var termsAggregation = container as ITermsAggregation;
+        var termsAggregation = container as TermsAggregation;
 
         foreach (var child in node.Children.OfType<IFieldQueryNode>())
         {
@@ -49,11 +51,11 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                         if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
                             minCount = parsedMinCount;
 
-                        termsAggregation.MinimumDocumentCount = minCount;
+                        termsAggregation.MinDocCount = minCount;
                     }
                 }
 
-                if (termNode != null && container is ITopHitsAggregation topHitsAggregation)
+                if (termNode != null && container is TopHitsAggregation topHitsAggregation)
                 {
                     var filter = node.GetSourceFilter(() => new SourceFilter());
                     if (termNode.Field == "@exclude")
@@ -73,7 +75,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                     topHitsAggregation.Source = filter;
                 }
 
-                if (termNode != null && container is IDateHistogramAggregation dateHistogramAggregation)
+                if (termNode != null && container is DateHistogramAggregation dateHistogramAggregation)
                 {
                     if (termNode.Field == "@missing")
                     {
@@ -97,7 +99,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                 if (bucketContainer.Aggregations == null)
                     bucketContainer.Aggregations = new AggregationDictionary();
 
-                bucketContainer.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                bucketContainer.Aggregations[((Aggregation)aggregation).Name] = (Aggregation)aggregation;
             }
 
             if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+"))
@@ -107,7 +109,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
                 termsAggregation.Order.Add(new TermsOrder
                 {
-                    Key = ((IAggregation)aggregation).Name,
+                    Key = ((Aggregation)aggregation).Name,
                     Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
                 });
             }
@@ -117,9 +119,9 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             node.SetAggregation(container);
     }
 
-    private async Task<AggregationBase> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context)
+    private async Task<Aggregation> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        AggregationBase container = null;
+        Aggregation container = null;
         var currentNode = node;
         while (container == null && currentNode != null)
         {

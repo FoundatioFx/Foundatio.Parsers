@@ -2,13 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Aggregations;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 using Pegasus.Common;
 
 namespace Foundatio.Parsers.ElasticQueries;
@@ -162,7 +164,7 @@ public class ElasticQueryParser : LuceneQueryParser
         return context.GetValidationResult();
     }
 
-    public async Task<QueryContainer> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null)
+    public async Task<Query> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null)
     {
         if (context == null)
             context = new ElasticQueryVisitorContext();
@@ -175,7 +177,7 @@ public class ElasticQueryParser : LuceneQueryParser
         return await BuildQueryAsync(result, context).ConfigureAwait(false);
     }
 
-    public async Task<QueryContainer> BuildQueryAsync(IQueryNode query, IElasticQueryVisitorContext context = null)
+    public async Task<Query> BuildQueryAsync(IQueryNode query, IElasticQueryVisitorContext context = null)
     {
         if (context == null)
             context = new ElasticQueryVisitorContext();
@@ -185,7 +187,7 @@ public class ElasticQueryParser : LuceneQueryParser
         {
             q = new BoolQuery
             {
-                Filter = new QueryContainer[] { q }
+                Filter = new Query[] { q }
             };
         }
 
@@ -205,7 +207,7 @@ public class ElasticQueryParser : LuceneQueryParser
         return context.GetValidationResult();
     }
 
-    public async Task<AggregationContainer> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null)
+    public async Task<Aggregation> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null)
     {
         if (context == null)
             context = new ElasticQueryVisitorContext();
@@ -219,7 +221,7 @@ public class ElasticQueryParser : LuceneQueryParser
     }
 
 #pragma warning disable IDE0060 // Remove unused parameter
-    public async Task<AggregationContainer> BuildAggregationsAsync(IQueryNode aggregations, IElasticQueryVisitorContext context = null)
+    public async Task<Aggregation> BuildAggregationsAsync(IQueryNode aggregations, IElasticQueryVisitorContext context = null)
     {
         if (aggregations == null)
             return null;
@@ -241,7 +243,7 @@ public class ElasticQueryParser : LuceneQueryParser
         return context.GetValidationResult();
     }
 
-    public async Task<IEnumerable<IFieldSort>> BuildSortAsync(string sort, IElasticQueryVisitorContext context = null)
+    public async Task<IEnumerable<FieldSort>> BuildSortAsync(string sort, IElasticQueryVisitorContext context = null)
     {
         if (context == null)
             context = new ElasticQueryVisitorContext();
@@ -254,7 +256,7 @@ public class ElasticQueryParser : LuceneQueryParser
         return await BuildSortAsync(result, context).ConfigureAwait(false);
     }
 
-    public Task<IEnumerable<IFieldSort>> BuildSortAsync(IQueryNode sort, IElasticQueryVisitorContext context = null)
+    public Task<IEnumerable<FieldSort>> BuildSortAsync(IQueryNode sort, IElasticQueryVisitorContext context = null)
     {
         if (context == null)
             context = new ElasticQueryVisitorContext();

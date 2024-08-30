@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
@@ -285,35 +286,35 @@ public class ElasticQueryParserConfiguration
 
     #endregion
 
-    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class
+    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, string index) where T : class
     {
         MappingResolver = ElasticMappingResolver.Create<T>(mappingBuilder, client, index, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<ITypeMapping> getMapping) where T : class
+    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<TypeMapping> getMapping) where T : class
     {
         MappingResolver = ElasticMappingResolver.Create<T>(mappingBuilder, inferrer, getMapping, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client)
+    public ElasticQueryParserConfiguration UseMappings<T>(ElasticsearchClient client)
     {
         MappingResolver = ElasticMappingResolver.Create<T>(client, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index)
+    public ElasticQueryParserConfiguration UseMappings(ElasticsearchClient client, string index)
     {
         MappingResolver = ElasticMappingResolver.Create(client, index, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping, Inferrer inferrer = null)
+    public ElasticQueryParserConfiguration UseMappings(Func<TypeMapping> getMapping, Inferrer inferrer = null)
     {
         MappingResolver = ElasticMappingResolver.Create(getMapping, inferrer, logger: _logger);
 

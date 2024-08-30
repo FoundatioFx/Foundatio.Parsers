@@ -6,9 +6,11 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Elasticsearch.Net;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Aggregations;
+using Elastic.Transport;
+using Elastic.Transport.Products.Elasticsearch;
 using Microsoft.Extensions.Logging;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
@@ -37,7 +39,7 @@ public static class ElasticExtensions
     }
 
     // TODO: Handle IFailureReason/BulkIndexByScrollFailure and other bulk response types.
-    public static string GetErrorMessage(this IElasticsearchResponse elasticResponse, string message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
+    public static string GetErrorMessage(this ElasticsearchResponse elasticResponse, string message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
     {
         if (elasticResponse == null)
             return String.Empty;
@@ -47,31 +49,30 @@ public static class ElasticExtensions
         if (!String.IsNullOrEmpty(message))
             sb.AppendLine(message);
 
-        var response = elasticResponse as IResponse;
-        if (includeDebugInformation && response?.DebugInformation != null)
-            sb.AppendLine(response.DebugInformation);
+        if (includeDebugInformation && elasticResponse?.DebugInformation != null)
+            sb.AppendLine(elasticResponse.DebugInformation);
 
-        if (response?.OriginalException != null)
-            sb.AppendLine($"Original: [{response.OriginalException.GetType().Name}] {response.OriginalException.Message}");
+        if (elasticResponse.TryGetOriginalException(out var exception) && exception is not null)
+            sb.AppendLine($"Original: [{exception.GetType().Name}] {exception.Message}");
 
-        if (response?.ServerError?.Error != null)
-            sb.AppendLine($"Server Error (Index={response.ServerError.Error?.Index}): {response.ServerError.Error.Reason}");
+        if (elasticResponse.ElasticsearchServerError?.Error != null)
+            sb.AppendLine($"Server Error (Index={elasticResponse.ElasticsearchServerError.Error?.Index}): {elasticResponse.ElasticsearchServerError.Error.Reason}");
 
         if (elasticResponse is BulkResponse bulkResponse)
             sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
 
-        if (elasticResponse.ApiCall != null)
-            sb.AppendLine($"[{elasticResponse.ApiCall.HttpStatusCode}] {elasticResponse.ApiCall.HttpMethod} {elasticResponse.ApiCall.Uri?.PathAndQuery}");
+        var apiCall = elasticResponse.ApiCallDetails;
+        if (apiCall is not null)
+            sb.AppendLine($"[{apiCall.HttpStatusCode}] {apiCall.HttpMethod} {apiCall.Uri?.PathAndQuery}");
 
-        if (elasticResponse.ApiCall?.RequestBodyInBytes != null)
+        if (apiCall?.RequestBodyInBytes is not null)
         {
-            string body = Encoding.UTF8.GetString(elasticResponse.ApiCall?.RequestBodyInBytes);
+            string body = Encoding.UTF8.GetString(apiCall.RequestBodyInBytes);
             if (normalize)
                 body = JsonUtility.Normalize(body);
             sb.AppendLine(body);
         }
 
-        var apiCall = response.ApiCall;
         if (includeResponse && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
         {
             string body = Encoding.UTF8.GetString(apiCall?.ResponseBodyInBytes);
@@ -88,52 +89,52 @@ public static class ElasticExtensions
         return sb.ToString();
     }
 
-    public static string GetRequest(this IElasticsearchResponse elasticResponse, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
+    public static string GetRequest(this ElasticsearchResponse elasticResponse, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
     {
         return GetErrorMessage(elasticResponse, null, normalize, includeResponse, includeDebugInformation);
     }
 
-    public static async Task<bool> WaitForReadyAsync(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null)
+    public static async Task<bool> WaitForReadyAsync(this ElasticsearchClient client, CancellationToken cancellationToken, ILogger logger = null)
     {
-        var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
+        var nodes = client.ElasticsearchClientSettings.NodePool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var pingResponse = await client.PingAsync(ct: cancellationToken);
-            if (pingResponse.IsValid)
+            var pingResponse = await client.PingAsync(cancellationToken);
+            if (pingResponse.IsValidResponse)
                 return true;
 
-            if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
+            if (logger != null && logger.IsEnabled(LogLevel.Information))
                 logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
             await Task.Delay(1000, cancellationToken);
         }
 
-        if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+        if (logger != null && logger.IsEnabled(LogLevel.Error))
             logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
     }
 
-    public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null)
+    public static bool WaitForReady(this ElasticsearchClient client, CancellationToken cancellationToken, ILogger logger = null)
     {
-        var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
+        var nodes = client.ElasticsearchClientSettings.NodePool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;
 
         while (!cancellationToken.IsCancellationRequested)
         {
             var pingResponse = client.Ping();
-            if (pingResponse.IsValid)
+            if (pingResponse.IsValidResponse)
                 return true;
 
-            if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
+            if (logger != null && logger.IsEnabled(LogLevel.Information))
                 logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
             Thread.Sleep(1000);
         }
 
-        if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+        if (logger != null && logger.IsEnabled(LogLevel.Error))
             logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
@@ -213,7 +214,6 @@ internal class JsonUtility
 
             default:
                 throw new NotImplementedException($"Kind: {element.ValueKind}");
-
         }
     }
 }
