@@ -1,12 +1,13 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Aggregations;
 using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
@@ -15,7 +16,7 @@ public static class DefaultAggregationNodeExtensions
     // NOTE: We may want to read this dynamically from server settings.
     public const int MAX_BUCKET_SIZE = 10000;
 
-    public static Task<AggregationBase> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static Task<Aggregation> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
     {
         if (node is GroupNode groupNode)
             return groupNode.GetDefaultAggregationAsync(context);
@@ -26,7 +27,7 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    public static async Task<AggregationBase> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context)
+    public static async Task<Aggregation> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -47,29 +48,34 @@ public static class DefaultAggregationNodeExtensions
                 return GetHistogramAggregation("histogram_" + originalField, field, node.UnescapedProximity, node.UnescapedBoost, context);
 
             case AggregationType.GeoHashGrid:
-                var precision = GeoHashPrecision.Precision1;
-                if (!String.IsNullOrEmpty(node.UnescapedProximity))
-                    Enum.TryParse(node.UnescapedProximity, out precision);
+                var precision = new GeohashPrecision(1);
+                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Double.TryParse(node.UnescapedProximity, out double parsedPrecision))
+                {
+                    if (parsedPrecision is < 1 or > 12)
+                        throw new ArgumentOutOfRangeException(nameof(node.UnescapedProximity), "Precision must be between 1 and 12");
 
-                return new GeoHashGridAggregation("geogrid_" + originalField)
+                    precision = new GeohashPrecision(parsedPrecision);
+                }
+
+                return new Aggregation("geogrid_" + originalField, new GeohashGridAggregation
                 {
                     Field = field,
                     Precision = precision,
                     Aggregations = new AverageAggregation("avg_lat", null)
                     {
-                        Script = new InlineScript($"doc['{node.Field}'].lat")
+                        Script = new Script { Source = $"doc['{node.Field}'].lat" }
                     } && new AverageAggregation("avg_lon", null)
                     {
-                        Script = new InlineScript($"doc['{node.Field}'].lon")
+                        Script = new Script { Source = $"doc['{node.Field}'].lon" }
                     }
-                };
+                });
 
             case AggregationType.Terms:
                 var agg = new TermsAggregation("terms_" + originalField)
                 {
                     Field = field,
                     Size = node.GetProximityAsInt32(),
-                    MinimumDocumentCount = node.GetBoostAsInt32(),
+                    MinDocCount = node.GetBoostAsInt32(),
                     Meta = new Dictionary<string, object> { { "@field_type", property?.Type } }
                 };
 
@@ -85,7 +91,7 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    public static async Task<AggregationBase> GetDefaultAggregationAsync(this TermNode node, IQueryVisitorContext context)
+    public static async Task<Aggregation> GetDefaultAggregationAsync(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -134,20 +140,25 @@ public static class DefaultAggregationNodeExtensions
                 return GetPercentilesAggregation("percentiles_" + originalField, aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
             case AggregationType.GeoHashGrid:
-                var precision = GeoHashPrecision.Precision1;
-                if (!String.IsNullOrEmpty(node.UnescapedProximity))
-                    Enum.TryParse(node.UnescapedProximity, out precision);
+                var precision = new GeohashPrecision(1);
+                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Double.TryParse(node.UnescapedProximity, out double parsedPrecision))
+                {
+                    if (parsedPrecision is < 1 or > 12)
+                        throw new ArgumentOutOfRangeException(nameof(node.UnescapedProximity), "Precision must be between 1 and 12");
 
-                return new GeoHashGridAggregation("geogrid_" + originalField)
+                    precision = new GeohashPrecision(parsedPrecision);
+                }
+
+                return new GeohashGridAggregation("geogrid_" + originalField)
                 {
                     Field = aggField,
                     Precision = precision,
                     Aggregations = new AverageAggregation("avg_lat", null)
                     {
-                        Script = new InlineScript($"doc['{node.Field}'].lat")
+                        Script = new Script { Source = $"doc['{node.Field}'].lat" }
                     } && new AverageAggregation("avg_lon", null)
                     {
-                        Script = new InlineScript($"doc['{node.Field}'].lon")
+                        Script = new Script { Source = $"doc['{node.Field}'].lon" }
                     }
                 };
 
@@ -156,7 +167,7 @@ public static class DefaultAggregationNodeExtensions
                 {
                     Field = aggField,
                     Size = node.GetProximityAsInt32(),
-                    MinimumDocumentCount = node.GetBoostAsInt32(),
+                    MinDocCount = node.GetBoostAsInt32(),
                     Meta = new Dictionary<string, object> { { "@field_type", property?.Type } }
                 };
 
@@ -169,7 +180,7 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    private static AggregationBase GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static Aggregation GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
     {
         List<double> percents = null;
         if (!String.IsNullOrWhiteSpace(proximity))
@@ -189,7 +200,7 @@ public static class DefaultAggregationNodeExtensions
         };
     }
 
-    private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static Aggregation GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
     {
         double interval = 50;
         if (Double.TryParse(proximity, out double prox))
@@ -198,25 +209,25 @@ public static class DefaultAggregationNodeExtensions
         return new HistogramAggregation(originalField)
         {
             Field = field,
-            MinimumDocumentCount = 0,
+            MinDocCount = 0,
             Interval = interval
         };
     }
 
-    private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static Aggregation GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
     {
         // NOTE: StartDate and EndDate are set in the Repositories QueryBuilderContext.
         var start = context.GetDate("StartDate");
         var end = context.GetDate("EndDate");
         bool isValidRange = start.HasValue && start.Value > DateTime.MinValue && end.HasValue && end.Value < DateTime.MaxValue && start.Value <= end.Value;
-        var bounds = isValidRange ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
+        var bounds = isValidRange ? new ExtendedBoundsDate { Min = start.Value, Max = end.Value } : null;
 
         var interval = GetInterval(proximity, start, end);
         string timezone = TryConvertTimeUnitToUtcOffset(boost);
         var agg = new DateHistogramAggregation(originalField)
         {
             Field = field,
-            MinimumDocumentCount = 0,
+            MinDocCount = 0,
             Format = "date_optional_time",
             TimeZone = timezone,
             Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
@@ -247,55 +258,55 @@ public static class DefaultAggregationNodeExtensions
         return "+" + timezoneOffset.Value.ToString("hh\\:mm");
     }
 
-    private static Union<DateInterval, Time> GetInterval(string proximity, DateTime? start, DateTime? end)
+    private static Union<CalendarInterval, Duration> GetInterval(string proximity, DateTime? start, DateTime? end)
     {
         if (String.IsNullOrEmpty(proximity))
             return GetInterval(start, end);
 
         return proximity.Trim() switch
         {
-            "s" or "1s" or "second" => DateInterval.Second,
-            "m" or "1m" or "minute" => DateInterval.Minute,
-            "h" or "1h" or "hour" => DateInterval.Hour,
-            "d" or "1d" or "day" => DateInterval.Day,
-            "w" or "1w" or "week" => DateInterval.Week,
-            "M" or "1M" or "month" => DateInterval.Month,
-            "q" or "1q" or "quarter" => DateInterval.Quarter,
-            "y" or "1y" or "year" => DateInterval.Year,
-            _ => new Union<DateInterval, Time>(proximity),
+            "s" or "1s" or "second" => CalendarInterval.Second,
+            "m" or "1m" or "minute" => CalendarInterval.Minute,
+            "h" or "1h" or "hour" => CalendarInterval.Hour,
+            "d" or "1d" or "day" => CalendarInterval.Day,
+            "w" or "1w" or "week" => CalendarInterval.Week,
+            "M" or "1M" or "month" => CalendarInterval.Month,
+            "q" or "1q" or "quarter" => CalendarInterval.Quarter,
+            "y" or "1y" or "year" => CalendarInterval.Year,
+            _ => new Union<CalendarInterval, Duration>(proximity),
         };
     }
 
-    private static Union<DateInterval, Time> GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100)
+    private static Union<CalendarInterval, Duration> GetInterval(DateTime? utcStart, DateTime? utcEnd, int desiredDataPoints = 100)
     {
         if (!utcStart.HasValue || !utcEnd.HasValue || utcStart.Value == DateTime.MinValue)
-            return DateInterval.Day;
+            return CalendarInterval.Day;
 
         var totalTime = utcEnd.Value - utcStart.Value;
         var timePerBlock = TimeSpan.FromMinutes(totalTime.TotalMinutes / desiredDataPoints);
         if (timePerBlock.TotalDays > 1)
         {
             timePerBlock = timePerBlock.Round(TimeSpan.FromDays(1));
-            return (Time)timePerBlock;
+            return (Duration)timePerBlock;
         }
 
         if (timePerBlock.TotalHours > 1)
         {
             timePerBlock = timePerBlock.Round(TimeSpan.FromHours(1));
-            return (Time)timePerBlock;
+            return (Duration)timePerBlock;
         }
 
         if (timePerBlock.TotalMinutes > 1)
         {
             timePerBlock = timePerBlock.Round(TimeSpan.FromMinutes(1));
-            return (Time)timePerBlock;
+            return (Duration)timePerBlock;
         }
 
         timePerBlock = timePerBlock.Round(TimeSpan.FromSeconds(15));
         if (timePerBlock.TotalSeconds < 1)
             timePerBlock = TimeSpan.FromSeconds(15);
 
-        return (Time)timePerBlock;
+        return (Duration)timePerBlock;
     }
 
     public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node)

@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
-using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -138,7 +138,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
-            .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
+            .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(1)
                 .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Source("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Source("doc['field3'].lon")))))
             .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "text")))
             .Histogram("histogram_field4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
@@ -245,7 +245,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
-            .GeoHash("geogrid_alias3", h => h.Field("field3").GeoHashPrecision(GeoHashPrecision.Precision1)
+            .GeoHash("geogrid_alias3", h => h.Field("field3").GeoHashPrecision(1)
                 .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Source("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Source("doc['field3'].lon")))))
             .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "text")))
             .Histogram("histogram_alias4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))

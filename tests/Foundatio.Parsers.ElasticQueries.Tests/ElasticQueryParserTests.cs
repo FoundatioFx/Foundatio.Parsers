@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
@@ -9,7 +12,6 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
-using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -1475,7 +1477,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [Fact]
     public async Task CanExpandElasticIncludesAsync()
     {
-        var client = new ElasticClient(new ConnectionSettings().DisableDirectStreaming().PrettyJson());
+        var client = new ElasticsearchClient(new ElasticsearchClientSettings().DisableDirectStreaming().PrettyJson());
         var aliases = new FieldMap { { "field", "aliased" }, { "included", "aliasedincluded" } };
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(GetIncludeAsync).UseFieldMap(aliases));

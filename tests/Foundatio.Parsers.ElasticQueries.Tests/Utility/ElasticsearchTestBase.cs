@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.IndexManagement;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Xunit;
 using Microsoft.Extensions.Logging;
-using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -26,14 +28,14 @@ public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLife
         _fixture.Log = Log;
     }
 
-    protected IElasticClient Client => _fixture.Client;
+    protected ElasticsearchClient Client => _fixture.Client;
 
-    protected void CreateNamedIndex<TModel>(string index, Func<TypeMappingDescriptor<TModel>, ITypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where TModel : class
+    protected void CreateNamedIndex<TModel>(string index, Func<TypeMappingDescriptor<TModel>, TypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where TModel : class
     {
         _fixture.CreateNamedIndex(index, configureMappings, configureIndex);
     }
 
-    protected string CreateRandomIndex<TModel>(Func<TypeMappingDescriptor<TModel>, ITypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where TModel : class
+    protected string CreateRandomIndex<TModel>(Func<TypeMappingDescriptor<TModel>, TypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where TModel : class
     {
         return _fixture.CreateRandomIndex(configureMappings, configureIndex);
     }
@@ -65,23 +67,23 @@ public class ElasticsearchFixture : IAsyncLifetime
     private readonly List<IndexName> _createdIndexes = new();
     private static bool _elaticsearchReady;
     protected readonly ILogger _logger;
-    private readonly Lazy<IElasticClient> _client;
+    private readonly Lazy<ElasticsearchClient> _client;
 
     public ElasticsearchFixture()
     {
-        _client = new Lazy<IElasticClient>(() => GetClient(ConfigureConnectionSettings));
+        _client = new Lazy<ElasticsearchClient>(() => GetClient(ConfigureConnectionSettings));
     }
 
     public TestLogger Log { get; set; }
-    public IElasticClient Client => _client.Value;
+    public ElasticsearchClient Client => _client.Value;
 
-    protected IElasticClient GetClient(Action<ConnectionSettings> configure = null)
+    protected ElasticsearchClient GetClient(Action<ElasticsearchClientSettings> configure = null)
     {
         string elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
-        var settings = new ConnectionSettings(new Uri(elasticsearchUrl));
+        var settings = new ElasticsearchClientSettings(new Uri(elasticsearchUrl));
         configure?.Invoke(settings);
 
-        var client = new ElasticClient(settings.DisableDirectStreaming().PrettyJson());
+        var client = new ElasticsearchClient(settings.DisableDirectStreaming().PrettyJson());
 
         if (!_elaticsearchReady)
         {
@@ -94,9 +96,9 @@ public class ElasticsearchFixture : IAsyncLifetime
         return client;
     }
 
-    protected virtual void ConfigureConnectionSettings(ConnectionSettings settings) { }
+    protected virtual void ConfigureConnectionSettings(ElasticsearchClientSettings settings) { }
 
-    public void CreateNamedIndex<T>(string index, Func<TypeMappingDescriptor<T>, ITypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where T : class
+    public void CreateNamedIndex<T>(string index, Func<TypeMappingDescriptor<T>, TypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where T : class
     {
         if (configureMappings == null)
             configureMappings = m => m.AutoMap<T>().Dynamic();
@@ -104,10 +106,10 @@ public class ElasticsearchFixture : IAsyncLifetime
             configureIndex = i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
 
         CreateIndex(index, i => i.Settings(configureIndex).Map<T>(configureMappings));
-        Client.ConnectionSettings.DefaultIndices[typeof(T)] = index;
+        Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
     }
 
-    public string CreateRandomIndex<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where T : class
+    public string CreateRandomIndex<T>(Func<TypeMappingDescriptor<T>, TypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where T : class
     {
         string index = "test_" + Guid.NewGuid().ToString("N");
         if (configureMappings == null)
@@ -116,7 +118,7 @@ public class ElasticsearchFixture : IAsyncLifetime
             configureIndex = i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
 
         CreateIndex(index, i => i.Settings(configureIndex).Map<T>(configureMappings));
-        Client.ConnectionSettings.DefaultIndices[typeof(T)] = index;
+        Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
 
         return index;
     }
@@ -135,7 +137,7 @@ public class ElasticsearchFixture : IAsyncLifetime
         return result;
     }
 
-    protected virtual void CleanupTestIndexes(IElasticClient client)
+    protected virtual void CleanupTestIndexes(ElasticsearchClient client)
     {
         if (_createdIndexes.Count > 0)
             client.Indices.Delete(Indices.Index(_createdIndexes));

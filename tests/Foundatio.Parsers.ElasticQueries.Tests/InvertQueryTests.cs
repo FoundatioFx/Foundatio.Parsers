@@ -6,7 +6,6 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
-using Nest;
 using Xunit;
 using Xunit.Abstractions;
 

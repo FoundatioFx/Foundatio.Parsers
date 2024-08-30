@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
-public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<IFieldSort>>
+public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<SortOptions>>
 {
-    private readonly List<IFieldSort> _fields = new();
+    private readonly List<SortOptions> _fields = new();
 
     public override void Visit(TermNode node, IQueryVisitorContext context)
     {
@@ -18,24 +18,24 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<I
             return;
 
         var sort = node.GetSort(() => node.GetDefaultSort(context));
-        if (sort.SortKey == null)
+        if (sort.AdditionalPropertyName == null)
             return;
 
         _fields.Add(sort);
     }
 
-    public override async Task<IEnumerable<IFieldSort>> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<IEnumerable<SortOptions>> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
         await node.AcceptAsync(this, context).ConfigureAwait(false);
         return _fields;
     }
 
-    public static Task<IEnumerable<IFieldSort>> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    public static Task<IEnumerable<SortOptions>> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
     {
         return new GetSortFieldsVisitor().AcceptAsync(node, context);
     }
 
-    public static IEnumerable<IFieldSort> Run(IQueryNode node, IQueryVisitorContext context = null)
+    public static IEnumerable<SortOptions> Run(IQueryNode node, IQueryVisitorContext context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }
