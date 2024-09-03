@@ -1495,20 +1495,21 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         return "included:value";
     }
 
-    [Fact]
-    public async Task CanValidateAggregation()
+    [Theory]
+    [InlineData("terms:field1")]
+    [InlineData("terms:(field1~100 @missing:__missing__)")]
+    [InlineData("terms:(field1~100 (@missing:__missing__))")]
+    public async Task CanValidateAggregation(string aggregation)
     {
-        var index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
-        await Client.IndexAsync(new MyType { Field1 = "value123" }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
-
+        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
-        var parser = new ElasticQueryParser(c => c.UseMappings(Client, index).SetValidationOptions(new QueryValidationOptions { AllowUnresolvedFields = false,  }).SetLoggerFactory(Log));
-        var node = await parser.ParseAsync("terms:(id~100 @missing:__missing__)", context);
+        var parser = new ElasticQueryParser(c => c.UseMappings(Client, index).SetLoggerFactory(Log));
+        var node = await parser.ParseAsync(aggregation, context);
 
         var result = await ValidationVisitor.RunAsync(node, context);
         Assert.True(result.IsValid, result.Message);
         Assert.Single(result.ReferencedFields, "field1");
+        Assert.Empty(result.UnresolvedFields);
     }
 }
 

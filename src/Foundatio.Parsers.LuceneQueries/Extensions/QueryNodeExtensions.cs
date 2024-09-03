@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -189,9 +189,14 @@ public static class QueryNodeExtensions
     }
 
     private const string OperationTypeKey = "@OperationType";
+    public static bool HasOperationType(this IQueryNode node)
+    {
+        return node.Data.ContainsKey(OperationTypeKey);
+    }
+
     public static string GetOperationType(this IQueryNode node)
     {
-        if (!node.Data.TryGetValue(OperationTypeKey, out var value))
+        if (!node.Data.TryGetValue(OperationTypeKey, out object value))
             return null;
 
         return (string)value;

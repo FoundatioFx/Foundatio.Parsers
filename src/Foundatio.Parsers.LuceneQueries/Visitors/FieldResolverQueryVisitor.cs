@@ -60,6 +60,9 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
 
             if (resolvedField == null)
             {
+                if (context.QueryType is QueryTypes.Aggregation && node.Field.StartsWith("@"))
+                    return;
+
                 // add field to unresolved fields list
                 context.GetValidationResult().UnresolvedFields.Add(node.Field);
                 return;

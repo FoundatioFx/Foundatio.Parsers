@@ -9,11 +9,19 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor
 {
     public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
+        if (node.HasOperationType())
+            return Task.CompletedTask;
+
         if (String.IsNullOrEmpty(node.Field))
             return base.VisitAsync(node, context);
 
         if (node.Left is not TermNode leftTerm)
         {
+            // For sub aggregations we need to see if there is a parent with parens
+            var closestParentWithParens = node.GetGroupNode();
+            if (closestParentWithParens is { HasParens: true })
+                return base.VisitAsync(node, context);
+
             context.AddValidationError($"Aggregations ({node.Field}) must specify a field.");
             return Task.CompletedTask;
         }
@@ -35,6 +43,17 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor
 
     public override void Visit(TermNode node, IQueryVisitorContext context)
     {
+        if (node.HasOperationType())
+            return;
+
+        if (String.IsNullOrEmpty(node.Field))
+            return;
+
+        // For sub aggregations we need to see if there is a parent with parens
+        var closestParentWithParens = node.GetGroupNode();
+        if (closestParentWithParens is { HasParens: true })
+            return;
+
         if (String.IsNullOrEmpty(node.Field) && !String.IsNullOrEmpty(node.Term))
         {
             context.AddValidationError($"Aggregations ({node.Term}) must specify a field.");
@@ -51,7 +70,7 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor
         node.SetOperationType(node.Field);
         node.Field = node.Term;
         node.Term = null;
-    }
+     }
 }
 
 public static class AggregationType
