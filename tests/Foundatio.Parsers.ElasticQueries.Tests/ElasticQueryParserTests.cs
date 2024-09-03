@@ -1494,6 +1494,22 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         await Task.Delay(150);
         return "included:value";
     }
+
+    [Fact]
+    public async Task CanValidateAggregation()
+    {
+        var index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
+        await Client.IndexAsync(new MyType { Field1 = "value123" }, i => i.Index(index));
+        await Client.Indices.RefreshAsync(index);
+
+        var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
+        var parser = new ElasticQueryParser(c => c.UseMappings(Client, index).SetValidationOptions(new QueryValidationOptions { AllowUnresolvedFields = false,  }).SetLoggerFactory(Log));
+        var node = await parser.ParseAsync("terms:(id~100 @missing:__missing__)", context);
+
+        var result = await ValidationVisitor.RunAsync(node, context);
+        Assert.True(result.IsValid, result.Message);
+        Assert.Single(result.ReferencedFields, "field1");
+    }
 }
 
 public class MyType
