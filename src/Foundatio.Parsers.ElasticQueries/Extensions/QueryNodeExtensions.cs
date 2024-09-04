@@ -62,8 +62,7 @@ public static class QueryNodeExtensions
 
     public static void RemoveAggregation(this IQueryNode node)
     {
-        if (node.Data.ContainsKey(AggregationKey))
-            node.Data.Remove(AggregationKey);
+        node.Data.Remove(AggregationKey);
     }
 
     private const string SortKey = "@Sort";
@@ -82,7 +81,6 @@ public static class QueryNodeExtensions
 
     public static void RemoveSort(this IQueryNode node)
     {
-        if (node.Data.ContainsKey(SortKey))
-            node.Data.Remove(SortKey);
+        node.Data.Remove(SortKey);
     }
 }

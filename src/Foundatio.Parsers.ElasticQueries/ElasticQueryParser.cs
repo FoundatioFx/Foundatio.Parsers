@@ -27,9 +27,7 @@ public class ElasticQueryParser : LuceneQueryParser
     public override async Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null)
     {
         query ??= String.Empty;
-
-        if (context == null)
-            context = new ElasticQueryVisitorContext();
+        context ??= new ElasticQueryVisitorContext();
 
         SetupQueryVisitorContextDefaults(context);
         try
@@ -151,9 +149,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
     public async Task<QueryValidationResult> ValidateQueryAsync(string query, QueryValidationOptions options = null, IElasticQueryVisitorContext context = null)
     {
-        if (context == null)
-            context = new ElasticQueryVisitorContext();
-
+        context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Query;
         context.SetValidationOptions(options);
 
@@ -164,9 +160,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
     public async Task<QueryContainer> BuildQueryAsync(string query, IElasticQueryVisitorContext context = null)
     {
-        if (context == null)
-            context = new ElasticQueryVisitorContext();
-
+        context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Query;
 
         var result = await ParseAsync(query, context).ConfigureAwait(false);
@@ -177,9 +171,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
     public async Task<QueryContainer> BuildQueryAsync(IQueryNode query, IElasticQueryVisitorContext context = null)
     {
-        if (context == null)
-            context = new ElasticQueryVisitorContext();
-
+        context ??= new ElasticQueryVisitorContext();
         var q = await query.GetQueryAsync() ?? new MatchAllQuery();
         if (context?.UseScoring == false)
         {
@@ -194,9 +186,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
     public async Task<QueryValidationResult> ValidateAggregationsAsync(string query, QueryValidationOptions options = null, IElasticQueryVisitorContext context = null)
     {
-        if (context == null)
-            context = new ElasticQueryVisitorContext();
-
+        context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Aggregation;
         context.SetValidationOptions(options);
 
@@ -207,9 +197,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
     public async Task<AggregationContainer> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null)
     {
-        if (context == null)
-            context = new ElasticQueryVisitorContext();
-
+        context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Aggregation;
 
         var result = await ParseAsync(aggregations, context).ConfigureAwait(false);
@@ -230,9 +218,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
     public async Task<QueryValidationResult> ValidateSortAsync(string query, QueryValidationOptions options = null, IElasticQueryVisitorContext context = null)
     {
-        if (context == null)
-            context = new ElasticQueryVisitorContext();
-
+        context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Sort;
         context.SetValidationOptions(options);
 
@@ -243,9 +229,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
     public async Task<IEnumerable<IFieldSort>> BuildSortAsync(string sort, IElasticQueryVisitorContext context = null)
     {
-        if (context == null)
-            context = new ElasticQueryVisitorContext();
-
+        context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Sort;
 
         var result = await ParseAsync(sort, context).ConfigureAwait(false);
@@ -256,9 +240,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
     public Task<IEnumerable<IFieldSort>> BuildSortAsync(IQueryNode sort, IElasticQueryVisitorContext context = null)
     {
-        if (context == null)
-            context = new ElasticQueryVisitorContext();
-
+        context ??= new ElasticQueryVisitorContext();
         return GetSortFieldsVisitor.RunAsync(sort, context);
     }
 
