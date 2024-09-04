@@ -57,7 +57,7 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor
         node.SetOperationType(node.Field);
         node.Field = node.Term;
         node.Term = null;
-     }
+    }
 }
 
 public static class AggregationType

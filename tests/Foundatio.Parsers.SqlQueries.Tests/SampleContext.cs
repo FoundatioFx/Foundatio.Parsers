@@ -4,7 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Foundatio.Parsers.SqlQueries.Tests;
 
-public class SampleContext : DbContext {
+public class SampleContext : DbContext
+{
     public SampleContext(DbContextOptions<SampleContext> options) : base(options) { }
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<Company> Companies => Set<Company>();
@@ -31,12 +32,13 @@ public class SampleContext : DbContext {
         modelBuilder.Entity<DataValue>().Property(e => e.DateValue).IsSparse();
         modelBuilder.Entity<DataValue>().Property(e => e.MoneyValue).IsSparse().HasColumnType("money").HasPrecision(2);
         modelBuilder.Entity<DataValue>().Property(e => e.BooleanValue).IsSparse();
-        modelBuilder.Entity<DataValue>().Property(e => e.NumberValue).HasColumnType("decimal").HasPrecision(15,3).IsSparse();
+        modelBuilder.Entity<DataValue>().Property(e => e.NumberValue).HasColumnType("decimal").HasPrecision(15, 3).IsSparse();
         modelBuilder.Entity<DataValue>().HasIndex(e => new { e.StringValue, e.DateValue, e.MoneyValue, e.BooleanValue, e.NumberValue });
     }
 }
 
-public class Employee {
+public class Employee
+{
     public int Id { get; set; }
     public string FullName { get; set; }
     public string Title { get; set; }
@@ -46,7 +48,8 @@ public class Employee {
     public DateTime Created { get; set; } = DateTime.Now;
 }
 
-public class Company {
+public class Company
+{
     public int Id { get; set; }
     public string Name { get; set; }
     public string Description { get; set; }

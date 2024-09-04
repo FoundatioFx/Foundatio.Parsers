@@ -15,8 +15,10 @@ using Pegasus.Common;
 
 namespace Foundatio.Parsers.SqlQueries;
 
-public class SqlQueryParser : LuceneQueryParser {
-    public SqlQueryParser(Action<SqlQueryParserConfiguration> configure = null) {
+public class SqlQueryParser : LuceneQueryParser
+{
+    public SqlQueryParser(Action<SqlQueryParserConfiguration> configure = null)
+    {
         var config = new SqlQueryParserConfiguration();
         configure?.Invoke(config);
         Configuration = config;
@@ -24,14 +26,17 @@ public class SqlQueryParser : LuceneQueryParser {
 
     public SqlQueryParserConfiguration Configuration { get; }
 
-    public override async Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null) {
+    public override async Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null)
+    {
         query ??= String.Empty;
         context ??= new SqlQueryVisitorContext();
 
         SetupQueryVisitorContextDefaults(context);
-        try {
+        try
+        {
             var result = await base.ParseAsync(query, context).ConfigureAwait(false);
-            switch (context.QueryType) {
+            switch (context.QueryType)
+            {
                 case QueryTypes.Aggregation:
                     result = await Configuration.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
                     break;
@@ -44,7 +49,9 @@ public class SqlQueryParser : LuceneQueryParser {
             }
 
             return result;
-        } catch (FormatException ex) {
+        }
+        catch (FormatException ex)
+        {
             var cursor = ex.Data["cursor"] as Cursor;
             context.GetValidationResult().QueryType = context.QueryType;
             context.AddValidationError(ex.Message, cursor.Column);

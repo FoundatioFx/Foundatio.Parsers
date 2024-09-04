@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Foundatio.Parsers.SqlQueries.Visitors;
 
-public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorContext {
+public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorContext
+{
     public List<EntityFieldInfo> Fields { get; set; }
     public IEntityType EntityType { get; set; }
 }

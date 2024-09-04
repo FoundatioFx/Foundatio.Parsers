@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Linq.Dynamic.Core;
@@ -18,8 +17,10 @@ using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.SqlQueries.Tests;
 
-public class SqlQueryParserTests : TestWithLoggingBase {
-    public SqlQueryParserTests(ITestOutputHelper output) : base(output) {
+public class SqlQueryParserTests : TestWithLoggingBase
+{
+    public SqlQueryParserTests(ITestOutputHelper output) : base(output)
+    {
         Log.DefaultMinimumLevel = LogLevel.Trace;
     }
 
@@ -218,7 +219,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
         var context = parser.GetContext(db.Employees.EntityType);
-        context.Fields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = {{ "DataDefinitionId", 1 }}});
+        context.Fields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
         context.ValidationOptions.AllowedFields.Add("age");
 
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name == "acme") && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
@@ -270,9 +271,10 @@ public class SqlQueryParserTests : TestWithLoggingBase {
         await db.Database.EnsureDeletedAsync();
         await db.Database.EnsureCreatedAsync();
 
-        var company = new Company {
+        var company = new Company
+        {
             Name = "Acme",
-            DataDefinitions = [ new() { Key = "age", DataType = DataType.Number } ]
+            DataDefinitions = [new() { Key = "age", DataType = DataType.Number }]
         };
         db.Companies.Add(company);
         db.Employees.Add(new Employee
@@ -280,7 +282,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
             FullName = "John Doe",
             Title = "Software Developer",
             Salary = 80_000,
-            DataValues = [ new() { Definition = company.DataDefinitions[0], NumberValue = 30 } ],
+            DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 30 }],
             Companies = [company]
         });
         db.Employees.Add(new Employee
@@ -288,7 +290,7 @@ public class SqlQueryParserTests : TestWithLoggingBase {
             FullName = "Jane Doe",
             Title = "Software Developer",
             Salary = 90_000,
-            DataValues = [ new() { Definition = company.DataDefinitions[0], NumberValue = 23 } ],
+            DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 23 }],
             Companies = [company]
         });
         await db.SaveChangesAsync();
@@ -321,7 +323,9 @@ public class SqlQueryParserTests : TestWithLoggingBase {
 
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation(nodes);
-        var context = new SqlQueryVisitorContext { Fields =
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
             [
                 new EntityFieldInfo { Field = "field", IsNumber = true }
             ]

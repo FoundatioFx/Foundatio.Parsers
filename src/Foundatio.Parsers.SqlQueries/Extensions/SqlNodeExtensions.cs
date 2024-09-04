@@ -220,7 +220,8 @@ public static class SqlNodeExtensions
 
                 builder.Append(".");
 
-                var method = term[^1..] switch {
+                var method = term[^1..] switch
+                {
                     "y" => "AddYears",
                     "M" => "AddMonths",
                     "d" => "AddDays",
