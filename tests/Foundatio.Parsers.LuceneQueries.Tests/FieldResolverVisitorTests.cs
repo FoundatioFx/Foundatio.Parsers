@@ -33,7 +33,7 @@ public class FieldResolverVisitorTests
             };
 
         var resolver = map.ToHierarchicalFieldResolver();
-        var resolvedField = await resolver(field, null);
+        string resolvedField = await resolver(field, null);
         Assert.Equal(expected, resolvedField);
     }
 
@@ -186,7 +186,7 @@ public class FieldResolverVisitorTests
         var result = await parser.ParseAsync("field1.nested:value");
 
         var context = new QueryVisitorContext();
-        var aliased = await FieldResolverQueryVisitor.RunAsync(result, f => throw new ApplicationException("Bam"), context);
+        var aliased = await FieldResolverQueryVisitor.RunAsync(result, _ => throw new ApplicationException("Bam"), context);
         var validationResult = context.GetValidationResult();
 
         Assert.False(validationResult.IsValid);

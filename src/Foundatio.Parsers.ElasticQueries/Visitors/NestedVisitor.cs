@@ -15,7 +15,7 @@ public class NestedVisitor : ChainableQueryVisitor
         if (String.IsNullOrEmpty(node.Field))
             return base.VisitAsync(node, context);
 
-        var nestedProperty = GetNestedProperty(node.Field, context);
+        string nestedProperty = GetNestedProperty(node.Field, context);
         if (nestedProperty == null)
             return base.VisitAsync(node, context);
 

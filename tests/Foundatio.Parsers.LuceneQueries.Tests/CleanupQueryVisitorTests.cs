@@ -57,9 +57,9 @@ public class CleanupQueryVisitorTests : TestWithLoggingBase
             return;
         }
 
-        string CleanedQuery = CleanupQueryVisitor.Run(result);
+        string cleanedQuery = await CleanupQueryVisitor.RunAsync(result);
         string nodes = await DebugQueryVisitor.RunAsync(result);
-        _logger.LogInformation(nodes);
-        Assert.Equal(expected, CleanedQuery);
+        _logger.LogInformation("{Result}", nodes);
+        Assert.Equal(expected, cleanedQuery);
     }
 }

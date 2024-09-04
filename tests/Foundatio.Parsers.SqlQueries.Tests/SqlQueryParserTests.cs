@@ -322,7 +322,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         }
 
         string nodes = await DebugQueryVisitor.RunAsync(result);
-        _logger.LogInformation(nodes);
+        _logger.LogInformation("{Nodes}", nodes);
         var context = new SqlQueryVisitorContext
         {
             Fields =

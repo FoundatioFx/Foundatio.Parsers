@@ -14,7 +14,7 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
         if (fieldsToRemove == null)
             throw new ArgumentNullException(nameof(fieldsToRemove));
 
-        var fieldsToRemoveList = fieldsToRemove.ToArray();
+        string[] fieldsToRemoveList = fieldsToRemove.ToArray();
         ShouldRemoveField = f => fieldsToRemoveList.Contains(f, StringComparer.OrdinalIgnoreCase);
     }
 

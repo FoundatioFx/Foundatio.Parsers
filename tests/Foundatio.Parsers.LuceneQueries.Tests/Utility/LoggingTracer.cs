@@ -60,7 +60,7 @@ public class LoggingTracer : ITracer
 
         ruleStats.Invocations++;
         var key = new CacheKey(ruleName, cursor.StateKey, cursor.Location);
-        ruleStats.Locations.TryGetValue(key, out var count);
+        ruleStats.Locations.TryGetValue(key, out int count);
         ruleStats.Locations[key] = count + 1;
 
         _logger.LogInformation($"{GetIndent()}Start '{ruleName}' at ({cursor.Line},{cursor.Column}) with state key {cursor.StateKey}");
@@ -69,10 +69,10 @@ public class LoggingTracer : ITracer
 
     public void TraceRuleExit<T>(string ruleName, Cursor cursor, IParseResult<T> parseResult)
     {
-        var success = parseResult != null;
+        bool success = parseResult != null;
         var entry = _ruleStack.Pop();
         entry.Stopwatch.Stop();
-        var ticks = entry.Stopwatch.ElapsedTicks;
+        long ticks = entry.Stopwatch.ElapsedTicks;
         _indentLevel--;
 
         if (entry.CacheHit ?? false)
@@ -85,28 +85,28 @@ public class LoggingTracer : ITracer
             _stats[ruleName].TotalTicks += ticks;
         }
 
-        _logger.LogInformation($"{GetIndent()}End '{ruleName}' with {(success ? "success" : "failure")} at ({cursor.Line},{cursor.Column}) with state key {cursor.StateKey}");
+        _logger.LogInformation("{Indent}End \'{RuleName}\' with {Success} at ({CursorLine},{CursorColumn}) with state key {CursorStateKey}", GetIndent(), ruleName, (success ? "success" : "failure"), cursor.Line, cursor.Column, cursor.StateKey);
 
         if (!_reportPerformance)
             return;
 
         if (_ruleStack.Count == 0)
         {
-            var cacheHitTicks = _cacheHitStats.Invocations == 0
+            double cacheHitTicks = _cacheHitStats.Invocations == 0
                 ? 1.35
                 : (double)_cacheHitStats.TotalTicks / _cacheHitStats.Invocations;
 
             ReportPerformance(TimeSpan.FromTicks((long)Math.Round(cacheHitTicks)), _stats.Select(stat =>
             {
                 var stats = stat.Value;
-                var isCached = stats.CacheMisses > 0;
-                var cacheHits = isCached ? stats.CacheHits : stats.Locations.Values.Where(v => v > 1).Select(v => v - 1).Sum();
-                var cacheMisses = isCached ? stats.CacheMisses : stats.Locations.Count;
-                var averageTicks = (double)stats.TotalTicks / (isCached ? stats.CacheMisses : stats.Invocations);
+                bool isCached = stats.CacheMisses > 0;
+                int cacheHits = isCached ? stats.CacheHits : stats.Locations.Values.Where(v => v > 1).Select(v => v - 1).Sum();
+                int cacheMisses = isCached ? stats.CacheMisses : stats.Locations.Count;
+                double averageTicks = (double)stats.TotalTicks / (isCached ? stats.CacheMisses : stats.Invocations);
 
-                var estimatedTimeWithoutCache = (cacheHits + cacheMisses) * averageTicks;
-                var estimatedTimeWithCache = (cacheMisses * averageTicks) + ((cacheHits + cacheMisses) * cacheHitTicks);
-                var estimatedTimeSaved = estimatedTimeWithoutCache - estimatedTimeWithCache;
+                double estimatedTimeWithoutCache = (cacheHits + cacheMisses) * averageTicks;
+                double estimatedTimeWithCache = (cacheMisses * averageTicks) + ((cacheHits + cacheMisses) * cacheHitTicks);
+                double estimatedTimeSaved = estimatedTimeWithoutCache - estimatedTimeWithCache;
 
                 return new RulePerformanceInfo
                 {
@@ -124,37 +124,37 @@ public class LoggingTracer : ITracer
 
     protected virtual void ReportPerformance(TimeSpan averageCacheHitDuration, RulePerformanceInfo[] stats)
     {
-        _logger.LogInformation($"Average Cache Hit Duration: {averageCacheHitDuration}");
+        _logger.LogInformation("Average Cache Hit Duration: {AverageCacheHitDuration}", averageCacheHitDuration);
         foreach (var stat in stats)
         {
-            _logger.LogInformation($"Rule: {stat.Name}");
+            _logger.LogInformation("Rule: {StatName}", stat.Name);
 
-            _logger.LogInformation($"  Invocations: {stat.Invocations}");
-            _logger.LogInformation($"  Average Duration: {stat.AverageTime}");
-            _logger.LogInformation($"  Is Cached: {stat.IsCached}");
+            _logger.LogInformation("  Invocations: {StatInvocations}", stat.Invocations);
+            _logger.LogInformation("  Average Duration: {StatAverageTime}", stat.AverageTime);
+            _logger.LogInformation("  Is Cached: {StatIsCached}", stat.IsCached);
 
             if (stat.IsCached)
             {
-                _logger.LogInformation($"    Cache Hits: {stat.CacheHits}");
-                _logger.LogInformation($"    Cache Misses: {stat.CacheMisses}");
+                _logger.LogInformation("    Cache Hits: {StatCacheHits}", stat.CacheHits);
+                _logger.LogInformation("    Cache Misses: {StatCacheMisses}", stat.CacheMisses);
             }
             else
             {
-                _logger.LogInformation($"    Redundant Invocations: {stat.CacheHits}");
+                _logger.LogInformation("    Redundant Invocations: {StatCacheHits}", stat.CacheHits);
             }
 
             if (stat.IsCached || stat.CacheHits > 0)
             {
-                _logger.LogInformation($"  Estimated Time Saved: {stat.EstimatedTotalTimeSaved}");
+                _logger.LogInformation("  Estimated Time Saved: {StatEstimatedTotalTimeSaved}", stat.EstimatedTotalTimeSaved);
             }
 
             if (!stat.IsCached && stat.EstimatedTotalTimeSaved > TimeSpan.Zero)
             {
-                _logger.LogInformation($"  Recommendation: Add the -memoize flag to `{stat.Name}`. (Saves {stat.EstimatedTotalTimeSaved})");
+                _logger.LogInformation("  Recommendation: Add the -memoize flag to `{StatName}`. (Saves {StatEstimatedTotalTimeSaved})", stat.Name, stat.EstimatedTotalTimeSaved);
             }
             else if (stat.IsCached && stat.EstimatedTotalTimeSaved < -TimeSpan.FromMilliseconds(10))
             {
-                _logger.LogInformation($"  Recommendation: Remove -memoize flag from `{stat.Name}`. (Saves {stat.EstimatedTotalTimeSaved.Negate()})");
+                _logger.LogInformation("  Recommendation: Remove -memoize flag from `{StatName}`. (Saves {Negate})", stat.Name, stat.EstimatedTotalTimeSaved.Negate());
             }
         }
     }

@@ -175,7 +175,7 @@ public static class QueryVisitorContextExtensions
 
     public static T GetValue<T>(this IQueryVisitorContext context, string key)
     {
-        if (context.Data.TryGetValue(key, out var value) && value is T typedValue)
+        if (context.Data.TryGetValue(key, out object value) && value is T typedValue)
             return typedValue;
 
         return default;
@@ -183,7 +183,7 @@ public static class QueryVisitorContextExtensions
 
     public static ICollection<T> GetCollection<T>(this IQueryVisitorContext context, string key)
     {
-        if (context.Data.TryGetValue(key, out var value))
+        if (context.Data.TryGetValue(key, out object value))
         {
             if (value is ICollection<T> typedValue)
                 return typedValue;
@@ -199,7 +199,7 @@ public static class QueryVisitorContextExtensions
 
     public static DateTime? GetDate(this IQueryVisitorContext context, string key)
     {
-        if (context.Data.TryGetValue(key, out var value) && value is DateTime date)
+        if (context.Data.TryGetValue(key, out object value) && value is DateTime date)
             return date;
 
         return null;
@@ -207,7 +207,7 @@ public static class QueryVisitorContextExtensions
 
     public static string GetString(this IQueryVisitorContext context, string key)
     {
-        if (context.Data.TryGetValue(key, out var value) && value is string str)
+        if (context.Data.TryGetValue(key, out object value) && value is string str)
             return str;
 
         return null;
@@ -215,7 +215,7 @@ public static class QueryVisitorContextExtensions
 
     public static bool GetBoolean(this IQueryVisitorContext context, string key, bool defaultValue = false)
     {
-        if (context.Data.TryGetValue(key, out var value) && value is bool b)
+        if (context.Data.TryGetValue(key, out object value) && value is bool b)
             return b;
 
         return defaultValue;

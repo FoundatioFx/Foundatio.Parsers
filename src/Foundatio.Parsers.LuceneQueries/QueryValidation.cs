@@ -64,8 +64,8 @@ public class QueryValidationResult
     internal void AddOperation(string operation, string field)
     {
         _operations.AddOrUpdate(operation,
-            op => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { field },
-            (op, collection) =>
+            _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { field },
+            (_, collection) =>
             {
                 collection.Add(field);
                 return collection;

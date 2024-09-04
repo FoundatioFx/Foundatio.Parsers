@@ -30,19 +30,29 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public void CanResolveCodedProperty()
     {
-        var index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
+        string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
 
-        Client.IndexMany(new[] {
-                new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = new MyType[] {
-                    new MyType { Field1 = "banana", Data = {
+        Client.IndexMany([
+            new MyNestedType
+            {
+                Field1 = "value1",
+                Field2 = "value2",
+                Nested =
+            [
+                new MyType
+                {
+                    Field1 = "banana",
+                    Data = {
                         { "number-0001", 23 },
                         { "text-0001", "Hey" },
                         { "spaced field", "hey" }
-                    }}
-                }},
-                new MyNestedType { Field1 = "value2", Field2 = "value2" },
-                new MyNestedType { Field1 = "value1", Field2 = "value4" }
-            }, index);
+                    }
+                }
+            ]
+            },
+            new MyNestedType { Field1 = "value2", Field2 = "value2" },
+            new MyNestedType { Field1 = "value1", Field2 = "value4" }
+        ], index);
         Client.Indices.Refresh(index);
 
         var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
@@ -55,57 +65,67 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public void CanResolveProperties()
     {
-        var index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
+        string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
 
-        Client.IndexMany(new[] {
-                new MyNestedType { Field1 = "value1", Field2 = "value2", Nested = new MyType[] {
-                    new MyType { Field1 = "banana", Data = {
+        Client.IndexMany([
+            new MyNestedType
+            {
+                Field1 = "value1",
+                Field2 = "value2",
+                Nested =
+            [
+                new MyType
+                {
+                    Field1 = "banana",
+                    Data = {
                         { "number-0001", 23 },
                         { "text-0001", "Hey" },
                         { "spaced field", "hey" }
-                    }}
-                }},
-                new MyNestedType { Field1 = "value2", Field2 = "value2" },
-                new MyNestedType { Field1 = "value1", Field2 = "value4" }
-            }, index);
+                    }
+                }
+            ]
+            },
+            new MyNestedType { Field1 = "value2", Field2 = "value2" },
+            new MyNestedType { Field1 = "value1", Field2 = "value4" }
+        ], index);
         Client.Indices.Refresh(index);
 
         var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
 
-        var dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001");
+        string dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001");
         Assert.Equal("nested.data.text-0001.keyword", dynamicTextAggregation);
 
-        var dynamicSpacedAggregation = resolver.GetAggregationsFieldName("nested.data.spaced field");
+        string dynamicSpacedAggregation = resolver.GetAggregationsFieldName("nested.data.spaced field");
         Assert.Equal("nested.data.spaced field.keyword", dynamicSpacedAggregation);
 
-        var dynamicSpacedSort = resolver.GetSortFieldName("nested.data.spaced field");
+        string dynamicSpacedSort = resolver.GetSortFieldName("nested.data.spaced field");
         Assert.Equal("nested.data.spaced field.keyword", dynamicSpacedSort);
 
-        var dynamicSpacedField = resolver.GetResolvedField("nested.data.spaced field");
+        string dynamicSpacedField = resolver.GetResolvedField("nested.data.spaced field");
         Assert.Equal("nested.data.spaced field", dynamicSpacedField);
 
         var field1Property = resolver.GetMappingProperty("Field1");
         Assert.IsType<TextProperty>(field1Property);
 
-        var field5Property = resolver.GetAggregationsFieldName("Field5");
+        string field5Property = resolver.GetAggregationsFieldName("Field5");
         Assert.Equal("field5.keyword", field5Property);
 
         var unknownProperty = resolver.GetMappingProperty("UnknowN.test.doesNotExist");
         Assert.Null(unknownProperty);
 
-        var field1 = resolver.GetResolvedField("FielD1");
+        string field1 = resolver.GetResolvedField("FielD1");
         Assert.Equal("field1", field1);
 
-        var emptyField = resolver.GetResolvedField(" ");
+        string emptyField = resolver.GetResolvedField(" ");
         Assert.Equal(" ", emptyField);
 
-        var unknownField = resolver.GetResolvedField("UnknowN.test.doesNotExist");
+        string unknownField = resolver.GetResolvedField("UnknowN.test.doesNotExist");
         Assert.Equal("UnknowN.test.doesNotExist", unknownField);
 
-        var unknownField2 = resolver.GetResolvedField("unknown.test.doesnotexist");
+        string unknownField2 = resolver.GetResolvedField("unknown.test.doesnotexist");
         Assert.Equal("unknown.test.doesnotexist", unknownField2);
 
-        var unknownField3 = resolver.GetResolvedField("unknown");
+        string unknownField3 = resolver.GetResolvedField("unknown");
         Assert.Equal("unknown", unknownField3);
 
         var field4Property = resolver.GetMappingProperty("Field4");
@@ -121,16 +141,16 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<TextProperty>(field4AliasMapping.Property);
         Assert.Same(field4Property, field4AliasMapping.Property);
 
-        var field4sort = resolver.GetSortFieldName("Field4Alias");
+        string field4sort = resolver.GetSortFieldName("Field4Alias");
         Assert.Equal("field4.sort", field4sort);
 
-        var field4aggs = resolver.GetAggregationsFieldName("Field4Alias");
+        string field4aggs = resolver.GetAggregationsFieldName("Field4Alias");
         Assert.Equal("field4.keyword", field4aggs);
 
         var nestedIdProperty = resolver.GetMappingProperty("Nested.Id");
         Assert.IsType<TextProperty>(nestedIdProperty);
 
-        var nestedId = resolver.GetResolvedField("Nested.Id");
+        string nestedId = resolver.GetResolvedField("Nested.Id");
         Assert.Equal("nested.id", nestedId);
 
         nestedIdProperty = resolver.GetMappingProperty("nested.id");

@@ -10,8 +10,8 @@ public static class StringExtensions
             return null;
 
         var sb = new StringBuilder();
-        var escaped = false;
-        foreach (var ch in input)
+        bool escaped = false;
+        foreach (char ch in input)
         {
             if (escaped)
             {

@@ -74,7 +74,7 @@ public class ElasticMappingResolver
             _logger.LogTrace("Cached mapping (not found), got new server mapping.");
         }
 
-        var fieldParts = field.Split('.');
+        string[] fieldParts = field.Split('.');
         string resolvedFieldName = "";
         var mappingServerTime = _lastMappingUpdate;
         var currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
@@ -89,7 +89,7 @@ public class ElasticMappingResolver
                 if (currentProperties != null)
                     fieldMapping = currentProperties.Values.FirstOrDefault(m =>
                     {
-                        var propertyName = _inferrer.PropertyName(m?.Name);
+                        string propertyName = _inferrer.PropertyName(m?.Name);
                         return propertyName != null && propertyName.Equals(fieldPart, StringComparison.OrdinalIgnoreCase);
                     });
 
@@ -133,7 +133,7 @@ public class ElasticMappingResolver
             if (depth == fieldParts.Length - 1)
             {
                 var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping, mappingServerTime);
-                _mappingCache.AddOrUpdate(field, resolvedMapping, (f, m) => resolvedMapping);
+                _mappingCache.AddOrUpdate(field, resolvedMapping, (_, _) => resolvedMapping);
                 _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property?.Type);
 
                 if (followAlias && resolvedMapping.Property is IFieldAliasProperty fieldAlias)
@@ -157,7 +157,7 @@ public class ElasticMappingResolver
 
         _logger.LogTrace("Mapping not found: {field}", field);
         var notFoundMapping = new FieldMapping(resolvedFieldName, null, mappingServerTime);
-        _mappingCache.AddOrUpdate(field, notFoundMapping, (f, m) => notFoundMapping);
+        _mappingCache.AddOrUpdate(field, notFoundMapping, (_, _) => notFoundMapping);
 
         return notFoundMapping;
     }

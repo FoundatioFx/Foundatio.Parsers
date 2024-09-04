@@ -21,17 +21,17 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSingleAggregationAsync()
     {
-        var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
-        await Client.IndexManyAsync(new[] {
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+        await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
             new MyType { Field1 = "value3", Field4 = 3, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3)) },
             new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
             new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
-        }, index);
+        ], index);
         await Client.Indices.RefreshAsync(index);
 
-        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(l => "51.5032520,-0.1278990"));
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4");
 
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
@@ -52,18 +52,18 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSingleAggregationWithAliasAsync()
     {
-        var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
-        await Client.IndexManyAsync(new[] {
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+        await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
             new MyType { Field1 = "value3", Field4 = 3, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3)) },
             new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
             new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
-        }, index);
+        ], index);
         await Client.Indices.RefreshAsync(index);
 
         var fieldMap = new FieldMap { { "heynow", "field4" } };
-        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap).UseGeo(l => "51.5032520,-0.1278990"));
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:heynow");
 
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
@@ -84,18 +84,18 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessAnalyzedAggregationWithAliasAsync()
     {
-        var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
             .Text(f => f.Name(n => n.Field1)
                 .Fields(k => k.Keyword(m => m.Name("keyword"))))
             .FieldAlias(f => f.Name("heynow").Path(k => k.Field1))
             .GeoPoint(g => g.Name(f => f.Field3))));
-        await Client.IndexManyAsync(new[] {
+        await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
             new MyType { Field1 = "value3", Field4 = 3, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3)) },
             new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
             new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
-        }, index);
+        ], index);
         await Client.Indices.RefreshAsync(index);
 
         var fieldMap = new FieldMap { { "heynow2", "field1" } };
@@ -120,17 +120,17 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessAggregationsAsync()
     {
-        var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
-        await Client.IndexManyAsync(new[] {
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+        await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
             new MyType { Field1 = "value3", Field4 = 3, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3)) },
             new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
             new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
-        }, index);
+        ], index);
         await Client.Indices.RefreshAsync(index);
 
-        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(l => "51.5032520,-0.1278990"));
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4~50,100 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
 
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
@@ -162,14 +162,14 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessNestedAggregationsWithAliasesAsync()
     {
-        var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
             .GeoPoint(g => g.Name(f => f.Field3))
             .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
                 .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
                     .Text(f3 => f3.Name("identity")
                         .Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))))));
 
-        await Client.IndexManyAsync(new[] { new MyType { Field1 = "value1" } }, index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
         var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" } };
@@ -195,11 +195,11 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSingleAggregationWithAlias()
     {
-        var index = CreateRandomIndex<MyType>();
+        string index = CreateRandomIndex<MyType>();
 
-        await Client.IndexManyAsync(new[] {
+        await Client.IndexManyAsync([
             new MyType { Field2 = "field2" }
-        }, index);
+        ], index);
         await Client.Indices.RefreshAsync(index);
 
         var aliasMap = new FieldMap { { "alias2", "field2" } };
@@ -225,19 +225,19 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessAggregationsWithAliasesAsync()
     {
-        var index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
             .GeoPoint(g => g.Name(f => f.Field3))
             .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
                 .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
                     .Text(f3 => f3.Name("identity").Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))))));
 
-        await Client.IndexManyAsync(new[] {
+        await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" }
-        }, index);
+        ], index);
         await Client.Indices.RefreshAsync(index);
 
         var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
-        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(l => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 histogram:alias4 geogrid:alias3 terms:alias1");
 
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
@@ -269,8 +269,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessTermAggregations()
     {
-        var index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync(new[] { new MyType { Field1 = "value1" } }, index);
+        string index = CreateRandomIndex<MyType>();
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
@@ -284,8 +284,8 @@ public class AggregationParserTests : ElasticsearchTestBase
             .Terms("terms_field1", t => t
                 .Field("field1.keyword")
                 .MinimumDocumentCount(1)
-                .Include(new[] { "otherinclude", "myinclude" })
-                .Exclude(new[] { "otherexclude", "myexclude" })
+                .Include(["otherinclude", "myinclude"])
+                .Exclude(["otherexclude", "myexclude"])
                 .Missing("mymissing")
                 .Meta(m => m.Add("@field_type", "keyword")))));
         string expectedRequest = expectedResponse.GetRequest();
@@ -298,8 +298,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessHistogramIntervalAggregations()
     {
-        var index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync(new[] { new MyType { Field1 = "value1" } }, index);
+        string index = CreateRandomIndex<MyType>();
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
@@ -325,8 +325,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessTermTopHitsAggregations()
     {
-        var index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync(new[] { new MyType { Field1 = "value1" } }, index);
+        string index = CreateRandomIndex<MyType>();
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
@@ -353,8 +353,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSortedTermAggregations()
     {
-        var index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync(new[] { new MyType { Field1 = "value1" } }, index);
+        string index = CreateRandomIndex<MyType>();
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
@@ -383,8 +383,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessDateHistogramAggregations()
     {
-        var index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync(new[] { new MyType { Field5 = DateTime.UtcNow } }, index);
+        string index = CreateRandomIndex<MyType>();
+        await Client.IndexManyAsync([new MyType { Field5 = DateTime.UtcNow }], index);
         await Client.Indices.RefreshAsync(index);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
@@ -417,8 +417,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task CanSpecifyDefaultValuesAggregations()
     {
-        var index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync(new[] { new MyType { Field1 = "test" }, new MyType { Field4 = 1 } }, index);
+        string index = CreateRandomIndex<MyType>();
+        await Client.IndexManyAsync([new MyType { Field1 = "test" }, new MyType { Field4 = 1 }], index);
         await Client.Indices.RefreshAsync(index);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
@@ -446,12 +446,12 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public Task GeoGridDoesNotResolveLocationForAggregation()
     {
-        var index = CreateRandomIndex<MyType>(d => d.Properties(p => p
+        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p
             .GeoPoint(g => g.Name(f => f.Field1))
             .FieldAlias(a => a.Name("geo").Path(f => f.Field1))));
 
         var processor = new ElasticQueryParser(c => c
-                .UseGeo(l => "someinvalidvaluehere")
+                .UseGeo(_ => "someinvalidvaluehere")
                 .UseMappings(Client, index));
 
         return processor.BuildAggregationsAsync("geogrid:geo~3");
@@ -469,38 +469,59 @@ public class AggregationParserTests : ElasticsearchTestBase
         return GetAggregationQueryInfoAsync(parser, query, isValid);
     }
 
-    public static IEnumerable<object[]> AggregationTestCases => new[] {
-            new object[] { null, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
-            new object[] { String.Empty, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
-            new object[] { "avg", false, 1, new HashSet<string> { ""}, new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { null } } } },
-            new object[] { "avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>() },
-            new object[] { "avg:value", true, 1,
-                new HashSet<string> { "value" },
-                new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
-            },
-            new object[] { "    avg    :    value", true, 1,
-                new HashSet<string> { "value"},
-                new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
-            },
-            new object[] { "avg:value cardinality:value sum:value min:value max:value", true, 1,
-                new HashSet<string> { "value" },
-                new Dictionary<string, ICollection<string>> {
+    public static IEnumerable<object[]> AggregationTestCases =>
+    [
+        [null, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>()],
+        [String.Empty, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>()],
+        ["avg",
+            false,
+            1,
+            new HashSet<string> { "" },
+            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { null } } }
+        ],
+        ["avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>()],
+        [
+            "avg:value",
+            true,
+            1,
+            new HashSet<string> { "value" },
+            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+        ],
+        [
+            "    avg    :    value",
+            true,
+            1,
+            new HashSet<string> { "value" },
+            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+        ],
+        [
+            "avg:value cardinality:value sum:value min:value max:value",
+            true,
+            1,
+            new HashSet<string> { "value" },
+            new Dictionary<string, ICollection<string>> {
                     { "avg", new HashSet<string> { "value" } },
                     { "cardinality", new HashSet<string> { "value" } },
                     { "sum", new HashSet<string> { "value" } },
                     { "min", new HashSet<string> { "value" } },
                     { "max", new HashSet<string> { "value" } }
                 }
-            },
-            new object[] { "avg:value avg:value2", true, 1,
-                new HashSet<string> { "value", "value2" },
-                new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value", "value2" } } }
-            },
-            new object[] { "avg:value avg:value", true, 1,
-                new HashSet<string> { "value" },
-                new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
-            }
-        };
+        ],
+        [
+            "avg:value avg:value2",
+            true,
+            1,
+            new HashSet<string> { "value", "value2" },
+            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value", "value2" } } }
+        ],
+        [
+            "avg:value avg:value",
+            true,
+            1,
+            new HashSet<string> { "value" },
+            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+        ]
+    ];
 
     [Theory]
     [MemberData(nameof(AggregationTestCases))]

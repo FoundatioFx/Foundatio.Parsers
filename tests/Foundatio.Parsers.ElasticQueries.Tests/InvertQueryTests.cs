@@ -100,7 +100,7 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture>
             return;
         }
 
-        var invertQueryVisitor = new InvertQueryVisitor(new[] { "organizationId" });
+        var invertQueryVisitor = new InvertQueryVisitor(["organizationId"]);
         var context = new QueryVisitorContext();
 
         if (!String.IsNullOrWhiteSpace(alternateInvertedCriteria))
@@ -110,9 +110,9 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture>
         }
 
         result = await invertQueryVisitor.AcceptAsync(result, context);
-        var invertedQuery = result.ToString();
-        var nodes = await DebugQueryVisitor.RunAsync(result);
-        _logger.LogInformation(nodes);
+        string invertedQuery = result.ToString();
+        string nodes = await DebugQueryVisitor.RunAsync(result);
+        _logger.LogInformation("{Result}", nodes);
         Assert.Equal(expected, invertedQuery);
 
         var total = await Client.CountAsync<InvertTest>();

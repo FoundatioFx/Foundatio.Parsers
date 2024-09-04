@@ -39,15 +39,20 @@ public class QueryParserTests : TestWithLoggingBase
         {
             var result = await parser.ParseAsync(query);
 
-            _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
         }
         catch (FormatException ex)
         {
-            _logger.LogInformation(tracer.ToString());
+            _logger.LogInformation("{Result}", tracer.ToString());
             var cursor = ex.Data["cursor"] as Cursor;
-            throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            if (cursor != null)
+            {
+                throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            }
+
+            throw;
         }
     }
 
@@ -69,7 +74,7 @@ public class QueryParserTests : TestWithLoggingBase
         {
             var result = await parser.ParseAsync(query);
 
-            _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
 
@@ -81,9 +86,14 @@ public class QueryParserTests : TestWithLoggingBase
         }
         catch (FormatException ex)
         {
-            _logger.LogInformation(tracer.ToString());
+            _logger.LogInformation("{Result}", tracer.ToString());
             var cursor = ex.Data["cursor"] as Cursor;
-            throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            if (cursor != null)
+            {
+                throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            }
+
+            throw;
         }
     }
 
@@ -105,7 +115,7 @@ public class QueryParserTests : TestWithLoggingBase
         {
             var result = await parser.ParseAsync(query);
 
-            _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
 
@@ -118,7 +128,12 @@ public class QueryParserTests : TestWithLoggingBase
         catch (FormatException ex)
         {
             var cursor = ex.Data["cursor"] as Cursor;
-            throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            if (cursor != null)
+            {
+                throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            }
+
+            throw;
         }
     }
 
@@ -141,7 +156,7 @@ public class QueryParserTests : TestWithLoggingBase
         var ex = Assert.Throws<FormatException>(() =>
         {
             var result = sut.Parse(@"/\(\[A-Za-z\/\]+\).*?");
-            var ast = DebugQueryVisitor.Run(result);
+            string ast = DebugQueryVisitor.Run(result);
         });
         Assert.Contains("Unterminated regex", ex.Message);
     }
@@ -164,7 +179,7 @@ public class QueryParserTests : TestWithLoggingBase
         {
             var result = await parser.ParseAsync(query);
 
-            _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
 
@@ -178,7 +193,12 @@ public class QueryParserTests : TestWithLoggingBase
         catch (FormatException ex)
         {
             var cursor = ex.Data["cursor"] as Cursor;
-            throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            if (cursor != null)
+            {
+                throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            }
+
+            throw;
         }
     }
 
@@ -186,7 +206,7 @@ public class QueryParserTests : TestWithLoggingBase
     public void CanParseQueryConcurrently()
     {
         var parser = new LuceneQueryParser();
-        Parallel.For(0, 100, i =>
+        Parallel.For(0, 100, _ =>
         {
             var result = parser.Parse("criteria   some:criteria blah:(more      stuff)");
             Assert.NotNull(result);
@@ -199,7 +219,7 @@ public class QueryParserTests : TestWithLoggingBase
         var sut = new LuceneQueryParser();
 
         var result = sut.Parse("NOT (dog parrot)");
-        var ast = DebugQueryVisitor.Run(result);
+        string ast = DebugQueryVisitor.Run(result);
 
         Assert.IsType<GroupNode>(result.Left);
         Assert.True((result.Left as GroupNode).HasParens);
@@ -212,7 +232,7 @@ public class QueryParserTests : TestWithLoggingBase
         var sut = new LuceneQueryParser();
 
         var result = sut.Parse(@"""jakarta apache"" !""Apache Lucene""");
-        var ast = DebugQueryVisitor.Run(result);
+        string ast = DebugQueryVisitor.Run(result);
 
         var left = result.Left as TermNode;
         var right = result.Right as TermNode;
@@ -244,7 +264,7 @@ public class QueryParserTests : TestWithLoggingBase
         var sut = new LuceneQueryParser();
 
         var result = sut.Parse("[1 TO 2]");
-        var ast = DebugQueryVisitor.Run(result);
+        string ast = DebugQueryVisitor.Run(result);
 
         var left = result.Left as TermRangeNode;
         Assert.NotNull(left);
@@ -376,11 +396,11 @@ public class QueryParserTests : TestWithLoggingBase
         };
 
         var result = parser.Parse("\"\"");
-        var ast = DebugQueryVisitor.Run(result);
+        string ast = DebugQueryVisitor.Run(result);
 
         Assert.IsType<TermNode>(result.Left);
-        Assert.True((result.Left as TermNode).IsQuotedTerm);
-        Assert.Empty((result.Left as TermNode).Term);
+        Assert.True(((TermNode)result.Left).IsQuotedTerm);
+        Assert.Empty(((TermNode)result.Left).Term);
     }
 
     [Fact]
@@ -391,7 +411,7 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.Throws<FormatException>(() =>
         {
             var result = sut.Parse("something AND NOT OR otherthing");
-            var ast = DebugQueryVisitor.Run(result);
+            string ast = DebugQueryVisitor.Run(result);
         });
     }
 
@@ -403,7 +423,7 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.Throws<FormatException>(() =>
         {
             var result = sut.Parse("something AND OR otherthing");
-            var ast = DebugQueryVisitor.Run(result);
+            string ast = DebugQueryVisitor.Run(result);
         });
     }
 
@@ -415,7 +435,7 @@ public class QueryParserTests : TestWithLoggingBase
         var ex = Assert.Throws<FormatException>(() =>
         {
             var result = sut.Parse("\"something");
-            var ast = DebugQueryVisitor.Run(result);
+            string ast = DebugQueryVisitor.Run(result);
         });
         Assert.Contains("Unterminated quoted string", ex.Message);
     }
@@ -428,7 +448,7 @@ public class QueryParserTests : TestWithLoggingBase
         var ex = Assert.Throws<FormatException>(() =>
         {
             var result = sut.Parse("\"something\"\"");
-            var ast = DebugQueryVisitor.Run(result);
+            string ast = DebugQueryVisitor.Run(result);
         });
         Assert.Contains("Unterminated quoted string", ex.Message);
     }
@@ -438,10 +458,7 @@ public class QueryParserTests : TestWithLoggingBase
     {
         var sut = new LuceneQueryParser();
 
-        var ex = Assert.Throws<FormatException>(() =>
-        {
-            var result = sut.Parse("(something");
-        });
+        var ex = Assert.Throws<FormatException>(() => sut.Parse("(something"));
         Assert.Contains("Missing closing paren ')' for group expression", ex.Message);
     }
 
@@ -454,12 +471,12 @@ public class QueryParserTests : TestWithLoggingBase
 
         var result = await parser.ParseAsync(query);
 
-        _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+        _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
         string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
         Assert.Equal(expected, generatedQuery);
 
         await new AssignOperationTypeVisitor().AcceptAsync(result, null);
-        _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+        _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
     }
 }
 

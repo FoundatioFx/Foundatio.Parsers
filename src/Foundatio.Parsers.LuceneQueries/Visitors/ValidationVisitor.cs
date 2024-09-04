@@ -108,9 +108,9 @@ public class ValidationVisitor : ChainableQueryVisitor
         {
             var fieldResolver = context.GetFieldResolver();
             var restrictedFields = new List<string>();
-            foreach (var field in options.RestrictedFields)
+            foreach (string field in options.RestrictedFields)
             {
-                var resolvedField = fieldResolver == null ? field : await fieldResolver(field, context);
+                string resolvedField = fieldResolver == null ? field : await fieldResolver(field, context);
                 if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField.Equals(f) || field.Equals(f))))
                     restrictedFields.Add(field);
             }
@@ -121,7 +121,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         if (options.AllowedFields.Count > 0 && result.ReferencedFields.Count > 0)
         {
             var nonAllowedFields = new List<string>();
-            foreach (var field in result.ReferencedFields)
+            foreach (string field in result.ReferencedFields)
             {
                 if (String.IsNullOrWhiteSpace(field))
                     continue;
@@ -162,8 +162,7 @@ public class ValidationVisitor : ChainableQueryVisitor
 
     public static async Task<QueryValidationResult> RunAsync(IQueryNode node, IQueryVisitorContextWithValidation context = null)
     {
-        if (context == null)
-            context = new QueryVisitorContext();
+        context ??= new QueryVisitorContext();
 
         var visitor = new ChainedQueryVisitor();
         if (context.QueryType == QueryTypes.Aggregation)
@@ -183,8 +182,7 @@ public class ValidationVisitor : ChainableQueryVisitor
 
     public static async Task<QueryValidationResult> RunAsync(IQueryNode node, QueryValidationOptions options, IQueryVisitorContextWithValidation context = null)
     {
-        if (context == null)
-            context = new QueryVisitorContext();
+        context ??= new QueryVisitorContext();
 
         if (options != null)
             context.SetValidationOptions(options);
@@ -197,7 +195,7 @@ public class ValidationVisitor : ChainableQueryVisitor
     public static Task<QueryValidationResult> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null)
     {
         var options = new QueryValidationOptions();
-        foreach (var field in allowedFields)
+        foreach (string field in allowedFields)
             options.AllowedFields.Add(field);
         return RunAsync(node, options, context);
     }

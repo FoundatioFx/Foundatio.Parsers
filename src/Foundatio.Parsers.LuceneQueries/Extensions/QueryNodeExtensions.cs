@@ -163,7 +163,7 @@ public static class QueryNodeExtensions
     private const string TimeZoneKey = "@TimeZone";
     public static string GetTimeZone(this IFieldQueryNode node, string defaultTimeZone = null)
     {
-        if (!node.Data.TryGetValue(TimeZoneKey, out var value))
+        if (!node.Data.TryGetValue(TimeZoneKey, out object value))
             return defaultTimeZone;
 
         return value as string;
@@ -177,7 +177,7 @@ public static class QueryNodeExtensions
     private const string OriginalFieldKey = "@OriginalField";
     public static string GetOriginalField(this IFieldQueryNode node)
     {
-        if (!node.Data.TryGetValue(OriginalFieldKey, out var value))
+        if (!node.Data.TryGetValue(OriginalFieldKey, out object value))
             return node.Field;
 
         return value as string;
@@ -210,7 +210,7 @@ public static class QueryNodeExtensions
     public static string[] GetDefaultFields(this IQueryNode node, string[] rootDefaultFields)
     {
         var scopedNode = GetGroupNode(node);
-        return !String.IsNullOrEmpty(scopedNode?.Field) ? new[] { scopedNode.Field } : rootDefaultFields;
+        return !String.IsNullOrEmpty(scopedNode?.Field) ? [scopedNode.Field] : rootDefaultFields;
     }
 
     public static GroupOperator GetOperator(this IQueryNode node, IQueryVisitorContext context)
@@ -237,10 +237,10 @@ public static class QueryNodeExtensions
     private const string CurrentGroupReferencedFieldsKey = "@CurrentGroupReferencedFields";
     public static ISet<string> GetReferencedFields<T>(this T node, IQueryVisitorContext context = null, bool currentGroupOnly = false) where T : IQueryNode
     {
-        if (!currentGroupOnly && node.Data.TryGetValue(ReferencedFieldsKey, out var allFieldsObject) && allFieldsObject is ISet<string> allFields)
+        if (!currentGroupOnly && node.Data.TryGetValue(ReferencedFieldsKey, out object allFieldsObject) && allFieldsObject is ISet<string> allFields)
             return allFields;
 
-        if (currentGroupOnly && node.Data.TryGetValue(CurrentGroupReferencedFieldsKey, out var immediateFieldsObject) && immediateFieldsObject is ISet<string> immediateFields)
+        if (currentGroupOnly && node.Data.TryGetValue(CurrentGroupReferencedFieldsKey, out object immediateFieldsObject) && immediateFieldsObject is ISet<string> immediateFields)
             return immediateFields;
 
         var fields = new HashSet<string>();
@@ -268,11 +268,11 @@ public static class QueryNodeExtensions
             }
             else if (fieldNode is not GroupNode)
             {
-                var defaultFields = node.GetDefaultFields(context?.DefaultFields);
+                string[] defaultFields = node.GetDefaultFields(context?.DefaultFields);
                 if (defaultFields == null || defaultFields.Length == 0)
                     fields.Add("");
                 else
-                    foreach (var defaultField in fields)
+                    foreach (string defaultField in fields)
                         fields.Add(defaultField);
             }
         }

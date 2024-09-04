@@ -181,7 +181,7 @@ public class QueryParserValidationTests : TestWithLoggingBase
         }
 
         string nodes = await DebugQueryVisitor.RunAsync(result);
-        _logger.LogInformation(nodes);
+        _logger.LogInformation("{Result}", nodes);
         string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
         Assert.Equal(expected, generatedQuery);
     }
@@ -221,17 +221,22 @@ public class QueryParserValidationTests : TestWithLoggingBase
 
         try
         {
-            _logger.LogInformation($"Attempting: {escaped}");
+            _logger.LogInformation("Attempting: {Escaped}", escaped);
             var result = await parser.ParseAsync(query);
 
-            _logger.LogInformation(await DebugQueryVisitor.RunAsync(result));
+            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
         }
         catch (FormatException ex)
         {
             var cursor = ex.Data["cursor"] as Cursor;
-            throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            if (cursor != null)
+            {
+                throw new FormatException($"[{cursor.Line}:{cursor.Column}] {ex.Message}", ex);
+            }
+
+            throw;
         }
     }
 }

@@ -174,11 +174,11 @@ public static class DefaultAggregationNodeExtensions
         List<double> percents = null;
         if (!String.IsNullOrWhiteSpace(proximity))
         {
-            var percentStrings = proximity.Split(',');
+            string[] percentStrings = proximity.Split(',');
             percents = new List<double>();
             foreach (string ps in percentStrings)
             {
-                if (Double.TryParse(ps, out var percent))
+                if (Double.TryParse(ps, out double percent))
                     percents.Add(percent);
             }
         }
@@ -300,7 +300,7 @@ public static class DefaultAggregationNodeExtensions
 
     public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node)
     {
-        if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out var parsedValue))
+        if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out int parsedValue))
             return parsedValue;
 
         return null;
@@ -308,7 +308,7 @@ public static class DefaultAggregationNodeExtensions
 
     public static int? GetBoostAsInt32(this IFieldQueryWithProximityAndBoostNode node)
     {
-        if (!String.IsNullOrEmpty(node.UnescapedBoost) && Int32.TryParse(node.UnescapedBoost, out var parsedValue))
+        if (!String.IsNullOrEmpty(node.UnescapedBoost) && Int32.TryParse(node.UnescapedBoost, out int parsedValue))
             return parsedValue;
 
         return null;
@@ -316,7 +316,7 @@ public static class DefaultAggregationNodeExtensions
 
     public static double? GetProximityAsDouble(this IFieldQueryWithProximityAndBoostNode node)
     {
-        if (!String.IsNullOrEmpty(node.UnescapedProximity) && Double.TryParse(node.UnescapedProximity, out var parsedValue))
+        if (!String.IsNullOrEmpty(node.UnescapedProximity) && Double.TryParse(node.UnescapedProximity, out double parsedValue))
             return parsedValue;
 
         return null;
@@ -324,7 +324,7 @@ public static class DefaultAggregationNodeExtensions
 
     public static double? GetBoostAsDouble(this IFieldQueryWithProximityAndBoostNode node)
     {
-        if (!String.IsNullOrEmpty(node.UnescapedBoost) && Double.TryParse(node.UnescapedBoost, out var parsedValue))
+        if (!String.IsNullOrEmpty(node.UnescapedBoost) && Double.TryParse(node.UnescapedBoost, out double parsedValue))
             return parsedValue;
 
         return null;

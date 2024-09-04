@@ -128,7 +128,7 @@ public class InvertQueryVisitorTests : TestWithLoggingBase
             return;
         }
 
-        var invertQueryVisitor = new InvertQueryVisitor(new[] { "noninvertedfield1", "noninvertedfield2" });
+        var invertQueryVisitor = new InvertQueryVisitor(["noninvertedfield1", "noninvertedfield2"]);
         var context = new QueryVisitorContext();
 
         if (!String.IsNullOrWhiteSpace(alternateInvertedCriteria))
@@ -138,9 +138,9 @@ public class InvertQueryVisitorTests : TestWithLoggingBase
         }
 
         result = await invertQueryVisitor.AcceptAsync(result, context);
-        var invertedQuery = result.ToString();
-        var nodes = await DebugQueryVisitor.RunAsync(result);
-        _logger.LogInformation(nodes);
+        string invertedQuery = result.ToString();
+        string nodes = await DebugQueryVisitor.RunAsync(result);
+        _logger.LogInformation("{Result}", nodes);
         Assert.Equal(expected, invertedQuery);
     }
 }

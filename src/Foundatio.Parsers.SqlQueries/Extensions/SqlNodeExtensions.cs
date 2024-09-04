@@ -135,9 +135,9 @@ public static class SqlNodeExtensions
                 var defaultField = GetFieldInfo(context.Fields, context.DefaultFields[index]);
                 if (defaultField.IsCollection)
                 {
-                    var dotIndex = defaultField.Field.LastIndexOf('.');
-                    var collectionField = defaultField.Field.Substring(0, dotIndex);
-                    var fieldName = defaultField.Field.Substring(dotIndex + 1);
+                    int dotIndex = defaultField.Field.LastIndexOf('.');
+                    string collectionField = defaultField.Field.Substring(0, dotIndex);
+                    string fieldName = defaultField.Field.Substring(dotIndex + 1);
 
                     builder.Append(collectionField);
                     builder.Append(".Any(");
@@ -168,9 +168,9 @@ public static class SqlNodeExtensions
 
         if (field.IsCollection)
         {
-            var index = node.Field.LastIndexOf('.');
-            var collectionField = node.Field.Substring(0, index);
-            var fieldName = node.Field.Substring(index + 1);
+            int index = node.Field.LastIndexOf('.');
+            string collectionField = node.Field.Substring(0, index);
+            string fieldName = node.Field.Substring(index + 1);
 
             builder.Append(collectionField);
             builder.Append(".Any(");
@@ -220,7 +220,7 @@ public static class SqlNodeExtensions
 
                 builder.Append(".");
 
-                var method = term[^1..] switch
+                string method = term[^1..] switch
                 {
                     "y" => "AddYears",
                     "M" => "AddMonths",
@@ -232,7 +232,7 @@ public static class SqlNodeExtensions
                     _ => throw new NotSupportedException("Invalid date operation.")
                 };
 
-                var subtract = term.Substring(3, 1) == "-";
+                bool subtract = term.Substring(3, 1) == "-";
 
                 builder.Append(method).Append("(").Append(subtract ? "-" : "").Append(term.Substring(4, term.Length - 5)).Append(")");
             }

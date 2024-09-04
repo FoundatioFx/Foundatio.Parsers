@@ -34,13 +34,13 @@ public static class DefaultQueryNodeExtensions
 
         QueryBase query;
         string field = node.UnescapedField;
-        var defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
+        string[] defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
         if (field == null && defaultFields != null && defaultFields.Length == 1)
             field = defaultFields[0];
 
         if (elasticContext.MappingResolver.IsPropertyAnalyzed(field))
         {
-            var fields = !String.IsNullOrEmpty(field) ? new[] { field } : defaultFields;
+            string[] fields = !String.IsNullOrEmpty(field) ? [field] : defaultFields;
 
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
@@ -167,11 +167,13 @@ public static class DefaultQueryNodeExtensions
     {
         return new BoolQuery
         {
-            MustNot = new QueryContainer[] {
-                    new ExistsQuery {
-                        Field =  node.UnescapedField
-                    }
+            MustNot =
+            [
+                new ExistsQuery
+                {
+                    Field = node.UnescapedField
                 }
+            ]
         };
     }
 }

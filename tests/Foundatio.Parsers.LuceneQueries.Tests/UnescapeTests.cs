@@ -22,7 +22,7 @@ public sealed class UnescapeTests : TestWithLoggingBase
     [InlineData(@"At end \", @"At end \")]
     public void UnescapingWorks(string test, string expected)
     {
-        var result = test.Unescape();
+        string result = test.Unescape();
         Assert.Equal(expected, result);
     }
 }

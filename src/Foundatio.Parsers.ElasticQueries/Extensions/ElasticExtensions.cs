@@ -17,7 +17,7 @@ public static class ElasticExtensions
     public static TermsInclude AddValue(this TermsInclude include, string value)
     {
         if (include?.Values == null)
-            return new TermsInclude(new[] { value });
+            return new TermsInclude([value]);
 
         var values = include.Values.ToList();
         values.Add(value);
@@ -28,7 +28,7 @@ public static class ElasticExtensions
     public static TermsExclude AddValue(this TermsExclude exclude, string value)
     {
         if (exclude?.Values == null)
-            return new TermsExclude(new[] { value });
+            return new TermsExclude([value]);
 
         var values = exclude.Values.ToList();
         values.Add(value);
@@ -161,8 +161,8 @@ internal class JsonUtility
             Write(element, writer);
         }
 
-        var bytes = ms.ToArray();
-        var str = Encoding.UTF8.GetString(bytes);
+        byte[] bytes = ms.ToArray();
+        string str = Encoding.UTF8.GetString(bytes);
         return str;
     }
 

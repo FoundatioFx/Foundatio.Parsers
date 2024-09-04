@@ -45,9 +45,9 @@ public class GenerateQueryVisitorTests : TestWithLoggingBase
         IQueryNode parsedQuery = await parser.ParseAsync(query);
 
         var context = new QueryVisitorContext { DefaultOperator = defaultOperator };
-        string result = GenerateQueryVisitor.Run(parsedQuery, context);
+        string result = await GenerateQueryVisitor.RunAsync(parsedQuery, context);
         string nodes = await DebugQueryVisitor.RunAsync(parsedQuery);
-        _logger.LogInformation(nodes);
+        _logger.LogInformation("{Result}", nodes);
         Assert.Equal(expected, result);
     }
 }

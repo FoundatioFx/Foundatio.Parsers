@@ -36,7 +36,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
                 { "other", "field:value" },
                 { "nested", "field:value @include:other" }
             };
-        var resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: (n, ctx) => true);
+        var resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: (_, _) => true);
         Assert.Equal("outter @include:other @skipped:(other stuff @include:other)", resolved.ToString());
 
         resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: ShouldSkipInclude);
@@ -107,7 +107,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         var result = await parser.ParseAsync("field1:value1 @include:include1");
 
         var context = new QueryVisitorContext();
-        var resolved = await IncludeVisitor.RunAsync(result, i => throw new ApplicationException("Bam"), context);
+        var resolved = await IncludeVisitor.RunAsync(result, _ => throw new ApplicationException("Bam"), context);
         var validationResult = context.GetValidationResult();
         Assert.Contains("include1", validationResult.UnresolvedIncludes);
         Assert.False(validationResult.IsValid);
