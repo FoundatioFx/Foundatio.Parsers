@@ -9,6 +9,9 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor
 {
     public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
+        if (node.HasOperationType())
+            return Task.CompletedTask;
+
         if (String.IsNullOrEmpty(node.Field))
             return base.VisitAsync(node, context);
 
@@ -35,6 +38,9 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor
 
     public override void Visit(TermNode node, IQueryVisitorContext context)
     {
+        if (node.HasOperationType())
+            return;
+
         if (String.IsNullOrEmpty(node.Field) && !String.IsNullOrEmpty(node.Term))
         {
             context.AddValidationError($"Aggregations ({node.Term}) must specify a field.");
@@ -51,7 +57,7 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor
         node.SetOperationType(node.Field);
         node.Field = node.Term;
         node.Term = null;
-    }
+     }
 }
 
 public static class AggregationType
