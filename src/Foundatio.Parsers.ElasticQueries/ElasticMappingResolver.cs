@@ -92,7 +92,7 @@ public class ElasticMappingResolver
                 if (currentProperties != null)
                     fieldMapping = ((IDictionary<PropertyName, IProperty>)currentProperties).Values.FirstOrDefault(m =>
                     {
-                        string propertyName = _inferrer.PropertyName(m?.Name);
+                        string propertyName = _inferrer.PropertyName(m?.TryGetName());
                         return propertyName != null && propertyName.Equals(fieldPart, StringComparison.OrdinalIgnoreCase);
                     });
 
@@ -125,13 +125,14 @@ public class ElasticMappingResolver
             }
 
             // coded properties sometimes have null Name properties
-            if (fieldMapping.Name == null && fieldMapping is IPropertyWithClrOrigin clrOrigin && clrOrigin.ClrOrigin != null)
-                fieldMapping.Name = new PropertyName(clrOrigin.ClrOrigin);
+            string name = fieldMapping.TryGetName();
+            if (name == null && fieldMapping is IPropertyWithClrOrigin clrOrigin && clrOrigin.ClrOrigin != null)
+                name = new PropertyName(clrOrigin.ClrOrigin);
 
             if (depth == 0)
-                resolvedFieldName += _inferrer.PropertyName(fieldMapping.Name);
+                resolvedFieldName += _inferrer.PropertyName(name);
             else
-                resolvedFieldName += "." + _inferrer.PropertyName(fieldMapping.Name);
+                resolvedFieldName += "." + _inferrer.PropertyName(name);
 
             if (depth == fieldParts.Length - 1)
             {
@@ -415,7 +416,7 @@ public class ElasticMappingResolver
 
                     mergedCodeProperties[kvp.Key] = new FieldAliasProperty
                     {
-                        Meta = aliasProperty.Meta,
+                        //LocalMetadata = aliasProperty.LocalMetadata,
                         Path = _inferrer?.Field(aliasProperty.Path) ?? aliasProperty.Path,
                         Name = aliasProperty.Name
                     };
@@ -431,19 +432,23 @@ public class ElasticMappingResolver
         foreach (var serverProperty in serverProperties)
         {
             var merged = serverProperty.Value;
-            if (mergedCodeProperties.TryGetProperty(serverProperty.Key, out var codeProperty))
-                merged.LocalMetadata = codeProperty.LocalMetadata;
+            // if (mergedCodeProperties.TryGetProperty(serverProperty.Key, out var codeProperty))
+            //     merged.LocalMetadata = codeProperty.LocalMetadata;
 
-            switch (merged)
+            if (mergedCodeProperties.TryGetProperty(serverProperty.Key, out var codeProperty))
             {
-                case ObjectProperty objectProperty:
-                    var codeObjectProperty = codeProperty as ObjectProperty;
-                    objectProperty.Properties = MergeProperties(codeObjectProperty?.Properties, objectProperty.Properties);
-                    break;
-                case TextProperty textProperty:
-                    var codeTextProperty = codeProperty as TextProperty;
-                    textProperty.Fields = MergeProperties(codeTextProperty?.Fields, textProperty.Fields);
-                    break;
+                switch (merged)
+                {
+                    case ObjectProperty objectProperty:
+                        var codeObjectProperty = codeProperty as ObjectProperty;
+                        objectProperty.Properties =
+                            MergeProperties(codeObjectProperty?.Properties, objectProperty.Properties);
+                        break;
+                    case TextProperty textProperty:
+                        var codeTextProperty = codeProperty as TextProperty;
+                        textProperty.Fields = MergeProperties(codeTextProperty?.Fields, textProperty.Fields);
+                        break;
+                }
             }
 
             properties.Add(serverProperty.Key, merged);

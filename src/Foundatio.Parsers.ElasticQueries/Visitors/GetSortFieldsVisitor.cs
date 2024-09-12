@@ -18,7 +18,7 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<S
             return;
 
         var sort = node.GetSort(() => node.GetDefaultSort(context));
-        if (sort.AdditionalPropertyName == null)
+        if (sort.SortKey == null)
             return;
 
         _fields.Add(sort);

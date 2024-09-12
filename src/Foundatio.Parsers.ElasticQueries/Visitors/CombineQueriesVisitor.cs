@@ -26,8 +26,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         Query query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
         Query container = query;
-        var nested = query as NestedQuery;
-        if (nested != null && node.Parent != null)
+        if (query.TryGet<NestedQuery>(out var nested) && node.Parent != null)
             container = null;
 
         foreach (var child in node.Children.OfType<IFieldQueryNode>())

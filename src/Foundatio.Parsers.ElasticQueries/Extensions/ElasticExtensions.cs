@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Transport.Products.Elasticsearch;
 using Microsoft.Extensions.Logging;
 
@@ -15,6 +16,12 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class ElasticExtensions
 {
+    public static string TryGetName(this IProperty property)
+    {
+        // TODO until: https://github.com/elastic/elasticsearch-net/issues/8336
+        return null;
+    }
+
     public static TermsInclude AddValue(this TermsInclude include, string value)
     {
         if (include?.Values == null)
