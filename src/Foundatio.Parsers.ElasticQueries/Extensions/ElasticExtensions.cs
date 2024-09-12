@@ -22,6 +22,18 @@ public static class ElasticExtensions
         return null;
     }
 
+    public static bool IsBucketAggregation(this object aggregation)
+    {
+        // NOTE FilterAggregate was called FilterAggregation in the past.
+        return aggregation is AdjacencyMatrixAggregation or AutoDateHistogramAggregation or ChildrenAggregation
+            or CompositeAggregation or DateHistogramAggregation or DateRangeAggregation or DiversifiedSamplerAggregation
+            or FilterAggregate or FiltersAggregation or GeoDistanceAggregation or GeohashGridAggregation
+            or GeotileGridAggregation or GlobalAggregation or HistogramAggregation or IpRangeAggregation
+            or MissingAggregation or MultiTermsAggregation or NestedAggregation or ParentAggregation or RangeAggregation
+            or RareTermsAggregation or ReverseNestedAggregation or SamplerAggregation or SignificantTermsAggregation
+            or SignificantTextAggregation or TermsAggregation or VariableWidthHistogramAggregation;
+    }
+
     public static Properties GetFields(this IProperty property)
     {
         return property switch

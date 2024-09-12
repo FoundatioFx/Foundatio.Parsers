@@ -94,12 +94,9 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                 continue;
             }
 
-            if (container.Value is BucketAggregationBase bucketContainer)
+            if (container.Value.IsBucketAggregation())
             {
-                if (bucketContainer.Aggregations == null)
-                    bucketContainer.Aggregations = new AggregationDictionary();
-
-                bucketContainer.Aggregations[aggregation.Name] = aggregation.Value;
+                container.Aggregations.Add(aggregation);
             }
 
             if (termsAggregation != null && child.Prefix is "-" or "+")
