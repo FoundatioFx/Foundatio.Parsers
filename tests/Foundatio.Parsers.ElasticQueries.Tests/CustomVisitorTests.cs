@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -15,14 +16,14 @@ public class CustomVisitorTests : ElasticsearchTestBase
 {
     public CustomVisitorTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture)
     {
-        Log.DefaultMinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        Log.DefaultMinimumLevel = LogLevel.Trace;
     }
 
     [Fact]
     public async Task CanResolveSimpleCustomFilter()
     {
         string index = CreateRandomIndex<MyType>();
-        Client.Index(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -30,11 +31,11 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one)");
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(_ => result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(_ => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms("1"))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -47,7 +48,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveCustomFilterContainingIncludes()
     {
         string index = CreateRandomIndex<MyType>();
-        Client.Index(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -55,11 +56,11 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one @include:3)");
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(_ => result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(_ => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms("1", "3"))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -72,7 +73,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveIncludeToCustomFilterContainingIgnoredInclude()
     {
         string index = CreateRandomIndex<MyType>();
-        Client.Index(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -80,11 +81,11 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor(), 1));
 
         var result = await processor.BuildQueryAsync("@include:test");
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(_ => result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(_ => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms("1", "3"))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -119,7 +120,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveMultipleCustomFilters()
     {
         string index = CreateRandomIndex<MyType>();
-        Client.Index(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -127,11 +128,11 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one) OR (field1:Test @custom:(two))");
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(_ => result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(_ => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index)
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index)
             .Query(f => f
                 .Bool(b => b
                     .Filter(filter => filter
@@ -170,7 +171,7 @@ public sealed class CustomFilterVisitor : ChainableQueryVisitor
         {
             string term = ToTerm(node);
             var ids = await GetIdsAsync(term);
-            if (ids != null && ids.Count > 0)
+            if (ids is { Count: > 0 })
                 node.Parent.SetQuery(new TermsQuery { Field = "id", Terms = ids });
             else
                 node.Parent.SetQuery(new TermQuery { Field = "id", Value = "none" });

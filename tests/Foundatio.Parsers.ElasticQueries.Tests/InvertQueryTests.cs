@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -188,7 +189,6 @@ public class SampleDataFixture : ElasticsearchFixture
         }
 
         await Client.IndexManyAsync(records, indexName);
-
         await Client.Indices.RefreshAsync(indexName);
     }
 }

@@ -34,18 +34,18 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Min("min_field4", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -66,18 +66,18 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:heynow");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Min("min_heynow", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -102,18 +102,18 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap));
         var aggregations = await processor.BuildAggregationsAsync("terms:heynow");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Terms("terms_heynow", c => c.Field("field1.keyword").Meta(m => m.Add("@field_type", "text")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -133,11 +133,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4~50,100 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(1)
                 .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Source("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Source("doc['field3'].lon")))))
             .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "text")))
@@ -154,8 +154,8 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -176,19 +176,19 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("terms:(alias1 cardinality:user)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "keyword"))
                 .Aggregations(a1 => a1.Cardinality("cardinality_user", c => c.Field("data.@user.identity.keyword"))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -206,19 +206,19 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("missing:alias2");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Missing("missing_alias2", t => t.Field("field2.keyword"))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -240,11 +240,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 histogram:alias4 geogrid:alias3 terms:alias1");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .GeoHash("geogrid_alias3", h => h.Field("field3").GeoHashPrecision(1)
                 .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Source("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Source("doc['field3'].lon")))))
             .Terms("terms_alias1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "text")))
@@ -261,8 +261,8 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -276,11 +276,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Terms("terms_field1", t => t
                 .Field("field1.keyword")
                 .MinimumDocumentCount(1)
@@ -305,11 +305,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("histogram:(field1~0.1)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Histogram("histogram_field1", t => t
                 .Field("field1.keyword")
                 .Interval(0.1)
@@ -332,11 +332,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1~1000^2 tophits:(_~1000 @include:myinclude))");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Terms("terms_field1", t => t
                 .Field("field1.keyword")
                 .Size(1000)
@@ -360,11 +360,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 -cardinality:field4)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Terms("terms_field1", t => t
                 .Field("field1.keyword")
                 .Order(o => o.Descending("cardinality_field4"))
@@ -375,8 +375,8 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -390,11 +390,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("date:(field5^1h @missing:\"0001-01-01T00:00:00\" min:field5^1h max:field5^1h)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .DateHistogram("date_field5", d1 => d1
                 .Field("field5").Meta(m => m.Add("@timezone", "1h"))
                 .CalendarInterval(DateInterval.Day)
@@ -409,8 +409,8 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid, actualResponse.DebugInformation);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse, actualResponse.DebugInformation);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -424,11 +424,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("min:field4~0 max:field4~0 avg:field4~0 sum:field4~0 cardinality:field4~0");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Sum("sum_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "integer")))
             .Cardinality("cardinality_field4", c => c.Field("field4").Missing(0))
             .Average("avg_field4", c => c.Field("field4").Missing(0).Meta(m => m.Add("@field_type", "integer")))
@@ -438,8 +438,8 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
-        Assert.True(actualResponse.IsValid);
-        Assert.True(expectedResponse.IsValid);
+        Assert.True(actualResponse.IsValidResponse);
+        Assert.True(expectedResponse.IsValidResponse);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
@@ -463,10 +463,10 @@ public class AggregationParserTests : ElasticsearchTestBase
     [InlineData("avg:value", true)]
     [InlineData("    avg     :   value", true)]
     [InlineData("avg:value cardinality:value sum:value min:value max:value", true)]
-    public Task CanParseAggregations(string query, bool isValid)
+    public Task CanParseAggregations(string query, bool IsValidResponse)
     {
         var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
-        return GetAggregationQueryInfoAsync(parser, query, isValid);
+        return GetAggregationQueryInfoAsync(parser, query, IsValidResponse);
     }
 
     public static IEnumerable<object[]> AggregationTestCases =>
@@ -525,23 +525,23 @@ public class AggregationParserTests : ElasticsearchTestBase
 
     [Theory]
     [MemberData(nameof(AggregationTestCases))]
-    public Task GetElasticAggregationQueryInfoAsync(string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations)
+    public Task GetElasticAggregationQueryInfoAsync(string query, bool IsValidResponse, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations)
     {
         var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
-        return GetAggregationQueryInfoAsync(parser, query, isValid, maxNodeDepth, fields, operations);
+        return GetAggregationQueryInfoAsync(parser, query, IsValidResponse, maxNodeDepth, fields, operations);
     }
 
-    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth = -1, HashSet<string> fields = null, Dictionary<string, ICollection<string>> operations = null)
+    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool IsValidResponse, int maxNodeDepth = -1, HashSet<string> fields = null, Dictionary<string, ICollection<string>> operations = null)
     {
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var queryNode = await parser.ParseAsync(query, context);
 
         var result = context.GetValidationResult();
         Assert.Equal(QueryTypes.Aggregation, result.QueryType);
-        if (!result.IsValid)
+        if (!result.IsValidResponse)
             _logger.LogInformation(result.Message);
 
-        Assert.Equal(isValid, result.IsValid);
+        Assert.Equal(IsValidResponse, result.IsValidResponse);
         if (maxNodeDepth >= 0)
             Assert.Equal(maxNodeDepth, result.MaxNodeDepth);
         if (fields != null)

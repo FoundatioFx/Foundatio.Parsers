@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Linq.Expressions;
+using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -27,11 +30,11 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanResolveCodedProperty()
+    public async Task CanResolveCodedProperty()
     {
         string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
 
-        Client.IndexMany([
+        await Client.IndexManyAsync([
             new MyNestedType
             {
                 Field1 = "value1",
@@ -52,7 +55,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
         ], index);
-        Client.Indices.Refresh(index);
+
+        await Client.Indices.RefreshAsync(index);
 
         var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
 
@@ -62,11 +66,11 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanResolveProperties()
+    public async Task CanResolveProperties()
     {
         string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
 
-        Client.IndexMany([
+        await Client.IndexManyAsync([
             new MyNestedType
             {
                 Field1 = "value1",
@@ -87,7 +91,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
         ], index);
-        Client.Indices.Refresh(index);
+         await Client.Indices.RefreshAsync(index);
 
         var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
 
