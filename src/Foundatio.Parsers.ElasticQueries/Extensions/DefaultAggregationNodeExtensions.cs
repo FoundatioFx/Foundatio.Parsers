@@ -240,7 +240,9 @@ public static class DefaultAggregationNodeExtensions
         var start = context.GetDate("StartDate");
         var end = context.GetDate("EndDate");
         bool isValidRange = start.HasValue && start.Value > DateTime.MinValue && end.HasValue && end.Value < DateTime.MaxValue && start.Value <= end.Value;
-        var bounds = isValidRange ? new ExtendedBoundsDate { Min = start.Value, Max = end.Value } : null;
+        // TODO: https://github.com/elastic/elasticsearch-net/issues/8338
+        //var bounds = isValidRange ? new ExtendedBoundsDate { Min = start.Value, Max = end.Value } : null;
+        var bounds = isValidRange ? new ExtendedBoundsDate { Min = new FieldDateMath(DateMath.Anchored(start.Value).ToString()), Max = new FieldDateMath(DateMath.Anchored(end.Value).ToString()) } : null;
 
         var interval = GetInterval(proximity, start, end);
         string timezone = TryConvertTimeUnitToUtcOffset(boost);

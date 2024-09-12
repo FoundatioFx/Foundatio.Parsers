@@ -126,8 +126,8 @@ public class ElasticMappingResolver
 
             // coded properties sometimes have null Name properties
             string name = fieldMapping.TryGetName();
-            if (name == null && fieldMapping is IPropertyWithClrOrigin clrOrigin && clrOrigin.ClrOrigin != null)
-                name = new PropertyName(clrOrigin.ClrOrigin);
+            // if (name == null && fieldMapping is IPropertyWithClrOrigin clrOrigin && clrOrigin.ClrOrigin != null)
+            //     name = new PropertyName(clrOrigin.ClrOrigin);
 
             if (depth == 0)
                 resolvedFieldName += _inferrer.PropertyName(name);
@@ -419,7 +419,7 @@ public class ElasticMappingResolver
                     {
                         //LocalMetadata = aliasProperty.LocalMetadata,
                         Path = _inferrer?.Field(aliasProperty.Path) ?? aliasProperty.Path,
-                        Name = aliasProperty.Name
+                        // Name = aliasProperty.Name
                     };
                 }
             }
