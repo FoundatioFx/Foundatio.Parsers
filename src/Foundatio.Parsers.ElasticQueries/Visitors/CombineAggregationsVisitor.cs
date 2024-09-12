@@ -102,16 +102,10 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                 bucketContainer.Aggregations[aggregation.Name] = aggregation.Value;
             }
 
-            if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+"))
+            if (termsAggregation != null && child.Prefix is "-" or "+")
             {
-                if (termsAggregation.Order == null)
-                    termsAggregation.Order = new List<TermsOrder>();
-
-                termsAggregation.Order.Add(new TermsOrder
-                {
-                    Key = ((Aggregation)aggregation).Name,
-                    Order = child.Prefix == "-" ? SortOrder.Desc : SortOrder.Asc
-                });
+                termsAggregation.Order ??= new List<KeyValuePair<Field, SortOrder>>();
+                termsAggregation.Order.Add(new KeyValuePair<Field, SortOrder>(aggregation.Name, child.Prefix == "-" ? SortOrder.Desc : SortOrder.Asc));
             }
         }
 

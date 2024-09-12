@@ -234,10 +234,11 @@ public class ElasticMappingResolver
             return field;
 
         var multiFieldProperty = mapping.Property;
-        if (multiFieldProperty?.Fields == null)
+        var fields = multiFieldProperty.GetFields();
+        if ((IDictionary<PropertyName, IProperty>)fields is not { Count: > 0 })
             return mapping.FullPath;
 
-        var nonAnalyzedProperty = multiFieldProperty.Fields.OrderByDescending(kvp => kvp.Key.Name == preferredSubField).FirstOrDefault(kvp =>
+        var nonAnalyzedProperty = fields.OrderByDescending(kvp => kvp.Key.Name == preferredSubField).FirstOrDefault(kvp =>
         {
             if (kvp.Value is KeywordProperty)
                 return true;

@@ -22,6 +22,62 @@ public static class ElasticExtensions
         return null;
     }
 
+    public static Properties GetFields(this IProperty property)
+    {
+        return property switch
+        {
+            AggregateMetricDoubleProperty p => p.Fields,
+            BinaryProperty p => p.Fields,
+            BooleanProperty p => p.Fields,
+            ByteNumberProperty p => p.Fields,
+            CompletionProperty p => p.Fields,
+            ConstantKeywordProperty p => p.Fields,
+            DateNanosProperty p => p.Fields,
+            DateProperty p => p.Fields,
+            DateRangeProperty p => p.Fields,
+            DenseVectorProperty p => p.Fields,
+            DoubleNumberProperty p => p.Fields,
+            DoubleRangeProperty p => p.Fields,
+            DynamicProperty p => p.Fields,
+            FieldAliasProperty p => p.Fields,
+            FlattenedProperty p => p.Fields,
+            FloatNumberProperty p => p.Fields,
+            FloatRangeProperty p => p.Fields,
+            GeoPointProperty p => p.Fields,
+            GeoShapeProperty p => p.Fields,
+            HalfFloatNumberProperty p => p.Fields,
+            HistogramProperty p => p.Fields,
+            IcuCollationProperty p => p.Fields,
+            IntegerNumberProperty p => p.Fields,
+            IntegerRangeProperty p => p.Fields,
+            IpProperty p => p.Fields,
+            IpRangeProperty p => p.Fields,
+            JoinProperty p => p.Fields,
+            KeywordProperty p => p.Fields,
+            LongNumberProperty p => p.Fields,
+            LongRangeProperty p => p.Fields,
+            MatchOnlyTextProperty p => p.Fields,
+            Murmur3HashProperty p => p.Fields,
+            NestedProperty p => p.Fields,
+            ObjectProperty p => p.Fields,
+            PercolatorProperty p => p.Fields,
+            PointProperty p => p.Fields,
+            RankFeatureProperty p => p.Fields,
+            RankFeaturesProperty p => p.Fields,
+            ScaledFloatNumberProperty p => p.Fields,
+            SearchAsYouTypeProperty p => p.Fields,
+            ShapeProperty p => p.Fields,
+            ShortNumberProperty p => p.Fields,
+            SparseVectorProperty p => p.Fields,
+            TextProperty p => p.Fields,
+            TokenCountProperty p => p.Fields,
+            UnsignedLongNumberProperty p => p.Fields,
+            VersionProperty p => p.Fields,
+            WildcardProperty p => p.Fields,
+            _ => null
+        };
+    }
+
     public static TermsInclude AddValue(this TermsInclude include, string value)
     {
         if (include?.Values == null)

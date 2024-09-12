@@ -286,14 +286,14 @@ public class ElasticQueryParserConfiguration
 
     #endregion
 
-    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, string index) where T : class
+    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMapping> mappingBuilder, ElasticsearchClient client, string index) where T : class
     {
         MappingResolver = ElasticMappingResolver.Create<T>(mappingBuilder, client, index, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<TypeMapping> getMapping) where T : class
+    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMapping> mappingBuilder, Inferrer inferrer, Func<TypeMapping> getMapping) where T : class
     {
         MappingResolver = ElasticMappingResolver.Create<T>(mappingBuilder, inferrer, getMapping, logger: _logger);
 
