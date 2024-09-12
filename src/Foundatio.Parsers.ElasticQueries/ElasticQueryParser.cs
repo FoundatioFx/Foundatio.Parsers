@@ -197,7 +197,7 @@ public class ElasticQueryParser : LuceneQueryParser
         return context.GetValidationResult();
     }
 
-    public async Task<Aggregation> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null)
+    public async Task<AggregationMap> BuildAggregationsAsync(string aggregations, IElasticQueryVisitorContext context = null)
     {
         context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Aggregation;
@@ -209,7 +209,7 @@ public class ElasticQueryParser : LuceneQueryParser
     }
 
 #pragma warning disable IDE0060 // Remove unused parameter
-    public async Task<Aggregation> BuildAggregationsAsync(IQueryNode aggregations, IElasticQueryVisitorContext context = null)
+    public async Task<AggregationMap> BuildAggregationsAsync(IQueryNode aggregations, IElasticQueryVisitorContext context = null)
     {
         if (aggregations == null)
             return null;

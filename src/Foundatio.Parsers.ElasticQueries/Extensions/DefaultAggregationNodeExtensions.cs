@@ -16,7 +16,7 @@ public static class DefaultAggregationNodeExtensions
     // NOTE: We may want to read this dynamically from server settings.
     public const int MAX_BUCKET_SIZE = 10000;
 
-    public static Task<Aggregation> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static Task<AggregationMap> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
     {
         if (node is GroupNode groupNode)
             return groupNode.GetDefaultAggregationAsync(context);
@@ -27,7 +27,7 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    public static async Task<Aggregation> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context)
+    public static async Task<AggregationMap> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -42,10 +42,10 @@ public static class DefaultAggregationNodeExtensions
         switch (node.GetOperationType())
         {
             case AggregationType.DateHistogram:
-                return GetDateHistogramAggregation("date_" + originalField, field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()), context);
+                return GetDateHistogramAggregation($"date_{originalField}", field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()), context);
 
             case AggregationType.Histogram:
-                return GetHistogramAggregation("histogram_" + originalField, field, node.UnescapedProximity, node.UnescapedBoost, context);
+                return GetHistogramAggregation($"histogram_{originalField}", field, node.UnescapedProximity, node.UnescapedBoost, context);
 
             case AggregationType.GeoHashGrid:
                 var precision = new GeohashPrecision(1);
@@ -57,41 +57,39 @@ public static class DefaultAggregationNodeExtensions
                     precision = new GeohashPrecision(parsedPrecision);
                 }
 
-                return new Aggregation("geogrid_" + originalField, new GeohashGridAggregation
+                return new AggregationMap($"geogrid_{originalField}", new GeohashGridAggregation { Field = field, Precision = precision })
                 {
-                    Field = field,
-                    Precision = precision,
-                    Aggregations = new AverageAggregation("avg_lat", null)
+                    Aggregations =
                     {
-                        Script = new Script { Source = $"doc['{node.Field}'].lat" }
-                    } && new AverageAggregation("avg_lon", null)
-                    {
-                        Script = new Script { Source = $"doc['{node.Field}'].lon" }
+                        new AggregationMap("avg_lat", new AverageAggregation { Script = new Script { Source = $"doc['{node.Field}'].lat" } }),
+                        new AggregationMap("avg_lon", new AverageAggregation { Script = new Script { Source = $"doc['{node.Field}'].lon" } })
                     }
-                });
+                };
 
             case AggregationType.Terms:
-                var agg = new TermsAggregation("terms_" + originalField)
+                var termsAggregation = new TermsAggregation
                 {
                     Field = field,
                     Size = node.GetProximityAsInt32(),
-                    MinDocCount = node.GetBoostAsInt32(),
-                    Meta = new Dictionary<string, object> { { "@field_type", property?.Type } }
+                    MinDocCount = node.GetBoostAsInt32()
                 };
 
-                if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
-                    agg.ShardSize = Math.Max((int)agg.Size, MAX_BUCKET_SIZE);
+                if (termsAggregation.Size.HasValue && (termsAggregation.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
+                    termsAggregation.ShardSize = Math.Max((int)termsAggregation.Size, MAX_BUCKET_SIZE);
 
-                return agg;
+                return new AggregationMap($"terms_{originalField}", termsAggregation)
+                {
+                    Meta = { { "@field_type", property?.Type } }
+                };
 
             case AggregationType.TopHits:
-                return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
+                return new AggregationMap("tophits", new TopHitsAggregation { Size = node.GetProximityAsInt32() });
         }
 
         return null;
     }
 
-    public static async Task<Aggregation> GetDefaultAggregationAsync(this TermNode node, IQueryVisitorContext context)
+    public static async Task<AggregationMap> GetDefaultAggregationAsync(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -104,40 +102,63 @@ public static class DefaultAggregationNodeExtensions
         switch (node.GetOperationType())
         {
             case AggregationType.Min:
-                return new MinAggregation("min_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
+                return new AggregationMap($"min_{originalField}", new MinAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
+                {
+                    Meta = { { "@field_type", property?.Type }, { "@timezone", timezone } }
+                };
 
             case AggregationType.Max:
-                return new MaxAggregation("max_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
+                return new AggregationMap($"max_{originalField}", new MaxAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
+                {
+                    Meta = { { "@field_type", property?.Type }, { "@timezone", timezone } }
+                };
 
             case AggregationType.Avg:
-                return new AverageAggregation("avg_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                return new AggregationMap($"avg_{originalField}", new AverageAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
+                {
+                    Meta = { { "@field_type", property?.Type } }
+                };
 
             case AggregationType.Sum:
-                return new SumAggregation("sum_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                return new AggregationMap($"sum_{originalField}", new SumAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
+                {
+                    Meta = { { "@field_type", property?.Type } }
+                };
 
             case AggregationType.Stats:
-                return new StatsAggregation("stats_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                return new AggregationMap($"stats_{originalField}", new StatsAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
+                {
+                    Meta = { { "@field_type", property?.Type } }
+                };
 
             case AggregationType.ExtendedStats:
-                return new ExtendedStatsAggregation("exstats_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                return new AggregationMap($"exstats_{originalField}", new ExtendedStatsAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
+                {
+                    Meta = { { "@field_type", property?.Type } }
+                };
 
             case AggregationType.Cardinality:
-                return new CardinalityAggregation("cardinality_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), PrecisionThreshold = node.GetBoostAsInt32() };
+                return new AggregationMap($"cardinality_{originalField}", new CardinalityAggregation
+                {
+                    Field = aggField,
+                    Missing = node.GetProximityAsDouble(),
+                    PrecisionThreshold = node.GetBoostAsInt32()
+                });
 
             case AggregationType.TopHits:
-                return new TopHitsAggregation("tophits") { Size = node.GetProximityAsInt32() };
+                return new AggregationMap("tophits", new TopHitsAggregation { Size = node.GetProximityAsInt32() });
 
             case AggregationType.Missing:
-                return new MissingAggregation("missing_" + originalField) { Field = aggField };
+                return new AggregationMap($"missing_{originalField}", new MissingAggregation { Field = aggField });
 
             case AggregationType.DateHistogram:
-                return GetDateHistogramAggregation("date_" + originalField, aggField, node.UnescapedProximity, node.UnescapedBoost, context);
+                return GetDateHistogramAggregation($"date_{originalField}", aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
             case AggregationType.Histogram:
-                return GetHistogramAggregation("histogram_" + originalField, aggField, node.UnescapedProximity, node.UnescapedBoost, context);
+                return GetHistogramAggregation($"histogram_{originalField}", aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
             case AggregationType.Percentiles:
-                return GetPercentilesAggregation("percentiles_" + originalField, aggField, node.UnescapedProximity, node.UnescapedBoost, context);
+                return GetPercentilesAggregation($"percentiles_{originalField}", aggField, node.UnescapedProximity, node.UnescapedBoost, context);
 
             case AggregationType.GeoHashGrid:
                 var precision = new GeohashPrecision(1);
@@ -149,38 +170,36 @@ public static class DefaultAggregationNodeExtensions
                     precision = new GeohashPrecision(parsedPrecision);
                 }
 
-                return new GeohashGridAggregation("geogrid_" + originalField)
+                return new AggregationMap($"geogrid_{originalField}", new GeohashGridAggregation { Field = aggField, Precision = precision })
                 {
-                    Field = aggField,
-                    Precision = precision,
-                    Aggregations = new AverageAggregation("avg_lat", null)
+                    Aggregations =
                     {
-                        Script = new Script { Source = $"doc['{node.Field}'].lat" }
-                    } && new AverageAggregation("avg_lon", null)
-                    {
-                        Script = new Script { Source = $"doc['{node.Field}'].lon" }
+                        new AggregationMap("avg_lat", new AverageAggregation { Script = new Script { Source = $"doc['{node.Field}'].lat" } }),
+                        new AggregationMap("avg_lon", new AverageAggregation { Script = new Script { Source = $"doc['{node.Field}'].lon" } })
                     }
                 };
 
             case AggregationType.Terms:
-                var agg = new TermsAggregation("terms_" + originalField)
+                var termsAggregation = new TermsAggregation
                 {
                     Field = aggField,
                     Size = node.GetProximityAsInt32(),
-                    MinDocCount = node.GetBoostAsInt32(),
-                    Meta = new Dictionary<string, object> { { "@field_type", property?.Type } }
+                    MinDocCount = node.GetBoostAsInt32()
                 };
 
-                if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
-                    agg.ShardSize = Math.Max((int)agg.Size, MAX_BUCKET_SIZE);
+                if (termsAggregation.Size.HasValue && (termsAggregation.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
+                    termsAggregation.ShardSize = Math.Max((int)termsAggregation.Size, MAX_BUCKET_SIZE);
 
-                return agg;
+                return new AggregationMap($"terms_{originalField}", termsAggregation)
+                {
+                    Meta = { { "@field_type", property?.Type } }
+                };
         }
 
         return null;
     }
 
-    private static Aggregation GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static AggregationMap GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
     {
         List<double> percents = null;
         if (!String.IsNullOrWhiteSpace(proximity))
@@ -194,27 +213,28 @@ public static class DefaultAggregationNodeExtensions
             }
         }
 
-        return new PercentilesAggregation(originalField, field)
+        return new AggregationMap(originalField, new PercentilesAggregation
         {
+            Field = field,
             Percents = percents
-        };
+        });
     }
 
-    private static Aggregation GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static AggregationMap GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
     {
         double interval = 50;
         if (Double.TryParse(proximity, out double prox))
             interval = prox;
 
-        return new HistogramAggregation(originalField)
+        return new AggregationMap(originalField, new HistogramAggregation
         {
             Field = field,
             MinDocCount = 0,
             Interval = interval
-        };
+        });
     }
 
-    private static Aggregation GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static AggregationMap GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
     {
         // NOTE: StartDate and EndDate are set in the Repositories QueryBuilderContext.
         var start = context.GetDate("StartDate");
@@ -224,18 +244,24 @@ public static class DefaultAggregationNodeExtensions
 
         var interval = GetInterval(proximity, start, end);
         string timezone = TryConvertTimeUnitToUtcOffset(boost);
-        var agg = new DateHistogramAggregation(originalField)
+        var agg = new DateHistogramAggregation
         {
             Field = field,
             MinDocCount = 0,
             Format = "date_optional_time",
             TimeZone = timezone,
-            Meta = !String.IsNullOrEmpty(boost) ? new Dictionary<string, object> { { "@timezone", boost } } : null,
             ExtendedBounds = bounds
         };
 
         interval.Match(d => agg.CalendarInterval = d, f => agg.FixedInterval = f);
-        return agg;
+
+        var aggregationMap = new AggregationMap(originalField, agg);
+        if (!String.IsNullOrEmpty(boost))
+        {
+            aggregationMap.Meta.Add("@timezone", boost);
+        }
+
+        return aggregationMap;
     }
 
     private static string TryConvertTimeUnitToUtcOffset(string boost)
@@ -253,9 +279,9 @@ public static class DefaultAggregationNodeExtensions
             return null;
 
         if (timezoneOffset.Value < TimeSpan.Zero)
-            return "-" + timezoneOffset.Value.ToString("hh\\:mm");
+            return $"-{timezoneOffset.Value:hh\\:mm}";
 
-        return "+" + timezoneOffset.Value.ToString("hh\\:mm");
+        return $"+{timezoneOffset.Value:hh\\:mm}";
     }
 
     private static Union<CalendarInterval, Duration> GetInterval(string proximity, DateTime? start, DateTime? end)

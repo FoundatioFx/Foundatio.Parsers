@@ -45,20 +45,20 @@ public static class QueryNodeExtensions
     }
 
     private const string AggregationKey = "@Aggregation";
-    public static Task<Aggregation> GetAggregationAsync(this IQueryNode node, Func<Task<Aggregation>> getDefaultValue = null)
+    public static Task<AggregationMap> GetAggregationAsync(this IQueryNode node, Func<Task<AggregationMap>> getDefaultValue = null)
     {
         if (!node.Data.TryGetValue(AggregationKey, out object value))
         {
             if (getDefaultValue == null)
-                return Task.FromResult<Aggregation>(null);
+                return Task.FromResult<AggregationMap>(null);
 
             return getDefaultValue?.Invoke();
         }
 
-        return Task.FromResult(value as Aggregation);
+        return Task.FromResult(value as AggregationMap);
     }
 
-    public static void SetAggregation(this IQueryNode node, Aggregation aggregation)
+    public static void SetAggregation(this IQueryNode node, AggregationMap aggregation)
     {
         node.Data[AggregationKey] = aggregation;
     }
