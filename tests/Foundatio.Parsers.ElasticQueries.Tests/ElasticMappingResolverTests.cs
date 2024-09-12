@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -62,7 +63,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
 
         var payloadProperty = resolver.GetMappingProperty("payload");
         Assert.IsType<TextProperty>(payloadProperty);
-        Assert.NotNull(payloadProperty.Name);
+        Assert.NotNull(payloadProperty.TryGetName());
     }
 
     [Fact]
@@ -144,11 +145,11 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<TextProperty>(field4AliasMapping.Property);
         Assert.Same(field4Property, field4AliasMapping.Property);
 
-        string field4sort = resolver.GetSortFieldName("Field4Alias");
-        Assert.Equal("field4.sort", field4sort);
+        string field4Sort = resolver.GetSortFieldName("Field4Alias");
+        Assert.Equal("field4.sort", field4Sort);
 
-        string field4aggs = resolver.GetAggregationsFieldName("Field4Alias");
-        Assert.Equal("field4.keyword", field4aggs);
+        string field4Aggs = resolver.GetAggregationsFieldName("Field4Alias");
+        Assert.Equal("field4.keyword", field4Aggs);
 
         var nestedIdProperty = resolver.GetMappingProperty("Nested.Id");
         Assert.IsType<TextProperty>(nestedIdProperty);
@@ -166,7 +167,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<TextProperty>(nestedField1Property);
 
         var nestedField2Property = resolver.GetMappingProperty("Nested.Field4");
-        Assert.IsType<NumberProperty>(nestedField2Property);
+        Assert.IsType<IntegerNumberProperty>(nestedField2Property);
 
         var nestedField5Property = resolver.GetMappingProperty("Nested.Field5");
         Assert.IsType<DateProperty>(nestedField5Property);

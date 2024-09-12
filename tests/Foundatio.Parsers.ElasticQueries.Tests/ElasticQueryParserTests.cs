@@ -22,7 +22,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 {
     public ElasticQueryParserTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture)
     {
-        Log.DefaultMinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        Log.DefaultMinimumLevel = LogLevel.Trace;
     }
 
     [Fact]
@@ -53,12 +53,11 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public void CanUseElasticQueryParser()
     {
         var sut = new ElasticQueryParser();
-
         var result = sut.Parse("NOT (dog parrot)");
 
         Assert.IsType<GroupNode>(result.Left);
-        Assert.True((result.Left as GroupNode).HasParens);
-        Assert.True((result.Left as GroupNode).IsNegated);
+        Assert.True(((GroupNode)result.Left).HasParens);
+        Assert.True(((GroupNode)result.Left).IsNegated);
     }
 
     [Fact]

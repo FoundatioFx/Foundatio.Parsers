@@ -98,7 +98,7 @@ public class ElasticsearchFixture : IAsyncLifetime
 
     protected virtual void ConfigureConnectionSettings(ElasticsearchClientSettings settings) { }
 
-    public void CreateNamedIndex<T>(string index, Func<TypeMappingDescriptor<T>, TypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
+    public void CreateNamedIndex<T>(string index, Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
     {
         configureMappings ??= m => m.AutoMap<T>().Dynamic();
         if (configureIndex == null)
@@ -108,7 +108,7 @@ public class ElasticsearchFixture : IAsyncLifetime
         Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
     }
 
-    public string CreateRandomIndex<T>(Func<TypeMappingDescriptor<T>, TypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
+    public string CreateRandomIndex<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
     {
         string index = "test_" + Guid.NewGuid().ToString("N");
         configureMappings ??= m => m.AutoMap<T>().Dynamic();
