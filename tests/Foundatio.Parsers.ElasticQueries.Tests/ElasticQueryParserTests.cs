@@ -1412,7 +1412,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanParseMixedCaseSort()
     {
         string index = await CreateRandomIndexAsync<MyType>(d => d.Properties(p => p
-            .Text(e => e.Name(m => m.MultiWord).Fields(f1 => f1.Keyword("keyword")))
+            .Text(e => e.MultiWord, o => o.Fields(f1 => f1.Keyword("keyword")))
         ));
 
         var res = await Client.IndexAsync(new MyType { MultiWord = "value1" }, i => i.Index(index));
@@ -1529,7 +1529,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     }
 }
 
-public class MyType
+public record MyType
 {
     public string Id { get; set; }
     public string Field1 { get; set; }
@@ -1541,7 +1541,7 @@ public class MyType
     public Dictionary<string, object> Data { get; set; } = new Dictionary<string, object>();
 }
 
-public class MyNestedType
+public record MyNestedType
 {
     public string Field1 { get; set; }
     public string Field2 { get; set; }
