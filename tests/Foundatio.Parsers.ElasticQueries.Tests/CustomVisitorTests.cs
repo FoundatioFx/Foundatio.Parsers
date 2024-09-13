@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -172,9 +174,9 @@ public sealed class CustomFilterVisitor : ChainableQueryVisitor
             string term = ToTerm(node);
             var ids = await GetIdsAsync(term);
             if (ids is { Count: > 0 })
-                node.Parent.SetQuery(new TermsQuery { Field = "id", Terms = ids });
+                node.Parent.SetQuery(new TermsQuery { Field = "id", Term = new TermsQueryField(ids.Select(FieldValue.String).ToArray()) });
             else
-                node.Parent.SetQuery(new TermQuery { Field = "id", Value = "none" });
+                node.Parent.SetQuery(new TermQuery("id") { Value = "none" });
 
             node.Left = null;
             node.Right = null;

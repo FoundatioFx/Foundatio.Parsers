@@ -55,6 +55,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var sut = new ElasticQueryParser();
         var result = sut.Parse("NOT (dog parrot)");
 
+        Assert.NotNull(result);
         Assert.IsType<GroupNode>(result.Left);
         Assert.True(((GroupNode)result.Left).HasParens);
         Assert.True(((GroupNode)result.Left).IsNegated);
@@ -70,9 +71,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var result = sut.Parse("NOT (dog parrot)", context) as GroupNode;
         Assert.Equal(2, testQueryVisitor.GroupNodeCount);
 
+        Assert.NotNull(result);
         Assert.IsType<GroupNode>(result.Left);
-        Assert.True((result.Left as GroupNode).HasParens);
-        Assert.True((result.Left as GroupNode).IsNegated);
+        Assert.True(((GroupNode)result.Left).HasParens);
+        Assert.True((result.Left as GroupNode)?.IsNegated);
     }
 
     [Fact]
@@ -92,7 +94,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(q => q.Bool(b => b.Filter(f => f.Term(m => m.Field1, "value1")))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(q => q.Bool(b => b.Filter(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1"))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -122,8 +124,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(f =>
-            f.Term(m => m.Field1, "value1")
-            && f.Term(m => m.Field2, "value2")));
+            f.Term(m => m.Field(tf => tf.Field1).Value("value1"))
+            && f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -147,7 +149,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(f =>
-            f.Term(m => m.Field1, "value1") || f.Term(m => m.Field2, "value2") || f.Term(m => m.Field3, "value3")));
+            f.Term(m => m.Field(tf => tf.Field1).Value("value1")) || f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(tf => tf.Field3).Value("value3"))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -160,9 +162,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task ShouldHandleMultipleTermsForAnalyzedFields()
     {
         string index = CreateRandomIndex<MyType>(d => d
-            .Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))
-                .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
-                .Keyword(e => e.Name(m => m.Field2))
+            .Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)
+                .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
+                .Keyword(e => e.Field2)
             ));
         await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index));
         await Client.Indices.RefreshAsync(index);
@@ -180,7 +182,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             || f.Match(m => m.Field(mf => mf.Field1).Query("abc"))
             || f.Match(m => m.Field(mf => mf.Field1).Query("def"))
             || f.Match(m => m.Field(mf => mf.Field1).Query("ghi"))
-            || f.Term(m => m.Field2, "value2") || f.Term(m => m.Field2, "jhk")));
+            || f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field2, "jhk")));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -214,10 +216,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(f =>
-            f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("value1"))
-            || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("abc"))
-            || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("def"))
-            || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("ghi"))));
+            f.MultiMatch(m => m.Fields(Fields.FromStrings(["field1", "field2"])).Query("value1"))
+            || f.MultiMatch(m => m.Fields(Fields.FromStrings(["field1", "field2"])).Query("abc"))
+            || f.MultiMatch(m => m.Fields(Fields.FromStrings(["field1", "field2"])).Query("def"))
+            || f.MultiMatch(m => m.Fields(Fields.FromStrings(["field1", "field2"])).Query("ghi"))));
 
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -227,21 +229,21 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanGetMappingsFromCode()
+    public async Task CanGetMappingsFromCode()
     {
         TypeMappingDescriptor<MyType> GetCodeMappings(TypeMappingDescriptor<MyType> d) =>
-            d.Dynamic()
+            d.Dynamic(DynamicMapping.True)
                 .Properties(p => p
-                    .GeoPoint(g => g.Name(f => f.Field3))
-                    .Text(e => e.Name(m => m.Field1)));
+                    .GeoPoint(g => g.Field3)
+                    .Text(e => e.Field1));
 
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic()
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True)
             .Properties(p => p
-                .GeoPoint(g => g.Name(f => f.Field3))
-                .Keyword(e => e.Name(m => m.Field2))));
+                .GeoPoint(g => g.Field3)
+                .Keyword(e => e.Field2)));
 
-        var res = Client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index));
-        Client.Indices.RefreshAsync(index);
+        var res = await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index));
+        await Client.Indices.RefreshAsync(index);
 
         var parser = new ElasticQueryParser(c => c.SetDefaultFields(["field1"]).UseMappings<MyType>(GetCodeMappings, Client, index));
 
@@ -487,8 +489,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             {
                 d.Field(d2 => d2.Field5);
 
-                if (expectedInterval is CalendarInterval CalendarInterval)
-                    d.CalendarInterval(CalendarInterval);
+                if (expectedInterval is CalendarInterval calendarInterval)
+                    d.CalendarInterval(calendarInterval);
                 else if (expectedInterval is string stringInterval)
                     d.FixedInterval(stringInterval);
                 else
@@ -508,11 +510,11 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanDoNestDateHistogram()
+    public async Task CanDoNestDateHistogram()
     {
         string index = CreateRandomIndex<MyType>();
         await Client.IndexManyAsync([new MyType { Field5 = DateTime.Now }], index);
-        Client.Indices.RefreshAsync(index);
+        await Client.Indices.RefreshAsync(index);
 
         var response = await Client.SearchAsync<MyType>(i => i.Index(index).Aggregations(f => f
             .DateHistogram("myagg", d => d.Field(d2 => d2.Field5).CalendarInterval(CalendarInterval.Day))
@@ -639,7 +641,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Term(m => m.Field1, "value1") && !f.Term(m => m.Field2, "value2")));
+            .Index(index).Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) && !f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -654,7 +656,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Term(m => m.Field1, "value1") && !f.Term(m => m.Field2, "value2")));
+            .Index(index).Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) && !f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -669,7 +671,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Term(m => m.Field1, "value1") || !f.Term(m => m.Field2, "value2")));
+            .Index(index).Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) || !f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -684,7 +686,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Term(m => m.Field1, "value1") || !f.Term(m => m.Field2, "value2")));
+            .Index(index).Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) || !f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -712,8 +714,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index)
-                .Query(f => f.Term(m => m.Field1, "value1") ||
-                    (f.Term(m => m.Field2, "value2") || f.Term(m => m.Field3, "value3"))));
+                .Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) ||
+                    (f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(tf => tf.Field3).Value("value3")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -742,8 +744,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var expectedResponse =
             await Client.SearchAsync<MyType>(d => d.Index(index)
                 .Query(q => q.Bool(b => b.Filter(f => f
-                    .Term(m => m.Field1, "value1") &&
-                        (f.Term(m => m.Field2, "value2") || f.Term(m => m.Field3, "value3"))))));
+                    .Term(m => m.Field(tf => tf.Field1).Value("value1")) &&
+                        (f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(tf => tf.Field3).Value("value3")))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -832,8 +834,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index)
-            .Query(f => f.Term(m => m.Field1, "value1") &&
-                    (f.Term(m => m.Field2, "value2") || f.Term(m => m.Field3, "value3"))));
+            .Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) &&
+                    (f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(tf => tf.Field3).Value("value3")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -845,15 +847,15 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task NestedFilterProcessor()
     {
         string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
-            .Text(e => e.Name(n => n.Field1).Index())
-            .Text(e => e.Name(n => n.Field2).Index())
-            .Text(e => e.Name(n => n.Field3).Index())
-            .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+            .Text(e => e.Field1, o => o.Index())
+            .Text(e => e.Field2, o => o.Index())
+            .Text(e => e.Field3, o => o.Index())
+            .IntegerNumber(e => e.Field4)
             .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
-                .Text(e => e.Name(n => n.Field1).Index())
-                .Text(e => e.Name(n => n.Field2).Index())
-                .Text(e => e.Name(n => n.Field3).Index())
-                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+                .Text(e => e.Field1, o => o.Index())
+                .Text(e => e.Field2, o => o.Index())
+                .Text(e => e.Field3, o => o.Index())
+                .IntegerNumber(e => e.Field4)
             ))
         ));
         await Client.IndexManyAsync([
@@ -917,15 +919,15 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task NestedFilterProcessor2()
     {
         string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
-            .Text(e => e.Name(n => n.Field1).Index())
-            .Text(e => e.Name(n => n.Field2).Index())
-            .Text(e => e.Name(n => n.Field3).Index())
-            .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+            .Text(e => e.Field1, o => o.Index())
+            .Text(e => e.Field2, o => o.Index())
+            .Text(e => e.Field3, o => o.Index())
+            .IntegerNumber(e => e.Field4)
             .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
-                .Text(e => e.Name(n => n.Field1).Index())
-                .Text(e => e.Name(n => n.Field2).Index())
-                .Text(e => e.Name(n => n.Field3).Index())
-                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+                .Text(e => e.Field1, o => o.Index())
+                .Text(e => e.Field2, o => o.Index())
+                .Text(e => e.Field3, o => o.Index())
+                .IntegerNumber(e => e.Field4)
             ))
         ));
 
@@ -966,9 +968,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanGenerateMatchQuery()
     {
         string index = CreateRandomIndex<MyType>(m => m.Properties(p => p
-            .Text(f => f.Name(e => e.Field1)
+           .Text(e => e.Field1)
                 .Fields(f1 => f1
-                    .Keyword(k => k.Name("keyword").IgnoreAbove(256))))));
+                    .Keyword(k => k.Name("keyword").IgnoreAbove(256)))));
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildQueryAsync("field1:test", new ElasticQueryVisitorContext().UseScoring());
@@ -1011,7 +1013,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [Fact]
     public async Task NonAnalyzedPrefixQuery()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
+        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Field1)));
         await Client.IndexAsync(new MyType { Field1 = "value123" }, i => i.Index(index));
         await Client.Indices.RefreshAsync(index);
 
@@ -1058,7 +1060,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                         .Query(
                             f =>
                                 f.TermRange(m => m.Field(f2 => f2.Field4).GreaterThanOrEquals("1").LessThan("2")) ||
-                                f.Term(m => m.Field1, "value1")));
+                                f.Term(m => m.Field(tf => tf.Field1).Value("value1"))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1147,7 +1149,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualResponse);
 
-        var expectedResponse = await Client.SearchAsyncAsync<MyType>(d => d
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Index(index)
             .Query(f => f
                 .DateRange(m => m.Field(f2 => f2.Field5).GreaterThanOrEquals("2017-01-31").TimeZone("America/Chicago"))
@@ -1225,7 +1227,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [Fact]
     public async Task SimpleGeoRangeQuery()
     {
-        string index = CreateRandomIndex<MyType>(m => m.Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+        string index = CreateRandomIndex<MyType>(m => m.Properties(p => p.GeoPoint(g => g.Field3)));
         var res = await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" },
             i => i.Index(index));
         await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
@@ -1256,7 +1258,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [Fact]
     public async Task CanUseValidationToGetUnresolvedFields()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
+        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Field1)));
         await Client.IndexAsync(new MyType { Field1 = "value123" }, i => i.Index(index));
         await Client.Indices.RefreshAsync(index);
 
@@ -1298,7 +1300,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [Fact]
     public async Task CanSortByUnmappedField()
     {
-        string index = CreateRandomIndex<MyType>(m => m.Dynamic());
+        string index = CreateRandomIndex<MyType>(m => m.Dynamic(DynamicMapping.True));
 
         var processor = new ElasticQueryParser(c => c.UseMappings(Client, index));
         var sort = await processor.BuildSortAsync("-field1");
@@ -1322,9 +1324,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [Fact]
     public async Task CanParseSort()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))
-                .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
-                .Text(e => e.Name(m => m.Field2).Fields(f2 => f2.Keyword(e1 => e1.Name("keyword")).Keyword(e2 => e2.Name("sort"))))
+        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p.GeoPoint(g => g.Field3)
+                .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")))
+                .Text(e => e.Field2, o => o.Fields(f2 => f2.Keyword("keyword").Keyword(e2 => e2.Name("sort"))))
             ));
         var res = await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" },
             i => i.Index(index));
@@ -1410,7 +1412,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanParseMixedCaseSort()
     {
         string index = CreateRandomIndex<MyType>(d => d.Properties(p => p
-            .Text(e => e.Name(m => m.MultiWord).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
+            .Text(e => e.Name(m => m.MultiWord).Fields(f1 => f1.Keyword("keyword")))
         ));
 
         var res = await Client.IndexAsync(new MyType { MultiWord = "value1" }, i => i.Index(index));
@@ -1435,8 +1437,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task GeoRangeQueryProcessor()
     {
         string index = CreateRandomIndex<MyType>(m => m.Properties(p => p
-                .GeoPoint(g => g.Name(f => f.Field3))
-                .Text(e => e.Name(m => m.Field1).Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))));
+                .GeoPoint(g => g.Field3)
+                .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")))));
 
         await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index(index));
         await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
@@ -1515,7 +1517,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [InlineData("terms:(field1~100 (@missing:__missing__))")]
     public async Task CanValidateAggregation(string aggregation)
     {
-        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Name(m => m.Field1))));
+        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p.Keyword(e => e.Field1)));
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var parser = new ElasticQueryParser(c => c.UseMappings(Client, index).SetLoggerFactory(Log));
         var node = await parser.ParseAsync(aggregation, context);

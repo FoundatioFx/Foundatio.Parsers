@@ -16,11 +16,11 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Log.DefaultMinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
-    private TypeMapping MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
+    private TypeMappingDescriptor<MyNestedType> MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
     {
         return m
             .AutoMap<MyNestedType>()
-            .Dynamic()
+            .Dynamic(DynamicMapping.True)
             .DynamicTemplates(t => t.DynamicTemplate("idx_text", t => t.Match("text*").Mapping(m => m.Text(mp => mp.AddKeywordAndSortFields()))))
             .Properties(p => p
                 .Text(p1 => p1.Name(n => n.Field1).AddKeywordAndSortFields())

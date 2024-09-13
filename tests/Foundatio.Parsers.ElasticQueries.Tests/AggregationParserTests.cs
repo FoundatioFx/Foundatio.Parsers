@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
@@ -21,7 +22,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSingleAggregationAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)));
         await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -52,7 +53,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSingleAggregationWithAliasAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)));
         await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -84,11 +85,11 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessAnalyzedAggregationWithAliasAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
-            .Text(f => f.Name(n => n.Field1)
-                .Fields(k => k.Keyword(m => m.Name("keyword"))))
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p
+            .Text(f => f.Field1, o => o
+                .Fields(k => k.Keyword("keyword")))
             .FieldAlias(f => f.Name("heynow").Path(k => k.Field1))
-            .GeoPoint(g => g.Name(f => f.Field3))));
+            .GeoPoint(g => g.Field3)));
         await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -120,7 +121,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessAggregationsAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p.GeoPoint(g => g.Name(f => f.Field3))));
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)));
         await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -138,7 +139,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
-            .GeoHash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(1)
+            .Geohash("geogrid_field3", h => h.Field("field3").GeoHashPrecision(1)
                 .Aggregations(a1 => a1.Average("avg_lat", s => s.Script(ss => ss.Source("doc['field3'].lat"))).Average("avg_lon", s => s.Script(ss => ss.Source("doc['field3'].lon")))))
             .Terms("terms_field1", t => t.Field("field1.keyword").Meta(m => m.Add("@field_type", "text")))
             .Histogram("histogram_field4", h => h.Field("field4").Interval(50).MinimumDocumentCount(0))
@@ -162,8 +163,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessNestedAggregationsWithAliasesAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
-            .GeoPoint(g => g.Name(f => f.Field3))
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p
+            .GeoPoint(g => g.Field3)
             .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
                 .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
                     .Text(f3 => f3.Name("identity")
@@ -225,8 +226,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessAggregationsWithAliasesAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic().Properties(p => p
-            .GeoPoint(g => g.Name(f => f.Field3))
+        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p
+            .GeoPoint(g => g.Field3)
             .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
                 .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
                     .Text(f3 => f3.Name("identity").Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))))));
@@ -447,7 +448,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     public Task GeoGridDoesNotResolveLocationForAggregation()
     {
         string index = CreateRandomIndex<MyType>(d => d.Properties(p => p
-            .GeoPoint(g => g.Name(f => f.Field1))
+            .GeoPoint(g => g.Field1)
             .FieldAlias(a => a.Name("geo").Path(f => f.Field1))));
 
         var processor = new ElasticQueryParser(c => c
@@ -463,10 +464,10 @@ public class AggregationParserTests : ElasticsearchTestBase
     [InlineData("avg:value", true)]
     [InlineData("    avg     :   value", true)]
     [InlineData("avg:value cardinality:value sum:value min:value max:value", true)]
-    public Task CanParseAggregations(string query, bool IsValidResponse)
+    public Task CanParseAggregations(string query, bool isValid)
     {
         var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
-        return GetAggregationQueryInfoAsync(parser, query, IsValidResponse);
+        return GetAggregationQueryInfoAsync(parser, query, isValid);
     }
 
     public static IEnumerable<object[]> AggregationTestCases =>
@@ -525,23 +526,24 @@ public class AggregationParserTests : ElasticsearchTestBase
 
     [Theory]
     [MemberData(nameof(AggregationTestCases))]
-    public Task GetElasticAggregationQueryInfoAsync(string query, bool IsValidResponse, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations)
+    public Task GetElasticAggregationQueryInfoAsync(string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations)
     {
         var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
-        return GetAggregationQueryInfoAsync(parser, query, IsValidResponse, maxNodeDepth, fields, operations);
+        return GetAggregationQueryInfoAsync(parser, query, isValid, maxNodeDepth, fields, operations);
     }
 
-    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool IsValidResponse, int maxNodeDepth = -1, HashSet<string> fields = null, Dictionary<string, ICollection<string>> operations = null)
+    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth = -1, HashSet<string> fields = null, Dictionary<string, ICollection<string>> operations = null)
     {
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var queryNode = await parser.ParseAsync(query, context);
+        Assert.NotNull(queryNode);
 
         var result = context.GetValidationResult();
         Assert.Equal(QueryTypes.Aggregation, result.QueryType);
-        if (!result.IsValidResponse)
-            _logger.LogInformation(result.Message);
+        if (!result.IsValid)
+            _logger.LogInformation("Result {Request}", result.Message);
 
-        Assert.Equal(IsValidResponse, result.IsValidResponse);
+        Assert.Equal(isValid, result.IsValid);
         if (maxNodeDepth >= 0)
             Assert.Equal(maxNodeDepth, result.MaxNodeDepth);
         if (fields != null)

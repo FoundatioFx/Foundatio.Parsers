@@ -30,12 +30,12 @@ public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLife
 
     protected ElasticsearchClient Client => _fixture.Client;
 
-    protected void CreateNamedIndex<TModel>(string index, Func<TypeMappingDescriptor<TModel>, TypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
+    protected void CreateNamedIndex<TModel>(string index, Func<TypeMappingDescriptor<TModel>, TypeMappingDescriptor<TModel>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
     {
         _fixture.CreateNamedIndex(index, configureMappings, configureIndex);
     }
 
-    protected string CreateRandomIndex<TModel>(Func<TypeMappingDescriptor<TModel>, TypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
+    protected string CreateRandomIndex<TModel>(Func<TypeMappingDescriptor<TModel>, TypeMappingDescriptor<TModel>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
     {
         return _fixture.CreateRandomIndex(configureMappings, configureIndex);
     }
@@ -100,7 +100,7 @@ public class ElasticsearchFixture : IAsyncLifetime
 
     public void CreateNamedIndex<T>(string index, Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
     {
-        configureMappings ??= m => m.AutoMap<T>().Dynamic();
+        configureMappings ??= m => m.AutoMap<T>().Dynamic(DynamicMapping.True);
         if (configureIndex == null)
             configureIndex = i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
 
@@ -111,7 +111,7 @@ public class ElasticsearchFixture : IAsyncLifetime
     public string CreateRandomIndex<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
     {
         string index = "test_" + Guid.NewGuid().ToString("N");
-        configureMappings ??= m => m.AutoMap<T>().Dynamic();
+        configureMappings ??= m => m.AutoMap<T>().Dynamic(DynamicMapping.True);
         configureIndex ??= i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
 
         CreateIndex(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Map<T>(configureMappings));
