@@ -143,7 +143,7 @@ public class SampleDataFixture : ElasticsearchFixture
         await base.InitializeAsync();
 
         const string indexName = "test_invert";
-        CreateNamedIndex<InvertTest>(indexName, m => m
+        await CreateNamedIndexAsync<InvertTest>(indexName, m => m
             .Properties(p => p
                 .Keyword(p1 => p1.Id)
                 .Keyword(p1 => p1.OrganizationId)

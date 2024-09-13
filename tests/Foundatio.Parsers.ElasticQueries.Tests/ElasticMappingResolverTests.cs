@@ -33,7 +33,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public async Task CanResolveCodedProperty()
     {
-        string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
+        string index = await CreateRandomIndexAsync<MyNestedType>(MapMyNestedType);
 
         await Client.IndexManyAsync([
             new MyNestedType
@@ -69,7 +69,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public async Task CanResolveProperties()
     {
-        string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
+        string index = await CreateRandomIndexAsync<MyNestedType>(MapMyNestedType);
 
         await Client.IndexManyAsync([
             new MyNestedType

@@ -22,7 +22,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSingleAggregationAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)));
+        string index = await CreateRandomIndexAsync<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)));
         await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -53,7 +53,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSingleAggregationWithAliasAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)));
+        string index = await CreateRandomIndexAsync<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)));
         await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -85,7 +85,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessAnalyzedAggregationWithAliasAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p
+        string index = await CreateRandomIndexAsync<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p
             .Text(f => f.Field1, o => o
                 .Fields(k => k.Keyword("keyword")))
             .FieldAlias(f => f.Name("heynow").Path(k => k.Field1))
@@ -121,7 +121,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessAggregationsAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)));
+        string index = await CreateRandomIndexAsync<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)));
         await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" },
             new MyType { Field1 = "value2", Field4 = 2, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(4)) },
@@ -163,7 +163,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessNestedAggregationsWithAliasesAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p
+        string index = await CreateRandomIndexAsync<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p
             .GeoPoint(g => g.Field3)
             .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
                 .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
@@ -196,7 +196,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSingleAggregationWithAlias()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
 
         await Client.IndexManyAsync([
             new MyType { Field2 = "field2" }
@@ -226,7 +226,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessAggregationsWithAliasesAsync()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p
+        string index = await CreateRandomIndexAsync<MyType>(d => d.Dynamic(DynamicMapping.True).Properties(p => p
             .GeoPoint(g => g.Field3)
             .Object<Dictionary<string, object>>(o1 => o1.Name(f1 => f1.Data).Properties(p1 => p1
                 .Object<object>(o2 => o2.Name("@user").Properties(p2 => p2
@@ -270,7 +270,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessTermAggregations()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
@@ -299,7 +299,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessHistogramIntervalAggregations()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
@@ -326,7 +326,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessTermTopHitsAggregations()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
@@ -354,7 +354,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessSortedTermAggregations()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
@@ -384,7 +384,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessDateHistogramAggregations()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([new MyType { Field5 = DateTime.UtcNow }], index);
         await Client.Indices.RefreshAsync(index);
 
@@ -418,7 +418,7 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task CanSpecifyDefaultValuesAggregations()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([new MyType { Field1 = "test" }, new MyType { Field4 = 1 }], index);
         await Client.Indices.RefreshAsync(index);
 
@@ -445,9 +445,9 @@ public class AggregationParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public Task GeoGridDoesNotResolveLocationForAggregation()
+    public async Task GeoGridDoesNotResolveLocationForAggregation()
     {
-        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p
+        string index = await CreateRandomIndexAsync<MyType>(d => d.Properties(p => p
             .GeoPoint(g => g.Field1)
             .FieldAlias(a => a.Name("geo").Path(f => f.Field1))));
 
@@ -455,7 +455,7 @@ public class AggregationParserTests : ElasticsearchTestBase
                 .UseGeo(_ => "someinvalidvaluehere")
                 .UseMappings(Client, index));
 
-        return processor.BuildAggregationsAsync("geogrid:geo~3");
+        await processor.BuildAggregationsAsync("geogrid:geo~3");
     }
 
     [Theory]

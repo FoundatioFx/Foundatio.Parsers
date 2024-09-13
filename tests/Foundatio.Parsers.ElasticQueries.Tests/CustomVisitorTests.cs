@@ -24,7 +24,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     [Fact]
     public async Task CanResolveSimpleCustomFilter()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
 
         var processor = new ElasticQueryParser(c => c
@@ -49,7 +49,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     [Fact]
     public async Task CanResolveCustomFilterContainingIncludes()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
 
         var processor = new ElasticQueryParser(c => c
@@ -74,7 +74,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     [Fact]
     public async Task CanResolveIncludeToCustomFilterContainingIgnoredInclude()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
 
         var processor = new ElasticQueryParser(c => c
@@ -121,7 +121,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     [Fact]
     public async Task CanResolveMultipleCustomFilters()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
 
         var processor = new ElasticQueryParser(c => c

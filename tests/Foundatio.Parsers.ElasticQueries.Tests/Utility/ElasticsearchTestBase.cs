@@ -30,19 +30,19 @@ public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLife
 
     protected ElasticsearchClient Client => _fixture.Client;
 
-    protected void CreateNamedIndex<TModel>(string index, Func<TypeMappingDescriptor<TModel>, TypeMappingDescriptor<TModel>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
+    protected Task CreateNamedIndexAsync<TModel>(string index, Func<TypeMappingDescriptor<TModel>, TypeMappingDescriptor<TModel>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
     {
-        _fixture.CreateNamedIndex(index, configureMappings, configureIndex);
+        return _fixture.CreateNamedIndexAsync(index, configureMappings, configureIndex);
     }
 
-    protected string CreateRandomIndex<TModel>(Func<TypeMappingDescriptor<TModel>, TypeMappingDescriptor<TModel>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
+    protected Task<string> CreateRandomIndexAsync<TModel>(Func<TypeMappingDescriptor<TModel>, TypeMappingDescriptor<TModel>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
     {
-        return _fixture.CreateRandomIndex(configureMappings, configureIndex);
+        return _fixture.CreateRandomIndexAsync(configureMappings, configureIndex);
     }
 
-    protected CreateIndexResponse CreateIndex(IndexName index, Func<CreateIndexRequestDescriptor, CreateIndexRequest> configureIndex = null)
+    protected Task<CreateIndexResponse> CreateIndexAsync(IndexName index, Action<CreateIndexRequestDescriptor> configureIndex = null)
     {
-        return _fixture.CreateIndex(index, configureIndex);
+        return _fixture.CreateIndexAsync(index, configureIndex);
     }
 
     /// <summary>
@@ -98,34 +98,33 @@ public class ElasticsearchFixture : IAsyncLifetime
 
     protected virtual void ConfigureConnectionSettings(ElasticsearchClientSettings settings) { }
 
-    public void CreateNamedIndex<T>(string index, Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
+    public async Task CreateNamedIndexAsync<T>(string index, Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
     {
-        configureMappings ??= m => m.AutoMap<T>().Dynamic(DynamicMapping.True);
-        if (configureIndex == null)
-            configureIndex = i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
-
-        CreateIndex(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Map<T>(configureMappings));
-        Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
-    }
-
-    public string CreateRandomIndex<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
-    {
-        string index = "test_" + Guid.NewGuid().ToString("N");
         configureMappings ??= m => m.AutoMap<T>().Dynamic(DynamicMapping.True);
         configureIndex ??= i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
 
-        CreateIndex(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Map<T>(configureMappings));
+        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Map<T>(configureMappings));
+        Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
+    }
+
+    public async Task<string> CreateRandomIndexAsync<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
+    {
+        string index = $"test_{Guid.NewGuid():N}";
+        configureMappings ??= m => m.AutoMap<T>().Dynamic(DynamicMapping.True);
+        configureIndex ??= i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
+
+        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Map<T>(configureMappings));
         Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
 
         return index;
     }
 
-    public CreateIndexResponse CreateIndex(IndexName index, Func<CreateIndexRequestDescriptor, CreateIndexRequest> configureIndex = null)
+    public async Task<CreateIndexResponse> CreateIndexAsync(IndexName index, Action<CreateIndexRequestDescriptor> configureIndex = null)
     {
         _createdIndexes.Add(index);
 
         configureIndex ??= d => d.Settings(s => s.NumberOfReplicas(0));
-        var result = Client.Indices.Create(index, configureIndex);
+        var result = await Client.Indices.CreateAsync(index, configureIndex);
         if (!result.IsValidResponse)
             throw new ApplicationException($"Unable to create index {index}: " + result.DebugInformation);
 
