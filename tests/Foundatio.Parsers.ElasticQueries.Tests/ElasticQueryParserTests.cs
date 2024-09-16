@@ -1553,7 +1553,6 @@ public record MyNestedType
 
 public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryVisitor
 {
-
     public override void Visit(TermNode node, IQueryVisitorContext context)
     {
         if (!String.Equals(node.Field, "fixed", StringComparison.OrdinalIgnoreCase))
@@ -1562,7 +1561,7 @@ public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryV
         if (!Boolean.TryParse(node.Term, out bool isFixed))
             return;
 
-        var query = new ExistsQuery { Field = "date_fixed" };
+        var query = Query.Exists(new ExistsQuery { Field = "date_fixed" });
         node.SetQuery(isFixed ? query : !query);
     }
 }
