@@ -38,7 +38,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms("1"))))));
+            .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Term(new TermsQueryField(["1"])))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -63,7 +63,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms("1", "3"))))));
+            .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Term(new TermsQueryField(["1", "3"])))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -88,7 +88,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms("1", "3"))))));
+            .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Term(new TermsQueryField(["1", "3"])))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -101,7 +101,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
         var current = node.Parent;
         while (current != null)
         {
-            if (current is GroupNode groupNode && groupNode.Field == "@custom")
+            if (current is GroupNode { Field: "@custom" })
                 return true;
 
             current = current.Parent;
@@ -140,10 +140,10 @@ public class CustomVisitorTests : ElasticsearchTestBase
                     .Filter(filter => filter
                         .Bool(b1 => b1
                             .Should(
-                                s1 => s1.Terms(m => m.Field("id").Terms("1")),
+                                s1 => s1.Terms(m => m.Field("id").Term(new TermsQueryField(["1"]))),
                                 s2 => s2.Bool(b2 => b2
                                     .Must(
-                                        m2 => m2.Terms(t1 => t1.Field("id").Terms("2")),
+                                        m2 => m2.Terms(t1 => t1.Field("id").Term(new TermsQueryField(["2"]))),
                                         m2 => m2.Term(t1 => t1.Field("field1").Value("Test"))
                                     )
                                 )

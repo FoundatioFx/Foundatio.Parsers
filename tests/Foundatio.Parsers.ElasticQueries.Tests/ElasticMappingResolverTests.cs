@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
@@ -23,10 +24,10 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             .Dynamic(DynamicMapping.True)
             .DynamicTemplates(t => t.DynamicTemplate("idx_text", t => t.Match("text*").Mapping(m => m.Text(mp => mp.AddKeywordAndSortFields()))))
             .Properties(p => p
-                .Text(p1 => p1.Name(n => n.Field1).AddKeywordAndSortFields())
-                .Text(p1 => p1.Name(n => n.Field4).AddKeywordAndSortFields())
-                    .FieldAlias(a => a.Path(n => n.Field4).Name("field4alias"))
-                .Text(p1 => p1.Name(n => n.Field5).AddKeywordAndSortFields(true))
+                .Text(p1 => p1.Field1, o => o.AddKeywordAndSortFields())
+                .Text(p1 => p1.Field4, o => o.AddKeywordAndSortFields())
+                    .FieldAlias(a => a.Field4, o => o.Path("field4alias"))
+                .Text(p1 => p1.Field5, o => o.AddKeywordAndSortFields(true))
             );
     }
 

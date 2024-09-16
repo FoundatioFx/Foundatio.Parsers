@@ -163,7 +163,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     {
         string index = await CreateRandomIndexAsync<MyType>(d => d
             .Dynamic(DynamicMapping.True).Properties(p => p.GeoPoint(g => g.Field3)
-                .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword(e1 => e1.Name("keyword"))))
+                .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")))
                 .Keyword(e => e.Field2)
             ));
         await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index));
@@ -1326,10 +1326,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     {
         string index = await CreateRandomIndexAsync<MyType>(d => d.Properties(p => p.GeoPoint(g => g.Field3)
                 .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")))
-                .Text(e => e.Field2, o => o.Fields(f2 => f2.Keyword("keyword").Keyword(e2 => e2.Name("sort"))))
+                .Text(e => e.Field2, o => o.Fields(f2 => f2.Keyword("keyword").Keyword("sort")))
             ));
-        var res = await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" },
-            i => i.Index(index));
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index(index));
         await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
         await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
         await Client.Indices.RefreshAsync(index);
