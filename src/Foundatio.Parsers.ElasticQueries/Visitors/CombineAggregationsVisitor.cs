@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Aggregations;
+using Elastic.Clients.Elasticsearch.Core.Search;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
@@ -20,7 +22,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
         var container = await GetParentContainerAsync(node, context);
-        var termsAggregation = container as ITermsAggregation;
+        var termsAggregation = container.Value as TermsAggregation;
 
         foreach (var child in node.Children.OfType<IFieldQueryNode>())
         {
@@ -49,11 +51,11 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                         if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
                             minCount = parsedMinCount;
 
-                        termsAggregation.MinimumDocumentCount = minCount;
+                        termsAggregation.MinDocCount = minCount;
                     }
                 }
 
-                if (termNode != null && container is ITopHitsAggregation topHitsAggregation)
+                if (termNode != null && container.Value is TopHitsAggregation topHitsAggregation)
                 {
                     var filter = node.GetSourceFilter(() => new SourceFilter());
                     if (termNode.Field == "@exclude")
@@ -70,10 +72,10 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                         else
                             filter.Includes.And(termNode.UnescapedTerm);
                     }
-                    topHitsAggregation.Source = filter;
+                    topHitsAggregation.Source = new SourceConfig(filter);
                 }
 
-                if (termNode != null && container is IDateHistogramAggregation dateHistogramAggregation)
+                if (termNode != null && container.Value is DateHistogramAggregation dateHistogramAggregation)
                 {
                     if (termNode.Field == "@missing")
                     {
@@ -92,24 +94,15 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                 continue;
             }
 
-            if (container is BucketAggregationBase bucketContainer)
+            if (container.Value.IsBucketAggregation())
             {
-                if (bucketContainer.Aggregations == null)
-                    bucketContainer.Aggregations = new AggregationDictionary();
-
-                bucketContainer.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                container.Aggregations.Add(aggregation);
             }
 
-            if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+"))
+            if (termsAggregation != null && child.Prefix is "-" or "+")
             {
-                if (termsAggregation.Order == null)
-                    termsAggregation.Order = new List<TermsOrder>();
-
-                termsAggregation.Order.Add(new TermsOrder
-                {
-                    Key = ((IAggregation)aggregation).Name,
-                    Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
-                });
+                termsAggregation.Order ??= new List<KeyValuePair<Field, SortOrder>>();
+                termsAggregation.Order.Add(new KeyValuePair<Field, SortOrder>(aggregation.Name, child.Prefix == "-" ? SortOrder.Desc : SortOrder.Asc));
             }
         }
 
@@ -117,9 +110,9 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             node.SetAggregation(container);
     }
 
-    private async Task<AggregationBase> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context)
+    private async Task<AggregationMap> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        AggregationBase container = null;
+        AggregationMap container = null;
         var currentNode = node;
         while (container == null && currentNode != null)
         {
@@ -141,7 +134,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         if (container == null)
         {
-            container = new ChildrenAggregation(null, null);
+            container = new AggregationMap(null, null);
             currentNode.SetAggregation(container);
         }
 
