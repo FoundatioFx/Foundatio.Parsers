@@ -49,12 +49,15 @@ services:
         ]
       interval: 1s
       retries: 20
+    networks:
+      - foundatio
 
   ready:
     image: andrewlock/wait-for-dependencies
     command: elasticsearch:9200
     depends_on:
       - elasticsearch
+      - sqlserver
     networks:
       - foundatio
 
