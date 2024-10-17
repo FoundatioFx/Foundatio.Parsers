@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.SqlQueries.Visitors;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -25,7 +26,7 @@ public class SqlQueryParserConfiguration
 
     public int MaxFieldDepth { get; private set; } = 10;
     public QueryFieldResolver FieldResolver { get; private set; }
-    public Func<string, string[]> Tokenizer { get; set; } = static s => [s];
+    public Func<EntityFieldInfo, string, SearchTokenizeResult> SearchTokenizer { get; set; } = static (_, t) => new SearchTokenizeResult([t], SqlSearchOperator.Contains);
     public EntityTypePropertyFilter EntityTypePropertyFilter { get; private set; } = static _ => true;
     public EntityTypeNavigationFilter EntityTypeNavigationFilter { get; private set; } = static _ => true;
     public EntityTypeSkipNavigationFilter EntityTypeSkipNavigationFilter { get; private set; } = static _ => true;
@@ -49,9 +50,9 @@ public class SqlQueryParserConfiguration
         return this;
     }
 
-    public SqlQueryParserConfiguration SetTokenizer(Func<string, string[]> tokenizer)
+    public SqlQueryParserConfiguration SetSearchTokenizer(Func<EntityFieldInfo, string, SearchTokenizeResult> tokenizer)
     {
-        Tokenizer = tokenizer;
+        SearchTokenizer = tokenizer;
         return this;
     }
 

@@ -192,7 +192,7 @@ public class SqlQueryParser : LuceneQueryParser
 
         if (context is ISqlQueryVisitorContext sqlContext)
         {
-            sqlContext.Tokenizer = Configuration.Tokenizer;
+            sqlContext.Tokenizer = Configuration.SearchTokenizer;
         }
     }
 }

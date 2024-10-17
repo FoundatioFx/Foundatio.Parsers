@@ -128,18 +128,19 @@ public static class SqlNodeExtensions
                 return String.Empty;
             }
 
-            var fieldTerms = new Dictionary<EntityFieldInfo, List<string>>();
+            var fieldTerms = new Dictionary<EntityFieldInfo, (List<string> Tokens, SqlSearchOperator Operator)>();
             foreach (string df in context.DefaultFields)
             {
                 var fieldInfo = GetFieldInfo(context.Fields, df);
-                if (!fieldTerms.TryGetValue(fieldInfo, out var fields))
+                if (!fieldTerms.TryGetValue(fieldInfo, out var searchInfo))
                 {
-                    fields = new List<string>();
-                    fieldTerms.Add(fieldInfo, fields);
+                    searchInfo = (new List<string>(), SqlSearchOperator.Contains);
+                    fieldTerms.Add(fieldInfo, searchInfo);
                 }
 
-                foreach (string token in context.Tokenizer?.Invoke(node.Term) ?? [node.Term])
-                    fields.Add(token);
+                var result = context.Tokenizer.Invoke(fieldInfo, node.Term);
+                searchInfo.Tokens.AddRange(result.Tokens);
+                searchInfo.Operator = result.Operator;
             }
 
             var keys = fieldTerms.Keys.ToArray();
@@ -147,7 +148,7 @@ public static class SqlNodeExtensions
             {
                 builder.Append(index == 0 ? "(" : " OR ");
                 var fieldInfo = keys[index];
-                var terms = fieldTerms[fieldInfo];
+                var searchInfo = fieldTerms[fieldInfo];
 
                 if (fieldInfo.IsCollection)
                 {
@@ -159,13 +160,13 @@ public static class SqlNodeExtensions
                     builder.Append(".Any(");
                     builder.Append(fieldName);
                     builder.Append(" in (");
-                    builder.Append(String.Join(',', terms.Select(t => "\"" + t + "\"")));
+                    builder.Append(String.Join(',', searchInfo.Tokens.Select(t => "\"" + t + "\"")));
                     builder.Append("))");
                 }
                 else
                 {
                     builder.Append(fieldInfo.Field).Append(" in (");
-                    builder.Append(String.Join(',', terms.Select(t => "\"" + t + "\"")));
+                    builder.Append(String.Join(',', searchInfo.Tokens.Select(t => "\"" + t + "\"")));
                     builder.Append(")");
                 }
 
