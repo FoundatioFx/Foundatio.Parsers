@@ -104,19 +104,14 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
-    public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo> fields, string field)
-    {
-        if (fields == null)
-            return new EntityFieldInfo { Field = field };
-
-        return fields.FirstOrDefault(f => f.Field.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
-               new EntityFieldInfo { Field = field };
-    }
-
     public static string ToDynamicLinqString(this TermNode node, ISqlQueryVisitorContext context)
     {
         if (!String.IsNullOrEmpty(node.Prefix))
             context.AddValidationError("Prefix is not supported for term range queries.");
+
+        // support overriding the generated query
+        if (node.TryGetQuery(out string query))
+            return query;
 
         var builder = new StringBuilder();
 
@@ -128,58 +123,77 @@ public static class SqlNodeExtensions
                 return String.Empty;
             }
 
-            var fieldTerms = new Dictionary<EntityFieldInfo, (List<string> Tokens, SqlSearchOperator Operator)>();
+            var fieldTerms = new Dictionary<EntityFieldInfo, SearchTerm>();
             foreach (string df in context.DefaultFields)
             {
                 var fieldInfo = GetFieldInfo(context.Fields, df);
-                if (!fieldTerms.TryGetValue(fieldInfo, out var searchInfo))
+                if (!fieldTerms.TryGetValue(fieldInfo, out var searchTerm))
                 {
-                    searchInfo = (new List<string>(), SqlSearchOperator.Contains);
-                    fieldTerms.Add(fieldInfo, searchInfo);
+                    searchTerm = new SearchTerm
+                    {
+                        FieldInfo = fieldInfo,
+                        Tokens = [node.Term],
+                        Operator = SqlSearchOperator.StartsWith
+                    };
+                    fieldTerms[fieldInfo] = searchTerm;
                 }
 
-                var result = context.Tokenizer.Invoke(fieldInfo, node.Term);
-                searchInfo.Tokens.AddRange(result.Tokens);
-                searchInfo.Operator = result.Operator;
+                context.Tokenizer.Invoke(searchTerm);
             }
 
-            var keys = fieldTerms.Keys.ToArray();
-            for (int index = 0; index < keys.Length; index++)
+            fieldTerms.ForEach((kvp, info) =>
             {
-                builder.Append(index == 0 ? "(" : " OR ");
-                var fieldInfo = keys[index];
-                var searchInfo = fieldTerms[fieldInfo];
+                builder.Append(info.IsFirst ? "(" : " OR ");
+                var searchTerm = kvp.Value;
+                var tokens = kvp.Value.Tokens ?? [kvp.Value.Term];
 
-                if (fieldInfo.IsCollection)
+                if (searchTerm.FieldInfo.IsCollection)
                 {
-                    int dotIndex = fieldInfo.Field.LastIndexOf('.');
-                    string collectionField = fieldInfo.Field.Substring(0, dotIndex);
-                    string fieldName = fieldInfo.Field.Substring(dotIndex + 1);
+                    int dotIndex = searchTerm.FieldInfo.Field.LastIndexOf('.');
+                    string collectionField = searchTerm.FieldInfo.Field.Substring(0, dotIndex);
+                    string fieldName = searchTerm.FieldInfo.Field.Substring(dotIndex + 1);
 
                     builder.Append(collectionField);
                     builder.Append(".Any(");
                     builder.Append(fieldName);
                     builder.Append(" in (");
-                    builder.Append(String.Join(',', searchInfo.Tokens.Select(t => "\"" + t + "\"")));
+                    builder.Append(String.Join(',', tokens.Select(t => "\"" + t + "\"")));
                     builder.Append("))");
                 }
                 else
                 {
-                    builder.Append(fieldInfo.Field).Append(" in (");
-                    builder.Append(String.Join(',', searchInfo.Tokens.Select(t => "\"" + t + "\"")));
-                    builder.Append(")");
+                    if (searchTerm.Operator == SqlSearchOperator.Equals)
+                    {
+                        builder.Append(searchTerm.FieldInfo.Field).Append(" in (");
+                        builder.Append(String.Join(',', tokens.Select(t => "\"" + t + "\"")));
+                        builder.Append(")");
+                    }
+                    else if (searchTerm.Operator == SqlSearchOperator.Contains)
+                    {
+                        searchTerm.Tokens.ForEach((token, info) => {
+                            builder.Append(info.IsFirst ? "(" : " OR ");
+                            builder.Append(searchTerm.FieldInfo.Field).Append(".Contains(\"").Append(token).Append("\")");
+                            if (info.IsLast)
+                                builder.Append(")");
+                        });
+                    }
+                    else if (searchTerm.Operator == SqlSearchOperator.StartsWith)
+                    {
+                        searchTerm.Tokens.ForEach((token, info) => {
+                            builder.Append(info.IsFirst ? "(" : " OR ");
+                            builder.Append(searchTerm.FieldInfo.Field).Append(".StartsWith(\"").Append(token).Append("\")");
+                            if (info.IsLast)
+                                builder.Append(")");
+                        });
+                    }
                 }
 
-                if (index == context.DefaultFields.Length - 1)
+                if (info.IsLast)
                     builder.Append(")");
-            }
+            });
 
             return builder.ToString();
         }
-
-        // support overriding the generated query
-        if (node.TryGetQuery(out string query))
-            return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
 
@@ -217,52 +231,6 @@ public static class SqlNodeExtensions
         }
 
         return builder.ToString();
-    }
-
-    private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term)
-    {
-        if (field == null)
-            return;
-
-        if (field.IsNumber || field.IsBoolean || field.IsMoney)
-        {
-            builder.Append(term);
-        }
-        else if (field is { IsDate: true })
-        {
-            term = term.Trim();
-            if (term.StartsWith("now", StringComparison.OrdinalIgnoreCase))
-            {
-                builder.Append("DateTime.UtcNow");
-
-                if (term.Length == 3)
-                    return;
-
-                builder.Append(".");
-
-                string method = term[^1..] switch
-                {
-                    "y" => "AddYears",
-                    "M" => "AddMonths",
-                    "d" => "AddDays",
-                    "h" => "AddHours",
-                    "H" => "AddHours",
-                    "m" => "AddMinutes",
-                    "s" => "AddSeconds",
-                    _ => throw new NotSupportedException("Invalid date operation.")
-                };
-
-                bool subtract = term.Substring(3, 1) == "-";
-
-                builder.Append(method).Append("(").Append(subtract ? "-" : "").Append(term.Substring(4, term.Length - 5)).Append(")");
-            }
-            else
-            {
-                builder.Append("DateTime.Parse(\"" + term + "\")");
-            }
-        }
-        else
-            builder.Append("\"" + term + "\"");
     }
 
     public static string ToDynamicLinqString(this TermRangeNode node, ISqlQueryVisitorContext context)
@@ -324,6 +292,61 @@ public static class SqlNodeExtensions
             TermRangeNode termRangeNode => termRangeNode.ToDynamicLinqString(context),
             _ => throw new NotSupportedException($"Node type {node.GetType().Name} is not supported.")
         };
+    }
+
+    public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo> fields, string field)
+    {
+        if (fields == null)
+            return new EntityFieldInfo { Field = field };
+
+        return fields.FirstOrDefault(f => f.Field.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
+               new EntityFieldInfo { Field = field };
+    }
+
+    private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term)
+    {
+        if (field == null)
+            return;
+
+        if (field.IsNumber || field.IsBoolean || field.IsMoney)
+        {
+            builder.Append(term);
+        }
+        else if (field is { IsDate: true })
+        {
+            term = term.Trim();
+            if (term.StartsWith("now", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.Append("DateTime.UtcNow");
+
+                if (term.Length == 3)
+                    return;
+
+                builder.Append(".");
+
+                string method = term[^1..] switch
+                {
+                    "y" => "AddYears",
+                    "M" => "AddMonths",
+                    "d" => "AddDays",
+                    "h" => "AddHours",
+                    "H" => "AddHours",
+                    "m" => "AddMinutes",
+                    "s" => "AddSeconds",
+                    _ => throw new NotSupportedException("Invalid date operation.")
+                };
+
+                bool subtract = term.Substring(3, 1) == "-";
+
+                builder.Append(method).Append("(").Append(subtract ? "-" : "").Append(term.Substring(4, term.Length - 5)).Append(")");
+            }
+            else
+            {
+                builder.Append("DateTime.Parse(\"" + term + "\")");
+            }
+        }
+        else
+            builder.Append("\"" + term + "\"");
     }
 
     private const string QueryKey = "Query";

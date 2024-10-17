@@ -26,7 +26,7 @@ public class SqlQueryParserConfiguration
 
     public int MaxFieldDepth { get; private set; } = 10;
     public QueryFieldResolver FieldResolver { get; private set; }
-    public Func<EntityFieldInfo, string, SearchTokenizeResult> SearchTokenizer { get; set; } = static (_, t) => new SearchTokenizeResult([t], SqlSearchOperator.Contains);
+    public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
     public EntityTypePropertyFilter EntityTypePropertyFilter { get; private set; } = static _ => true;
     public EntityTypeNavigationFilter EntityTypeNavigationFilter { get; private set; } = static _ => true;
     public EntityTypeSkipNavigationFilter EntityTypeSkipNavigationFilter { get; private set; } = static _ => true;
@@ -50,7 +50,7 @@ public class SqlQueryParserConfiguration
         return this;
     }
 
-    public SqlQueryParserConfiguration SetSearchTokenizer(Func<EntityFieldInfo, string, SearchTokenizeResult> tokenizer)
+    public SqlQueryParserConfiguration SetSearchTokenizer(Action<SearchTerm> tokenizer)
     {
         SearchTokenizer = tokenizer;
         return this;

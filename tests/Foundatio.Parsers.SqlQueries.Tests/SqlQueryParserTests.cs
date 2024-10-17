@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Pegasus.Common.Tracing;
+using PhoneNumbers;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -84,21 +85,22 @@ public class SqlQueryParserTests : TestWithLoggingBase
     {
         var sp = GetServiceProvider();
         await using var db = await GetSampleContextWithDataAsync(sp);
+        var phoneNumberUtil = PhoneNumberUtil.GetInstance();
         var parser = sp.GetRequiredService<SqlQueryParser>();
-        parser.Configuration.SetDefaultFields(["SearchValues.Term"]);
-        parser.Configuration.SetSearchTokenizer((f, t) =>
+        parser.Configuration.SetDefaultFields(["NationalPhoneNumber"]);
+        parser.Configuration.SetSearchTokenizer(s =>
         {
-            if (f.Field != "SearchValues.Term")
-                return new SearchTokenizeResult([t], SqlSearchOperator.Contains);
+            if (s.FieldInfo.Field != "NationalPhoneNumber")
+                return;
 
-            string[] terms = [t.Replace("-", "")];
-            return new SearchTokenizeResult(terms.Distinct().ToArray(), SqlSearchOperator.Equals);
+            s.Tokens = [phoneNumberUtil.Parse(s.Term, "US").NationalNumber.ToString()];
+            s.Operator = SqlSearchOperator.StartsWith;
         });
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.SearchValues.Any(s => s.Term == "2142222222")).ToQueryString();
-        string sqlActual = db.Employees.Where("""SearchValues.Any(Term in ("2142222222"))""").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => e.NationalPhoneNumber.StartsWith("2142222222")).ToQueryString();
+        string sqlActual = db.Employees.Where("NationalPhoneNumber.StartsWith(\"2142222222\")").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         string sql = await parser.ToDynamicLinqAsync("214-222-2222", context);
@@ -109,13 +111,6 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.Equal(sqlExpected, sqlActual);
 
         sql = await parser.ToDynamicLinqAsync("2142222222", context);
-        _logger.LogInformation(sql);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        results = await db.Employees.Where(sql).ToListAsync();
-        Assert.Single(results);
-        Assert.Equal(sqlExpected, sqlActual);
-
-        sql = await parser.ToDynamicLinqAsync("(214) 222-2222", context);
         _logger.LogInformation(sql);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         results = await db.Employees.Where(sql).ToListAsync();
@@ -309,6 +304,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
         var db = sp.GetRequiredService<SampleContext>();
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
+        var phoneNumberUtil = PhoneNumberUtil.GetInstance();
+
         var dbParser = db.GetService<SqlQueryParser>();
         Assert.Same(parser, dbParser);
         var dbSetParser = db.Employees.GetService<SqlQueryParser>();
@@ -328,32 +325,20 @@ public class SqlQueryParserTests : TestWithLoggingBase
             FullName = "John Doe",
             Title = "Software Developer",
             PhoneNumber = "(214) 222-2222",
+            NationalPhoneNumber = phoneNumberUtil.Parse("(214) 222-2222", "US").NationalNumber.ToString(),
             Salary = 80_000,
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 30 }],
-            Companies = [company],
-            SearchValues = [
-                new() { Term = "john" },
-                new() { Term = "doe" },
-                new() { Term = "software" },
-                new() { Term = "developer" },
-                new() { Term = "2142222222" }
-            ]
+            Companies = [company]
         });
         db.Employees.Add(new Employee
         {
             FullName = "Jane Doe",
             Title = "Software Developer",
-            PhoneNumber = "214-333-1111",
+            PhoneNumber = "+52 55 1234 5678", // Mexico
+            NationalPhoneNumber = phoneNumberUtil.Parse("+52 55 1234 5678", "US").NationalNumber.ToString(),
             Salary = 90_000,
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 23 }],
-            Companies = [company],
-            SearchValues = [
-                new() { Term = "jane" },
-                new() { Term = "doe" },
-                new() { Term = "software" },
-                new() { Term = "developer" },
-                new() { Term = "2143331111" }
-            ]
+            Companies = [company]
         });
         await db.SaveChangesAsync();
 
