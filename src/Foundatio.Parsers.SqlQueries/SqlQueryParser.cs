@@ -189,5 +189,10 @@ public class SqlQueryParser : LuceneQueryParser
             if (Configuration.IncludeResolver != null && context.GetIncludeResolver() == null)
                 context.SetIncludeResolver(Configuration.IncludeResolver);
         }
+
+        if (context is ISqlQueryVisitorContext sqlContext)
+        {
+            sqlContext.Tokenizer = Configuration.Tokenizer;
+        }
     }
 }

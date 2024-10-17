@@ -69,11 +69,39 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.FullName.Contains("John") || e.Title.Contains("John")).ToQueryString();
-        string sqlActual = db.Employees.Where("""FullName.Contains("John") || Title.Contains("John")""").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => e.FullName == "John Doe" || e.Title == "John Doe").ToQueryString();
+        string sqlActual = db.Employees.Where("""FullName = "John Doe" || Title = "John Doe" """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToDynamicLinqAsync("John", context);
+        string sql = await parser.ToDynamicLinqAsync("John Doe", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
+        var results = await db.Employees.Where(sql).ToListAsync();
+        Assert.Single(results);
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
+    public async Task CanSearchWithTokenizer()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["SearchValues.Term"]);
+        parser.Configuration.SetTokenizer(t =>
+        {
+            string[] terms = [t.Replace("-", "")];
+            return terms.Distinct().ToArray();
+        });
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.SearchValues.Any(s => s.Term == "2142222222")).ToQueryString();
+        string sqlActual = db.Employees.Where("""SearchValues.Any(Term in ("2142222222"))""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("214-222-2222", context);
+        _logger.LogInformation(sql);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        var results = await db.Employees.Where(sql).ToListAsync();
+        Assert.Single(results);
         Assert.Equal(sqlExpected, sqlActual);
     }
 
@@ -281,9 +309,17 @@ public class SqlQueryParserTests : TestWithLoggingBase
         {
             FullName = "John Doe",
             Title = "Software Developer",
+            PhoneNumber = "(214) 222-2222",
             Salary = 80_000,
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 30 }],
-            Companies = [company]
+            Companies = [company],
+            SearchValues = [
+                new() { Term = "john" },
+                new() { Term = "doe" },
+                new() { Term = "software" },
+                new() { Term = "developer" },
+                new() { Term = "2142222222" }
+            ]
         });
         db.Employees.Add(new Employee
         {

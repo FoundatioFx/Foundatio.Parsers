@@ -25,6 +25,7 @@ public class SqlQueryParserConfiguration
 
     public int MaxFieldDepth { get; private set; } = 10;
     public QueryFieldResolver FieldResolver { get; private set; }
+    public Func<string, string[]> Tokenizer { get; set; } = static s => [s];
     public EntityTypePropertyFilter EntityTypePropertyFilter { get; private set; } = static _ => true;
     public EntityTypeNavigationFilter EntityTypeNavigationFilter { get; private set; } = static _ => true;
     public EntityTypeSkipNavigationFilter EntityTypeSkipNavigationFilter { get; private set; } = static _ => true;
@@ -45,6 +46,12 @@ public class SqlQueryParserConfiguration
     public SqlQueryParserConfiguration SetDefaultFields(string[] fields)
     {
         DefaultFields = fields;
+        return this;
+    }
+
+    public SqlQueryParserConfiguration SetTokenizer(Func<string, string[]> tokenizer)
+    {
+        Tokenizer = tokenizer;
         return this;
     }
 

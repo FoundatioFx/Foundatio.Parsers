@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -8,6 +9,7 @@ namespace Foundatio.Parsers.SqlQueries.Visitors;
 public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorContext
 {
     public List<EntityFieldInfo> Fields { get; set; }
+    public Func<string, string[]> Tokenizer { get; set; } = s => [s];
     public IEntityType EntityType { get; set; }
 }
 

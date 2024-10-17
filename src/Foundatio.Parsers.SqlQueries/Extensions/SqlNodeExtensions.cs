@@ -128,26 +128,45 @@ public static class SqlNodeExtensions
                 return String.Empty;
             }
 
-            for (int index = 0; index < context.DefaultFields.Length; index++)
+            var fieldTerms = new Dictionary<EntityFieldInfo, List<string>>();
+            foreach (string df in context.DefaultFields)
+            {
+                var fieldInfo = GetFieldInfo(context.Fields, df);
+                if (!fieldTerms.TryGetValue(fieldInfo, out var fields))
+                {
+                    fields = new List<string>();
+                    fieldTerms.Add(fieldInfo, fields);
+                }
+
+                foreach (string token in context.Tokenizer?.Invoke(node.Term) ?? [node.Term])
+                    fields.Add(token);
+            }
+
+            var keys = fieldTerms.Keys.ToArray();
+            for (int index = 0; index < keys.Length; index++)
             {
                 builder.Append(index == 0 ? "(" : " OR ");
+                var fieldInfo = keys[index];
+                var terms = fieldTerms[fieldInfo];
 
-                var defaultField = GetFieldInfo(context.Fields, context.DefaultFields[index]);
-                if (defaultField.IsCollection)
+                if (fieldInfo.IsCollection)
                 {
-                    int dotIndex = defaultField.Field.LastIndexOf('.');
-                    string collectionField = defaultField.Field.Substring(0, dotIndex);
-                    string fieldName = defaultField.Field.Substring(dotIndex + 1);
+                    int dotIndex = fieldInfo.Field.LastIndexOf('.');
+                    string collectionField = fieldInfo.Field.Substring(0, dotIndex);
+                    string fieldName = fieldInfo.Field.Substring(dotIndex + 1);
 
                     builder.Append(collectionField);
                     builder.Append(".Any(");
                     builder.Append(fieldName);
-                    builder.Append(".Contains(\"").Append(node.Term).Append("\")");
-                    builder.Append(")");
+                    builder.Append(" in (");
+                    builder.Append(String.Join(',', terms.Select(t => "\"" + t + "\"")));
+                    builder.Append("))");
                 }
                 else
                 {
-                    builder.Append(defaultField.Field).Append(".Contains(\"").Append(node.Term).Append("\")");
+                    builder.Append(fieldInfo.Field).Append(" in (");
+                    builder.Append(String.Join(',', terms.Select(t => "\"" + t + "\"")));
+                    builder.Append(")");
                 }
 
                 if (index == context.DefaultFields.Length - 1)

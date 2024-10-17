@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 
 namespace Foundatio.Parsers.SqlQueries.Tests;
@@ -11,6 +12,7 @@ public class SampleContext : DbContext
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<DataDefinition> DataDefinitions => Set<DataDefinition>();
     public DbSet<DataValue> DataValues => Set<DataValue>();
+    public DbSet<SearchValue> SearchValues => Set<SearchValue>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,17 +36,30 @@ public class SampleContext : DbContext
         modelBuilder.Entity<DataValue>().Property(e => e.BooleanValue).IsSparse();
         modelBuilder.Entity<DataValue>().Property(e => e.NumberValue).HasColumnType("decimal").HasPrecision(15, 3).IsSparse();
         modelBuilder.Entity<DataValue>().HasIndex(e => new { e.StringValue, e.DateValue, e.MoneyValue, e.BooleanValue, e.NumberValue });
+
+        // Search
+        modelBuilder.Entity<SearchValue>().HasIndex(s => new { s.EmployeeId, s.Term });
     }
+}
+
+public class SearchValue
+{
+    public int Id { get; set; }
+    public int EmployeeId { get; set; }
+    public string Term { get; set; }
 }
 
 public class Employee
 {
     public int Id { get; set; }
     public string FullName { get; set; }
+    public string PhoneNumber { get; set; }
     public string Title { get; set; }
     public int Salary { get; set; }
     public List<Company> Companies { get; set; }
     public List<DataValue> DataValues { get; set; }
+
+    public List<SearchValue> SearchValues { get; set; }
     public DateTime Created { get; set; } = DateTime.Now;
 }
 
