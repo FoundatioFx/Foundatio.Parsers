@@ -138,7 +138,7 @@ public static class SqlNodeExtensions
                     fieldTerms[fieldInfo] = searchTerm;
                 }
 
-                context.Tokenizer.Invoke(searchTerm);
+                context.SearchTokenizer.Invoke(searchTerm);
             }
 
             fieldTerms.ForEach((kvp, x) =>

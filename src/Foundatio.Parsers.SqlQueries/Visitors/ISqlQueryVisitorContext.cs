@@ -7,5 +7,5 @@ namespace Foundatio.Parsers.SqlQueries.Visitors;
 public interface ISqlQueryVisitorContext : IQueryVisitorContext
 {
     List<EntityFieldInfo> Fields { get; set; }
-    Action<SearchTerm> Tokenizer { get; set; }
+    Action<SearchTerm> SearchTokenizer { get; set; }
 }

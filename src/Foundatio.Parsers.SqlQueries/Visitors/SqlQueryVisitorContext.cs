@@ -9,7 +9,7 @@ namespace Foundatio.Parsers.SqlQueries.Visitors;
 public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorContext
 {
     public List<EntityFieldInfo> Fields { get; set; }
-    public Action<SearchTerm> Tokenizer { get; set; } = static _ => { };
+    public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
     public IEntityType EntityType { get; set; }
 }
 
