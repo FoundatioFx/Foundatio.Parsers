@@ -141,9 +141,9 @@ public static class SqlNodeExtensions
                 context.Tokenizer.Invoke(searchTerm);
             }
 
-            fieldTerms.ForEach((kvp, info) =>
+            fieldTerms.ForEach((kvp, x) =>
             {
-                builder.Append(info.IsFirst ? "(" : " OR ");
+                builder.Append(x.IsFirst ? "(" : " OR ");
                 var searchTerm = kvp.Value;
                 var tokens = kvp.Value.Tokens ?? [kvp.Value.Term];
 
@@ -153,12 +153,43 @@ public static class SqlNodeExtensions
                     string collectionField = searchTerm.FieldInfo.Field.Substring(0, dotIndex);
                     string fieldName = searchTerm.FieldInfo.Field.Substring(dotIndex + 1);
 
-                    builder.Append(collectionField);
-                    builder.Append(".Any(");
-                    builder.Append(fieldName);
-                    builder.Append(" in (");
-                    builder.Append(String.Join(',', tokens.Select(t => "\"" + t + "\"")));
-                    builder.Append("))");
+                    if (searchTerm.Operator == SqlSearchOperator.Equals)
+                    {
+                        builder.Append(collectionField);
+                        builder.Append(".Any(");
+                        builder.Append(fieldName);
+                        builder.Append(" in (");
+                        builder.Append(String.Join(',', tokens.Select(t => "\"" + t + "\"")));
+                        builder.Append("))");
+                    }
+                    else if (searchTerm.Operator == SqlSearchOperator.Contains)
+                    {
+                        tokens.ForEach((token, i) => {
+                            builder.Append(i.IsFirst ? "(" : " OR ");
+                            builder.Append(collectionField);
+                            builder.Append(".Any(");
+                            builder.Append(fieldName);
+                            builder.Append(".Contains(\"");
+                            builder.Append(token);
+                            builder.Append("\"))");
+                            if (i.IsLast)
+                                builder.Append(")");
+                        });
+                    }
+                    else if (searchTerm.Operator == SqlSearchOperator.StartsWith)
+                    {
+                        tokens.ForEach((token, i) => {
+                            builder.Append(i.IsFirst ? "(" : " OR ");
+                            builder.Append(collectionField);
+                            builder.Append(".Any(");
+                            builder.Append(fieldName);
+                            builder.Append(".StartsWith(\"");
+                            builder.Append(token);
+                            builder.Append("\"))");
+                            if (i.IsLast)
+                                builder.Append(")");
+                        });
+                    }
                 }
                 else
                 {
@@ -170,25 +201,25 @@ public static class SqlNodeExtensions
                     }
                     else if (searchTerm.Operator == SqlSearchOperator.Contains)
                     {
-                        searchTerm.Tokens.ForEach((token, info) => {
-                            builder.Append(info.IsFirst ? "(" : " OR ");
+                        tokens.ForEach((token, i) => {
+                            builder.Append(i.IsFirst ? "(" : " OR ");
                             builder.Append(searchTerm.FieldInfo.Field).Append(".Contains(\"").Append(token).Append("\")");
-                            if (info.IsLast)
+                            if (i.IsLast)
                                 builder.Append(")");
                         });
                     }
                     else if (searchTerm.Operator == SqlSearchOperator.StartsWith)
                     {
-                        searchTerm.Tokens.ForEach((token, info) => {
-                            builder.Append(info.IsFirst ? "(" : " OR ");
+                        tokens.ForEach((token, i) => {
+                            builder.Append(i.IsFirst ? "(" : " OR ");
                             builder.Append(searchTerm.FieldInfo.Field).Append(".StartsWith(\"").Append(token).Append("\")");
-                            if (info.IsLast)
+                            if (i.IsLast)
                                 builder.Append(")");
                         });
                     }
                 }
 
-                if (info.IsLast)
+                if (x.IsLast)
                     builder.Append(")");
             });
 

@@ -205,8 +205,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name.Contains("acme"))).ToQueryString();
-        string sqlActual = db.Employees.Where("""Companies.Any(Name.Contains("acme"))""").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name.StartsWith("acme"))).ToQueryString();
+        string sqlActual = db.Employees.Where("""Companies.Any(Name.StartsWith("acme"))""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("acme", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
