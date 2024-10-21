@@ -35,8 +35,11 @@ services:
       - "1433:1433" # login with sa:P@ssword1
     environment:
       - "ACCEPT_EULA=Y"
-      - "SA_PASSWORD=P@ssword1"
+      - "MSSQL_SA_PASSWORD=P@ssword1"
       - "MSSQL_PID=Developer"
+    user: root
+    networks:
+      - foundatio
     healthcheck:
       test:
         [
@@ -49,8 +52,6 @@ services:
         ]
       interval: 1s
       retries: 20
-    networks:
-      - foundatio
 
   ready:
     image: andrewlock/wait-for-dependencies
