@@ -70,10 +70,10 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.FullName == "John Doe" || e.Title == "John Doe").ToQueryString();
-        string sqlActual = db.Employees.Where("""FullName = "John Doe" || Title = "John Doe" """).ToQueryString();
+        string sqlExpected = db.Employees.Where(e => e.FullName.StartsWith("John") || e.Title.StartsWith("John")).ToQueryString();
+        string sqlActual = db.Employees.Where("""FullName.StartsWith("John") || Title.StartsWith("John") """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToDynamicLinqAsync("John Doe", context);
+        string sql = await parser.ToDynamicLinqAsync("John", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         var results = await db.Employees.Where(sql).ToListAsync();
         Assert.Single(results);
@@ -90,6 +90,9 @@ public class SqlQueryParserTests : TestWithLoggingBase
         parser.Configuration.SetDefaultFields(["NationalPhoneNumber"]);
         parser.Configuration.SetSearchTokenizer(s =>
         {
+            if (String.IsNullOrWhiteSpace(s.Term))
+                return;
+
             if (s.FieldInfo.Field != "NationalPhoneNumber")
                 return;
 
@@ -116,6 +119,12 @@ public class SqlQueryParserTests : TestWithLoggingBase
         results = await db.Employees.Where(sql).ToListAsync();
         Assert.Single(results);
         Assert.Equal(sqlExpected, sqlActual);
+
+        sql = await parser.ToDynamicLinqAsync("21422", context);
+        _logger.LogInformation(sql);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        results = await db.Employees.Where(sql).ToListAsync();
+        Assert.Single(results);
     }
 
     [Fact]

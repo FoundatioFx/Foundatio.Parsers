@@ -132,7 +132,7 @@ public static class SqlNodeExtensions
                     searchTerm = new SearchTerm
                     {
                         FieldInfo = fieldInfo,
-                        Tokens = [node.Term],
+                        Term = node.Term,
                         Operator = SqlSearchOperator.StartsWith
                     };
                     fieldTerms[fieldInfo] = searchTerm;
