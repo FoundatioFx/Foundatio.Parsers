@@ -85,7 +85,6 @@ public class SqlQueryParserTests : TestWithLoggingBase
     {
         var sp = GetServiceProvider();
         await using var db = await GetSampleContextWithDataAsync(sp);
-        var phoneNumberUtil = PhoneNumberUtil.GetInstance();
         var parser = sp.GetRequiredService<SqlQueryParser>();
         parser.Configuration.SetDefaultFields(["NationalPhoneNumber"]);
         parser.Configuration.SetSearchTokenizer(s =>
@@ -96,7 +95,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             if (s.FieldInfo.FullName != "NationalPhoneNumber")
                 return;
 
-            s.Tokens = [phoneNumberUtil.Parse(s.Term, "US").NationalNumber.ToString()];
+            s.Tokens = [TryGetNationalNumber(s.Term)];
             s.Operator = SqlSearchOperator.StartsWith;
         });
 
@@ -125,6 +124,27 @@ public class SqlQueryParserTests : TestWithLoggingBase
         sqlActual = db.Employees.Where(sql).ToQueryString();
         results = await db.Employees.Where(sql).ToListAsync();
         Assert.Single(results);
+    }
+
+    [Fact]
+    public async Task CanHandleEmptyTokens()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["NationalPhoneNumber"]);
+        parser.Configuration.SetSearchTokenizer(s =>
+        {
+            s.Tokens = ["", "    "];
+        });
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sql = await parser.ToDynamicLinqAsync("test", context);
+        _logger.LogInformation(sql);
+        string sqlActual = db.Employees.Where(sql).ToQueryString();
+        var results = await db.Employees.Where(sql).ToListAsync();
+        Assert.Empty(results);
     }
 
     [Fact]
@@ -311,6 +331,19 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.Single(employees);
         var employee = employees.Single();
         Assert.Equal("John Doe", employee.FullName);
+    }
+
+    public static string? TryGetNationalNumber(string phoneNumber, string regionCode = "US")
+    {
+        var phoneNumberUtil = PhoneNumberUtil.GetInstance();
+        try
+        {
+            return phoneNumberUtil.Parse(phoneNumber, regionCode).NationalNumber.ToString();
+        }
+        catch (NumberParseException)
+        {
+            return null;
+        }
     }
 
     public IServiceProvider GetServiceProvider()

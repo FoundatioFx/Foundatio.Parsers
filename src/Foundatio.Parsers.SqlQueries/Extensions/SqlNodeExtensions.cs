@@ -149,9 +149,13 @@ public static class SqlNodeExtensions
                 }
 
                 context.SearchTokenizer.Invoke(searchTerm);
+                if (searchTerm.Tokens == null)
+                    searchTerm.Tokens = [ searchTerm.Term ];
+                else
+                    searchTerm.Tokens = searchTerm.Tokens.Select(t => !String.IsNullOrWhiteSpace(t) ? t : "@__NOMATCH__").ToList();
             }
 
-            fieldTerms.ForEach((kvp, x) =>
+            fieldTerms.Where(f => f.Value.Tokens is { Count: > 0 }).ForEach((kvp, x) =>
             {
                 if (x.IsFirst && node.IsNegated.HasValue && node.IsNegated.Value)
                     builder.Append("!");
