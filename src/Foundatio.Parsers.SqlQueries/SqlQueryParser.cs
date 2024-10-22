@@ -82,7 +82,7 @@ public class SqlQueryParser : LuceneQueryParser
         if (!_entityFieldCache.TryGetValue(entityType, out var fields))
         {
             fields = new List<EntityFieldInfo>();
-            AddEntityFields(fields, entityType);
+            AddEntityFields(fields, null, entityType);
             _entityFieldCache.TryAdd(entityType, fields);
         }
 
@@ -90,7 +90,7 @@ public class SqlQueryParser : LuceneQueryParser
         fields = fields.ToList();
 
         var validationOptions = new QueryValidationOptions();
-        foreach (string field in fields.Select(f => f.Field))
+        foreach (string field in fields.Where(f => !f.IsNavigation).Select(f => f.FullName))
             validationOptions.AllowedFields.Add(field);
 
         Configuration.SetValidationOptions(validationOptions);
@@ -101,7 +101,7 @@ public class SqlQueryParser : LuceneQueryParser
         };
     }
 
-    private void AddEntityFields(List<EntityFieldInfo> fields, IEntityType entityType, Stack<IEntityType> entityTypeStack = null, string prefix = null, bool isCollection = false, int depth = 0)
+    private void AddEntityFields(List<EntityFieldInfo> fields, EntityFieldInfo parent, IEntityType entityType, Stack<IEntityType> entityTypeStack = null, string prefix = null, int depth = 0)
     {
         entityTypeStack ??= new Stack<IEntityType>();
 
@@ -123,11 +123,12 @@ public class SqlQueryParser : LuceneQueryParser
             string propertyPath = prefix + property.Name;
             fields.Add(new EntityFieldInfo
             {
-                Field = propertyPath,
+                Name = property.Name,
+                FullName = propertyPath,
                 IsNumber = property.ClrType.UnwrapNullable().IsNumeric(),
                 IsDate = property.ClrType.UnwrapNullable().IsDateTime(),
                 IsBoolean = property.ClrType.UnwrapNullable().IsBoolean(),
-                IsCollection = isCollection
+                Parent = parent
             });
         }
 
@@ -139,7 +140,17 @@ public class SqlQueryParser : LuceneQueryParser
             string propertyPath = prefix + nav.Name;
             bool isNavCollection = nav is IReadOnlyNavigationBase { IsCollection: true };
 
-            AddEntityFields(fields, nav.TargetEntityType, entityTypeStack, propertyPath + ".", isNavCollection, depth + 1);
+            var navFieldInfo = new EntityFieldInfo
+            {
+                IsCollection = isNavCollection,
+                IsNavigation = true,
+                Name = nav.Name,
+                FullName = propertyPath,
+                Parent = parent
+            };
+            fields.Add(navFieldInfo);
+
+            AddEntityFields(fields, navFieldInfo, nav.TargetEntityType, entityTypeStack, propertyPath + ".", depth + 1);
         }
 
         foreach (var skipNav in entityType.GetSkipNavigations())
@@ -149,7 +160,17 @@ public class SqlQueryParser : LuceneQueryParser
 
             string propertyPath = prefix + skipNav.Name;
 
-            AddEntityFields(fields, skipNav.TargetEntityType, entityTypeStack, propertyPath + ".", skipNav.IsCollection, depth + 1);
+            var navFieldInfo = new EntityFieldInfo
+            {
+                IsCollection = skipNav.IsCollection,
+                IsNavigation = true,
+                Name = skipNav.Name,
+                FullName = propertyPath,
+                Parent = parent
+            };
+            fields.Add(navFieldInfo);
+
+            AddEntityFields(fields, navFieldInfo, skipNav.TargetEntityType, entityTypeStack, propertyPath + ".", depth + 1);
         }
 
         entityTypeStack.Pop();

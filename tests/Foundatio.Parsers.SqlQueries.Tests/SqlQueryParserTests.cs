@@ -93,7 +93,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             if (String.IsNullOrWhiteSpace(s.Term))
                 return;
 
-            if (s.FieldInfo.Field != "NationalPhoneNumber")
+            if (s.FieldInfo.FullName != "NationalPhoneNumber")
                 return;
 
             s.Tokens = [phoneNumberUtil.Parse(s.Term, "US").NationalNumber.ToString()];
@@ -214,6 +214,25 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task CanUseCollectionDefaultFieldsWithNestedDepth()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["Companies.DataDefinitions.Key"]);
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.DataDefinitions.Any(e => e.Key.StartsWith("age")))).ToQueryString();
+        string sqlActual = db.Employees.Where("""Companies.Any(DataDefinitions.Any(Key.StartsWith("age")))""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("age", context);
+        _logger.LogInformation(sql);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
     public async Task CanUseNavigationFields()
     {
         var sp = GetServiceProvider();
@@ -269,7 +288,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
         var context = parser.GetContext(db.Employees.EntityType);
-        context.Fields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
+        context.Fields.Add(new EntityFieldInfo { Name = "age", FullName = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
         context.ValidationOptions.AllowedFields.Add("age");
 
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name == "acme") && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
@@ -383,7 +402,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         {
             Fields =
             [
-                new EntityFieldInfo { Field = "field", IsNumber = true }
+                new EntityFieldInfo { Name = "field", FullName = "field", IsNumber = true }
             ]
         };
         string generatedQuery = await GenerateSqlVisitor.RunAsync(result, context);
