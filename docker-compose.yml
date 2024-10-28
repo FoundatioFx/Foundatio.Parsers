@@ -10,24 +10,36 @@ services:
       - 9300:9300
     networks:
       - foundatio
+    healthcheck:
+      interval: 2s
+      retries: 10
+      test: curl -s http://localhost:9200/_cluster/health | grep -vq '"status":"red"'
 
   kibana:
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     image: docker.elastic.co/kibana/kibana:8.15.1
     ports:
       - 5601:5601
     networks:
       - foundatio
+    healthcheck:
+      interval: 2s
+      retries: 20
+      test: curl --write-out 'HTTP %{http_code}' --fail --silent --output /dev/null http://localhost:5601/api/status
 
   sqlserver:
-    image: mcr.microsoft.com/azure-sql-edge:1.0.7
+    image: mcr.microsoft.com/mssql/server:2022-latest
     ports:
       - "1433:1433" # login with sa:P@ssword1
     environment:
       - "ACCEPT_EULA=Y"
-      - "SA_PASSWORD=P@ssword1"
+      - "MSSQL_SA_PASSWORD=P@ssword1"
       - "MSSQL_PID=Developer"
+    user: root
+    networks:
+      - foundatio
     healthcheck:
       test:
         [
@@ -46,6 +58,7 @@ services:
     command: elasticsearch:9200
     depends_on:
       - elasticsearch
+      - sqlserver
     networks:
       - foundatio
 

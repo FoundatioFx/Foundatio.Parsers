@@ -5,6 +5,7 @@ using System.Text;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.SqlQueries.Visitors;
+using Microsoft.Extensions.Primitives;
 
 namespace Foundatio.Parsers.SqlQueries.Extensions;
 
@@ -70,13 +71,18 @@ public static class SqlNodeExtensions
         if (node.TryGetQuery(out string query))
             return query;
 
+        var field = GetFieldInfo(context.Fields, node.Field);
+        var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
+
         var builder = new StringBuilder();
 
-        builder.Append(node.Field);
+        builder.Append(fieldPrefix);
+        builder.Append(field.Name);
         if (!node.IsNegated.HasValue || !node.IsNegated.Value)
             builder.Append(" != null");
         else
             builder.Append(" == null");
+        builder.Append(fieldSuffix);
 
         return builder.ToString();
     }
@@ -93,30 +99,29 @@ public static class SqlNodeExtensions
         if (node.TryGetQuery(out string query))
             return query;
 
-        var builder = new StringBuilder();
+        var field = GetFieldInfo(context.Fields, node.Field);
+        var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
 
-        builder.Append(node.Field);
+        var builder = new StringBuilder();
+        builder.Append(fieldPrefix);
+        builder.Append(field.Name);
         if (!node.IsNegated.HasValue || !node.IsNegated.Value)
             builder.Append(" == null");
         else
             builder.Append(" != null");
+        builder.Append(fieldSuffix);
 
         return builder.ToString();
-    }
-
-    public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo> fields, string field)
-    {
-        if (fields == null)
-            return new EntityFieldInfo { Field = field };
-
-        return fields.FirstOrDefault(f => f.Field.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
-               new EntityFieldInfo { Field = field };
     }
 
     public static string ToDynamicLinqString(this TermNode node, ISqlQueryVisitorContext context)
     {
         if (!String.IsNullOrEmpty(node.Prefix))
             context.AddValidationError("Prefix is not supported for term range queries.");
+
+        // support overriding the generated query
+        if (node.TryGetQuery(out string query))
+            return query;
 
         var builder = new StringBuilder();
 
@@ -128,75 +133,200 @@ public static class SqlNodeExtensions
                 return String.Empty;
             }
 
-            for (int index = 0; index < context.DefaultFields.Length; index++)
+            var fieldTerms = new Dictionary<EntityFieldInfo, SearchTerm>();
+            foreach (string df in context.DefaultFields)
             {
-                builder.Append(index == 0 ? "(" : " OR ");
-
-                var defaultField = GetFieldInfo(context.Fields, context.DefaultFields[index]);
-                if (defaultField.IsCollection)
+                var fieldInfo = GetFieldInfo(context.Fields, df);
+                if (!fieldTerms.TryGetValue(fieldInfo, out var searchTerm))
                 {
-                    int dotIndex = defaultField.Field.LastIndexOf('.');
-                    string collectionField = defaultField.Field.Substring(0, dotIndex);
-                    string fieldName = defaultField.Field.Substring(dotIndex + 1);
-
-                    builder.Append(collectionField);
-                    builder.Append(".Any(");
-                    builder.Append(fieldName);
-                    builder.Append(".Contains(\"").Append(node.Term).Append("\")");
-                    builder.Append(")");
+                    searchTerm = new SearchTerm
+                    {
+                        FieldInfo = fieldInfo,
+                        Term = node.Term,
+                        Operator = SqlSearchOperator.StartsWith
+                    };
+                    fieldTerms[fieldInfo] = searchTerm;
                 }
+
+                context.SearchTokenizer.Invoke(searchTerm);
+                if (searchTerm.Tokens == null)
+                    searchTerm.Tokens = [ searchTerm.Term ];
                 else
+                    searchTerm.Tokens = searchTerm.Tokens.Select(t => !String.IsNullOrWhiteSpace(t) ? t : "@__NOMATCH__").ToList();
+            }
+
+            fieldTerms.Where(f => f.Value.Tokens is { Count: > 0 }).ForEach((kvp, x) =>
+            {
+                if (x.IsFirst && node.IsNegated.HasValue && node.IsNegated.Value)
+                    builder.Append("!");
+
+                builder.Append(x.IsFirst ? "(" : " OR ");
+
+                var searchTerm = kvp.Value;
+                var tokens = kvp.Value.Tokens ?? [kvp.Value.Term];
+                var (fieldPrefix, fieldSuffix) = kvp.Key.GetFieldPrefixAndSuffix();
+
+                if (searchTerm.Operator == SqlSearchOperator.Equals)
                 {
-                    builder.Append(defaultField.Field).Append(".Contains(\"").Append(node.Term).Append("\")");
+                    builder.Append(fieldPrefix);
+                    builder.Append(kvp.Key.Name);
+                    builder.Append(" in (");
+                    builder.Append(String.Join(',', tokens.Select(t => "\"" + t + "\"")));
+                    builder.Append(")");
+                    builder.Append(fieldSuffix);
+                }
+                else if (searchTerm.Operator == SqlSearchOperator.Contains)
+                {
+                    tokens.ForEach((token, i) => {
+                        builder.Append(i.IsFirst ? "(" : " OR ");
+                        builder.Append(fieldPrefix);
+                        builder.Append(kvp.Key.Name);
+                        builder.Append(".Contains(\"");
+                        builder.Append(token);
+                        builder.Append("\")");
+                        builder.Append(fieldSuffix);
+                        if (i.IsLast)
+                            builder.Append(")");
+                    });
+                }
+                else if (searchTerm.Operator == SqlSearchOperator.StartsWith)
+                {
+                    tokens.ForEach((token, i) => {
+                        builder.Append(i.IsFirst ? "(" : " OR ");
+                        builder.Append(fieldPrefix);
+                        builder.Append(kvp.Key.Name);
+                        builder.Append(".StartsWith(\"");
+                        builder.Append(token);
+                        builder.Append("\")");
+                        builder.Append(fieldSuffix);
+                        if (i.IsLast)
+                            builder.Append(")");
+                    });
                 }
 
-                if (index == context.DefaultFields.Length - 1)
+                if (x.IsLast)
                     builder.Append(")");
-            }
+            });
 
             return builder.ToString();
         }
+
+        var field = GetFieldInfo(context.Fields, node.Field);
+        var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
+        var searchOperator = SqlSearchOperator.Equals;
+        if (node.Term.StartsWith("*") && node.Term.EndsWith("*"))
+            searchOperator = SqlSearchOperator.Contains;
+        else if (node.Term.EndsWith("*"))
+            searchOperator = SqlSearchOperator.StartsWith;
+
+        if (node.IsNegated.HasValue && node.IsNegated.Value)
+            builder.Append("!");
+
+        if (searchOperator == SqlSearchOperator.Equals)
+        {
+            builder.Append(fieldPrefix);
+            builder.Append(field.Name);
+            builder.Append(" = \"");
+            builder.Append(node.Term);
+            builder.Append("\"");
+            builder.Append(fieldSuffix);
+        }
+        else if (searchOperator == SqlSearchOperator.Contains)
+        {
+            builder.Append(fieldPrefix);
+            builder.Append(field.Name);
+            builder.Append(".Contains(\"");
+            builder.Append(node.Term);
+            builder.Append("\")");
+            builder.Append(fieldSuffix);
+        }
+        else
+        {
+            builder.Append(fieldPrefix);
+            builder.Append(field.Name);
+            builder.Append(".StartsWith(\"");
+            builder.Append(node.Term);
+            builder.Append("\")");
+            builder.Append(fieldSuffix);
+        }
+
+        return builder.ToString();
+    }
+
+    public static string ToDynamicLinqString(this TermRangeNode node, ISqlQueryVisitorContext context)
+    {
+        if (String.IsNullOrEmpty(node.Field))
+            context.AddValidationError("Field is required for term range queries.");
+        if (!String.IsNullOrEmpty(node.Boost))
+            context.AddValidationError("Boost is not supported for term range queries.");
+        if (!String.IsNullOrEmpty(node.Proximity))
+            context.AddValidationError("Proximity is not supported for term range queries.");
 
         // support overriding the generated query
         if (node.TryGetQuery(out string query))
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
+        if (!field.IsNumber && !field.IsDate && !field.IsMoney)
+            context.AddValidationError("Field must be a number, money or date for term range queries.");
+
+        var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
+
+        var builder = new StringBuilder();
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
             builder.Append("!");
 
-        if (field.IsCollection)
+        if (node.Min != null && node.Max != null)
+            builder.Append("(");
+
+        if (node.Min != null)
         {
-            int index = node.Field.LastIndexOf('.');
-            string collectionField = node.Field.Substring(0, index);
-            string fieldName = node.Field.Substring(index + 1);
+            builder.Append(fieldPrefix);
+            builder.Append(field.Name);
+            builder.Append(node.MinInclusive == true ? " >= " : " > ");
+            AppendField(builder, field, node.Min);
+            builder.Append(fieldSuffix);
+        }
 
-            builder.Append(collectionField);
-            builder.Append(".Any(");
-            builder.Append(fieldName);
+        if (node.Min != null && node.Max != null)
+            builder.Append(" AND ");
 
-            if (node.IsNegated.HasValue && node.IsNegated.Value)
-                builder.Append(" != ");
-            else
-                builder.Append(" = ");
+        if (node.Max != null)
+        {
+            builder.Append(fieldPrefix);
+            builder.Append(field.Name);
+            builder.Append(node.MaxInclusive == true ? " <= " : " < ");
+            AppendField(builder, field, node.Max);
+            builder.Append(fieldSuffix);
+        }
 
-            AppendField(builder, field, node.Term);
-
+        if (node.Min != null && node.Max != null)
             builder.Append(")");
-        }
-        else
-        {
-            builder.Append(node.Field);
-            if (node.IsNegated.HasValue && node.IsNegated.Value)
-                builder.Append(" != ");
-            else
-                builder.Append(" = ");
-
-            AppendField(builder, field, node.Term);
-        }
 
         return builder.ToString();
+    }
+
+    public static string ToDynamicLinqString(this IQueryNode node, ISqlQueryVisitorContext context)
+    {
+        return node switch
+        {
+            GroupNode groupNode => groupNode.ToDynamicLinqString(context),
+            ExistsNode existsNode => existsNode.ToDynamicLinqString(context),
+            MissingNode missingNode => missingNode.ToDynamicLinqString(context),
+            TermNode termNode => termNode.ToDynamicLinqString(context),
+            TermRangeNode termRangeNode => termRangeNode.ToDynamicLinqString(context),
+            _ => throw new NotSupportedException($"Node type {node.GetType().Name} is not supported.")
+        };
+    }
+
+    public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo> fields, string field)
+    {
+        if (fields == null)
+            return new EntityFieldInfo { Name = field, FullName = field};
+
+        return fields.FirstOrDefault(f => f.FullName.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
+               new EntityFieldInfo { Name = field, FullName = field};
     }
 
     private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term)
@@ -243,67 +373,6 @@ public static class SqlNodeExtensions
         }
         else
             builder.Append("\"" + term + "\"");
-    }
-
-    public static string ToDynamicLinqString(this TermRangeNode node, ISqlQueryVisitorContext context)
-    {
-        if (String.IsNullOrEmpty(node.Field))
-            context.AddValidationError("Field is required for term range queries.");
-        if (!String.IsNullOrEmpty(node.Boost))
-            context.AddValidationError("Boost is not supported for term range queries.");
-        if (!String.IsNullOrEmpty(node.Proximity))
-            context.AddValidationError("Proximity is not supported for term range queries.");
-
-        // support overriding the generated query
-        if (node.TryGetQuery(out string query))
-            return query;
-
-        var field = GetFieldInfo(context.Fields, node.Field);
-        if (!field.IsNumber && !field.IsDate && !field.IsMoney)
-            context.AddValidationError("Field must be a number, money or date for term range queries.");
-
-        var builder = new StringBuilder();
-
-        if (node.IsNegated.HasValue && node.IsNegated.Value)
-            builder.Append("NOT ");
-
-        if (node.Min != null && node.Max != null)
-            builder.Append("(");
-
-        if (node.Min != null)
-        {
-            builder.Append(node.Field);
-            builder.Append(node.MinInclusive == true ? " >= " : " > ");
-            AppendField(builder, field, node.Min);
-        }
-
-        if (node.Min != null && node.Max != null)
-            builder.Append(" AND ");
-
-        if (node.Max != null)
-        {
-            builder.Append(node.Field);
-            builder.Append(node.MaxInclusive == true ? " <= " : " < ");
-            AppendField(builder, field, node.Max);
-        }
-
-        if (node.Min != null && node.Max != null)
-            builder.Append(")");
-
-        return builder.ToString();
-    }
-
-    public static string ToDynamicLinqString(this IQueryNode node, ISqlQueryVisitorContext context)
-    {
-        return node switch
-        {
-            GroupNode groupNode => groupNode.ToDynamicLinqString(context),
-            ExistsNode existsNode => existsNode.ToDynamicLinqString(context),
-            MissingNode missingNode => missingNode.ToDynamicLinqString(context),
-            TermNode termNode => termNode.ToDynamicLinqString(context),
-            TermRangeNode termRangeNode => termRangeNode.ToDynamicLinqString(context),
-            _ => throw new NotSupportedException($"Node type {node.GetType().Name} is not supported.")
-        };
     }
 
     private const string QueryKey = "Query";

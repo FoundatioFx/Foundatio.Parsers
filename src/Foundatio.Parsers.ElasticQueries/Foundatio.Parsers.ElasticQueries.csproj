@@ -1,9 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\..\build\common.props" />
   <ItemGroup>
     <PackageReference Include="Elastic.Clients.Elasticsearch" Version="8.15.6" />
     <PackageReference Include="Exceptionless.DateTimeExtensions" Version="3.4.3" />
-    <PackageReference Include="System.Text.Json" Version="8.0.4" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0" />
   </ItemGroup>
   <ItemGroup>

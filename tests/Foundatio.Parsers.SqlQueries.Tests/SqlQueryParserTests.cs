@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Pegasus.Common.Tracing;
+using PhoneNumbers;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -69,12 +70,81 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.FullName.Contains("John") || e.Title.Contains("John")).ToQueryString();
-        string sqlActual = db.Employees.Where("""FullName.Contains("John") || Title.Contains("John")""").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => e.FullName.StartsWith("John") || e.Title.StartsWith("John")).ToQueryString();
+        string sqlActual = db.Employees.Where("""FullName.StartsWith("John") || Title.StartsWith("John") """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("John", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
+        var results = await db.Employees.Where(sql).ToListAsync();
+        Assert.Single(results);
         Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
+    public async Task CanSearchWithTokenizer()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["NationalPhoneNumber"]);
+        parser.Configuration.SetSearchTokenizer(s =>
+        {
+            if (String.IsNullOrWhiteSpace(s.Term))
+                return;
+
+            if (s.FieldInfo.FullName != "NationalPhoneNumber")
+                return;
+
+            s.Tokens = [TryGetNationalNumber(s.Term)];
+            s.Operator = SqlSearchOperator.StartsWith;
+        });
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.NationalPhoneNumber.StartsWith("2142222222")).ToQueryString();
+        string sqlActual = db.Employees.Where("NationalPhoneNumber.StartsWith(\"2142222222\")").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+
+        string sql = await parser.ToDynamicLinqAsync("214-222-2222", context);
+        _logger.LogInformation(sql);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        var results = await db.Employees.Where(sql).ToListAsync();
+        Assert.Single(results);
+        Assert.Equal(sqlExpected, sqlActual);
+
+        sql = await parser.ToDynamicLinqAsync("2142222222", context);
+        _logger.LogInformation(sql);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        results = await db.Employees.Where(sql).ToListAsync();
+        Assert.Single(results);
+        Assert.Equal(sqlExpected, sqlActual);
+
+        sql = await parser.ToDynamicLinqAsync("21422", context);
+        _logger.LogInformation(sql);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        results = await db.Employees.Where(sql).ToListAsync();
+        Assert.Single(results);
+    }
+
+    [Fact]
+    public async Task CanHandleEmptyTokens()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["NationalPhoneNumber"]);
+        parser.Configuration.SetSearchTokenizer(s =>
+        {
+            s.Tokens = ["", "    "];
+        });
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sql = await parser.ToDynamicLinqAsync("test", context);
+        _logger.LogInformation(sql);
+        string sqlActual = db.Employees.Where(sql).ToQueryString();
+        var results = await db.Employees.Where(sql).ToListAsync();
+        Assert.Empty(results);
     }
 
     [Fact]
@@ -155,10 +225,29 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name.Contains("acme"))).ToQueryString();
-        string sqlActual = db.Employees.Where("""Companies.Any(Name.Contains("acme"))""").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name.StartsWith("acme"))).ToQueryString();
+        string sqlActual = db.Employees.Where("""Companies.Any(Name.StartsWith("acme"))""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("acme", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
+    public async Task CanUseCollectionDefaultFieldsWithNestedDepth()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["Companies.DataDefinitions.Key"]);
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.DataDefinitions.Any(e => e.Key.StartsWith("age")))).ToQueryString();
+        string sqlActual = db.Employees.Where("""Companies.Any(DataDefinitions.Any(Key.StartsWith("age")))""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("age", context);
+        _logger.LogInformation(sql);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
     }
@@ -219,7 +308,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
         var context = parser.GetContext(db.Employees.EntityType);
-        context.Fields.Add(new EntityFieldInfo { Field = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
+        context.Fields.Add(new EntityFieldInfo { Name = "age", FullName = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
         context.ValidationOptions.AllowedFields.Add("age");
 
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name == "acme") && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
@@ -244,6 +333,19 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.Equal("John Doe", employee.FullName);
     }
 
+    public static string? TryGetNationalNumber(string phoneNumber, string regionCode = "US")
+    {
+        var phoneNumberUtil = PhoneNumberUtil.GetInstance();
+        try
+        {
+            return phoneNumberUtil.Parse(phoneNumber, regionCode).NationalNumber.ToString();
+        }
+        catch (NumberParseException)
+        {
+            return null;
+        }
+    }
+
     public IServiceProvider GetServiceProvider()
     {
         var services = new ServiceCollection();
@@ -263,6 +365,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
         var db = sp.GetRequiredService<SampleContext>();
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
+        var phoneNumberUtil = PhoneNumberUtil.GetInstance();
+
         var dbParser = db.GetService<SqlQueryParser>();
         Assert.Same(parser, dbParser);
         var dbSetParser = db.Employees.GetService<SqlQueryParser>();
@@ -281,6 +385,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
         {
             FullName = "John Doe",
             Title = "Software Developer",
+            PhoneNumber = "(214) 222-2222",
+            NationalPhoneNumber = phoneNumberUtil.Parse("(214) 222-2222", "US").NationalNumber.ToString(),
             Salary = 80_000,
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 30 }],
             Companies = [company]
@@ -289,6 +395,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
         {
             FullName = "Jane Doe",
             Title = "Software Developer",
+            PhoneNumber = "+52 55 1234 5678", // Mexico
+            NationalPhoneNumber = phoneNumberUtil.Parse("+52 55 1234 5678", "US").NationalNumber.ToString(),
             Salary = 90_000,
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 23 }],
             Companies = [company]
@@ -327,7 +435,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         {
             Fields =
             [
-                new EntityFieldInfo { Field = "field", IsNumber = true }
+                new EntityFieldInfo { Name = "field", FullName = "field", IsNumber = true }
             ]
         };
         string generatedQuery = await GenerateSqlVisitor.RunAsync(result, context);
