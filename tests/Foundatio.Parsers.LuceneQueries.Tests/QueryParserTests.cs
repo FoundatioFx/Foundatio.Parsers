@@ -454,6 +454,22 @@ public class QueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public void DataBackslashShouldBeValidBeginningOfString()
+    {
+        var sut = new LuceneQueryParser();
+        var result = sut.Parse("\"\\something\"");
+        string ast = DebugQueryVisitor.Run(result);
+    }
+
+    [Fact]
+    public void DataBackslashShouldBeValidEndOfString()
+    {
+        var sut = new LuceneQueryParser();
+        var result = sut.Parse("\"something\\\"");
+        string ast = DebugQueryVisitor.Run(result);
+    }
+
+    [Fact]
     public void UnterminatedParensIsNotValid()
     {
         var sut = new LuceneQueryParser();
