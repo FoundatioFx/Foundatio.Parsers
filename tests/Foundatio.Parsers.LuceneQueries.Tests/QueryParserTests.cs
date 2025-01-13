@@ -8,6 +8,7 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Xunit;
 using Microsoft.Extensions.Logging;
 using Pegasus.Common;
+using Pegasus.Common.Tracing;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -135,6 +136,30 @@ public class QueryParserTests : TestWithLoggingBase
 
             throw;
         }
+    }
+
+    [Fact]
+    public void DataBackslashShouldBeValidBeginningOfString()
+    {
+        var sut = new LuceneQueryParser();
+        var result = sut.Parse("\"\\something\"");
+        _logger.LogInformation(DebugQueryVisitor.Run(result));
+    }
+
+    [Fact]
+    public void CanHandleDateRange()
+    {
+#if FALSE
+        var tracer = new LoggingTracer(_logger, reportPerformance: true);
+#else
+        var tracer = NullTracer.Instance;
+#endif
+        var sut = new LuceneQueryParser {
+            Tracer = tracer
+        };
+        string query = "mydate:[now/d TO now/d+30d/d]";
+        var result = sut.Parse(query);
+        _logger.LogInformation(DebugQueryVisitor.Run(result));
     }
 
     [Fact]

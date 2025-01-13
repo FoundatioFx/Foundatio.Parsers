@@ -47,6 +47,8 @@ public class Employee
     public int Salary { get; set; }
     public List<Company> Companies { get; set; }
     public List<DataValue> DataValues { get; set; }
+    public TimeOnly HappyHour { get; set; }
+    public DateOnly Birthday { get; set; }
 
     public DateTime Created { get; set; } = DateTime.Now;
 }
@@ -70,6 +72,7 @@ public class DataValue
     // store the values separately as sparse columns for querying purposes
     public string StringValue { get; set; }
     public DateTime? DateValue { get; set; }
+    public DateOnly? DateOnlyValue { get; set; }
     public decimal? MoneyValue { get; set; }
     public bool? BooleanValue { get; set; }
     public decimal? NumberValue { get; set; }
@@ -87,6 +90,7 @@ public class DataValue
             {
                 DataType.String => StringValue,
                 DataType.Date => DateValue,
+                DataType.DateOnly => DateOnlyValue,
                 DataType.Number => NumberValue,
                 DataType.Boolean => BooleanValue,
                 DataType.Money => MoneyValue,
@@ -172,6 +176,7 @@ public enum DataType
     Number,
     Boolean,
     Date,
+    DateOnly,
     Money,
     Percent
 }

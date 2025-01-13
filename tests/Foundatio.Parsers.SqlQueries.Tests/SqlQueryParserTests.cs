@@ -165,6 +165,40 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task CanUseDateOnlyFilter()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.Birthday < DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-90)).ToQueryString();
+        string sqlActual = db.Employees.Where("""birthday < DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-90)""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("birthday:<now-90d", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
+    public async Task CanUseTimeOnlyFilter()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => e.HappyHour < TimeOnly.Parse("6:00")).ToQueryString();
+        string sqlActual = db.Employees.Where("""happyhour < TimeOnly.Parse("6:00")""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("""happyhour:<"6:00" """, context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
     public async Task CanUseExistsFilter()
     {
         var sp = GetServiceProvider();
@@ -388,6 +422,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             PhoneNumber = "(214) 222-2222",
             NationalPhoneNumber = phoneNumberUtil.Parse("(214) 222-2222", "US").NationalNumber.ToString(),
             Salary = 80_000,
+            Birthday = new DateOnly(1980, 1, 1),
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 30 }],
             Companies = [company]
         });
@@ -398,6 +433,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             PhoneNumber = "+52 55 1234 5678", // Mexico
             NationalPhoneNumber = phoneNumberUtil.Parse("+52 55 1234 5678", "US").NationalNumber.ToString(),
             Salary = 90_000,
+            Birthday = new DateOnly(1972, 11, 6),
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 23 }],
             Companies = [company]
         });

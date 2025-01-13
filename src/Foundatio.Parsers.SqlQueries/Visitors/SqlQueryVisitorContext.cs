@@ -24,6 +24,7 @@ public class EntityFieldInfo
     public bool IsNumber { get; set; }
     public bool IsMoney { get; set; }
     public bool IsDate { get; set; }
+    public bool IsDateOnly { get; set; }
     public bool IsBoolean { get; set; }
     public bool IsCollection { get; set; }
     public bool IsNavigation { get; set; }

@@ -40,6 +40,9 @@ public class DynamicFieldVisitor : ChainableMutatingQueryVisitor
             case { IsDate: true }:
                 customFieldBuilder.Append("DateValue");
                 break;
+            case { IsDateOnly: true }:
+                customFieldBuilder.Append("DateOnlyValue");
+                break;
             default:
                 customFieldBuilder.Append("StringValue");
                 break;
