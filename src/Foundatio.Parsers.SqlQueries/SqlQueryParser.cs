@@ -127,6 +127,7 @@ public class SqlQueryParser : LuceneQueryParser
                 FullName = propertyPath,
                 IsNumber = property.ClrType.UnwrapNullable().IsNumeric(),
                 IsDate = property.ClrType.UnwrapNullable().IsDateTime(),
+                IsDateOnly = property.ClrType.UnwrapNullable().IsDateOnly(),
                 IsBoolean = property.ClrType.UnwrapNullable().IsBoolean(),
                 Parent = parent
             });

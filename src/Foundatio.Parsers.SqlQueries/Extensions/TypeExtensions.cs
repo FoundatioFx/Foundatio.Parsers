@@ -35,6 +35,7 @@ public static class TypeExtensions
 
     public static bool IsString(this Type type) => type == typeof(string);
     public static bool IsDateTime(this Type typeToCheck) => typeToCheck == typeof(DateTime) || typeToCheck == typeof(DateTime?);
+    public static bool IsDateOnly(this Type typeToCheck) => typeToCheck == typeof(DateOnly) || typeToCheck == typeof(DateOnly?);
     public static bool IsBoolean(this Type typeToCheck) => typeToCheck == typeof(bool) || typeToCheck == typeof(bool?);
     public static bool IsNumeric(this Type type) => type.IsFloatingPoint() || type.IsIntegerBased();
     public static bool IsIntegerBased(this Type type) => _integerTypes.Contains(type);

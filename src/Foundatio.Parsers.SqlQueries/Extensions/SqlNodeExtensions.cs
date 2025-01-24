@@ -267,7 +267,7 @@ public static class SqlNodeExtensions
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
-        if (!field.IsNumber && !field.IsDate && !field.IsMoney)
+        if (!field.IsNumber && !field.IsDateOnly && !field.IsDate && !field.IsMoney)
             context.AddValidationError("Field must be a number, money or date for term range queries.");
 
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
@@ -369,6 +369,35 @@ public static class SqlNodeExtensions
             else
             {
                 builder.Append("DateTime.Parse(\"" + term + "\")");
+            }
+        }
+        else if (field is { IsDateOnly: true })
+        {
+            term = term.Trim();
+            if (term.StartsWith("now", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.Append("DateOnly.FromDateTime(DateTime.UtcNow)");
+
+                if (term.Length == 3)
+                    return;
+
+                builder.Append(".");
+
+                string method = term[^1..] switch
+                {
+                    "y" => "AddYears",
+                    "M" => "AddMonths",
+                    "d" => "AddDays",
+                    _ => throw new NotSupportedException("Invalid date operation.")
+                };
+
+                bool subtract = term.Substring(3, 1) == "-";
+
+                builder.Append(method).Append("(").Append(subtract ? "-" : "").Append(term.Substring(4, term.Length - 5)).Append(")");
+            }
+            else
+            {
+                builder.Append("DateOnly.Parse(\"" + term + "\")");
             }
         }
         else
