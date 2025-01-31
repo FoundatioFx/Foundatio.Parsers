@@ -367,7 +367,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.Equal("John Doe", employee.FullName);
     }
 
-    public static string? TryGetNationalNumber(string phoneNumber, string regionCode = "US")
+    public static string TryGetNationalNumber(string phoneNumber, string regionCode = "US")
     {
         var phoneNumberUtil = PhoneNumberUtil.GetInstance();
         try

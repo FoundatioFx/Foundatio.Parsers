@@ -5,7 +5,6 @@ using System.Text;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.SqlQueries.Visitors;
-using Microsoft.Extensions.Primitives;
 
 namespace Foundatio.Parsers.SqlQueries.Extensions;
 
@@ -150,7 +149,7 @@ public static class SqlNodeExtensions
 
                 context.SearchTokenizer.Invoke(searchTerm);
                 if (searchTerm.Tokens == null)
-                    searchTerm.Tokens = [ searchTerm.Term ];
+                    searchTerm.Tokens = [searchTerm.Term];
                 else
                     searchTerm.Tokens = searchTerm.Tokens.Select(t => !String.IsNullOrWhiteSpace(t) ? t : "@__NOMATCH__").ToList();
             }
@@ -177,7 +176,8 @@ public static class SqlNodeExtensions
                 }
                 else if (searchTerm.Operator == SqlSearchOperator.Contains)
                 {
-                    tokens.ForEach((token, i) => {
+                    tokens.ForEach((token, i) =>
+                    {
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(fieldPrefix);
                         builder.Append(kvp.Key.Name);
@@ -191,7 +191,8 @@ public static class SqlNodeExtensions
                 }
                 else if (searchTerm.Operator == SqlSearchOperator.StartsWith)
                 {
-                    tokens.ForEach((token, i) => {
+                    tokens.ForEach((token, i) =>
+                    {
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(fieldPrefix);
                         builder.Append(kvp.Key.Name);
@@ -323,10 +324,10 @@ public static class SqlNodeExtensions
     public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo> fields, string field)
     {
         if (fields == null)
-            return new EntityFieldInfo { Name = field, FullName = field};
+            return new EntityFieldInfo { Name = field, FullName = field };
 
         return fields.FirstOrDefault(f => f.FullName.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
-               new EntityFieldInfo { Name = field, FullName = field};
+               new EntityFieldInfo { Name = field, FullName = field };
     }
 
     private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term)

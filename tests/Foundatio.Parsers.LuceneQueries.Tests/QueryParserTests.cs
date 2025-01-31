@@ -154,7 +154,8 @@ public class QueryParserTests : TestWithLoggingBase
 #else
         var tracer = NullTracer.Instance;
 #endif
-        var sut = new LuceneQueryParser {
+        var sut = new LuceneQueryParser
+        {
             Tracer = tracer
         };
         string query = "mydate:[now/d TO now/d+30d/d]";

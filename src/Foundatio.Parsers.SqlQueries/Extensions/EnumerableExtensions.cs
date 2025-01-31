@@ -2,7 +2,8 @@
 
 namespace Foundatio.Parsers.SqlQueries.Extensions;
 
-internal static class EnumerableExtensions {
+internal static class EnumerableExtensions
+{
     public delegate void ElementAction<in T>(T element, ElementInfo info);
 
     public static void ForEach<T>(this IEnumerable<T> elements, ElementAction<T> action)
@@ -22,9 +23,11 @@ internal static class EnumerableExtensions {
         }
     }
 
-    public struct ElementInfo {
+    public struct ElementInfo
+    {
         public ElementInfo(int index, bool isFirst, bool isLast)
-            : this() {
+            : this()
+        {
             Index = index;
             IsFirst = isFirst;
             IsLast = isLast;

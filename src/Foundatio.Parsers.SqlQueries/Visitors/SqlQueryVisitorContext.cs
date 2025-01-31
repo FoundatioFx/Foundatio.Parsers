@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Foundatio.Parsers.SqlQueries.Extensions;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.Extensions.Primitives;
 
 namespace Foundatio.Parsers.SqlQueries.Visitors;
 
@@ -69,7 +67,8 @@ public class EntityFieldInfo
 
         var prefix = new StringBuilder();
         var suffix = new StringBuilder();
-        foreach (var field in fieldTree) {
+        foreach (var field in fieldTree)
+        {
             if (field.IsCollection)
             {
                 prefix.Append($"{field.Name}.Any(");
