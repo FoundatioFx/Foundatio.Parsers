@@ -20,9 +20,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     private TypeMappingDescriptor<MyNestedType> MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
     {
         return m
-            .AutoMap<MyNestedType>()
             .Dynamic(DynamicMapping.True)
-            .DynamicTemplates(t => t.DynamicTemplate("idx_text", t => t.Match("text*").Mapping(m => m.Text(mp => mp.AddKeywordAndSortFields()))))
+            .DynamicTemplates(t => t.DynamicTemplate("idx_text", t1 => t1.Match("text*").Mapping(m1 => m1.Text(mp => mp.AddKeywordAndSortFields()))))
             .Properties(p => p
                 .Text(p1 => p1.Field1, o => o.AddKeywordAndSortFields())
                 .Text(p1 => p1.Field4, o => o.AddKeywordAndSortFields())

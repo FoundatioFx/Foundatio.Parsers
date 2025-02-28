@@ -96,24 +96,26 @@ public class ElasticsearchFixture : IAsyncLifetime
         return client;
     }
 
-    protected virtual void ConfigureConnectionSettings(ElasticsearchClientSettings settings) { }
+    protected virtual void ConfigureConnectionSettings(ElasticsearchClientSettings settings)
+    {
+    }
 
     public async Task CreateNamedIndexAsync<T>(string index, Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
     {
-        configureMappings ??= m => m.AutoMap<T>().Dynamic(DynamicMapping.True);
+        configureMappings ??= m => m.Dynamic(DynamicMapping.True);
         configureIndex ??= i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
 
-        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Map<T>(configureMappings));
+        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Mappings(configureMappings));
         Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
     }
 
     public async Task<string> CreateRandomIndexAsync<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
     {
         string index = $"test_{Guid.NewGuid():N}";
-        configureMappings ??= m => m.AutoMap<T>().Dynamic(DynamicMapping.True);
+        configureMappings ??= m => m.Dynamic(DynamicMapping.True);
         configureIndex ??= i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
 
-        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Map<T>(configureMappings));
+        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Mappings(configureMappings));
         Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
 
         return index;
@@ -134,7 +136,7 @@ public class ElasticsearchFixture : IAsyncLifetime
     protected virtual async Task CleanupTestIndexesAsync(ElasticsearchClient client)
     {
         if (_createdIndexes.Count > 0)
-            await client.Indices.DeleteAsync(Indices.Index(_createdIndexes));
+            await client.Indices.DeleteAsync(_createdIndexes.ToArray());
     }
 
     public virtual Task InitializeAsync()

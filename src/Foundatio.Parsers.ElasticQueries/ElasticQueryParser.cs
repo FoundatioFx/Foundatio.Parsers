@@ -229,7 +229,7 @@ public class ElasticQueryParser : LuceneQueryParser
         return context.GetValidationResult();
     }
 
-    public async Task<IEnumerable<SortOptions>> BuildSortAsync(string sort, IElasticQueryVisitorContext context = null)
+    public async Task<ICollection<SortOptions>> BuildSortAsync(string sort, IElasticQueryVisitorContext context = null)
     {
         context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Sort;
@@ -240,7 +240,7 @@ public class ElasticQueryParser : LuceneQueryParser
         return await BuildSortAsync(result, context).ConfigureAwait(false);
     }
 
-    public Task<IEnumerable<SortOptions>> BuildSortAsync(IQueryNode sort, IElasticQueryVisitorContext context = null)
+    public Task<ICollection<SortOptions>> BuildSortAsync(IQueryNode sort, IElasticQueryVisitorContext context = null)
     {
         context ??= new ElasticQueryVisitorContext();
         return GetSortFieldsVisitor.RunAsync(sort, context);

@@ -8,7 +8,7 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
-public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<SortOptions>>
+public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<ICollection<SortOptions>>
 {
     private readonly List<SortOptions> _fields = new();
 
@@ -29,18 +29,18 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<S
         _fields.Add(sort);
     }
 
-    public override async Task<IEnumerable<SortOptions>> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<ICollection<SortOptions>> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
         await node.AcceptAsync(this, context).ConfigureAwait(false);
         return _fields;
     }
 
-    public static Task<IEnumerable<SortOptions>> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    public static Task<ICollection<SortOptions>> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
     {
         return new GetSortFieldsVisitor().AcceptAsync(node, context);
     }
 
-    public static IEnumerable<SortOptions> Run(IQueryNode node, IQueryVisitorContext context = null)
+    public static ICollection<SortOptions> Run(IQueryNode node, IQueryVisitorContext context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }
