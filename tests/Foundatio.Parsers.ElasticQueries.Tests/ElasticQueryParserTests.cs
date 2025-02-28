@@ -182,7 +182,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             || f.Match(m => m.Field(mf => mf.Field1).Query("abc"))
             || f.Match(m => m.Field(mf => mf.Field1).Query("def"))
             || f.Match(m => m.Field(mf => mf.Field1).Query("ghi"))
-            || f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(mf => mf.Field2), "jhk")));
+            || f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(mf => mf.Field2).Value("jhk"))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -305,8 +305,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index)
             .Query(q => q
                 .Bool(b => b
-                    .Filter(f => f
-                        .QueryString(m => m.Query("one\\/two*").Fields(f1 => f1.Field(f2 => f2.Field1)).AllowLeadingWildcard(false).AnalyzeWildcard())))));
+                    .Filter(f => f.QueryString(m => m.Query("one\\/two*").Fields(Fields.FromExpression((MyType f1) => f1.Field1)).AllowLeadingWildcard(false).AnalyzeWildcard())))));
         string expectedRequest = expectedResponse.GetRequest(true);
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -609,7 +608,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(q => q.QueryString(m => m
             .AllowLeadingWildcard(false)
             .AnalyzeWildcard(true)
-            .Fields(f => f.Field(f1 => f1.Field3))
+            .Fields(Fields.FromExpression((MyType f1) => f1.Field3))
             .Query("hey*")
         )));
         expectedRequest = expectedResponse.GetRequest();
@@ -965,9 +964,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanGenerateMatchQuery()
     {
         string index = await CreateRandomIndexAsync<MyType>(m => m.Properties(p => p
-           .Text(e => e.Field1)
-                .Fields(f1 => f1
-                    .Keyword(k => k.Name("keyword").IgnoreAbove(256)))));
+           .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")).IgnoreAbove(256))));
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildQueryAsync("field1:test", new ElasticQueryVisitorContext().UseScoring());
@@ -1242,7 +1239,11 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(q =>
             q.GeoBoundingBox(
-                m => m.Field(p => p.Field3).BoundingBox("51.5032520,-0.1278990", "51.5032520,-0.1278990"))));
+                m => m.Field(p => p.Field3).BoundingBox(new TopLeftBottomRightGeoBounds
+                {
+                    TopLeft = "51.5032520,-0.1278990",
+                    BottomRight = "51.5032520,-0.1278990"
+                }))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1396,7 +1397,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             .Query(q => q.Bool(b => b.Filter(f => f
                 .Match(mf => mf.Field("nested.data.spaced field").Query("hey")))))
             .Aggregations(a => a
-                .Add("terms_nested.data.spaced field.keyword", ad => ad.Terms(t => t.Field("nested.data.spaced field.keyword").Meta(m2 => m2.Add("@field_type", "text"))))));
+                .Add("terms_nested.data.spaced field.keyword", ad => ad.Terms(t => t.Field("nested.data.spaced field.keyword")).Meta(m2 => m2.Add("@field_type", "text")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
         Assert.Equal(expectedRequest, actualRequest);
@@ -1460,7 +1461,11 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 .Field("field1.keyword", so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword))
             ).Query(q => q
                 .GeoBoundingBox(m => m
-                    .Field(p => p.Field3).BoundingBox("51.5032520,-0.1278990", "51.5032520,-0.1278990"))
+                    .Field(p => p.Field3).BoundingBox(new TopLeftBottomRightGeoBounds
+                    {
+                        TopLeft = "51.5032520,-0.1278990",
+                        BottomRight = "51.5032520,-0.1278990"
+                    }))
                 || q.Match(y => y.Field(e => e.Field1).Query("value1"))
                 || q.Range(qr => qr.TermRange(m => m.Field(g => g.Field2).Gte("1").Lte("4")))
                 || !q.GeoDistance(m => m.Field(p => p.Field3).Location("51.5032520,-0.1278990").Distance("75mi"))));

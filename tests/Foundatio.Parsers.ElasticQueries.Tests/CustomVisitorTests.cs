@@ -33,7 +33,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one)");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(_ => result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -58,7 +58,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one @include:3)");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(_ => result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -83,7 +83,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor(), 1));
 
         var result = await processor.BuildQueryAsync("@include:test");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(_ => result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -130,7 +130,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one) OR (field1:Test @custom:(two))");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(_ => result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 

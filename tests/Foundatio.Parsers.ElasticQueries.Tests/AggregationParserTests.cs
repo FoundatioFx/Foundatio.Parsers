@@ -136,7 +136,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
-            .Min("min_heynow", c => c.Field("field4").Meta(m => m.Add("@field_type", "long")))));
+            .Add("min_heynow", a1 => a1.Min(c => c.Field(cf => cf.Field4)).Meta(m => m.Add("@field_type", "long")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -265,21 +265,21 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
-            .Add("geogrid_field3", a1 => a1.GeohashGrid(h => h.Field("field3").Precision(new GeohashPrecision(1)))
+            .Add("geogrid_field3", a1 => a1.GeohashGrid(h => h.Field(f => f.Field3).Precision(new GeohashPrecision(1)))
                 .Aggregations(a2 => a2
                     .Add("avg_lat", a3 => a3.Avg(s => s.Script(ss => ss.Source("doc['field3'].lat"))))
                     .Add("avg_lon", a3 => a3.Avg(s => s.Script(ss => ss.Source("doc['field3'].lon"))))
             ))
             .Add("terms_field1", a1 => a1.Terms(t => t.Field("field1.keyword")).Meta(m => m.Add("@field_type", "text")))
-            .Add("histogram_field4", a1 => a1.Histogram(h => h.Field("field4").Interval(50).MinDocCount(0)))
-            .Add("date_field5", a1 => a1.DateHistogram(d1 => d1.Field("field5").CalendarInterval(CalendarInterval.Day).Format("date_optional_time").MinDocCount(0)))
+            .Add("histogram_field4", a1 => a1.Histogram(h => h.Field(f => f.Field4).Interval(50).MinDocCount(0)))
+            .Add("date_field5", a1 => a1.DateHistogram(d1 => d1.Field(f => f.Field5).CalendarInterval(CalendarInterval.Day).Format("date_optional_time").MinDocCount(0)))
             .Add("missing_field2", a1 => a1.Missing(t => t.Field("field2.keyword")))
-            .Add("cardinality_field4", a1 => a1.Cardinality(c => c.Field("field4")))
-            .Add("percentiles_field4", a1 => a1.Percentiles(c => c.Field("field4").Percents([50, 100])))
-            .Add("sum_field4", a1 => a1.Sum(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))
-            .Add("avg_field4", a1 => a1.Avg(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))
-            .Add("max_field4", a1 => a1.Max(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))
-            .Add("min_field4", a1 => a1.Min(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))));
+            .Add("cardinality_field4", a1 => a1.Cardinality(c => c.Field(f => f.Field4)))
+            .Add("percentiles_field4", a1 => a1.Percentiles(c => c.Field(f => f.Field4).Percents([50, 100])))
+            .Add("sum_field4", a1 => a1.Sum(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
+            .Add("avg_field4", a1 => a1.Avg(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
+            .Add("max_field4", a1 => a1.Max(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
+            .Add("min_field4", a1 => a1.Min(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -362,11 +362,26 @@ public class AggregationParserTests : ElasticsearchTestBase
                     .Text("identity", o4 => o4.Fields(f => f.Keyword("keyword", o5 => o5.IgnoreAbove(256))))))))));
 
         await Client.IndexManyAsync([
-            new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" }
+            new MyType
+            {
+                Field1 = "value1",
+                Field4 = 1,
+                Field3 = "51.5032520,-0.1278990",
+                Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)),
+                Field2 = "field2"
+            }
         ], index);
         await Client.Indices.RefreshAsync(index);
 
-        var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
+        var aliasMap = new FieldMap
+        {
+            { "user", "data.@user.identity" },
+            { "alias1", "field1" },
+            { "alias2", "field2" },
+            { "alias3", "field3" },
+            { "alias4", "field4" },
+            { "alias5", "field5" }
+        };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 histogram:alias4 geogrid:alias3 terms:alias1");
 
@@ -375,21 +390,21 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
-                .Add("geogrid_alias3", a1 => a1.GeohashGrid(h => h.Field("field3").Precision(new GeohashPrecision(1)))
+                .Add("geogrid_alias3", a1 => a1.GeohashGrid(h => h.Field(f => f.Field3).Precision(new GeohashPrecision(1)))
                     .Aggregations(a2 => a2
                         .Add("avg_lat", a3 => a3.Avg(s => s.Script(ss => ss.Source("doc['field3'].lat"))))
                         .Add("avg_lon", a3 => a3.Avg(s => s.Script(ss => ss.Source("doc['field3'].lon"))))
                     ))
                 .Add("terms_alias1", a1 => a1.Terms(t => t.Field("field1.keyword")).Meta(m => m.Add("@field_type", "text")))
-                .Add("histogram_alias4", a1 => a1.Histogram(h => h.Field("field4").Interval(50).MinDocCount(0)))
-                .Add("date_alias5", a1 => a1.DateHistogram(d1 => d1.Field("field5").CalendarInterval(CalendarInterval.Day).Format("date_optional_time").MinDocCount(0)))
+                .Add("histogram_alias4", a1 => a1.Histogram(h => h.Field(f => f.Field4).Interval(50).MinDocCount(0)))
+                .Add("date_alias5", a1 => a1.DateHistogram(d1 => d1.Field(f => f.Field5).CalendarInterval(CalendarInterval.Day).Format("date_optional_time").MinDocCount(0)))
                 .Add("missing_alias2", a1 => a1.Missing(t => t.Field("field2.keyword")))
                 .Add("cardinality_user", a1 => a1.Cardinality(c => c.Field("data.@user.identity.keyword")))
-                .Add("percentiles_alias4", a1 => a1.Percentiles(c => c.Field("field4")))
-                .Add("sum_alias4", a1 => a1.Sum(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))
-                .Add("avg_alias4", a1 => a1.Avg(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))
-                .Add("max_alias4", a1 => a1.Max(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))
-                .Add("min_alias4", a1 => a1.Min(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))));
+                .Add("percentiles_alias4", a1 => a1.Percentiles(c => c.Field(f => f.Field4)))
+                .Add("sum_alias4", a1 => a1.Sum(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
+                .Add("avg_alias4", a1 => a1.Avg(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
+                .Add("max_alias4", a1 => a1.Max(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
+                .Add("min_alias4", a1 => a1.Min(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -420,8 +435,8 @@ public class AggregationParserTests : ElasticsearchTestBase
                 .MinDocCount(1)
                 .Include(new TermsInclude(["otherinclude", "myinclude"]))
                 .Exclude(new TermsExclude(["otherexclude", "myexclude"]))
-                .Missing("mymissing")
-                .Meta(m => m.Add("@field_type", "keyword"))))));
+                .Missing("mymissing"))
+                .Meta(m => m.Add("@field_type", "keyword")))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -501,7 +516,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
                 .Add("terms_field1", a1 => a1
                     .Terms(t => t.Field("field1.keyword").Order(new List<KeyValuePair<Field, SortOrder>> { new ("cardinality_field4", SortOrder.Desc) }))
-                        .Aggregations(a2 => a2.Add("cardinality_field4", a3 => a3.Cardinality(c => c.Field("field4"))))
+                        .Aggregations(a2 => a2.Add("cardinality_field4", a3 => a3.Cardinality(c => c.Field(f => f.Field4))))
                     .Meta(m => m.Add("@field_type", "keyword")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -528,7 +543,7 @@ public class AggregationParserTests : ElasticsearchTestBase
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
             .Add("date_field5", a1 => a1.DateHistogram(d1 => d1
-                .Field("field5")
+                .Field(f => f.Field5)
                 .CalendarInterval(CalendarInterval.Day)
                 .Format("date_optional_time")
                 .MinDocCount(0)
@@ -536,8 +551,8 @@ public class AggregationParserTests : ElasticsearchTestBase
                 .Missing(DateTime.MinValue))
                 .Meta(m => m.Add("@timezone", "1h"))
                 .Aggregations(a2 => a2
-                    .Add("min_field5", a3 => a3.Min(c => c.Field("field5")).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))
-                    .Add("max_field5", a3 => a3.Max(c => c.Field("field5")).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))))));
+                    .Add("min_field5", a3 => a3.Min(c => c.Field(f => f.Field5)).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))
+                    .Add("max_field5", a3 => a3.Max(c => c.Field(f => f.Field5)).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -563,11 +578,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Aggregations(a => a
-            .Add("sum_field4", a1 => a1.Sum(c => c.Field("field4").Missing(0)).Meta(m => m.Add("@field_type", "integer")))
-            .Add("cardinality_field4", a1 => a1.Cardinality(c => c.Field("field4").Missing(0)))
-            .Add("avg_field4", a1 => a1.Avg(c => c.Field("field4").Missing(0)).Meta(m => m.Add("@field_type", "integer")))
-            .Add("max_field4", a1 => a1.Max(c => c.Field("field4").Missing(0)).Meta(m => m.Add("@field_type", "integer")))
-            .Add("min_field4", a1 => a1.Min(c => c.Field("field4").Missing(0)).Meta(m => m.Add("@field_type", "integer")))));
+            .Add("sum_field4", a1 => a1.Sum(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))
+            .Add("cardinality_field4", a1 => a1.Cardinality(c => c.Field(f => f.Field4).Missing(0)))
+            .Add("avg_field4", a1 => a1.Avg(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))
+            .Add("max_field4", a1 => a1.Max(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))
+            .Add("min_field4", a1 => a1.Min(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
