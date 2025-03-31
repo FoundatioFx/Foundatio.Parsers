@@ -9,7 +9,7 @@
 
     <ItemGroup>
       <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.1" />
-      <PackageReference Include="libphonenumber-csharp" Version="8.13.54" />
+      <PackageReference Include="libphonenumber-csharp" Version="9.0.2" />
     </ItemGroup>
 
 </Project>
