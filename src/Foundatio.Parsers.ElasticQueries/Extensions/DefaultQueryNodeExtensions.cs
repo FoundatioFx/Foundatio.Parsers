@@ -44,12 +44,11 @@ public static class DefaultQueryNodeExtensions
 
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
-                query = new QueryStringQuery
+                query = new QueryStringQuery(node.UnescapedTerm)
                 {
                     Fields = fields,
                     AllowLeadingWildcard = false,
-                    AnalyzeWildcard = true,
-                    Query = node.UnescapedTerm
+                    AnalyzeWildcard = true
                 };
             }
             else
@@ -58,25 +57,18 @@ public static class DefaultQueryNodeExtensions
                 {
                     if (node.IsQuotedTerm)
                     {
-                        query = new MatchPhraseQuery(fields[0])
-                        {
-                            Query = node.UnescapedTerm
-                        };
+                        query = new MatchPhraseQuery(fields[0], node.UnescapedTerm);
                     }
                     else
                     {
-                        query = new MatchQuery(fields[0])
-                        {
-                            Query = node.UnescapedTerm
-                        };
+                        query = new MatchQuery(fields[0], node.UnescapedTerm);
                     }
                 }
                 else
                 {
-                    query = new MultiMatchQuery
+                    query = new MultiMatchQuery(node.UnescapedTerm)
                     {
                         Fields = fields,
-                        Query = node.UnescapedTerm,
                         Type = node.IsQuotedTerm ? TextQueryType.Phrase : null
                     };
                 }
@@ -86,17 +78,11 @@ public static class DefaultQueryNodeExtensions
         {
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
-                query = new PrefixQuery(field)
-                {
-                    Value = node.UnescapedTerm.TrimEnd('*')
-                };
+                query = new PrefixQuery(field, node.UnescapedTerm.TrimEnd('*'));
             }
             else
             {
-                query = new TermQuery(field)
-                {
-                    Value = node.UnescapedTerm
-                };
+                query = new TermQuery(field, node.UnescapedTerm);
             }
         }
 
@@ -155,7 +141,7 @@ public static class DefaultQueryNodeExtensions
 
     public static Query GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context)
     {
-        return new ExistsQuery { Field = node.UnescapedField };
+        return new ExistsQuery(node.UnescapedField);
     }
 
     public static Query GetDefaultQuery(this MissingNode node, IQueryVisitorContext context)
@@ -164,10 +150,7 @@ public static class DefaultQueryNodeExtensions
         {
             MustNot =
             [
-                new ExistsQuery
-                {
-                    Field = node.UnescapedField
-                }
+                new ExistsQuery(node.UnescapedField)
             ]
         };
     }

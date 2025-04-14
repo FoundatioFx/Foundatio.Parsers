@@ -24,7 +24,7 @@ public class GeoVisitor : ChainableQueryVisitor
             return;
 
         string location = _resolveGeoLocation != null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;
-        var query = new GeoDistanceQuery { Field = node.Field, Location = location, Distance = node.Proximity ?? "10mi" };
+        var query = new GeoDistanceQuery(node.Proximity ?? "10mi", node.Field, location);
         node.SetQuery(query);
     }
 
@@ -33,8 +33,9 @@ public class GeoVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
             return;
 
-        var box = GeoBounds.TopLeftBottomRight(new TopLeftBottomRightGeoBounds { TopLeft = node.Min, BottomRight = node.Max });
-        var query = new GeoBoundingBoxQuery { BoundingBox = box, Field = node.Field };
+        // NOTE: Feedback here: https://github.com/elastic/elasticsearch-net/issues/8496
+        var box = GeoBounds.TopLeftBottomRight(new TopLeftBottomRightGeoBounds(node.Max, node.Min));
+        var query = new GeoBoundingBoxQuery(box, node.Field);
         node.SetQuery(query);
     }
 }

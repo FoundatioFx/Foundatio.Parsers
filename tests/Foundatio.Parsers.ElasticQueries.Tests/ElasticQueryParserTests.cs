@@ -847,10 +847,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             .Text(e => e.Field2, o => o.Index())
             .Text(e => e.Field3, o => o.Index())
             .IntegerNumber(e => e.Field4)
-            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
-                .Text(e => e.Field1, o => o.Index())
-                .Text(e => e.Field2, o => o.Index())
-                .Text(e => e.Field3, o => o.Index())
+            .Nested(e => e.Nested, o => o.Properties(p1 => p1
+                .Text(e1 => e1.Field1, o1 => o1.Index())
+                .Text(e1 => e1.Field2, o1 => o1.Index())
+                .Text(e1 => e1.Field3, o1 => o1.Index())
                 .IntegerNumber(e => e.Field4)
             ))
         ));
@@ -919,10 +919,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             .Text(e => e.Field2, o => o.Index())
             .Text(e => e.Field3, o => o.Index())
             .IntegerNumber(e => e.Field4)
-            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
-                .Text(e => e.Field1, o => o.Index())
-                .Text(e => e.Field2, o => o.Index())
-                .Text(e => e.Field3, o => o.Index())
+            .Nested(e => e.Nested, o => o.Properties(p1 => p1
+                .Text(e1 => e1.Field1, o1 => o1.Index())
+                .Text(e1 => e1.Field2, o1 => o1.Index())
+                .Text(e1 => e1.Field3, o1 => o1.Index())
                 .IntegerNumber(e => e.Field4)
             ))
         ));
@@ -985,9 +985,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanBuildAliasQueryProcessor()
     {
         string index = await CreateRandomIndexAsync<MyType>(m => m.Properties(p => p
-            .Object<Dictionary<string, object>>(f => f.Name(e => e.Data).Properties(p2 => p2
-                .Text(e => e.Name("@browser_version"))
-                .FieldAlias(a => a.Name("browser.version").Path("data.@browser_version"))))));
+            .Object(f => f.Data, o => o.Properties(p2 => p2
+                .Text("@browser_version")
+                .FieldAlias("browser.version", o1 => o1.Path("data.@browser_version"))))));
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("browser.version:1", new ElasticQueryVisitorContext().UseScoring());
