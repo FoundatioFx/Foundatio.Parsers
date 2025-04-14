@@ -21,13 +21,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     {
         return m
             .Dynamic(DynamicMapping.True)
-            .DynamicTemplates(new List<IDictionary<string, DynamicTemplate>>
-            {
-                new Dictionary<string, DynamicTemplate>
-                {
-                    { "idx_text", DynamicTemplate.Mapping(new TextProperty().AddKeywordAndSortFields()).Match("text*") }
-                }
-            })
+            .DynamicTemplates(dt => dt.Add("idx_text", d => d.Mapping(dm => dm.Text(o => o.AddKeywordAndSortFields())).Match("text*")))
             .Properties(p => p
                 .Text(p1 => p1.Field1, o => o.AddKeywordAndSortFields())
                 .Text(p1 => p1.Field4, o => o.AddKeywordAndSortFields())

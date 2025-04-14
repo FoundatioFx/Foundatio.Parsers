@@ -33,12 +33,12 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one)");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1"])))))));
+            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1"])))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -58,12 +58,12 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one @include:3)");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1", "3"])))))));
+            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1", "3"])))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -83,12 +83,12 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor(), 1));
 
         var result = await processor.BuildQueryAsync("@include:test");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Index(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1", "3"])))))));
+            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1", "3"])))))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -130,11 +130,11 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one) OR (field1:Test @custom:(two))");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Index(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Index(index)
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
             .Query(f => f
                 .Bool(b => b
                     .Filter(filter => filter
@@ -176,7 +176,7 @@ public sealed class CustomFilterVisitor : ChainableQueryVisitor
             if (ids is { Count: > 0 })
                 node.Parent.SetQuery(new TermsQuery { Field = "id", Terms = new TermsQueryField(ids.Select(FieldValue.String).ToArray()) });
             else
-                node.Parent.SetQuery(new TermQuery("id") { Value = "none" });
+                node.Parent.SetQuery(new TermQuery { Field = "id", Value = "none" });
 
             node.Left = null;
             node.Right = null;

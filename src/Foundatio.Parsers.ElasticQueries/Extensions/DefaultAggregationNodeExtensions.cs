@@ -49,7 +49,7 @@ public static class DefaultAggregationNodeExtensions
 
             case AggregationType.GeoHashGrid:
                 var precision = new GeohashPrecision(1);
-                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Double.TryParse(node.UnescapedProximity, out double parsedPrecision))
+                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int64.TryParse(node.UnescapedProximity, out long parsedPrecision))
                 {
                     if (parsedPrecision is < 1 or > 12)
                         throw new ArgumentOutOfRangeException(nameof(node.UnescapedProximity), "Precision must be between 1 and 12");
@@ -162,7 +162,7 @@ public static class DefaultAggregationNodeExtensions
 
             case AggregationType.GeoHashGrid:
                 var precision = new GeohashPrecision(1);
-                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Double.TryParse(node.UnescapedProximity, out double parsedPrecision))
+                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int64.TryParse(node.UnescapedProximity, out long parsedPrecision))
                 {
                     if (parsedPrecision is < 1 or > 12)
                         throw new ArgumentOutOfRangeException(nameof(node.UnescapedProximity), "Precision must be between 1 and 12");
@@ -240,9 +240,7 @@ public static class DefaultAggregationNodeExtensions
         var start = context.GetDate("StartDate");
         var end = context.GetDate("EndDate");
         bool isValidRange = start.HasValue && start.Value > DateTime.MinValue && end.HasValue && end.Value < DateTime.MaxValue && start.Value <= end.Value;
-        // TODO: https://github.com/elastic/elasticsearch-net/issues/8338
-        //var bounds = isValidRange ? new ExtendedBoundsDate { Min = start.Value, Max = end.Value } : null;
-        var bounds = isValidRange ? new ExtendedBoundsDate { Min = new FieldDateMath(DateMath.Anchored(start.Value).ToString()), Max = new FieldDateMath(DateMath.Anchored(end.Value).ToString()) } : null;
+        var bounds = isValidRange ? new ExtendedBounds<DateTime> { Min = start.Value, Max = end.Value } : null;
 
         var interval = GetInterval(proximity, start, end);
         string timezone = TryConvertTimeUnitToUtcOffset(boost);
@@ -252,7 +250,8 @@ public static class DefaultAggregationNodeExtensions
             MinDocCount = 0,
             Format = "date_optional_time",
             TimeZone = timezone,
-            ExtendedBounds = bounds
+            //ExtendedBounds = bounds
+            // TODO: https://github.com/elastic/elasticsearch-net/issues/8496
         };
 
         interval.Match(d => agg.CalendarInterval = d, f => agg.FixedInterval = f);

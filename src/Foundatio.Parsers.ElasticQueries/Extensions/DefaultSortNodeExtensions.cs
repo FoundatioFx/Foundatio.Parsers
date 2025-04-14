@@ -18,10 +18,13 @@ public static class DefaultSortNodeExtensions
         string field = elasticContext.MappingResolver.GetSortFieldName(node.UnescapedField);
         var fieldType = elasticContext.MappingResolver.GetFieldType(field);
 
-        return SortOptions.Field(field, new FieldSort
+        return new SortOptions
         {
-            UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType,
-            Order = node.IsNodeOrGroupNegated() ? SortOrder.Desc : SortOrder.Asc
-        });
+            Field = new FieldSort(field)
+            {
+                UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType,
+                Order = node.IsNodeOrGroupNegated() ? SortOrder.Desc : SortOrder.Asc
+            }
+        };
     }
 }

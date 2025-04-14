@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
 using Elastic.Clients.Elasticsearch.Mapping;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Elastic.Transport.Products.Elasticsearch;
 using Microsoft.Extensions.Logging;
 
@@ -16,9 +17,16 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class ElasticExtensions
 {
+    public static bool TryGet<T>(this Query query, out T result)
+    {
+        // TODO: until: https://github.com/elastic/elasticsearch-net/issues/8496
+        result = default;
+        return false;
+    }
+
     public static string TryGetName(this IProperty property)
     {
-        // TODO until: https://github.com/elastic/elasticsearch-net/issues/8336
+        // TODO: until: https://github.com/elastic/elasticsearch-net/issues/8336
         return null;
     }
 

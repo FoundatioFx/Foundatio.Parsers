@@ -55,7 +55,6 @@ public class ElasticMappingResolver
 
         if (_mappingCache.TryGetValue(field, out var mapping))
         {
-
             if (followAlias && mapping.Found && mapping.Property is FieldAliasProperty fieldAlias)
             {
                 _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
@@ -126,6 +125,7 @@ public class ElasticMappingResolver
 
             // coded properties sometimes have null Name properties
             string name = fieldMapping.TryGetName();
+            // TODO: ?
             // if (name == null && fieldMapping is IPropertyWithClrOrigin clrOrigin && clrOrigin.ClrOrigin != null)
             //     name = new PropertyName(clrOrigin.ClrOrigin);
 
@@ -502,7 +502,7 @@ public class ElasticMappingResolver
             logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
             // use first returned mapping because index could have been an index alias
-            var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
+            var mapping = response.Mappings.FirstOrDefault().Value?.Mappings;
             return mapping;
         }, logger);
     }
@@ -518,7 +518,7 @@ public class ElasticMappingResolver
             logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
             // use first returned mapping because index could have been an index alias
-            var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
+            var mapping = response.Mappings.FirstOrDefault().Value?.Mappings;
             return mapping;
         }, logger);
     }
@@ -529,21 +529,21 @@ public class ElasticMappingResolver
         return new ElasticMappingResolver(codeMapping, inferrer, getMapping, logger: logger);
     }
 
-    public static ElasticMappingResolver Create<T>(ElasticsearchClient client, ILogger logger = null)
+public static ElasticMappingResolver Create<T>(ElasticsearchClient client, ILogger logger = null)
+{
+    logger ??= NullLogger.Instance;
+
+    return Create(() =>
     {
-        logger ??= NullLogger.Instance;
+        client.Indices.Refresh(Indices.Index<T>());
+        var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
+        logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
-        return Create(() =>
-        {
-            client.Indices.Refresh(Indices.Index<T>());
-            var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
-            logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
-
-            // use first returned mapping because index could have been an index alias
-            var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
-            return mapping;
-        }, client.Infer, logger);
-    }
+        // use first returned mapping because index could have been an index alias
+        var mapping = response.Mappings.FirstOrDefault().Value?.Mappings;
+        return mapping;
+    }, client.Infer, logger);
+}
 
     public static ElasticMappingResolver Create(ElasticsearchClient client, string index, ILogger logger = null)
     {
@@ -556,7 +556,7 @@ public class ElasticMappingResolver
             logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
             // use first returned mapping because index could have been an index alias
-            var mapping = response.Indices.Values.FirstOrDefault()?.Mappings;
+            var mapping = response.Mappings.FirstOrDefault().Value?.Mappings;
             return mapping;
         }, client.Infer, logger);
     }
