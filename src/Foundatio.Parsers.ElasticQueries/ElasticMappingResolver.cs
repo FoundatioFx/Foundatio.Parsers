@@ -502,7 +502,7 @@ public class ElasticMappingResolver
             logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
             // use first returned mapping because index could have been an index alias
-            var mapping = response.Mappings.FirstOrDefault().Value?.Mappings;
+            var mapping = response.Mappings.Values.FirstOrDefault()?.Mappings;
             return mapping;
         }, logger);
     }
@@ -518,7 +518,7 @@ public class ElasticMappingResolver
             logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
             // use first returned mapping because index could have been an index alias
-            var mapping = response.Mappings.FirstOrDefault().Value?.Mappings;
+            var mapping = response.Mappings.Values.FirstOrDefault()?.Mappings;
             return mapping;
         }, logger);
     }
@@ -540,7 +540,7 @@ public static ElasticMappingResolver Create<T>(ElasticsearchClient client, ILogg
         logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
         // use first returned mapping because index could have been an index alias
-        var mapping = response.Mappings.FirstOrDefault().Value?.Mappings;
+        var mapping = response.Mappings.Values.FirstOrDefault()?.Mappings;
         return mapping;
     }, client.Infer, logger);
 }
@@ -556,7 +556,7 @@ public static ElasticMappingResolver Create<T>(ElasticsearchClient client, ILogg
             logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
             // use first returned mapping because index could have been an index alias
-            var mapping = response.Mappings.FirstOrDefault().Value?.Mappings;
+            var mapping = response.Mappings.Values.FirstOrDefault()?.Mappings;
             return mapping;
         }, client.Infer, logger);
     }

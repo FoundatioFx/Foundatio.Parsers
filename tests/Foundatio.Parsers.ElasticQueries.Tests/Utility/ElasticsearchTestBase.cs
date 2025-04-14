@@ -105,7 +105,7 @@ public class ElasticsearchFixture : IAsyncLifetime
         configureMappings ??= m => m.Dynamic(DynamicMapping.True);
         configureIndex ??= i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
 
-        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Mappings(configureMappings));
+        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Mappings<T>(configureMappings));
         Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
     }
 
@@ -115,7 +115,7 @@ public class ElasticsearchFixture : IAsyncLifetime
         configureMappings ??= m => m.Dynamic(DynamicMapping.True);
         configureIndex ??= i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
 
-        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Mappings(configureMappings));
+        await CreateIndexAsync(index, i => i.Settings(configureIndex(new IndexSettingsDescriptor())).Mappings<T>(configureMappings));
         Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
 
         return index;
