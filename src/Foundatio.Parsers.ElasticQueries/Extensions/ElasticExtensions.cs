@@ -104,13 +104,13 @@ public static class ElasticExtensions
             if (pingResponse.IsValid)
                 return true;
 
-            if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
+            if (logger != null)
                 logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
             await Task.Delay(1000, cancellationToken);
         }
 
-        if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+        if (logger != null)
             logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
@@ -127,13 +127,13 @@ public static class ElasticExtensions
             if (pingResponse.IsValid)
                 return true;
 
-            if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
+            if (logger != null)
                 logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
             Thread.Sleep(1000);
         }
 
-        if (logger != null && logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+        if (logger != null)
             logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
