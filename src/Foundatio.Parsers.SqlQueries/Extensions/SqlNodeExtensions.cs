@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -369,7 +370,7 @@ public static class SqlNodeExtensions
             }
             else
             {
-                builder.Append("DateTime.Parse(\"" + term + "\")");
+                builder.Append("DateTime.Parse(\"" + term + "\", null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)");
             }
         }
         else if (field is { IsDateOnly: true })
