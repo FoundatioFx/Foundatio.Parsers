@@ -165,6 +165,42 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task CanUseDateParser()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tokyo");
+        var utcNow = DateTime.UtcNow;
+        _logger.LogInformation("UtcNow: {UtcNow:O} {UtcTicks}", utcNow, utcNow.Ticks);
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz);
+        _logger.LogInformation("LocalNow: {LocalNow:O}", localNow);
+
+        parser.Configuration.DateTimeParser = dateTimeValue =>
+        {
+            if (dateTimeValue.Equals("now", StringComparison.OrdinalIgnoreCase))
+                return "DateTime.UtcNow";
+
+            var dateTime = DateTime.Parse(dateTimeValue);
+            _logger.LogInformation("Parsed DateTime: {DateTime:O} {DateTimeKind}", dateTime, dateTime.Kind);
+
+            if (dateTime.Kind != DateTimeKind.Utc)
+                dateTime = TimeZoneInfo.ConvertTimeToUtc(dateTime, tz);
+
+            _logger.LogInformation("Parsed UTC DateTime: {DateTime:O} {UtcTicks}", dateTime, dateTime.Ticks);
+            return "DateTime(" + dateTime.Ticks + ", DateTimeKind.Utc)";
+        };
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlActual = db.Employees.Where($"created > DateTime({utcNow.Ticks}, DateTimeKind.Utc)").ToQueryString();
+        Assert.Contains(utcNow.ToString("O"), sqlActual);
+        string sql = await parser.ToDynamicLinqAsync($"created:>\"{localNow:O}\"", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Contains(utcNow.ToString("O"), sqlActual);
+    }
+
+    [Fact]
     public async Task CanUseDateOnlyFilter()
     {
         var sp = GetServiceProvider();

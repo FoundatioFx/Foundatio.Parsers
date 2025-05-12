@@ -11,6 +11,8 @@ public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorConte
 {
     public List<EntityFieldInfo> Fields { get; set; }
     public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
+    public Func<string, string> DateTimeParser { get; set; }
+    public Func<string, string> DateOnlyParser { get; set; }
     public IEntityType EntityType { get; set; }
 }
 

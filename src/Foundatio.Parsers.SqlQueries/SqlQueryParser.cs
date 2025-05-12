@@ -215,6 +215,8 @@ public class SqlQueryParser : LuceneQueryParser
         if (context is ISqlQueryVisitorContext sqlContext)
         {
             sqlContext.SearchTokenizer = Configuration.SearchTokenizer;
+            sqlContext.DateTimeParser = Configuration.DateTimeParser;
+            sqlContext.DateOnlyParser = Configuration.DateOnlyParser;
         }
     }
 }

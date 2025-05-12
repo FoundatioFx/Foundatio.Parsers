@@ -287,7 +287,7 @@ public static class SqlNodeExtensions
             builder.Append(fieldPrefix);
             builder.Append(field.Name);
             builder.Append(node.MinInclusive == true ? " >= " : " > ");
-            AppendField(builder, field, node.Min);
+            AppendField(builder, field, node.Min, context);
             builder.Append(fieldSuffix);
         }
 
@@ -299,7 +299,7 @@ public static class SqlNodeExtensions
             builder.Append(fieldPrefix);
             builder.Append(field.Name);
             builder.Append(node.MaxInclusive == true ? " <= " : " < ");
-            AppendField(builder, field, node.Max);
+            AppendField(builder, field, node.Max, context);
             builder.Append(fieldSuffix);
         }
 
@@ -331,7 +331,7 @@ public static class SqlNodeExtensions
                new EntityFieldInfo { Name = field, FullName = field };
     }
 
-    private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term)
+    private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term, ISqlQueryVisitorContext context)
     {
         if (field == null)
             return;
@@ -343,9 +343,10 @@ public static class SqlNodeExtensions
         else if (field is { IsDate: true })
         {
             term = term.Trim();
+
             if (term.StartsWith("now", StringComparison.OrdinalIgnoreCase))
             {
-                builder.Append("DateTime.UtcNow");
+                builder.Append(context.DateTimeParser != null ? context.DateTimeParser("now") : "DateTime.UtcNow");
 
                 if (term.Length == 3)
                     return;
@@ -370,15 +371,26 @@ public static class SqlNodeExtensions
             }
             else
             {
-                builder.Append("DateTime.Parse(\"" + term + "\", null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)");
+                if (context.DateTimeParser != null)
+                {
+                    term = context.DateTimeParser(term);
+                    builder.Append(term);
+                }
+                else
+                {
+                    builder.Append("DateTime.Parse(\"" + term + "\")");
+                }
             }
         }
         else if (field is { IsDateOnly: true })
         {
             term = term.Trim();
+
             if (term.StartsWith("now", StringComparison.OrdinalIgnoreCase))
             {
-                builder.Append("DateOnly.FromDateTime(DateTime.UtcNow)");
+                builder.Append(context.DateOnlyParser != null
+                    ? context.DateOnlyParser("now")
+                    : "DateOnly.FromDateTime(DateTime.UtcNow)");
 
                 if (term.Length == 3)
                     return;
@@ -399,7 +411,15 @@ public static class SqlNodeExtensions
             }
             else
             {
-                builder.Append("DateOnly.Parse(\"" + term + "\")");
+                if (context.DateOnlyParser != null)
+                {
+                    term = context.DateOnlyParser(term);
+                    builder.Append(term);
+                }
+                else
+                {
+                    builder.Append("DateOnly.Parse(\"" + term + "\")");
+                }
             }
         }
         else
