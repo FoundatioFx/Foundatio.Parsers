@@ -228,9 +228,8 @@ public static class SqlNodeExtensions
         {
             builder.Append(fieldPrefix);
             builder.Append(field.Name);
-            builder.Append(" = \"");
-            builder.Append(node.Term);
-            builder.Append("\"");
+            builder.Append(" = ");
+            AppendField(builder, field, node.Term, context);
             builder.Append(fieldSuffix);
         }
         else if (searchOperator == SqlSearchOperator.Contains)

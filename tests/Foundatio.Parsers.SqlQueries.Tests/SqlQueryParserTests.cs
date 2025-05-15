@@ -215,6 +215,13 @@ public class SqlQueryParserTests : TestWithLoggingBase
         string sql = await parser.ToDynamicLinqAsync("birthday:<now-90d", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
+
+        sqlExpected = db.Employees.Where(e => e.Birthday == DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-90)).ToQueryString();
+        sqlActual = db.Employees.Where("""birthday = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-90)""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        sql = await parser.ToDynamicLinqAsync("birthday:now-90d", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
     }
 
     [Fact]
