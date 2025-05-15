@@ -171,7 +171,13 @@ public static class SqlNodeExtensions
                     builder.Append(fieldPrefix);
                     builder.Append(kvp.Key.Name);
                     builder.Append(" in (");
-                    builder.Append(String.Join(',', tokens.Select(t => "\"" + t + "\"")));
+                    for (int i = 0; i < tokens.Count; i++)
+                    {
+                        if (i > 0)
+                            builder.Append(", ");
+
+                        AppendField(builder, kvp.Key, tokens[i], context);
+                    }
                     builder.Append(")");
                     builder.Append(fieldSuffix);
                 }
@@ -182,9 +188,9 @@ public static class SqlNodeExtensions
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(fieldPrefix);
                         builder.Append(kvp.Key.Name);
-                        builder.Append(".Contains(\"");
-                        builder.Append(token);
-                        builder.Append("\")");
+                        builder.Append(".Contains(");
+                        AppendField(builder, kvp.Key, token, context);
+                        builder.Append(")");
                         builder.Append(fieldSuffix);
                         if (i.IsLast)
                             builder.Append(")");
@@ -197,9 +203,9 @@ public static class SqlNodeExtensions
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(fieldPrefix);
                         builder.Append(kvp.Key.Name);
-                        builder.Append(".StartsWith(\"");
-                        builder.Append(token);
-                        builder.Append("\")");
+                        builder.Append(".StartsWith(");
+                        AppendField(builder, kvp.Key, token, context);
+                        builder.Append(")");
                         builder.Append(fieldSuffix);
                         if (i.IsLast)
                             builder.Append(")");
@@ -236,18 +242,18 @@ public static class SqlNodeExtensions
         {
             builder.Append(fieldPrefix);
             builder.Append(field.Name);
-            builder.Append(".Contains(\"");
-            builder.Append(node.Term);
-            builder.Append("\")");
+            builder.Append(".Contains(");
+            AppendField(builder, field, node.Term, context);
+            builder.Append(")");
             builder.Append(fieldSuffix);
         }
         else
         {
             builder.Append(fieldPrefix);
             builder.Append(field.Name);
-            builder.Append(".StartsWith(\"");
-            builder.Append(node.Term);
-            builder.Append("\")");
+            builder.Append(".StartsWith(");
+            AppendField(builder, field, node.Term, context);
+            builder.Append(")");
             builder.Append(fieldSuffix);
         }
 
