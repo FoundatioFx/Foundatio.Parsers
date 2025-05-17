@@ -6,8 +6,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.15" />
     <PackageReference Include="Exceptionless.DateTimeExtensions" Version="3.4.3" />
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.3" />
+  </ItemGroup>
+  <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))">
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
   <ItemGroup>
       <ProjectReference Include="..\..\src\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj" />
