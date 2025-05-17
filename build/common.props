@@ -1,7 +1,7 @@
 <Project>
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net6.0;net8.0</TargetFrameworks>
     <Product>Foundatio.Parsers</Product>
     <Description>A lucene style query parser that is extensible and allows additional syntax features.</Description>
     <PackageProjectUrl>https://github.com/FoundatioFx/Foundatio.Parsers</PackageProjectUrl>
