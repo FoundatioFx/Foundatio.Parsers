@@ -12,7 +12,7 @@ A lucene style query parser that is extensible and allows additional syntax feat
 [This package](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) can be installed via the [NuGet package manager](https://docs.nuget.org/consume/Package-Manager-Dialog). If you need help, please contact us via in-app support or [open an issue](https://github.com/exceptionless/Foundatio.Parsers/issues/new). We’re always here to help if you have any questions!
 
 1. You will need to have [Visual Studio Code](https://code.visualstudio.com) installed.
-2. Open the `Foundatio.Parsers.sln` Visual Studio solution file.
+2. Open the `Foundatio.Parsers.slnx` Visual Studio solution file.
 
 ## Using LuceneQueryParser
 
@@ -82,5 +82,5 @@ System.Diagnostics.Debug.Assert(query == generatedQuery);
     - Supports both root and inner field name aliases
 
 ## Thanks to all the people who have contributed
- 
+
 [![contributors](https://contributors-img.web.app/image?repo=FoundatioFx/Foundatio.Parsers)](https://github.com/FoundatioFx/Foundatio.Parsers/graphs/contributors)
