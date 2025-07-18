@@ -30,6 +30,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                 var termNode = child as TermNode;
                 if (termNode != null && termsAggregation != null)
                 {
+                    // Look into this...
                     // TODO: Move these to the default aggs method using a visitor to walk down the tree to gather them but not going into any sub groups
                     if (termNode.Field == "@exclude")
                     {
