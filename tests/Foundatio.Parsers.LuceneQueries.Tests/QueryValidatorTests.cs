@@ -13,7 +13,7 @@ public class QueryValidatorTests : TestWithLoggingBase
 {
     public QueryValidatorTests(ITestOutputHelper output) : base(output)
     {
-        Log.DefaultMinimumLevel = LogLevel.Trace;
+        Log.DefaultLogLevel = LogLevel.Trace;
     }
 
     [Fact]

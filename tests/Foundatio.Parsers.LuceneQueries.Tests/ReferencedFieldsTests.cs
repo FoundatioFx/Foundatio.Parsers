@@ -10,7 +10,7 @@ public class ReferencedFieldsTests : TestWithLoggingBase
 {
     public ReferencedFieldsTests(ITestOutputHelper output) : base(output)
     {
-        Log.DefaultMinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     [Fact]

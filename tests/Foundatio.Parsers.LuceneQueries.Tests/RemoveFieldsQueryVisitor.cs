@@ -10,7 +10,7 @@ public class RemoveFieldsQueryVisitorTests : TestWithLoggingBase
 {
     public RemoveFieldsQueryVisitorTests(ITestOutputHelper output) : base(output)
     {
-        Log.DefaultMinimumLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
+        Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
     [Fact]

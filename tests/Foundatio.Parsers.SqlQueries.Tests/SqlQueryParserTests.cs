@@ -22,7 +22,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
 {
     public SqlQueryParserTests(ITestOutputHelper output) : base(output)
     {
-        Log.DefaultMinimumLevel = LogLevel.Trace;
+        Log.DefaultLogLevel = LogLevel.Trace;
     }
 
     [Theory]
