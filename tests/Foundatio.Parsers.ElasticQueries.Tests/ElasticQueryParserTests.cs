@@ -225,7 +225,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanGetMappingsFromCode()
+    public async Task CanGetMappingsFromCode()
     {
         TypeMappingDescriptor<MyType> GetCodeMappings(TypeMappingDescriptor<MyType> d) =>
             d.Dynamic()
@@ -238,8 +238,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 .GeoPoint(g => g.Name(f => f.Field3))
                 .Keyword(e => e.Name(m => m.Field2))));
 
-        var res = Client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index));
-        Client.Indices.Refresh(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index));
+        await Client.Indices.RefreshAsync(index);
 
         var parser = new ElasticQueryParser(c => c.SetDefaultFields(["field1"]).UseMappings<MyType>(GetCodeMappings, Client, index));
 
@@ -1217,7 +1217,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
         // Act
-        var result = await processor.BuildAggregationsAsync("terms:(nested.field1~@include:apple,banana,cherry nested.field4~@include:1,2,3)");
+        var result = await processor.BuildAggregationsAsync("terms:(nested.field1 @include:apple,banana,cherry @include:1,2,3)");
 
         // Assert
         var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Aggregations(result));
@@ -1235,7 +1235,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                             .Meta(m => m.Add("@field_type", "text")))
                         .Terms("terms_nested.field4", t => t
                             .Field("nested.field4")
-                            .Include(new long[] { 1, 2, 3 })
+                            .Include(new string[] { "1", "2", "3" })
                             .Meta(m => m.Add("@field_type", "integer")))))));
 
         string expectedRequest = expectedResponse.GetRequest();
@@ -1286,7 +1286,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                             .Meta(m => m.Add("@field_type", "text")))
                         .Terms("terms_nested.field4", t => t
                             .Field("nested.field4")
-                            .Exclude(new long[] { 4 })
+                            .Exclude(new string[] { "4" })
                             .Meta(m => m.Add("@field_type", "integer")))))));
 
         string expectedRequest = expectedResponse.GetRequest();
