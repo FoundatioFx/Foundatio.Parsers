@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
@@ -580,5 +581,17 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
         Assert.Equal(2, actualResponse.Total); // Should match high and medium
+    }
+
+
+    public class MyNestedType
+    {
+        public string Field1 { get; set; }
+        public string Field2 { get; set; }
+        public string Field3 { get; set; }
+        public int Field4 { get; set; }
+        public string Field5 { get; set; }
+        public string Payload { get; set; }
+        public IList<MyType> Nested { get; set; } = new List<MyType>();
     }
 }

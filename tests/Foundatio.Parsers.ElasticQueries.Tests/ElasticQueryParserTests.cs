@@ -1237,10 +1237,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [Fact]
     public async Task CanHandleSpacedFields()
     {
-        string index = CreateRandomIndex<MyNestedType>();
+        string index = CreateRandomIndex<ElasticNestedQueryParserTests.MyNestedType>();
 
         await Client.IndexManyAsync([
-            new MyNestedType
+            new ElasticNestedQueryParserTests.MyNestedType
             {
                 Field1 = "value1",
                 Field2 = "value2",
@@ -1257,8 +1257,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 }
             ]
             },
-            new MyNestedType { Field1 = "value2", Field2 = "value2" },
-            new MyNestedType { Field1 = "value1", Field2 = "value4" }
+            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value2", Field2 = "value2" },
+            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value1", Field2 = "value4" }
         ], index);
         await Client.Indices.RefreshAsync(index);
 
@@ -1415,20 +1415,8 @@ public class MyType
     public Dictionary<string, object> Data { get; set; } = new Dictionary<string, object>();
 }
 
-public class MyNestedType
-{
-    public string Field1 { get; set; }
-    public string Field2 { get; set; }
-    public string Field3 { get; set; }
-    public int Field4 { get; set; }
-    public string Field5 { get; set; }
-    public string Payload { get; set; }
-    public IList<MyType> Nested { get; set; } = new List<MyType>();
-}
-
 public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryVisitor
 {
-
     public override void Visit(TermNode node, IQueryVisitorContext context)
     {
         if (!String.Equals(node.Field, "fixed", StringComparison.OrdinalIgnoreCase))
