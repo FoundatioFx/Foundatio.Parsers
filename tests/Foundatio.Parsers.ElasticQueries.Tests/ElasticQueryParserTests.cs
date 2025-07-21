@@ -1268,7 +1268,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
         // Act
-        var result = await processor.BuildAggregationsAsync("terms:(nested.field1~@exclude:date nested.field4~@exclude:4)");
+        var result = await processor.BuildAggregationsAsync("terms:(nested.field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)");
 
         // Assert
         var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Aggregations(result));
