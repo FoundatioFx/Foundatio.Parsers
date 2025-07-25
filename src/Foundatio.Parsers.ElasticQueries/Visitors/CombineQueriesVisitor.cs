@@ -11,7 +11,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
 public class CombineQueriesVisitor : ChainableQueryVisitor
 {
-
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         await base.VisitAsync(node, context).ConfigureAwait(false);

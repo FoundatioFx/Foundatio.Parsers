@@ -19,7 +19,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public async Task NestedFilterProcessor()
+    public async Task NestedFilterProcessorWithFieldMapAsync()
     {
         string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
             .Text(e => e.Name(n => n.Field1).Index())
@@ -91,7 +91,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public async Task NestedFilterProcessor2()
+    public async Task NestedFilterProcessor()
     {
         string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
             .Text(e => e.Name(n => n.Field1).Index())
@@ -410,11 +410,11 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                     .Aggregations(na => na
                         .Terms("terms_nested.field1", t => t
                             .Field("nested.field1.keyword")
-                            .Include(new string[] { "apple", "banana", "cherry" })
+                            .Include(["apple", "banana", "cherry"])
                             .Meta(m => m.Add("@field_type", "text")))
                         .Terms("terms_nested.field4", t => t
                             .Field("nested.field4")
-                            .Include(new string[] { "1", "2", "3" })
+                            .Include(["1", "2", "3"])
                             .Meta(m => m.Add("@field_type", "integer")))))));
 
         string expectedRequest = expectedResponse.GetRequest();
@@ -461,11 +461,11 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                     .Aggregations(na => na
                         .Terms("terms_nested.field1", t => t
                             .Field("nested.field1.keyword")
-                            .Exclude(new string[] { "date" })
+                            .Exclude(["date"])
                             .Meta(m => m.Add("@field_type", "text")))
                         .Terms("terms_nested.field4", t => t
                             .Field("nested.field4")
-                            .Exclude(new string[] { "4" })
+                            .Exclude(["4"])
                             .Meta(m => m.Add("@field_type", "integer")))))));
 
         string expectedRequest = expectedResponse.GetRequest();
@@ -504,7 +504,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .SetLoggerFactory(Log)
             .UseMappings<MyNestedType>(Client)
             .UseNested()
-            .SetDefaultFields(new[] { "field1", "nested.field1" }));
+            .SetDefaultFields(["field1", "nested.field1"]));
 
         // Act
         var result = await processor.BuildQueryAsync("special_value", new ElasticQueryVisitorContext().UseSearchMode());
