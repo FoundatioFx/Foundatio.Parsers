@@ -55,7 +55,7 @@ public static class SearchDescriptorExtensions
                     }
 
                     // Copy Meta if present
-                    if (agg.Meta != null)
+                    if (agg.Meta != null && agg.Terms.Meta !=null)
                     {
                         t.Meta(d => {
                             foreach (var meta in agg.Terms.Meta)

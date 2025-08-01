@@ -12,6 +12,8 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
 public class CombineAggregationsVisitor : ChainableQueryVisitor
 {
+    private const string NestedPrefix = "nested.";
+
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         await base.VisitAsync(node, context).ConfigureAwait(false);
@@ -116,7 +118,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         {
             bool containsNestedField = node.Children
                 .OfType<IFieldQueryNode>()
-                .Any(c => !String.IsNullOrEmpty(c.Field) && c.Field.StartsWith("nested.", StringComparison.OrdinalIgnoreCase));
+                .Any(c => !String.IsNullOrEmpty(c.Field) && c.Field.StartsWith(NestedPrefix, StringComparison.OrdinalIgnoreCase));
 
             if (containsNestedField)
             {
