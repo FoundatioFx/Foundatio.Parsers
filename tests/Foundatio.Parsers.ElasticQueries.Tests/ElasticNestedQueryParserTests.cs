@@ -610,7 +610,14 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
 
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
-        Assert.Equal(2, actualResponse.Total); // Should match high and medium
+        Assert.Equal(2, actualResponse.Total);
+        var documents = actualResponse.Documents.ToList();
+        var field1Values = documents.Select(d => d.Nested.First().Field1).ToList();
+
+        // Verify that we have both high and medium values in the results
+        Assert.Contains("high", field1Values);
+        Assert.Contains("medium", field1Values);
+        Assert.DoesNotContain("low", field1Values);
     }
 
 

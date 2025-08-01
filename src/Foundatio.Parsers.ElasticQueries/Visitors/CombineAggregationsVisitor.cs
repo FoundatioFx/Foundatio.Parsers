@@ -48,8 +48,13 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                     }
                     else if (termNode.Field == "@min")
                     {
-                        if (!string.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
+                        if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
                             termsAggregation.MinimumDocumentCount = parsedMinCount;
+                    }
+                    else if (termNode.Field == "@max")
+                    {
+                        if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMaxCount))
+                            termsAggregation.Size = parsedMaxCount;
                     }
                 }
 

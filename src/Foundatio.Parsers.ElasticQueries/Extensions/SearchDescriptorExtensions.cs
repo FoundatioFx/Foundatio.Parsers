@@ -58,6 +58,27 @@ public static class SearchDescriptorExtensions
                     return t;
                 });
             }
+            else if (agg.Max != null)
+            {
+                target.Max(name, m =>
+                {
+                    // Copy field
+                    if (agg.Max.Field != null)
+                        m.Field(agg.Max.Field);
+
+                    // Copy Meta if present
+                    if (agg.Max.Meta != null)
+                    {
+                        m.Meta(d => {
+                            foreach (var meta in agg.Max.Meta)
+                                d.Add(meta.Key, meta.Value);
+                            return d;
+                        });
+                    }
+
+                    return m;
+                });
+            }
         }
 
         return target;
