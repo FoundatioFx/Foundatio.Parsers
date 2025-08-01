@@ -396,7 +396,10 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
         // Act
-        var result = await processor.BuildAggregationsAsync("terms:(nested.field1 @include:apple,banana,cherry @include:1,2,3)");
+        var result = await processor.BuildAggregationsAsync(
+                "terms:(nested.field1 @include:apple @include:banana @include:cherry)" +
+                "terms:(nested.field4 @include:1 @include:2 @include:3)"
+            );
 
         // Assert
         var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Aggregations(result));
@@ -411,7 +414,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                         .Terms("terms_nested.field1", t => t
                             .Field("nested.field1.keyword")
                             .Include(["apple", "banana", "cherry"])
-                            .Meta(m => m.Add("@field_type", "text")))
+                            .Meta(m => m.Add("@field_type", "keyword")))
                         .Terms("terms_nested.field4", t => t
                             .Field("nested.field4")
                             .Include(["1", "2", "3"])
@@ -422,6 +425,25 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
 
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
+
+        // Verify bucket contents
+        var actualNestedAgg = actualResponse.Aggregations.Nested("nested_nested");
+        var actualField1Terms = actualNestedAgg.Terms("terms_nested.field1");
+        var actualField4Terms = actualNestedAgg.Terms("terms_nested.field4");
+
+        // Verify field1 buckets have only the included values
+        Assert.Equal(3, actualField1Terms.Buckets.Count);
+        Assert.Contains(actualField1Terms.Buckets, b => b.Key == "apple" && b.DocCount == 1);
+        Assert.Contains(actualField1Terms.Buckets, b => b.Key == "banana" && b.DocCount == 1);
+        Assert.Contains(actualField1Terms.Buckets, b => b.Key == "cherry" && b.DocCount == 1);
+        Assert.DoesNotContain(actualField1Terms.Buckets, b => b.Key == "date");
+
+        // Verify field4 buckets have only the included values
+        Assert.Equal(3, actualField4Terms.Buckets.Count);
+        Assert.Contains(actualField4Terms.Buckets, b => b.Key == "1" && b.DocCount == 1);
+        Assert.Contains(actualField4Terms.Buckets, b => b.Key == "2" && b.DocCount == 1);
+        Assert.Contains(actualField4Terms.Buckets, b => b.Key == "3" && b.DocCount == 1);
+        Assert.DoesNotContain(actualField4Terms.Buckets, b => b.Key == "4");    
     }
 
     [Fact]
@@ -447,10 +469,14 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
         // Act
-        var result = await processor.BuildAggregationsAsync("terms:(nested.field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)");
+        
+        var result = await processor.BuildAggregationsAsync(
+            "terms:(nested.field1 @exclude:cherry @exclude:date) " +
+            "terms:(nested.field4 @exclude:3 @exclude:4)"
+        );
 
         // Assert
-        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Aggregations(result));
+        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Aggregations(result));        
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -461,12 +487,38 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                     .Aggregations(na => na
                         .Terms("terms_nested.field1", t => t
                             .Field("nested.field1.keyword")
-                            .Exclude(["date"])
-                            .Meta(m => m.Add("@field_type", "text")))
+                            .Exclude(["cherry","date"])
+                            .Meta(m => m.Add("@field_type", "keyword")))
                         .Terms("terms_nested.field4", t => t
                             .Field("nested.field4")
-                            .Exclude(["4"])
+                            .Exclude(["3","4"])
                             .Meta(m => m.Add("@field_type", "integer")))))));
+
+        // expected response buckets
+        var expectedNestedAgg = expectedResponse.Aggregations.Nested("nested_nested");
+        var expectedField1Terms = expectedNestedAgg.Terms("terms_nested.field1");
+        var expectedField4Terms = expectedNestedAgg.Terms("terms_nested.field4");
+                
+        // actual response buckets
+        var actualNestedAgg = actualResponse.Aggregations.Nested("nested_nested");
+        var actualField1Terms = actualNestedAgg.Terms("terms_nested.field1");
+        var actualField4Terms = actualNestedAgg.Terms("terms_nested.field4");
+
+        // Add assertions for bucket counts and contents
+        Assert.Equal(expectedField1Terms.Buckets.Count, actualField1Terms.Buckets.Count);
+        Assert.Equal(expectedField4Terms.Buckets.Count, actualField4Terms.Buckets.Count);
+
+        // Verify field1 buckets (apple and banana should be included, cherry and date excluded)
+        Assert.Contains(actualField1Terms.Buckets, b => b.Key == "apple" && b.DocCount == 1);
+        Assert.Contains(actualField1Terms.Buckets, b => b.Key == "banana" && b.DocCount == 1);
+        Assert.DoesNotContain(actualField1Terms.Buckets, b => b.Key == "cherry");
+        Assert.DoesNotContain(actualField1Terms.Buckets, b => b.Key == "date");
+
+        // Verify field4 buckets (1 and 2 should be included, 3 and 4 excluded)
+        Assert.Contains(actualField4Terms.Buckets, b => b.Key == "1" && b.DocCount == 1);
+        Assert.Contains(actualField4Terms.Buckets, b => b.Key == "2" && b.DocCount == 1);
+        Assert.DoesNotContain(actualField4Terms.Buckets, b => b.Key == "3");
+        Assert.DoesNotContain(actualField4Terms.Buckets, b => b.Key == "4");
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -580,7 +632,14 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
 
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
-        Assert.Equal(2, actualResponse.Total); // Should match high and medium
+        Assert.Equal(2, actualResponse.Total);
+        var documents = actualResponse.Documents.ToList();
+        var field1Values = documents.Select(d => d.Nested.First().Field1).ToList();
+
+        // Verify that we have both high and medium values in the results
+        Assert.Contains("high", field1Values);
+        Assert.Contains("medium", field1Values);
+        Assert.DoesNotContain("low", field1Values);
     }
 
 
