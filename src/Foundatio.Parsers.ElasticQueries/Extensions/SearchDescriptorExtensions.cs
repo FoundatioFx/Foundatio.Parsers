@@ -39,9 +39,18 @@ public static class SearchDescriptorExtensions
                     // Copy exclude
                     if (agg.Terms.Exclude != null)
                     {
-                        if (agg.Terms.Exclude.Values != null && agg.Terms.Exclude.Values.Count() > 0)
+                        if (agg.Terms.Exclude.Values != null && agg.Terms.Exclude.Values.Any())
                         {
-                            t.Exclude([.. agg.Terms.Exclude.Values]);
+                            t.Exclude([.. agg.Terms.Exclude.Values.OrderBy(v => v)]);
+                        }
+                    }
+
+                    // Copy include
+                    if (agg.Terms.Include != null)
+                    {
+                        if (agg.Terms.Include.Values != null && agg.Terms.Include.Values.Any())
+                        {
+                            t.Include([.. agg.Terms.Include.Values.OrderBy(v => v)]);
                         }
                     }
 
