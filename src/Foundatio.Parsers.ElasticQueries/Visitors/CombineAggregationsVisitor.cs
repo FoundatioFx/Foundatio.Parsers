@@ -12,8 +12,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
 public class CombineAggregationsVisitor : ChainableQueryVisitor
 {
-    private const string NestedPrefix = "nested.";
-
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         await base.VisitAsync(node, context).ConfigureAwait(false);
@@ -116,49 +114,89 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         if (parentBucket != null)
         {
-            bool containsNestedField = node.Children
-                .OfType<IFieldQueryNode>()
-                .Any(c => !String.IsNullOrEmpty(c.Field) && c.Field.StartsWith(NestedPrefix, StringComparison.OrdinalIgnoreCase));
-
-            if (containsNestedField)
+            // Map aggregation names to their originating field nodes to avoid invalid casts
+            var aggNameToFieldNode = new Dictionary<string, IFieldQueryNode>();
+            foreach (var child in node.Children.OfType<IFieldQueryNode>())
             {
-                parentBucket.Aggregations ??= [];
+                var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
+                if (aggregation != null)
+                {
+                    string name = ((IAggregation)aggregation).Name;
+                    aggNameToFieldNode[name] = child;
+                    childAggregations[name] = (AggregationContainer)aggregation;
+                }
+            }
 
-                bool nestedExists = parentBucket.Aggregations.Any(kvp => kvp.Key == "nested_nested");
+            // Get distinct nested paths from child fields
+            var nestedPaths = aggNameToFieldNode.Values
+                .Select(c => GetNestedPath(c.Field))
+                .Where(np => !String.IsNullOrEmpty(np))
+                .Distinct()
+                .ToList();
+
+            if (parentBucket.Aggregations == null)
+                parentBucket.Aggregations = new AggregationDictionary();
+
+            foreach (string nestedPath in nestedPaths)
+            {
+                // Create nested aggregation name based on the path
+                string nestedAggName = $"nested_{nestedPath}";
+                
+                // Try to find existing nested aggregation container by name
+                bool nestedExists = parentBucket.Aggregations.Any(kvp => kvp.Key == nestedAggName);
 
                 if (!nestedExists)
                 {
-                    var nestedAggregation = new NestedAggregation("nested_nested")
+                    // Create new nested aggregation
+                    var nestedAggregation = new NestedAggregation(nestedAggName)
                     {
-                        Path = "nested",
+                        Path = nestedPath,
                         Aggregations = []
                     };
 
-                    var nestedAggregationContainer = new AggregationContainer
+                    var nestedAggContainer = new AggregationContainer
                     {
                         Nested = nestedAggregation
                     };
 
-                    parentBucket.Aggregations["nested_nested"] = nestedAggregationContainer;
+                    parentBucket.Aggregations[nestedAggName] = nestedAggContainer;
                 }
 
-                var nestedAggregationContainerFromDict = parentBucket.Aggregations["nested_nested"];
-                var nestedAgg = nestedAggregationContainerFromDict.Nested;
-
+                var nestedAgg = parentBucket.Aggregations[nestedAggName].Nested;
                 nestedAgg.Aggregations ??= [];
 
+                // Add child aggregations belonging to this nested path
                 foreach (var kvp in childAggregations)
                 {
-                    nestedAgg.Aggregations[kvp.Key] = kvp.Value;
+                    if (aggNameToFieldNode.TryGetValue(kvp.Key, out var fieldNode) &&
+                        !String.IsNullOrEmpty(fieldNode.Field) &&
+                        fieldNode.Field.StartsWith($"{nestedPath}.", StringComparison.OrdinalIgnoreCase))
+                    {
+                        nestedAgg.Aggregations[kvp.Key] = kvp.Value;
+                    }
                 }
             }
-            else
-            {
-                if (parentBucket.Aggregations == null)
-                    parentBucket.Aggregations = [];
 
-                foreach (var kvp in childAggregations)
+            // Add non-nested child aggregations directly under parentBucket
+            foreach (var kvp in childAggregations)
+            {
+                if (aggNameToFieldNode.TryGetValue(kvp.Key, out var fieldNode))
                 {
+                    bool isNested = false;
+                    if (!String.IsNullOrEmpty(fieldNode.Field))
+                    {
+                        string path = GetNestedPath(fieldNode.Field);
+                        if (!String.IsNullOrEmpty(path) && nestedPaths.Contains(path))
+                            isNested = true;
+                    }
+                    if (!isNested)
+                    {
+                        parentBucket.Aggregations[kvp.Key] = kvp.Value;
+                    }
+                }
+                else
+                {
+                    // If no field info, assume not nested and add
                     parentBucket.Aggregations[kvp.Key] = kvp.Value;
                 }
             }
@@ -197,5 +235,14 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         }
 
         return container;
+    }
+
+    private static string GetNestedPath(string field)
+    {
+        if (String.IsNullOrEmpty(field))
+            return null;
+
+        int dotIndex = field.IndexOf('.');
+        return dotIndex > 0 ? field.Substring(0, dotIndex) : null;
     }
 }

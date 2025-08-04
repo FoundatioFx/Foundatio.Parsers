@@ -356,15 +356,15 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 .Nested("nested_nested", n => n
                     .Path("nested")
                     .Aggregations(na => na
+                        .Max("max_nested.field4", m => m
+                            .Field("nested.field4")
+                            .Meta(m2 => m2.Add("@field_type", "integer")))
                         .Terms("terms_nested.field1", t => t
                             .Field("nested.field1.keyword")
                             .Meta(m => m.Add("@field_type", "text")))
                         .Terms("terms_nested.field4", t => t
                             .Field("nested.field4")
-                            .Meta(m => m.Add("@field_type", "integer")))
-                        .Max("max_nested.field4", m => m
-                            .Field("nested.field4")
-                            .Meta(m2 => m2.Add("@field_type", "integer")))))));
+                            .Meta(m => m.Add("@field_type", "integer")))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -567,10 +567,15 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = Client.Search<MyNestedType>(d => d.Index(index)
-            .Query(q => q.Match(m => m.Field("field1").Query("special_value"))
-                || q.Nested(n => n
-                    .Path("nested")
-                    .Query(q2 => q2.Match(m => m.Field("nested.field1").Query("special_value"))))));
+            .Query(q => q.Bool(b => b
+                .MinimumShouldMatch(1)
+                .Should(
+                    q1 => q1.Match(m => m.Field("field1").Query("special_value")),
+                    q2 => q2.Nested(n => n
+                        .Path("nested")
+                        .Query(nq => nq.Match(m => m.Field("nested.field1").Query("special_value")))
+                    )
+                ))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -620,12 +625,12 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 .Nested("nested_nested", n => n
                     .Path("nested")
                     .Aggregations(na => na
-                        .Terms("terms_nested.field1", t => t
-                            .Field("nested.field1.keyword")
-                            .Meta(m => m.Add("@field_type", "text")))
                         .Max("max_nested.field4", m => m
                             .Field("nested.field4")
-                            .Meta(m2 => m2.Add("@field_type", "integer")))))));
+                            .Meta(m2 => m2.Add("@field_type", "integer")))
+                        .Terms("terms_nested.field1", t => t
+                            .Field("nested.field1.keyword")
+                            .Meta(m => m.Add("@field_type", "text")))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);

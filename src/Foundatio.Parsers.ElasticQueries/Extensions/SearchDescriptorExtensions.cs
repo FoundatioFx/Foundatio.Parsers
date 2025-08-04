@@ -16,7 +16,7 @@ public static class SearchDescriptorExtensions
         IDictionary<string, IAggregationContainer> sourceAggregations
     ) where T : class
     {
-        foreach (var kvp in sourceAggregations)
+        foreach (var kvp in sourceAggregations.OrderBy(x => x.Key))
         {
             string name = kvp.Key;
             var agg = kvp.Value;
@@ -34,7 +34,26 @@ public static class SearchDescriptorExtensions
                 {
                     // Copy field
                     if (agg.Terms.Field != null)
-                        t.Field(agg.Terms.Field);
+                    {
+                        var fieldName = agg.Terms.Field.Name;
+
+                        // For text fields, use the keyword sub-field if it's not already specified
+                        // This helps handle the common case where a text field needs to be aggregated
+                        bool isTextFieldWithoutKeyword = agg.Meta != null &&
+                                                      agg.Meta.TryGetValue("@field_type", out var fieldType) &&
+                                                      fieldType?.ToString() == "text" &&
+                                                      !fieldName.EndsWith(".keyword");
+
+                        if (isTextFieldWithoutKeyword)
+                        {
+                            // Use the keyword sub-field for text field aggregations
+                            t.Field($"{fieldName}.keyword");
+                        }
+                        else
+                        {
+                            t.Field(agg.Terms.Field);
+                        }
+                    }
 
                     // Copy exclude
                     if (agg.Terms.Exclude != null)
@@ -58,7 +77,7 @@ public static class SearchDescriptorExtensions
                     if (agg.Meta != null && agg.Terms.Meta !=null)
                     {
                         t.Meta(d => {
-                            foreach (var meta in agg.Terms.Meta)
+                            foreach (var meta in agg.Terms.Meta.OrderBy(m => m.Key))
                                 d.Add(meta.Key, meta.Value);
                             return d;
                         });
@@ -79,7 +98,7 @@ public static class SearchDescriptorExtensions
                     if (agg.Max.Meta != null)
                     {
                         m.Meta(d => {
-                            foreach (var meta in agg.Max.Meta)
+                            foreach (var meta in agg.Max.Meta.OrderBy(m => m.Key))
                                 d.Add(meta.Key, meta.Value);
                             return d;
                         });

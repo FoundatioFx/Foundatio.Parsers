@@ -47,38 +47,56 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             string fieldName = child.Field;
 
             // Check if field is nested (has a dot) - could be improved to check against valid nested paths
-            int dotIndex = fieldName.IndexOf('.');
-            if (dotIndex > 0)
+            if (!String.IsNullOrEmpty(fieldName))
             {
-                string nestedPath = fieldName.Substring(0, dotIndex);
-
-                // Get or create NestedQuery for this path
-                if (!nestedQueries.TryGetValue(nestedPath, out NestedQuery nestedQuery))
+                int dotIndex = fieldName.IndexOf('.');
+                if (dotIndex > 0)
                 {
-                    nestedQuery = new NestedQuery
+                    string nestedPath = fieldName.Substring(0, dotIndex);
+
+                    // Get or create NestedQuery for this path
+                    if (!nestedQueries.TryGetValue(nestedPath, out NestedQuery nestedQuery))
                     {
-                        Path = nestedPath,
-                        Query = null
-                    };
-                    nestedQueries[nestedPath] = nestedQuery;
-                }
+                        nestedQuery = new NestedQuery
+                        {
+                            Path = nestedPath,
+                            Query = null
+                        };
+                        nestedQueries[nestedPath] = nestedQuery;
+                    }
 
-                // Combine this child's query into the nested query's inner query
-                if (nestedQuery.Query == null)
-                {
-                    nestedQuery.Query = childQuery;
+                    // Combine this child's query into the nested query's inner query
+                    if (nestedQuery.Query == null)
+                    {
+                        nestedQuery.Query = childQuery;
+                    }
+                    else
+                    {
+                        if (op == GroupOperator.And)
+                            nestedQuery.Query &= childQuery;
+                        else if (op == GroupOperator.Or)
+                            nestedQuery.Query |= childQuery;
+                    }
                 }
                 else
                 {
-                    if (op == GroupOperator.And)
-                        nestedQuery.Query &= childQuery;
-                    else if (op == GroupOperator.Or)
-                        nestedQuery.Query |= childQuery;
+                    // Non-nested field queries combined here
+                    if (container == null)
+                    {
+                        container = childQuery;
+                    }
+                    else
+                    {
+                        if (op == GroupOperator.And)
+                            container &= childQuery;
+                        else if (op == GroupOperator.Or)
+                            container |= childQuery;
+                    }
                 }
             }
             else
             {
-                // Non-nested field queries combined here
+                // Handle null field case - this is for default field searches
                 if (container == null)
                 {
                     container = childQuery;
