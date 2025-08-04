@@ -6,7 +6,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.18" />
     <PackageReference Include="Exceptionless.DateTimeExtensions" Version="3.4.3" />
-    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.6" />
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />
   </ItemGroup>
   <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))">
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
