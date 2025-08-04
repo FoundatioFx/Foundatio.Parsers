@@ -127,10 +127,9 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = Client.Search<MyNestedType>(d => d.Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
+            && q.Nested(n => n.Path(p => p.Nested).Query(q2 => q2.Match(m => m.Field("nested.field1").Query("value1"))))
             && q.Nested(n => n.Path(p => p.Nested).Query(q2 =>
-                q2.Match(m => m.Field("nested.field1").Query("value1"))
-                && q2.Term("nested.field4", "4")
-                && q2.Match(m => m.Field("nested.field3").Query("value3"))))));
+                q2.Term("nested.field4", "4") && q2.Match(m => m.Field("nested.field3").Query("value3"))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
