@@ -15,15 +15,34 @@ public static class DefaultAggregationNodeExtensions
     // NOTE: We may want to read this dynamically from server settings.
     public const int MAX_BUCKET_SIZE = 10000;
 
-    public static Task<AggregationBase> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static async Task<AggregationBase> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
     {
+        AggregationBase aggregation = null;
         if (node is GroupNode groupNode)
-            return groupNode.GetDefaultAggregationAsync(context);
+            aggregation = await groupNode.GetDefaultAggregationAsync(context);
 
         if (node is TermNode termNode)
-            return termNode.GetDefaultAggregationAsync(context);
+            aggregation = await termNode.GetDefaultAggregationAsync(context);
 
-        return null;
+        if (aggregation is null)
+            return null;
+
+        if (aggregation is ITermsAggregation termsAggregation)
+        {
+            PopulateTermsAggregation(termsAggregation, node);
+        }
+
+        if (aggregation is ITopHitsAggregation topHitsAggregation)
+        {
+            PopulateTopHitsAggregation(topHitsAggregation, node);
+        }
+
+        if (aggregation is IDateHistogramAggregation histogramAggregation)
+        {
+            PopulateDateHistogramAggregation(histogramAggregation, node);
+        }
+
+        return aggregation;
     }
 
     public static async Task<AggregationBase> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context)
@@ -328,5 +347,132 @@ public static class DefaultAggregationNodeExtensions
             return parsedValue;
 
         return null;
+    }
+    private static void PopulateTermsAggregation(ITermsAggregation termsAggregation, IQueryNode node)
+    {
+        if (termsAggregation == null)
+            return;
+
+        foreach (var child in node.Children)
+        {
+            if (child is GroupNode groupNode && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field) && groupNode.Left == null)
+                continue;
+
+            var termNode = child as TermNode;
+            switch (termNode?.Field)
+            {
+                case "@exclude":
+                    if (termNode.IsRegexTerm)
+                    {
+                        termsAggregation.Exclude = new TermsExclude(termNode.UnescapedTerm);
+                    }
+                    else
+                    {
+                        termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm);
+                    }
+                    break;
+                case "@include":
+                    if (termNode.IsRegexTerm)
+                    {
+                        termsAggregation.Include = new TermsInclude(termNode.UnescapedTerm);
+                    }
+                    else
+                    {
+                        termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm);
+                    }
+                    break;
+                case "@missing":
+                    termsAggregation.Missing = termNode.UnescapedTerm; break;
+                case "@min":
+                    {
+                        int? minCount = null;
+                        if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
+                            minCount = parsedMinCount;
+
+                        termsAggregation.MinimumDocumentCount = minCount;
+                        break;
+                    }
+            }
+
+            PopulateTermsAggregation(termsAggregation, child);
+        }
+    }
+
+    private static void PopulateTopHitsAggregation(ITopHitsAggregation topHitsAggregation, IQueryNode node)
+    {
+        if (topHitsAggregation == null)
+            return;
+
+        foreach (var child in node.Children)
+        {
+            if (child is GroupNode groupNode && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field) && groupNode.Left == null)
+                continue;
+
+            if (child is TermNode termNode)
+            {
+                if (topHitsAggregation.Source is null)
+                {
+                    topHitsAggregation.Source = node.GetSourceFilter(() => new SourceFilter());
+                }
+
+                topHitsAggregation.Source.Match(
+                    b => { },
+                    filter =>
+                    {
+                        switch (termNode.Field)
+                        {
+                            case "@exclude":
+                                {
+                                    if (filter.Excludes == null)
+                                        filter.Excludes = termNode.UnescapedTerm;
+                                    else
+                                        filter.Excludes.And(termNode.UnescapedTerm);
+                                    break;
+                                }
+                            case "@include":
+                                {
+                                    if (filter.Includes == null)
+                                        filter.Includes = termNode.UnescapedTerm;
+                                    else
+                                        filter.Includes.And(termNode.UnescapedTerm);
+                                    break;
+                                }
+                        }
+                    });
+            }
+
+            PopulateTopHitsAggregation(topHitsAggregation, child);
+        }
+    }
+
+    private static void PopulateDateHistogramAggregation(IDateHistogramAggregation dateHistogramAggregation, IQueryNode node)
+    {
+        if (dateHistogramAggregation == null)
+            return;
+
+        foreach (var child in node.Children)
+        {
+            if (child is GroupNode groupNode && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field) && groupNode.Left == null)
+                continue;
+
+            var termNode = child as TermNode;
+            switch (termNode?.Field)
+            {
+                case "@missing":
+                    {
+                        DateTime? missingValue = null;
+                        if (!String.IsNullOrEmpty(termNode.Term) && DateTime.TryParse(termNode.Term, out var parsedMissingDate))
+                            missingValue = parsedMissingDate;
+
+                        dateHistogramAggregation.Missing = missingValue;
+                        break;
+                    }
+                case "@offset":
+                    dateHistogramAggregation.Offset = termNode.IsExcluded() ? "-" + termNode.Term : termNode.Term;
+                    break;
+            }
+
+            PopulateDateHistogramAggregation(dateHistogramAggregation, child);
+        }
     }
 }
