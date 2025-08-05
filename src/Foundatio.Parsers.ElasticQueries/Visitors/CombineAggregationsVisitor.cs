@@ -134,8 +134,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                 .Distinct()
                 .ToList();
 
-            if (parentBucket.Aggregations == null)
-                parentBucket.Aggregations = new AggregationDictionary();
+            parentBucket.Aggregations ??= [];
 
             foreach (string nestedPath in nestedPaths)
             {

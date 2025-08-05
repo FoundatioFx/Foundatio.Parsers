@@ -42,7 +42,7 @@ public static class DefaultQueryNodeExtensions
 
         if (elasticContext.MappingResolver.IsPropertyAnalyzed(field))
         {
-            string[] fields = !String.IsNullOrEmpty(field) ? new[] { field } : defaultFields;
+            string[] fields = !String.IsNullOrEmpty(field) ? [field] : defaultFields;
 
             // Handle wildcard query string case
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
@@ -84,11 +84,11 @@ public static class DefaultQueryNodeExtensions
 
             // Group nested fields by prefix (before dot)
             var nestedGroups = fields
-                .Where(f => !string.IsNullOrEmpty(f) && f.Contains('.'))
+                .Where(f => !String.IsNullOrEmpty(f) && f.Contains('.'))
                 .GroupBy(f => f.Substring(0, f.IndexOf('.')));
 
             // Non-nested fields (no dot)
-            var nonNestedFields = fields.Where(f => string.IsNullOrEmpty(f) || !f.Contains('.')).ToArray();
+            string[] nonNestedFields = [.. fields.Where(f => String.IsNullOrEmpty(f) || !f.Contains('.'))];
 
             // Add non-nested query if any
             if (nonNestedFields.Length == 1)

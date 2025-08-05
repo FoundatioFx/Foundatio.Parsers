@@ -18,13 +18,13 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         // Only stop on scoped group nodes (parens). Gather all child queries (including scoped groups) and then combine them.
         // Combining only happens at the scoped group level though.
-        // Merge all non-field terms together into a single match or multi-match query
+        // For all non-field terms, processes default field searches, adds them to container and combines them with AND/OR operators. merging into match/multi-match queries happen in DefaultQueryNodeExtensions.
         // Merge all nested queries for the same nested field together
 
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        QueryBase defaultQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
+        var defaultQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
 
         // Will accumulate combined queries for non-nested fields
         QueryBase container = null;
