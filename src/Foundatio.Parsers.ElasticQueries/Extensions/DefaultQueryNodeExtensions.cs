@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -42,6 +44,7 @@ public static class DefaultQueryNodeExtensions
         {
             string[] fields = !String.IsNullOrEmpty(field) ? [field] : defaultFields;
 
+            // Handle wildcard query string case
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
                 query = new QueryStringQuery
@@ -51,42 +54,108 @@ public static class DefaultQueryNodeExtensions
                     AnalyzeWildcard = true,
                     Query = node.UnescapedTerm
                 };
+                return query;
             }
-            else
+
+            // If a single field, use single Match or MatchPhrase query
+            if (fields != null && fields.Length == 1)
             {
-                if (fields != null && fields.Length == 1)
+                if (node.IsQuotedTerm)
                 {
-                    if (node.IsQuotedTerm)
+                    query = new MatchPhraseQuery
                     {
-                        query = new MatchPhraseQuery
-                        {
-                            Field = fields[0],
-                            Query = node.UnescapedTerm
-                        };
-                    }
-                    else
-                    {
-                        query = new MatchQuery
-                        {
-                            Field = fields[0],
-                            Query = node.UnescapedTerm
-                        };
-                    }
+                        Field = fields[0],
+                        Query = node.UnescapedTerm
+                    };
                 }
                 else
                 {
-                    query = new MultiMatchQuery
+                    query = new MatchQuery
                     {
-                        Fields = fields,
+                        Field = fields[0],
                         Query = node.UnescapedTerm
                     };
-                    if (node.IsQuotedTerm)
-                        ((MultiMatchQuery)query).Type = TextQueryType.Phrase;
+                }
+                return query;
+            }
+
+            // Multiple fields: split into nested groups and non-nested
+            var shouldQueries = new List<QueryBase>();
+
+            // Group nested fields by prefix (before dot)
+            var nestedGroups = fields
+                .Where(f => !String.IsNullOrEmpty(f) && f.Contains('.'))
+                .GroupBy(f => f.Substring(0, f.IndexOf('.')));
+
+            // Non-nested fields (no dot)
+            string[] nonNestedFields = [.. fields.Where(f => String.IsNullOrEmpty(f) || !f.Contains('.'))];
+
+            // Add non-nested query if any
+            if (nonNestedFields.Length == 1)
+            {
+                if (node.IsQuotedTerm)
+                {
+                    shouldQueries.Add(new MatchPhraseQuery
+                    {
+                        Field = nonNestedFields[0],
+                        Query = node.UnescapedTerm
+                    });
+                }
+                else
+                {
+                    shouldQueries.Add(new MatchQuery
+                    {
+                        Field = nonNestedFields[0],
+                        Query = node.UnescapedTerm
+                    });
                 }
             }
+            else if (nonNestedFields.Length > 1)
+            {
+                var mmq = new MultiMatchQuery
+                {
+                    Fields = nonNestedFields,
+                    Query = node.UnescapedTerm
+                };
+                if (node.IsQuotedTerm)
+                    mmq.Type = TextQueryType.Phrase;
+
+                shouldQueries.Add(mmq);
+            }
+
+            // Add nested queries per nested group
+            foreach (var group in nestedGroups)
+            {
+                string nestedPath = group.Key;
+
+                var nestedShouldQueries = group.Select(f => (QueryBase)(node.IsQuotedTerm
+                    ? new MatchPhraseQuery { Field = f, Query = node.UnescapedTerm }
+                    : new MatchQuery { Field = f, Query = node.UnescapedTerm })).ToList();
+
+                QueryBase nestedInnerQuery;
+                if (nestedShouldQueries.Count == 1)
+                    nestedInnerQuery = nestedShouldQueries[0];
+                else
+                    nestedInnerQuery = new BoolQuery { Should = nestedShouldQueries.Select(q => (QueryContainer)q), MinimumShouldMatch = 1 };
+
+                var nestedQuery = new NestedQuery
+                {
+                    Path = nestedPath,
+                    Query = nestedInnerQuery
+                };
+
+                shouldQueries.Add(nestedQuery);
+            }
+
+            query = new BoolQuery
+            {
+                Should = shouldQueries.Select(q => (QueryContainer)q),
+                MinimumShouldMatch = 1
+            };
         }
         else
         {
+            // Non-analyzed field path: handle prefix and term queries
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
                 query = new PrefixQuery

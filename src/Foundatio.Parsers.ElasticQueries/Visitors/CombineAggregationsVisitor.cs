@@ -22,6 +22,9 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         var container = await GetParentContainerAsync(node, context);
         var termsAggregation = container as ITermsAggregation;
 
+        var parentBucket = container as BucketAggregationBase;
+        var childAggregations = new Dictionary<string, AggregationContainer>();
+
         foreach (var child in node.Children.OfType<IFieldQueryNode>())
         {
             var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
@@ -30,8 +33,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                 var termNode = child as TermNode;
                 if (termNode != null && termsAggregation != null)
                 {
-                    // Look into this...
-                    // TODO: Move these to the default aggs method using a visitor to walk down the tree to gather them but not going into any sub groups
+                    // Accumulate @exclude values as a list
                     if (termNode.Field == "@exclude")
                     {
                         termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm);
@@ -46,11 +48,13 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                     }
                     else if (termNode.Field == "@min")
                     {
-                        int? minCount = null;
                         if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
-                            minCount = parsedMinCount;
-
-                        termsAggregation.MinimumDocumentCount = minCount;
+                            termsAggregation.MinimumDocumentCount = parsedMinCount;
+                    }
+                    else if (termNode.Field == "@max")
+                    {
+                        if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMaxCount))
+                            termsAggregation.Size = parsedMaxCount;
                     }
                 }
 
@@ -79,7 +83,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                     if (termNode.Field == "@missing")
                     {
                         DateTime? missingValue = null;
-                        if (!String.IsNullOrEmpty(termNode.Term) && DateTime.TryParse(termNode.Term, out var parsedMissingDate))
+                        if (!string.IsNullOrEmpty(termNode.Term) && DateTime.TryParse(termNode.Term, out var parsedMissingDate))
                             missingValue = parsedMissingDate;
 
                         dateHistogramAggregation.Missing = missingValue;
@@ -93,13 +97,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                 continue;
             }
 
-            if (container is BucketAggregationBase bucketContainer)
-            {
-                if (bucketContainer.Aggregations == null)
-                    bucketContainer.Aggregations = new AggregationDictionary();
-
-                bucketContainer.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
-            }
+            childAggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
 
             if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+"))
             {
@@ -111,6 +109,95 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                     Key = ((IAggregation)aggregation).Name,
                     Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
                 });
+            }
+        }
+
+        if (parentBucket != null)
+        {
+            // Map aggregation names to their originating field nodes to avoid invalid casts
+            var aggNameToFieldNode = new Dictionary<string, IFieldQueryNode>();
+            foreach (var child in node.Children.OfType<IFieldQueryNode>())
+            {
+                var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
+                if (aggregation != null)
+                {
+                    string name = ((IAggregation)aggregation).Name;
+                    aggNameToFieldNode[name] = child;
+                    childAggregations[name] = (AggregationContainer)aggregation;
+                }
+            }
+
+            // Get distinct nested paths from child fields
+            var nestedPaths = aggNameToFieldNode.Values
+                .Select(c => GetNestedPath(c.Field))
+                .Where(np => !String.IsNullOrEmpty(np))
+                .Distinct()
+                .ToList();
+
+            parentBucket.Aggregations ??= [];
+
+            foreach (string nestedPath in nestedPaths)
+            {
+                // Create nested aggregation name based on the path
+                string nestedAggName = $"nested_{nestedPath}";
+                
+                // Try to find existing nested aggregation container by name
+                bool nestedExists = parentBucket.Aggregations.Any(kvp => kvp.Key == nestedAggName);
+
+                if (!nestedExists)
+                {
+                    // Create new nested aggregation
+                    var nestedAggregation = new NestedAggregation(nestedAggName)
+                    {
+                        Path = nestedPath,
+                        Aggregations = []
+                    };
+
+                    var nestedAggContainer = new AggregationContainer
+                    {
+                        Nested = nestedAggregation
+                    };
+
+                    parentBucket.Aggregations[nestedAggName] = nestedAggContainer;
+                }
+
+                var nestedAgg = parentBucket.Aggregations[nestedAggName].Nested;
+                nestedAgg.Aggregations ??= [];
+
+                // Add child aggregations belonging to this nested path
+                foreach (var kvp in childAggregations)
+                {
+                    if (aggNameToFieldNode.TryGetValue(kvp.Key, out var fieldNode) &&
+                        !String.IsNullOrEmpty(fieldNode.Field) &&
+                        fieldNode.Field.StartsWith($"{nestedPath}.", StringComparison.OrdinalIgnoreCase))
+                    {
+                        nestedAgg.Aggregations[kvp.Key] = kvp.Value;
+                    }
+                }
+            }
+
+            // Add non-nested child aggregations directly under parentBucket
+            foreach (var kvp in childAggregations)
+            {
+                if (aggNameToFieldNode.TryGetValue(kvp.Key, out var fieldNode))
+                {
+                    bool isNested = false;
+                    if (!String.IsNullOrEmpty(fieldNode.Field))
+                    {
+                        string path = GetNestedPath(fieldNode.Field);
+                        if (!String.IsNullOrEmpty(path) && nestedPaths.Contains(path))
+                            isNested = true;
+                    }
+                    if (!isNested)
+                    {
+                        parentBucket.Aggregations[kvp.Key] = kvp.Value;
+                    }
+                }
+                else
+                {
+                    // If no field info, assume not nested and add
+                    parentBucket.Aggregations[kvp.Key] = kvp.Value;
+                }
             }
         }
 
@@ -147,5 +234,14 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         }
 
         return container;
+    }
+
+    private static string GetNestedPath(string field)
+    {
+        if (String.IsNullOrEmpty(field))
+            return null;
+
+        int dotIndex = field.IndexOf('.');
+        return dotIndex > 0 ? field.Substring(0, dotIndex) : null;
     }
 }
