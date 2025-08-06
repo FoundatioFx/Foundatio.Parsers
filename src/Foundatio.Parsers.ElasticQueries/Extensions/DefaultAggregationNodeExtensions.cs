@@ -348,9 +348,10 @@ public static class DefaultAggregationNodeExtensions
 
         return null;
     }
+
     private static void PopulateTermsAggregation(ITermsAggregation termsAggregation, IQueryNode node)
     {
-        if (termsAggregation == null)
+        if (termsAggregation is null)
             return;
 
         foreach (var child in node.Children)
@@ -385,11 +386,8 @@ public static class DefaultAggregationNodeExtensions
                     termsAggregation.Missing = termNode.UnescapedTerm; break;
                 case "@min":
                     {
-                        int? minCount = null;
-                        if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
-                            minCount = parsedMinCount;
-
-                        termsAggregation.MinimumDocumentCount = minCount;
+                        if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int minCount))
+                            termsAggregation.MinimumDocumentCount = minCount;
                         break;
                     }
             }
@@ -400,7 +398,7 @@ public static class DefaultAggregationNodeExtensions
 
     private static void PopulateTopHitsAggregation(ITopHitsAggregation topHitsAggregation, IQueryNode node)
     {
-        if (topHitsAggregation == null)
+        if (topHitsAggregation is null)
             return;
 
         foreach (var child in node.Children)
@@ -447,7 +445,7 @@ public static class DefaultAggregationNodeExtensions
 
     private static void PopulateDateHistogramAggregation(IDateHistogramAggregation dateHistogramAggregation, IQueryNode node)
     {
-        if (dateHistogramAggregation == null)
+        if (dateHistogramAggregation is null)
             return;
 
         foreach (var child in node.Children)
