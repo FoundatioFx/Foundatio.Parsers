@@ -284,7 +284,7 @@ public class AggregationParserTests : ElasticsearchTestBase
             .Terms("terms_field1", t => t
                 .Field("field1.keyword")
                 .MinimumDocumentCount(1)
-                .Include(["myinclude", "otherinclude" ])
+                .Include(["myinclude", "otherinclude"])
                 .Exclude(["myexclude", "otherexclude"])
                 .Missing("mymissing")
                 .Meta(m => m.Add("@field_type", "keyword")))));

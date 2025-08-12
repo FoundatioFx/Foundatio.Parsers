@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
@@ -80,7 +80,7 @@ public class EntityFieldInfo
             {
                 prefix.Append(field.Name).Append(".");
             }
-        };
+        }
 
         return (prefix.ToString(), suffix.ToString());
     }
