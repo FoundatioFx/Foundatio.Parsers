@@ -7,6 +7,7 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
+using DateMath = Nest.DateMath;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
