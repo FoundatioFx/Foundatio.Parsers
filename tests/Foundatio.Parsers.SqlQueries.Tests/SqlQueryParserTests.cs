@@ -79,7 +79,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
-        await WaitForFullTextIndexAsync(db, "ftCatalog");
+        await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
 
         var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
         Assert.Single(results);
@@ -114,7 +114,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         _logger.LogInformation(sql);
         Assert.Equal(sqlExpected, sqlActual);
 
-        await WaitForFullTextIndexAsync(db, "ftCatalog");
+        await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
 
         sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
         var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
@@ -538,58 +538,6 @@ public class SqlQueryParserTests : TestWithLoggingBase
               WITH (CHANGE_TRACKING = AUTO, STOPLIST = SYSTEM);");
 
         return db;
-    }
-
-    private static bool _checked;
-    private static readonly object _lock = new();
-
-    private static void WaitForSql(
-        string connectionString,
-        int maxRetries = 90,
-        int delayMs = 1000)
-    {
-        for (int i = 0; i < maxRetries; i++)
-        {
-            try
-            {
-                using var conn = new SqlConnection(connectionString);
-                conn.Open();
-
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = "SELECT 1";
-                cmd.ExecuteScalar();
-
-                return;
-            }
-            catch
-            {
-                if (i == maxRetries - 1)
-                    throw;
-
-                Thread.Sleep(delayMs);
-            }
-        }
-    }
-
-    private async Task WaitForFullTextIndexAsync(DbContext db, string catalogName, int timeoutSeconds = 30)
-    {
-        var end = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-
-        while (DateTime.UtcNow < end)
-        {
-            string sql = "SELECT FULLTEXTCATALOGPROPERTY(@catalogName, 'PopulateStatus') AS Value";
-
-            int status = await db.Database
-                .SqlQueryRaw<int>(sql, new SqlParameter("@catalogName", catalogName))
-                .SingleAsync();
-
-            if (status == 0)
-                return;
-
-            await Task.Delay(500);
-        }
-
-        throw new TimeoutException($"Full-text catalog '{catalogName}' didn't finish populating in time.");
     }
 
     private async Task ParseAndValidateQuery(string query, string expected, bool isValid)
