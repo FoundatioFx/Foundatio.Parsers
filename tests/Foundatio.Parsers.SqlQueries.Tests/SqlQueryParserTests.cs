@@ -500,25 +500,25 @@ public class SqlQueryParserTests : TestWithLoggingBase
         });
         await db.SaveChangesAsync();
 
-        var result = await db.Database.ExecuteSqlRawAsync(
+        await db.Database.ExecuteSqlRawAsync(
             @"IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') != 1
               BEGIN
                   RAISERROR('Full-Text Search is not installed', 16, 1);
               END");
 
-        result = await db.Database.ExecuteSqlRawAsync(
+        await db.Database.ExecuteSqlRawAsync(
             @"IF NOT EXISTS (SELECT * FROM sys.fulltext_catalogs WHERE name = 'ftCatalog')
               BEGIN
                   CREATE FULLTEXT CATALOG ftCatalog AS DEFAULT;
               END");
 
-        result = await db.Database.ExecuteSqlRawAsync(
+        await db.Database.ExecuteSqlRawAsync(
             @"IF EXISTS (SELECT * FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID('Employees'))
               BEGIN
                   DROP FULLTEXT INDEX ON Employees;
               END");
 
-        result = await db.Database.ExecuteSqlRawAsync(
+        await db.Database.ExecuteSqlRawAsync(
             @"CREATE FULLTEXT INDEX ON Employees
               (
                   FullName LANGUAGE 1033
