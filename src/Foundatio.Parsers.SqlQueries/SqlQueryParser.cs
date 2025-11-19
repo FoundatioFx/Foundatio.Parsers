@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Linq.Dynamic.Core;
+using System.Linq.Dynamic.Core.CustomTypeProviders;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -10,6 +12,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Parsers.SqlQueries.Extensions;
 using Foundatio.Parsers.SqlQueries.Visitors;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Pegasus.Common;
 
@@ -25,6 +28,10 @@ public class SqlQueryParser : LuceneQueryParser
     }
 
     public SqlQueryParserConfiguration Configuration { get; }
+    public ParsingConfig ParsingConfig { get; } = new()
+    {
+        CustomTypeProvider = new DynamicLinqTypeProvider()
+    };
 
     public override async Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null)
     {
@@ -217,6 +224,18 @@ public class SqlQueryParser : LuceneQueryParser
             sqlContext.SearchTokenizer = Configuration.SearchTokenizer;
             sqlContext.DateTimeParser = Configuration.DateTimeParser;
             sqlContext.DateOnlyParser = Configuration.DateOnlyParser;
+            sqlContext.DefaultSearchOperator = Configuration.DefaultFieldsSearchOperator;
+            sqlContext.FullTextSearchEnabled = Configuration.FullTextSearchEnabled;
         }
     }
 }
+
+public static class FTS
+{
+    public static bool Contains(string propertyValue, string searchTerm)
+    {
+        return EF.Functions.Contains(propertyValue, searchTerm);
+    }
+}
+
+public class DynamicLinqTypeProvider() : DefaultDynamicLinqCustomTypeProvider(ParsingConfig.Default, [ typeof(EF), typeof(FTS) ]);

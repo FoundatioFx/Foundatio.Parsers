@@ -142,7 +142,7 @@ public static class SqlNodeExtensions
                     {
                         FieldInfo = fieldInfo,
                         Term = node.Term,
-                        Operator = SqlSearchOperator.StartsWith
+                        Operator = context.DefaultSearchOperator
                     };
                     fieldTerms[fieldInfo] = searchTerm;
                 }
@@ -186,10 +186,23 @@ public static class SqlNodeExtensions
                     {
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(fieldPrefix);
-                        builder.Append(kvp.Key.Name);
-                        builder.Append(".Contains(");
-                        AppendField(builder, kvp.Key, token, context);
-                        builder.Append(")");
+
+                        if (context.FullTextSearchEnabled)
+                        {
+                            builder.Append("FTS.Contains(");
+                            builder.Append(kvp.Key.Name);
+                            builder.Append(", ");
+                            AppendField(builder, kvp.Key, token, context);
+                            builder.Append(")");
+                        }
+                        else
+                        {
+                            builder.Append(kvp.Key.Name);
+                            builder.Append(".Contains(");
+                            AppendField(builder, kvp.Key, token, context);
+                            builder.Append(")");
+                        }
+
                         builder.Append(fieldSuffix);
                         if (i.IsLast)
                             builder.Append(")");
@@ -201,10 +214,23 @@ public static class SqlNodeExtensions
                     {
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(fieldPrefix);
-                        builder.Append(kvp.Key.Name);
-                        builder.Append(".StartsWith(");
-                        AppendField(builder, kvp.Key, token, context);
-                        builder.Append(")");
+
+                        if (context.FullTextSearchEnabled)
+                        {
+                            builder.Append("FTS.Contains(");
+                            builder.Append(kvp.Key.Name);
+                            builder.Append(", ");
+                            AppendField(builder, kvp.Key, token + "*", context);
+                            builder.Append(")");
+                        }
+                        else
+                        {
+                            builder.Append(kvp.Key.Name);
+                            builder.Append(".StartsWith(");
+                            AppendField(builder, kvp.Key, token, context);
+                            builder.Append(")");
+                        }
+
                         builder.Append(fieldSuffix);
                         if (i.IsLast)
                             builder.Append(")");

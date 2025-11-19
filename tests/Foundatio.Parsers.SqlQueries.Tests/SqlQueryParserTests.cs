@@ -378,12 +378,29 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task CanUseLike()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.FullName, "john")).ToQueryString();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, """FTS.Contains(FullName, "john")""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("john", context);
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
     public async Task CanGenerateSql()
     {
         var sp = GetServiceProvider();
         await using var db = await GetSampleContextWithDataAsync(sp);
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
+        var efFunctions = EF.Functions;
         var context = parser.GetContext(db.Employees.EntityType);
         context.Fields.Add(new EntityFieldInfo { Name = "age", FullName = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
         context.ValidationOptions.AllowedFields.Add("age");
@@ -391,8 +408,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name == "acme") && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
         string sqlActual = db.Employees.Where("""Companies.Any(Name = "acme") AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToDynamicLinqAsync("companies.name:acme age:30", context);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
+        string sql = await parser.ToDynamicLinqAsync("EF.Contains(@0, companies.name, @1)companies.name:acme age:30", context);
+        sqlActual = db.Employees.Where(sql, efFunctions).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         var q = db.Employees.AsNoTracking();
@@ -433,6 +450,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
         var parser = new SqlQueryParser();
         parser.Configuration.UseEntityTypePropertyFilter(p => p.Name != nameof(Company.Description));
         parser.Configuration.AddQueryVisitor(new DynamicFieldVisitor());
+        parser.Configuration.SetDefaultFields(["FullName"], SqlSearchOperator.Contains);
+        parser.Configuration.UseFullTextSearch();
         services.AddSingleton(parser);
         return services.BuildServiceProvider();
     }
@@ -481,6 +500,33 @@ public class SqlQueryParserTests : TestWithLoggingBase
             Companies = [company]
         });
         await db.SaveChangesAsync();
+
+        var result = await db.Database.ExecuteSqlRawAsync(
+            @"IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') != 1
+              BEGIN
+                  RAISERROR('Full-Text Search is not installed', 16, 1);
+              END");
+
+        result = await db.Database.ExecuteSqlRawAsync(
+            @"IF NOT EXISTS (SELECT * FROM sys.fulltext_catalogs WHERE name = 'ftCatalog')
+              BEGIN
+                  CREATE FULLTEXT CATALOG ftCatalog AS DEFAULT;
+              END");
+
+        result = await db.Database.ExecuteSqlRawAsync(
+            @"IF EXISTS (SELECT * FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID('Employees'))
+              BEGIN
+                  DROP FULLTEXT INDEX ON Employees;
+              END");
+
+        result = await db.Database.ExecuteSqlRawAsync(
+            @"CREATE FULLTEXT INDEX ON Employees
+              (
+                  FullName LANGUAGE 1033
+              )
+              KEY INDEX PK_Employees
+              ON ftCatalog
+              WITH (CHANGE_TRACKING = AUTO, STOPLIST = SYSTEM);");
 
         return db;
     }

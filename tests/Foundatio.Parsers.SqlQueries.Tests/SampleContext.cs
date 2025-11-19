@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 
 namespace Foundatio.Parsers.SqlQueries.Tests;
 
@@ -34,6 +36,15 @@ public class SampleContext : DbContext
         modelBuilder.Entity<DataValue>().Property(e => e.BooleanValue).IsSparse();
         modelBuilder.Entity<DataValue>().Property(e => e.NumberValue).HasColumnType("decimal").HasPrecision(15, 3).IsSparse();
         modelBuilder.Entity<DataValue>().HasIndex(e => new { e.StringValue, e.DateValue, e.MoneyValue, e.BooleanValue, e.NumberValue });
+
+        modelBuilder.HasDbFunction(typeof(FTS).GetMethod(nameof(FTS.Contains))!)
+            .HasTranslation(args => new SqlFunctionExpression(
+                "CONTAINS",
+                args,
+                true,
+                args.Select(a => false).ToList(),
+                typeof(bool),
+                null));
     }
 }
 
