@@ -400,7 +400,6 @@ public class SqlQueryParserTests : TestWithLoggingBase
         await using var db = await GetSampleContextWithDataAsync(sp);
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
-        var efFunctions = EF.Functions;
         var context = parser.GetContext(db.Employees.EntityType);
         context.Fields.Add(new EntityFieldInfo { Name = "age", FullName = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
         context.ValidationOptions.AllowedFields.Add("age");
@@ -408,8 +407,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name == "acme") && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
         string sqlActual = db.Employees.Where("""Companies.Any(Name = "acme") AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        string sql = await parser.ToDynamicLinqAsync("EF.Contains(@0, companies.name, @1)companies.name:acme age:30", context);
-        sqlActual = db.Employees.Where(sql, efFunctions).ToQueryString();
+        string sql = await parser.ToDynamicLinqAsync("companies.name:acme age:30", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         var q = db.Employees.AsNoTracking();
