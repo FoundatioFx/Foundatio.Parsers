@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Linq.Dynamic.Core;
+using System.Threading;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -448,6 +449,9 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
     public IServiceProvider GetServiceProvider()
     {
+        string sqlConnectionString = "Server=localhost;User Id=sa;Password=P@ssword1;Timeout=5;Initial Catalog=foundatio;Encrypt=False";
+        SqlWaiter.Wait(sqlConnectionString);
+
         var services = new ServiceCollection();
         services.AddDbContext<SampleContext>((_, x) =>
         {
@@ -534,6 +538,37 @@ public class SqlQueryParserTests : TestWithLoggingBase
               WITH (CHANGE_TRACKING = AUTO, STOPLIST = SYSTEM);");
 
         return db;
+    }
+
+    private static bool _checked;
+    private static readonly object _lock = new();
+
+    private static void WaitForSql(
+        string connectionString,
+        int maxRetries = 90,
+        int delayMs = 1000)
+    {
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                using var conn = new SqlConnection(connectionString);
+                conn.Open();
+
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT 1";
+                cmd.ExecuteScalar();
+
+                return;
+            }
+            catch
+            {
+                if (i == maxRetries - 1)
+                    throw;
+
+                Thread.Sleep(delayMs);
+            }
+        }
     }
 
     private async Task WaitForFullTextIndexAsync(DbContext db, string catalogName, int timeoutSeconds = 30)
