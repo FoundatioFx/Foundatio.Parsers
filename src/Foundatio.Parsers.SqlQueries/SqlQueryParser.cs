@@ -225,7 +225,7 @@ public class SqlQueryParser : LuceneQueryParser
             sqlContext.DateTimeParser = Configuration.DateTimeParser;
             sqlContext.DateOnlyParser = Configuration.DateOnlyParser;
             sqlContext.DefaultSearchOperator = Configuration.DefaultFieldsSearchOperator;
-            sqlContext.FullTextSearchEnabled = Configuration.FullTextSearchEnabled;
+            sqlContext.FullTextFields = Configuration.FullTextFields;
         }
     }
 }

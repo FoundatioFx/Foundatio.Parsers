@@ -11,7 +11,7 @@ public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorConte
 {
     public List<EntityFieldInfo> Fields { get; set; }
     public SqlSearchOperator DefaultSearchOperator { get; set; } = SqlSearchOperator.StartsWith;
-    public bool FullTextSearchEnabled { get; set; } = false;
+    public string[] FullTextFields { get; set; } = [];
     public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
     public Func<string, string> DateTimeParser { get; set; }
     public Func<string, string> DateOnlyParser { get; set; }

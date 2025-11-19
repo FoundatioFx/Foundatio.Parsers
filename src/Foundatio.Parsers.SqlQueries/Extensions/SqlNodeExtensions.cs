@@ -187,7 +187,7 @@ public static class SqlNodeExtensions
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(fieldPrefix);
 
-                        if (context.FullTextSearchEnabled)
+                        if (context.FullTextFields.Contains(kvp.Key.Name, StringComparer.OrdinalIgnoreCase))
                         {
                             builder.Append("FTS.Contains(");
                             builder.Append(kvp.Key.Name);
@@ -215,12 +215,12 @@ public static class SqlNodeExtensions
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(fieldPrefix);
 
-                        if (context.FullTextSearchEnabled)
+                        if (context.FullTextFields.Contains(kvp.Key.Name, StringComparer.OrdinalIgnoreCase))
                         {
                             builder.Append("FTS.Contains(");
                             builder.Append(kvp.Key.Name);
                             builder.Append(", ");
-                            AppendField(builder, kvp.Key, token + "*", context);
+                            AppendField(builder, kvp.Key, "\\\"" + token + "*\\\"", context);
                             builder.Append(")");
                         }
                         else
@@ -266,19 +266,45 @@ public static class SqlNodeExtensions
         else if (searchOperator == SqlSearchOperator.Contains)
         {
             builder.Append(fieldPrefix);
-            builder.Append(field.Name);
-            builder.Append(".Contains(");
-            AppendField(builder, field, node.Term, context);
-            builder.Append(")");
+
+            if (context.FullTextFields.Contains(field.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                builder.Append("FTS.Contains(");
+                builder.Append(field.Name);
+                builder.Append(", ");
+                AppendField(builder, field, node.Term, context);
+                builder.Append(")");
+            }
+            else
+            {
+                builder.Append(field.Name);
+                builder.Append(".Contains(");
+                AppendField(builder, field, node.Term, context);
+                builder.Append(")");
+            }
+
             builder.Append(fieldSuffix);
         }
         else
         {
             builder.Append(fieldPrefix);
-            builder.Append(field.Name);
-            builder.Append(".StartsWith(");
-            AppendField(builder, field, node.Term, context);
-            builder.Append(")");
+
+            if (context.FullTextFields.Contains(field.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                builder.Append("FTS.Contains(");
+                builder.Append(field.Name);
+                builder.Append(", ");
+                AppendField(builder, field, "\\\"" + node.Term + "*\\\"", context);
+                builder.Append(")");
+            }
+            else
+            {
+                builder.Append(field.Name);
+                builder.Append(".Contains(");
+                AppendField(builder, field, node.Term, context);
+                builder.Append(")");
+            }
+
             builder.Append(fieldSuffix);
         }
 

@@ -7,6 +7,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Parsers.SqlQueries.Visitors;
 using Foundatio.Xunit;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,14 +71,17 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.FullName.StartsWith("John") || e.Title.StartsWith("John")).ToQueryString();
-        string sqlActual = db.Employees.Where("""FullName.StartsWith("John") || Title.StartsWith("John") """).ToQueryString();
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.FullName, "\"John*\"") || EF.Functions.Contains(e.Title, "\"John*\"")).ToQueryString();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, """FTS.Contains(FullName, "\"John*\"") || FTS.Contains(Title, "\"John*\"") """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("John", context);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        var results = await db.Employees.Where(sql).ToListAsync();
-        Assert.Single(results);
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
+
+        await WaitForFullTextIndexAsync(db, "ftCatalog");
+
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        Assert.Single(results);
     }
 
     [Fact]
@@ -101,28 +105,31 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.NationalPhoneNumber.StartsWith("2142222222")).ToQueryString();
-        string sqlActual = db.Employees.Where("NationalPhoneNumber.StartsWith(\"2142222222\")").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.NationalPhoneNumber, "\"2142222222*\"")).ToQueryString();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, "FTS.Contains(NationalPhoneNumber, \"\\\"2142222222*\\\"\")").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         string sql = await parser.ToDynamicLinqAsync("214-222-2222", context);
         _logger.LogInformation(sql);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        var results = await db.Employees.Where(sql).ToListAsync();
-        Assert.Single(results);
         Assert.Equal(sqlExpected, sqlActual);
+
+        await WaitForFullTextIndexAsync(db, "ftCatalog");
+
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        Assert.Single(results);
 
         sql = await parser.ToDynamicLinqAsync("2142222222", context);
         _logger.LogInformation(sql);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        results = await db.Employees.Where(sql).ToListAsync();
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
         Assert.Single(results);
         Assert.Equal(sqlExpected, sqlActual);
 
         sql = await parser.ToDynamicLinqAsync("21422", context);
         _logger.LogInformation(sql);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        results = await db.Employees.Where(sql).ToListAsync();
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
         Assert.Single(results);
     }
 
@@ -142,8 +149,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         string sql = await parser.ToDynamicLinqAsync("test", context);
         _logger.LogInformation(sql);
-        string sqlActual = db.Employees.Where(sql).ToQueryString();
-        var results = await db.Employees.Where(sql).ToListAsync();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
         Assert.Empty(results);
     }
 
@@ -302,11 +309,11 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name.StartsWith("acme"))).ToQueryString();
-        string sqlActual = db.Employees.Where("""Companies.Any(Name.StartsWith("acme"))""").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => EF.Functions.Contains(c.Name, "\"acme*\""))).ToQueryString();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, """Companies.Any(FTS.Contains(Name, "\"acme*\""))""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("acme", context);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
     }
 
@@ -450,7 +457,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         parser.Configuration.UseEntityTypePropertyFilter(p => p.Name != nameof(Company.Description));
         parser.Configuration.AddQueryVisitor(new DynamicFieldVisitor());
         parser.Configuration.SetDefaultFields(["FullName"], SqlSearchOperator.Contains);
-        parser.Configuration.UseFullTextSearch();
+        parser.Configuration.SetFullTextFields(["Name", "FullName", "Title", "NationalPhoneNumber"]);
         services.AddSingleton(parser);
         return services.BuildServiceProvider();
     }
@@ -504,30 +511,50 @@ public class SqlQueryParserTests : TestWithLoggingBase
             @"IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') != 1
               BEGIN
                   RAISERROR('Full-Text Search is not installed', 16, 1);
-              END");
+              END
 
-        await db.Database.ExecuteSqlRawAsync(
-            @"IF NOT EXISTS (SELECT * FROM sys.fulltext_catalogs WHERE name = 'ftCatalog')
+              IF NOT EXISTS (SELECT * FROM sys.fulltext_catalogs WHERE name = 'ftCatalog')
               BEGIN
                   CREATE FULLTEXT CATALOG ftCatalog AS DEFAULT;
-              END");
+              END
 
-        await db.Database.ExecuteSqlRawAsync(
-            @"IF EXISTS (SELECT * FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID('Employees'))
+              IF EXISTS (SELECT * FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID('Employees'))
               BEGIN
                   DROP FULLTEXT INDEX ON Employees;
-              END");
+              END
 
-        await db.Database.ExecuteSqlRawAsync(
-            @"CREATE FULLTEXT INDEX ON Employees
+              CREATE FULLTEXT INDEX ON Employees
               (
-                  FullName LANGUAGE 1033
+                  FullName LANGUAGE 1033,
+                  NationalPhoneNumber LANGUAGE 1033,
+                  Title LANGUAGE 1033
               )
               KEY INDEX PK_Employees
               ON ftCatalog
               WITH (CHANGE_TRACKING = AUTO, STOPLIST = SYSTEM);");
 
         return db;
+    }
+
+    private async Task WaitForFullTextIndexAsync(DbContext db, string catalogName, int timeoutSeconds = 30)
+    {
+        var end = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+
+        while (DateTime.UtcNow < end)
+        {
+            string sql = "SELECT FULLTEXTCATALOGPROPERTY(@catalogName, 'PopulateStatus') AS Value";
+
+            int status = await db.Database
+                .SqlQueryRaw<int>(sql, new SqlParameter("@catalogName", catalogName))
+                .SingleAsync();
+
+            if (status == 0)
+                return;
+
+            await Task.Delay(500);
+        }
+
+        throw new TimeoutException($"Full-text catalog '{catalogName}' didn't finish populating in time.");
     }
 
     private async Task ParseAndValidateQuery(string query, string expected, bool isValid)
