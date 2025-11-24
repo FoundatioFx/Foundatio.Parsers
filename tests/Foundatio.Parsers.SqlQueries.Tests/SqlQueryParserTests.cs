@@ -2,13 +2,11 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Linq.Dynamic.Core;
-using System.Threading;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Parsers.SqlQueries.Visitors;
 using Foundatio.Xunit;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -338,6 +336,30 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task CanUseCurrentCompanyFullText()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["CurrentCompany.Name", "CurrentCompany.Location"]);
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.CurrentCompany.Name, "\"acme*\"") || EF.Functions.Contains(e.CurrentCompany.Location, "\"acme*\"")).ToQueryString();
+
+        await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
+
+        string sql = await parser.ToDynamicLinqAsync("acme", context);
+        Assert.Contains("FTS.Contains(CurrentCompany.Name", sql);
+        Assert.Contains("FTS.Contains(CurrentCompany.Location", sql);
+
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        Assert.Equal(2, results.Count);
+    }
+
+    [Fact]
     public async Task CanUseNavigationFields()
     {
         var sp = GetServiceProvider();
@@ -461,7 +483,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         parser.Configuration.UseEntityTypePropertyFilter(p => p.Name != nameof(Company.Description));
         parser.Configuration.AddQueryVisitor(new DynamicFieldVisitor());
         parser.Configuration.SetDefaultFields(["FullName"], SqlSearchOperator.Contains);
-        parser.Configuration.SetFullTextFields(["Name", "FullName", "Title", "NationalPhoneNumber"]);
+        parser.Configuration.SetFullTextFields(["Name", "FullName", "Title", "NationalPhoneNumber", "CurrentCompany.Name", "CurrentCompany.Location", "Companies.Name", "Companies.Location"]);
         services.AddSingleton(parser);
         return services.BuildServiceProvider();
     }
@@ -496,7 +518,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
             Salary = 80_000,
             Birthday = new DateOnly(1980, 1, 1),
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 30 }],
-            Companies = [company]
+            Companies = [company],
+            CurrentCompany = company
         });
         db.Employees.Add(new Employee
         {
@@ -507,7 +530,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
             Salary = 90_000,
             Birthday = new DateOnly(1972, 11, 6),
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 23 }],
-            Companies = [company]
+            Companies = [company],
+            CurrentCompany = company
         });
         await db.SaveChangesAsync();
 
@@ -534,6 +558,15 @@ public class SqlQueryParserTests : TestWithLoggingBase
                   Title LANGUAGE 1033
               )
               KEY INDEX PK_Employees
+              ON ftCatalog
+              WITH (CHANGE_TRACKING = AUTO, STOPLIST = SYSTEM);
+
+              CREATE FULLTEXT INDEX ON Companies
+              (
+                  Name LANGUAGE 1033,
+                  Location LANGUAGE 1033
+              )
+              KEY INDEX PK_Companies
               ON ftCatalog
               WITH (CHANGE_TRACKING = AUTO, STOPLIST = SYSTEM);");
 
