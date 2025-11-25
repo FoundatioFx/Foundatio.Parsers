@@ -30,7 +30,9 @@ services:
       test: curl --write-out 'HTTP %{http_code}' --fail --silent --output /dev/null http://localhost:5601/api/status
 
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2025-latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "1433:1433" # login with sa:P@ssword1
     environment:

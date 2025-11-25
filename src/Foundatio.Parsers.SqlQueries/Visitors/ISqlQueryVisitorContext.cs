@@ -7,6 +7,8 @@ namespace Foundatio.Parsers.SqlQueries.Visitors;
 public interface ISqlQueryVisitorContext : IQueryVisitorContext
 {
     List<EntityFieldInfo> Fields { get; set; }
+    SqlSearchOperator DefaultSearchOperator { get; set; }
+    string[] FullTextFields { get; set; }
     Action<SearchTerm> SearchTokenizer { get; set; }
     Func<string, string> DateTimeParser { get; set; }
     Func<string, string> DateOnlyParser { get; set; }

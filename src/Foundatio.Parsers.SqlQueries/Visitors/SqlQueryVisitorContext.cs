@@ -10,6 +10,8 @@ namespace Foundatio.Parsers.SqlQueries.Visitors;
 public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorContext
 {
     public List<EntityFieldInfo> Fields { get; set; }
+    public SqlSearchOperator DefaultSearchOperator { get; set; } = SqlSearchOperator.StartsWith;
+    public string[] FullTextFields { get; set; } = [];
     public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
     public Func<string, string> DateTimeParser { get; set; }
     public Func<string, string> DateOnlyParser { get; set; }
@@ -83,6 +85,32 @@ public class EntityFieldInfo
         }
 
         return (prefix.ToString(), suffix.ToString());
+    }
+
+    public string GetNavigationPrefix()
+    {
+        if (Parent == null)
+            return String.Empty;
+
+        var stack = new Stack<EntityFieldInfo>();
+        var current = Parent;
+        while (current != null && !current.IsCollection)
+        {
+            stack.Push(current);
+            current = current.Parent;
+        }
+
+        if (stack.Count == 0)
+            return String.Empty;
+
+        var builder = new StringBuilder();
+        while (stack.Count > 0)
+        {
+            var field = stack.Pop();
+            builder.Append(field.Name).Append('.');
+        }
+
+        return builder.ToString();
     }
 }
 

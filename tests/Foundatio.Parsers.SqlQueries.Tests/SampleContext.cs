@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 
 namespace Foundatio.Parsers.SqlQueries.Tests;
 
@@ -17,7 +19,14 @@ public class SampleContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Employee
-        modelBuilder.Entity<Employee>().HasIndex(e => new { e.FullName, e.Title });
+        var employee = modelBuilder.Entity<Employee>();
+        employee.HasIndex(e => new { e.FullName, e.Title });
+        employee.HasOne(e => e.CurrentCompany)
+            .WithMany()
+            .HasForeignKey(e => e.CurrentCompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+        employee.HasMany(e => e.Companies)
+            .WithMany(c => c.Employees);
 
         // Company
         modelBuilder.Entity<Company>().HasIndex(e => new { e.Name });
@@ -34,6 +43,15 @@ public class SampleContext : DbContext
         modelBuilder.Entity<DataValue>().Property(e => e.BooleanValue).IsSparse();
         modelBuilder.Entity<DataValue>().Property(e => e.NumberValue).HasColumnType("decimal").HasPrecision(15, 3).IsSparse();
         modelBuilder.Entity<DataValue>().HasIndex(e => new { e.StringValue, e.DateValue, e.MoneyValue, e.BooleanValue, e.NumberValue });
+
+        modelBuilder.HasDbFunction(typeof(FTS).GetMethod(nameof(FTS.Contains))!)
+            .HasTranslation(args => new SqlFunctionExpression(
+                "CONTAINS",
+                args,
+                true,
+                args.Select(a => false).ToList(),
+                typeof(bool),
+                null));
     }
 }
 
@@ -45,6 +63,8 @@ public class Employee
     public string NationalPhoneNumber { get; set; }
     public string Title { get; set; }
     public int Salary { get; set; }
+    public int? CurrentCompanyId { get; set; }
+    public Company CurrentCompany { get; set; }
     public List<Company> Companies { get; set; }
     public List<DataValue> DataValues { get; set; }
     public TimeOnly HappyHour { get; set; }
@@ -58,6 +78,7 @@ public class Company
     public int Id { get; set; }
     public string Name { get; set; }
     public string Description { get; set; }
+    public string Location { get; set; }
     public List<Employee> Employees { get; set; }
     public List<DataDefinition> DataDefinitions { get; set; }
 }
