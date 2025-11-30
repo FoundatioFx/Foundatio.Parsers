@@ -23,7 +23,8 @@ public class SqlQueryParserConfiguration
 
     public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
     public string[] DefaultFields { get; private set; }
-
+    public SqlSearchOperator DefaultFieldsSearchOperator { get; private set; } = SqlSearchOperator.StartsWith;
+    public string[] FullTextFields { get; private set; }
     public int MaxFieldDepth { get; private set; } = 10;
     public QueryFieldResolver FieldResolver { get; private set; }
     public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
@@ -46,15 +47,22 @@ public class SqlQueryParserConfiguration
         return this;
     }
 
-    public SqlQueryParserConfiguration SetDefaultFields(string[] fields)
+    public SqlQueryParserConfiguration SetDefaultFields(string[] fields, SqlSearchOperator op = SqlSearchOperator.StartsWith)
     {
         DefaultFields = fields;
+        DefaultFieldsSearchOperator = op;
         return this;
     }
 
     public SqlQueryParserConfiguration SetSearchTokenizer(Action<SearchTerm> tokenizer)
     {
         SearchTokenizer = tokenizer;
+        return this;
+    }
+
+    public SqlQueryParserConfiguration SetFullTextFields(string[] fields)
+    {
+        FullTextFields = fields;
         return this;
     }
 

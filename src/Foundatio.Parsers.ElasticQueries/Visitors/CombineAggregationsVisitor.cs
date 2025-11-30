@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
-using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
@@ -26,72 +25,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         {
             var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
             if (aggregation == null)
-            {
-                var termNode = child as TermNode;
-                if (termNode != null && termsAggregation != null)
-                {
-                    // Look into this...
-                    // TODO: Move these to the default aggs method using a visitor to walk down the tree to gather them but not going into any sub groups
-                    if (termNode.Field == "@exclude")
-                    {
-                        termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm);
-                    }
-                    else if (termNode.Field == "@include")
-                    {
-                        termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm);
-                    }
-                    else if (termNode.Field == "@missing")
-                    {
-                        termsAggregation.Missing = termNode.UnescapedTerm;
-                    }
-                    else if (termNode.Field == "@min")
-                    {
-                        int? minCount = null;
-                        if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int parsedMinCount))
-                            minCount = parsedMinCount;
-
-                        termsAggregation.MinimumDocumentCount = minCount;
-                    }
-                }
-
-                if (termNode != null && container is ITopHitsAggregation topHitsAggregation)
-                {
-                    var filter = node.GetSourceFilter(() => new SourceFilter());
-                    if (termNode.Field == "@exclude")
-                    {
-                        if (filter.Excludes == null)
-                            filter.Excludes = termNode.UnescapedTerm;
-                        else
-                            filter.Excludes.And(termNode.UnescapedTerm);
-                    }
-                    else if (termNode.Field == "@include")
-                    {
-                        if (filter.Includes == null)
-                            filter.Includes = termNode.UnescapedTerm;
-                        else
-                            filter.Includes.And(termNode.UnescapedTerm);
-                    }
-                    topHitsAggregation.Source = filter;
-                }
-
-                if (termNode != null && container is IDateHistogramAggregation dateHistogramAggregation)
-                {
-                    if (termNode.Field == "@missing")
-                    {
-                        DateTime? missingValue = null;
-                        if (!String.IsNullOrEmpty(termNode.Term) && DateTime.TryParse(termNode.Term, out var parsedMissingDate))
-                            missingValue = parsedMissingDate;
-
-                        dateHistogramAggregation.Missing = missingValue;
-                    }
-                    else if (termNode.Field == "@offset")
-                    {
-                        dateHistogramAggregation.Offset = termNode.IsExcluded() ? "-" + termNode.Term : termNode.Term;
-                    }
-                }
-
                 continue;
-            }
 
             if (container is BucketAggregationBase bucketContainer)
             {

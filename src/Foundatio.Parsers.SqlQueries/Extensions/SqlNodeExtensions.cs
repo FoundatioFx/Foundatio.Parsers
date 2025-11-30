@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Text;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -143,7 +142,7 @@ public static class SqlNodeExtensions
                     {
                         FieldInfo = fieldInfo,
                         Term = node.Term,
-                        Operator = SqlSearchOperator.StartsWith
+                        Operator = context.DefaultSearchOperator
                     };
                     fieldTerms[fieldInfo] = searchTerm;
                 }
@@ -165,10 +164,12 @@ public static class SqlNodeExtensions
                 var searchTerm = kvp.Value;
                 var tokens = kvp.Value.Tokens ?? [kvp.Value.Term];
                 var (fieldPrefix, fieldSuffix) = kvp.Key.GetFieldPrefixAndSuffix();
+                var (scopePrefix, argumentPrefix) = SplitFieldPrefix(kvp.Key, fieldPrefix);
 
                 if (searchTerm.Operator == SqlSearchOperator.Equals)
                 {
-                    builder.Append(fieldPrefix);
+                    builder.Append(scopePrefix);
+                    builder.Append(argumentPrefix);
                     builder.Append(kvp.Key.Name);
                     builder.Append(" in (");
                     for (int i = 0; i < tokens.Count; i++)
@@ -186,11 +187,27 @@ public static class SqlNodeExtensions
                     tokens.ForEach((token, i) =>
                     {
                         builder.Append(i.IsFirst ? "(" : " OR ");
-                        builder.Append(fieldPrefix);
-                        builder.Append(kvp.Key.Name);
-                        builder.Append(".Contains(");
-                        AppendField(builder, kvp.Key, token, context);
-                        builder.Append(")");
+
+                        builder.Append(scopePrefix);
+
+                        if (context.FullTextFields.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase))
+                        {
+                            builder.Append("FTS.Contains(");
+                            builder.Append(argumentPrefix);
+                            builder.Append(kvp.Key.Name);
+                            builder.Append(", ");
+                            AppendField(builder, kvp.Key, token, context);
+                            builder.Append(")");
+                        }
+                        else
+                        {
+                            builder.Append(argumentPrefix);
+                            builder.Append(kvp.Key.Name);
+                            builder.Append(".Contains(");
+                            AppendField(builder, kvp.Key, token, context);
+                            builder.Append(")");
+                        }
+
                         builder.Append(fieldSuffix);
                         if (i.IsLast)
                             builder.Append(")");
@@ -201,11 +218,26 @@ public static class SqlNodeExtensions
                     tokens.ForEach((token, i) =>
                     {
                         builder.Append(i.IsFirst ? "(" : " OR ");
-                        builder.Append(fieldPrefix);
-                        builder.Append(kvp.Key.Name);
-                        builder.Append(".StartsWith(");
-                        AppendField(builder, kvp.Key, token, context);
-                        builder.Append(")");
+                        builder.Append(scopePrefix);
+
+                        if (context.FullTextFields.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase))
+                        {
+                            builder.Append("FTS.Contains(");
+                            builder.Append(argumentPrefix);
+                            builder.Append(kvp.Key.Name);
+                            builder.Append(", ");
+                            AppendField(builder, kvp.Key, "\\\"" + token + "*\\\"", context);
+                            builder.Append(")");
+                        }
+                        else
+                        {
+                            builder.Append(argumentPrefix);
+                            builder.Append(kvp.Key.Name);
+                            builder.Append(".StartsWith(");
+                            AppendField(builder, kvp.Key, token, context);
+                            builder.Append(")");
+                        }
+
                         builder.Append(fieldSuffix);
                         if (i.IsLast)
                             builder.Append(")");
@@ -221,6 +253,7 @@ public static class SqlNodeExtensions
 
         var field = GetFieldInfo(context.Fields, node.Field);
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
+        var (scopePrefix, argumentPrefix) = SplitFieldPrefix(field, fieldPrefix);
         var searchOperator = SqlSearchOperator.Equals;
         if (node.Term.StartsWith("*") && node.Term.EndsWith("*"))
             searchOperator = SqlSearchOperator.Contains;
@@ -232,7 +265,8 @@ public static class SqlNodeExtensions
 
         if (searchOperator == SqlSearchOperator.Equals)
         {
-            builder.Append(fieldPrefix);
+            builder.Append(scopePrefix);
+            builder.Append(argumentPrefix);
             builder.Append(field.Name);
             builder.Append(" = ");
             AppendField(builder, field, node.Term, context);
@@ -240,20 +274,50 @@ public static class SqlNodeExtensions
         }
         else if (searchOperator == SqlSearchOperator.Contains)
         {
-            builder.Append(fieldPrefix);
-            builder.Append(field.Name);
-            builder.Append(".Contains(");
-            AppendField(builder, field, node.Term, context);
-            builder.Append(")");
+            builder.Append(scopePrefix);
+
+            if (context.FullTextFields.Contains(field.FullName, StringComparer.OrdinalIgnoreCase))
+            {
+                builder.Append("FTS.Contains(");
+                builder.Append(argumentPrefix);
+                builder.Append(field.Name);
+                builder.Append(", ");
+                AppendField(builder, field, node.Term, context);
+                builder.Append(")");
+            }
+            else
+            {
+                builder.Append(argumentPrefix);
+                builder.Append(field.Name);
+                builder.Append(".Contains(");
+                AppendField(builder, field, node.Term, context);
+                builder.Append(")");
+            }
+
             builder.Append(fieldSuffix);
         }
         else
         {
-            builder.Append(fieldPrefix);
-            builder.Append(field.Name);
-            builder.Append(".StartsWith(");
-            AppendField(builder, field, node.Term, context);
-            builder.Append(")");
+            builder.Append(scopePrefix);
+
+            if (context.FullTextFields.Contains(field.FullName, StringComparer.OrdinalIgnoreCase))
+            {
+                builder.Append("FTS.Contains(");
+                builder.Append(argumentPrefix);
+                builder.Append(field.Name);
+                builder.Append(", ");
+                AppendField(builder, field, "\\\"" + node.Term + "*\\\"", context);
+                builder.Append(")");
+            }
+            else
+            {
+                builder.Append(argumentPrefix);
+                builder.Append(field.Name);
+                builder.Append(".Contains(");
+                AppendField(builder, field, node.Term, context);
+                builder.Append(")");
+            }
+
             builder.Append(fieldSuffix);
         }
 
@@ -278,6 +342,7 @@ public static class SqlNodeExtensions
             context.AddValidationError("Field must be a number, money or date for term range queries.");
 
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
+        var (scopePrefix, argumentPrefix) = SplitFieldPrefix(field, fieldPrefix);
 
         var builder = new StringBuilder();
 
@@ -289,7 +354,8 @@ public static class SqlNodeExtensions
 
         if (node.Min != null)
         {
-            builder.Append(fieldPrefix);
+            builder.Append(scopePrefix);
+            builder.Append(argumentPrefix);
             builder.Append(field.Name);
             builder.Append(node.MinInclusive == true ? " >= " : " > ");
             AppendField(builder, field, node.Min, context);
@@ -301,7 +367,8 @@ public static class SqlNodeExtensions
 
         if (node.Max != null)
         {
-            builder.Append(fieldPrefix);
+            builder.Append(scopePrefix);
+            builder.Append(argumentPrefix);
             builder.Append(field.Name);
             builder.Append(node.MaxInclusive == true ? " <= " : " < ");
             AppendField(builder, field, node.Max, context);
@@ -334,6 +401,18 @@ public static class SqlNodeExtensions
 
         return fields.FirstOrDefault(f => f.FullName.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
                new EntityFieldInfo { Name = field, FullName = field };
+    }
+
+    private static (string scopePrefix, string argumentPrefix) SplitFieldPrefix(EntityFieldInfo field, string fieldPrefix)
+    {
+        string navigationPrefix = field.GetNavigationPrefix();
+        if (String.IsNullOrEmpty(navigationPrefix))
+            return (fieldPrefix, String.Empty);
+
+        if (!String.IsNullOrEmpty(fieldPrefix) && fieldPrefix.EndsWith(navigationPrefix, StringComparison.Ordinal))
+            fieldPrefix = fieldPrefix.Substring(0, fieldPrefix.Length - navigationPrefix.Length);
+
+        return (fieldPrefix, navigationPrefix);
     }
 
     private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term, ISqlQueryVisitorContext context)
