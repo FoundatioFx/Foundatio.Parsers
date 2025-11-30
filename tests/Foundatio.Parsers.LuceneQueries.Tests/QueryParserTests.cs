@@ -19,7 +19,7 @@ public class QueryParserTests : TestWithLoggingBase
 {
     public QueryParserTests(ITestOutputHelper output) : base(output)
     {
-        Log.DefaultMinimumLevel = LogLevel.Trace;
+        Log.DefaultLogLevel = LogLevel.Trace;
     }
 
     [Fact]

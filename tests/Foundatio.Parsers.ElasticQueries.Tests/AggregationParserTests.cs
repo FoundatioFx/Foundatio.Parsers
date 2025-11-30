@@ -446,6 +446,33 @@ public class AggregationParserTests : ElasticsearchTestBase
     }
 
     [Fact]
+    public async Task ProcessTermAggregationsWithRegex()
+    {
+        string index = CreateRandomIndex<MyType>();
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
+        await Client.Indices.RefreshAsync(index);
+
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
+        var aggregations = await processor.BuildAggregationsAsync("terms:(field1 @exclude:/A.*/ @include:/B.*/)");
+
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
+            .Terms("terms_field1", t => t
+                .Field("field1.keyword")
+                .Include("B.*")
+                .Exclude("A.*")
+                .Meta(m => m.Add("@field_type", "keyword")))));
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
     public async Task ProcessHistogramIntervalAggregations()
     {
         string index = await CreateRandomIndexAsync<MyType>();

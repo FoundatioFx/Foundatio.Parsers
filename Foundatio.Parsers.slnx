@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".github/workflows/build.yml" />
+    <File Path="build/common.props" />
+    <File Path="docker-compose.yml" />
+    <File Path="NuGet.config" />
+    <File Path="README.md" />
+    <File Path="tests/Directory.Build.props" />
+  </Folder>
+  <Project Path="src/Foundatio.Parsers.ElasticQueries/Foundatio.Parsers.ElasticQueries.csproj" />
+  <Project Path="src/Foundatio.Parsers.LuceneQueries/Foundatio.Parsers.LuceneQueries.csproj" />
+  <Project Path="src/Foundatio.Parsers.SqlQueries/Foundatio.Parsers.SqlQueries.csproj" />
+  <Project Path="tests/Foundatio.Parsers.ElasticQueries.Tests/Foundatio.Parsers.ElasticQueries.Tests.csproj" />
+  <Project Path="tests/Foundatio.Parsers.LuceneQueries.Tests/Foundatio.Parsers.LuceneQueries.Tests.csproj" />
+  <Project Path="tests/Foundatio.Parsers.SqlQueries.Tests/Foundatio.Parsers.SqlQueries.Tests.csproj" />
+</Solution>

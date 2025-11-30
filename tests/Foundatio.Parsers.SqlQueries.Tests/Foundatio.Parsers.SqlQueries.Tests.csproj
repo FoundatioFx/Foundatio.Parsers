@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+      <TargetFrameworks>net10.0;</TargetFrameworks>
         <!--<DefineConstants>ENABLE_TRACING</DefineConstants>-->
+      <NoWarn>$(NoWarn);CS8002;</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -8,8 +10,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.1" />
-      <PackageReference Include="libphonenumber-csharp" Version="8.13.54" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+      <PackageReference Include="libphonenumber-csharp" Version="9.0.19" />
     </ItemGroup>
 
 </Project>

@@ -497,7 +497,6 @@ public class ElasticMappingResolver
 
         return Create(mappingBuilder, client.Infer, () =>
         {
-            client.Indices.Refresh(Indices.Index<T>());
             var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
             logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
@@ -513,7 +512,6 @@ public class ElasticMappingResolver
 
         return Create(mappingBuilder, client.Infer, () =>
         {
-            client.Indices.Refresh(index);
             var response = client.Indices.GetMapping(new GetMappingRequest(index));
             logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 
@@ -551,7 +549,6 @@ public static ElasticMappingResolver Create<T>(ElasticsearchClient client, ILogg
 
         return Create(() =>
         {
-            client.Indices.Refresh(index);
             var response = client.Indices.GetMapping(new GetMappingRequest(index));
             logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
 

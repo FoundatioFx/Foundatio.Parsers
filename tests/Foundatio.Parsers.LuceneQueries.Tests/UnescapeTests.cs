@@ -10,7 +10,7 @@ public sealed class UnescapeTests : TestWithLoggingBase
 {
     public UnescapeTests(ITestOutputHelper output) : base(output)
     {
-        Log.DefaultMinimumLevel = LogLevel.Trace;
+        Log.DefaultLogLevel = LogLevel.Trace;
     }
 
     [Theory]

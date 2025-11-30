@@ -23,10 +23,13 @@ public class SqlQueryParserConfiguration
 
     public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
     public string[] DefaultFields { get; private set; }
-
+    public SqlSearchOperator DefaultFieldsSearchOperator { get; private set; } = SqlSearchOperator.StartsWith;
+    public string[] FullTextFields { get; private set; }
     public int MaxFieldDepth { get; private set; } = 10;
     public QueryFieldResolver FieldResolver { get; private set; }
     public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
+    public Func<string, string> DateTimeParser { get; set; } = DefaultTimeParser;
+    public Func<string, string> DateOnlyParser { get; set; } = DefaultOnlyParser;
     public EntityTypePropertyFilter EntityTypePropertyFilter { get; private set; } = static _ => true;
     public EntityTypeNavigationFilter EntityTypeNavigationFilter { get; private set; } = static _ => true;
     public EntityTypeSkipNavigationFilter EntityTypeSkipNavigationFilter { get; private set; } = static _ => true;
@@ -39,20 +42,39 @@ public class SqlQueryParserConfiguration
     public SqlQueryParserConfiguration SetLoggerFactory(ILoggerFactory loggerFactory)
     {
         LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
-        _logger = loggerFactory.CreateLogger<SqlQueryParserConfiguration>();
+        _logger = loggerFactory!.CreateLogger<SqlQueryParserConfiguration>();
 
         return this;
     }
 
-    public SqlQueryParserConfiguration SetDefaultFields(string[] fields)
+    public SqlQueryParserConfiguration SetDefaultFields(string[] fields, SqlSearchOperator op = SqlSearchOperator.StartsWith)
     {
         DefaultFields = fields;
+        DefaultFieldsSearchOperator = op;
         return this;
     }
 
     public SqlQueryParserConfiguration SetSearchTokenizer(Action<SearchTerm> tokenizer)
     {
         SearchTokenizer = tokenizer;
+        return this;
+    }
+
+    public SqlQueryParserConfiguration SetFullTextFields(string[] fields)
+    {
+        FullTextFields = fields;
+        return this;
+    }
+
+    public SqlQueryParserConfiguration SetDateTimeParser(Func<string, string> dateTimeParser)
+    {
+        DateTimeParser = dateTimeParser;
+        return this;
+    }
+
+    public SqlQueryParserConfiguration SetDateOnlyParser(Func<string, string> dateOnlyParser)
+    {
+        DateOnlyParser = dateOnlyParser;
         return this;
     }
 
@@ -117,6 +139,22 @@ public class SqlQueryParserConfiguration
     {
         ValidationOptions = options;
         return this;
+    }
+
+    public static string DefaultTimeParser(string dateTimeValue)
+    {
+        if (dateTimeValue.Equals("now", StringComparison.OrdinalIgnoreCase))
+            return "DateTime.UtcNow";
+
+        return "DateTime.Parse(\"" + dateTimeValue + "\")";
+    }
+
+    public static string DefaultOnlyParser(string dateOnlyValue)
+    {
+        if (dateOnlyValue.Equals("now", StringComparison.OrdinalIgnoreCase))
+            return "DateOnly.FromDateTime(DateTime.UtcNow)";
+
+        return "DateOnly.Parse(\"" + dateOnlyValue + "\")";
     }
 
     #region Combined Visitor Management

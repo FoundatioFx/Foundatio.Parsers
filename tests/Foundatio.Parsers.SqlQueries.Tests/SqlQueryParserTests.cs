@@ -22,7 +22,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
 {
     public SqlQueryParserTests(ITestOutputHelper output) : base(output)
     {
-        Log.DefaultMinimumLevel = LogLevel.Trace;
+        Log.DefaultLogLevel = LogLevel.Trace;
     }
 
     [Theory]
@@ -70,14 +70,17 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.FullName.StartsWith("John") || e.Title.StartsWith("John")).ToQueryString();
-        string sqlActual = db.Employees.Where("""FullName.StartsWith("John") || Title.StartsWith("John") """).ToQueryString();
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.FullName, "\"John*\"") || EF.Functions.Contains(e.Title, "\"John*\"")).ToQueryString();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, """FTS.Contains(FullName, "\"John*\"") || FTS.Contains(Title, "\"John*\"") """).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("John", context);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        var results = await db.Employees.Where(sql).ToListAsync();
-        Assert.Single(results);
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
+
+        await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
+
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        Assert.Single(results);
     }
 
     [Fact]
@@ -101,28 +104,31 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.NationalPhoneNumber.StartsWith("2142222222")).ToQueryString();
-        string sqlActual = db.Employees.Where("NationalPhoneNumber.StartsWith(\"2142222222\")").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.NationalPhoneNumber, "\"2142222222*\"")).ToQueryString();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, "FTS.Contains(NationalPhoneNumber, \"\\\"2142222222*\\\"\")").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
 
         string sql = await parser.ToDynamicLinqAsync("214-222-2222", context);
         _logger.LogInformation(sql);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        var results = await db.Employees.Where(sql).ToListAsync();
-        Assert.Single(results);
         Assert.Equal(sqlExpected, sqlActual);
+
+        await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
+
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        Assert.Single(results);
 
         sql = await parser.ToDynamicLinqAsync("2142222222", context);
         _logger.LogInformation(sql);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        results = await db.Employees.Where(sql).ToListAsync();
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
         Assert.Single(results);
         Assert.Equal(sqlExpected, sqlActual);
 
         sql = await parser.ToDynamicLinqAsync("21422", context);
         _logger.LogInformation(sql);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
-        results = await db.Employees.Where(sql).ToListAsync();
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
         Assert.Single(results);
     }
 
@@ -142,8 +148,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         string sql = await parser.ToDynamicLinqAsync("test", context);
         _logger.LogInformation(sql);
-        string sqlActual = db.Employees.Where(sql).ToQueryString();
-        var results = await db.Employees.Where(sql).ToListAsync();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
         Assert.Empty(results);
     }
 
@@ -165,6 +171,42 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task CanUseDateParser()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tokyo");
+        var utcNow = DateTime.UtcNow;
+        _logger.LogInformation("UtcNow: {UtcNow:O} {UtcTicks}", utcNow, utcNow.Ticks);
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz);
+        _logger.LogInformation("LocalNow: {LocalNow:O}", localNow);
+
+        parser.Configuration.DateTimeParser = dateTimeValue =>
+        {
+            if (dateTimeValue.Equals("now", StringComparison.OrdinalIgnoreCase))
+                return "DateTime.UtcNow";
+
+            var dateTime = DateTime.Parse(dateTimeValue);
+            _logger.LogInformation("Parsed DateTime: {DateTime:O} {DateTimeKind}", dateTime, dateTime.Kind);
+
+            if (dateTime.Kind != DateTimeKind.Utc)
+                dateTime = TimeZoneInfo.ConvertTimeToUtc(dateTime, tz);
+
+            _logger.LogInformation("Parsed UTC DateTime: {DateTime:O} {UtcTicks}", dateTime, dateTime.Ticks);
+            return "DateTime(" + dateTime.Ticks + ", DateTimeKind.Utc)";
+        };
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlActual = db.Employees.Where($"created > DateTime({utcNow.Ticks}, DateTimeKind.Utc)").ToQueryString();
+        Assert.Contains(utcNow.ToString("O"), sqlActual);
+        string sql = await parser.ToDynamicLinqAsync($"created:>\"{localNow:O}\"", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Contains(utcNow.ToString("O"), sqlActual);
+    }
+
+    [Fact]
     public async Task CanUseDateOnlyFilter()
     {
         var sp = GetServiceProvider();
@@ -177,6 +219,13 @@ public class SqlQueryParserTests : TestWithLoggingBase
         string sqlActual = db.Employees.Where("""birthday < DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-90)""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("birthday:<now-90d", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+
+        sqlExpected = db.Employees.Where(e => e.Birthday == DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-90)).ToQueryString();
+        sqlActual = db.Employees.Where("""birthday = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-90)""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        sql = await parser.ToDynamicLinqAsync("birthday:now-90d", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
     }
@@ -259,11 +308,11 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name.StartsWith("acme"))).ToQueryString();
-        string sqlActual = db.Employees.Where("""Companies.Any(Name.StartsWith("acme"))""").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => EF.Functions.Contains(c.Name, "\"acme*\""))).ToQueryString();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, """Companies.Any(FTS.Contains(Name, "\"acme*\""))""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("acme", context);
-        sqlActual = db.Employees.Where(sql).ToQueryString();
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
     }
 
@@ -284,6 +333,30 @@ public class SqlQueryParserTests : TestWithLoggingBase
         _logger.LogInformation(sql);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
+    public async Task CanUseCurrentCompanyFullText()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+        parser.Configuration.SetDefaultFields(["CurrentCompany.Name", "CurrentCompany.Location"]);
+
+        var context = parser.GetContext(db.Employees.EntityType);
+
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.CurrentCompany.Name, "\"acme*\"") || EF.Functions.Contains(e.CurrentCompany.Location, "\"acme*\"")).ToQueryString();
+
+        await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
+
+        string sql = await parser.ToDynamicLinqAsync("acme", context);
+        Assert.Contains("FTS.Contains(CurrentCompany.Name", sql);
+        Assert.Contains("FTS.Contains(CurrentCompany.Location", sql);
+
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        Assert.Equal(2, results.Count);
     }
 
     [Fact]
@@ -335,6 +408,22 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task CanUseLike()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        var parser = sp.GetRequiredService<SqlQueryParser>();
+
+        var context = parser.GetContext(db.Employees.EntityType);
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.FullName, "john")).ToQueryString();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, """FTS.Contains(FullName, "john")""").ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+        string sql = await parser.ToDynamicLinqAsync("john", context);
+        sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Fact]
     public async Task CanGenerateSql()
     {
         var sp = GetServiceProvider();
@@ -382,6 +471,9 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
     public IServiceProvider GetServiceProvider()
     {
+        string sqlConnectionString = "Server=localhost;User Id=sa;Password=P@ssword1;Timeout=5;Initial Catalog=foundatio;Encrypt=False";
+        SqlWaiter.Wait(sqlConnectionString);
+
         var services = new ServiceCollection();
         services.AddDbContext<SampleContext>((_, x) =>
         {
@@ -390,6 +482,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
         var parser = new SqlQueryParser();
         parser.Configuration.UseEntityTypePropertyFilter(p => p.Name != nameof(Company.Description));
         parser.Configuration.AddQueryVisitor(new DynamicFieldVisitor());
+        parser.Configuration.SetDefaultFields(["FullName"], SqlSearchOperator.Contains);
+        parser.Configuration.SetFullTextFields(["Name", "FullName", "Title", "NationalPhoneNumber", "CurrentCompany.Name", "CurrentCompany.Location", "Companies.Name", "Companies.Location"]);
         services.AddSingleton(parser);
         return services.BuildServiceProvider();
     }
@@ -424,7 +518,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
             Salary = 80_000,
             Birthday = new DateOnly(1980, 1, 1),
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 30 }],
-            Companies = [company]
+            Companies = [company],
+            CurrentCompany = company
         });
         db.Employees.Add(new Employee
         {
@@ -435,9 +530,45 @@ public class SqlQueryParserTests : TestWithLoggingBase
             Salary = 90_000,
             Birthday = new DateOnly(1972, 11, 6),
             DataValues = [new() { Definition = company.DataDefinitions[0], NumberValue = 23 }],
-            Companies = [company]
+            Companies = [company],
+            CurrentCompany = company
         });
         await db.SaveChangesAsync();
+
+        await db.Database.ExecuteSqlRawAsync(
+            @"IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') != 1
+              BEGIN
+                  RAISERROR('Full-Text Search is not installed', 16, 1);
+              END
+
+              IF NOT EXISTS (SELECT * FROM sys.fulltext_catalogs WHERE name = 'ftCatalog')
+              BEGIN
+                  CREATE FULLTEXT CATALOG ftCatalog AS DEFAULT;
+              END
+
+              IF EXISTS (SELECT * FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID('Employees'))
+              BEGIN
+                  DROP FULLTEXT INDEX ON Employees;
+              END
+
+              CREATE FULLTEXT INDEX ON Employees
+              (
+                  FullName LANGUAGE 1033,
+                  NationalPhoneNumber LANGUAGE 1033,
+                  Title LANGUAGE 1033
+              )
+              KEY INDEX PK_Employees
+              ON ftCatalog
+              WITH (CHANGE_TRACKING = AUTO, STOPLIST = SYSTEM);
+
+              CREATE FULLTEXT INDEX ON Companies
+              (
+                  Name LANGUAGE 1033,
+                  Location LANGUAGE 1033
+              )
+              KEY INDEX PK_Companies
+              ON ftCatalog
+              WITH (CHANGE_TRACKING = AUTO, STOPLIST = SYSTEM);");
 
         return db;
     }

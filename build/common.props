@@ -1,7 +1,7 @@
 <Project>
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;</TargetFrameworks>
+    <TargetFrameworks>net8.0</TargetFrameworks>
     <Product>Foundatio.Parsers</Product>
     <Description>A lucene style query parser that is extensible and allows additional syntax features.</Description>
     <PackageProjectUrl>https://github.com/FoundatioFx/Foundatio.Parsers</PackageProjectUrl>
@@ -10,7 +10,7 @@
     <MinVerTagPrefix>v</MinVerTagPrefix>
     <ReferenceFoundatioSource Condition="$(SolutionName.Contains('All')) Or !$(SolutionName.Contains('Foundatio'))">true</ReferenceFoundatioSource>
 
-    <Copyright>Copyright (c) 2024 Foundatio.  All rights reserved.</Copyright>
+    <Copyright>Copyright (c) 2025 Foundatio.  All rights reserved.</Copyright>
     <Authors>FoundatioFx</Authors>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <WarningsAsErrors>true</WarningsAsErrors>
@@ -36,7 +36,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All"/>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
     <PackageReference Include="AsyncFixer" Version="1.6.0" PrivateAssets="All" />
     <PackageReference Include="MinVer" Version="6.0.0" PrivateAssets="All" />
   </ItemGroup>
