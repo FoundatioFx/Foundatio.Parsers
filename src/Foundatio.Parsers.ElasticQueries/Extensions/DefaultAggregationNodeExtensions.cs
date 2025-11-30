@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
+using Elastic.Clients.Elasticsearch.Core.Search;
 using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -16,9 +17,9 @@ public static class DefaultAggregationNodeExtensions
     // NOTE: We may want to read this dynamically from server settings.
     public const int MAX_BUCKET_SIZE = 10000;
 
-    public static Task<AggregationMap> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static async Task<AggregationMap> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
     {
-        AggregationBase aggregation = null;
+        AggregationMap aggregation = null;
         if (node is GroupNode groupNode)
             aggregation = await groupNode.GetDefaultAggregationAsync(context);
 
@@ -28,17 +29,17 @@ public static class DefaultAggregationNodeExtensions
         if (aggregation is null)
             return null;
 
-        if (aggregation is ITermsAggregation termsAggregation)
+        if (aggregation is TermsAggregation termsAggregation)
         {
             PopulateTermsAggregation(termsAggregation, node);
         }
 
-        if (aggregation is ITopHitsAggregation topHitsAggregation)
+        if (aggregation is TopHitsAggregation topHitsAggregation)
         {
             PopulateTopHitsAggregation(topHitsAggregation, node);
         }
 
-        if (aggregation is IDateHistogramAggregation histogramAggregation)
+        if (aggregation is DateHistogramAggregation histogramAggregation)
         {
             PopulateDateHistogramAggregation(histogramAggregation, node);
         }
@@ -387,7 +388,7 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    private static void PopulateTermsAggregation(ITermsAggregation termsAggregation, IQueryNode node)
+    private static void PopulateTermsAggregation(TermsAggregation termsAggregation, IQueryNode node)
     {
         if (termsAggregation is null)
             return;
@@ -425,7 +426,7 @@ public static class DefaultAggregationNodeExtensions
                 case "@min":
                     {
                         if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int minCount))
-                            termsAggregation.MinimumDocumentCount = minCount;
+                            termsAggregation.MinDocCount = minCount;
                         break;
                     }
             }
@@ -434,7 +435,7 @@ public static class DefaultAggregationNodeExtensions
         }
     }
 
-    private static void PopulateTopHitsAggregation(ITopHitsAggregation topHitsAggregation, IQueryNode node)
+    private static void PopulateTopHitsAggregation(TopHitsAggregation topHitsAggregation, IQueryNode node)
     {
         if (topHitsAggregation is null)
             return;
@@ -481,7 +482,7 @@ public static class DefaultAggregationNodeExtensions
         }
     }
 
-    private static void PopulateDateHistogramAggregation(IDateHistogramAggregation dateHistogramAggregation, IQueryNode node)
+    private static void PopulateDateHistogramAggregation(DateHistogramAggregation dateHistogramAggregation, IQueryNode node)
     {
         if (dateHistogramAggregation is null)
             return;
