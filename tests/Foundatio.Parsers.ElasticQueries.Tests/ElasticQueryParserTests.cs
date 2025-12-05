@@ -203,7 +203,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-        // multi-match on multiple default fields
+        // multi-match on multiple default fields with mixed types (text + keyword)
+        // Now splits into match for text fields and term for keyword fields
         processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).SetDefaultFields(["field1", "field2"]).UseMappings(Client, index));
         result = await processor.BuildQueryAsync("value1 abc def ghi", new ElasticQueryVisitorContext().UseSearchMode());
         actualResponse = Client.Search<MyType>(d => d.Index(index).Query(_ => result));
@@ -211,16 +212,63 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = Client.Search<MyType>(d => d.Index(index).Query(f =>
-            f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("value1"))
-            || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("abc"))
-            || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("def"))
-            || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("ghi"))));
+            f.Match(m => m.Field("field1").Query("value1"))
+            || f.Term(t => t.Field("field2").Value("value1"))
+            || f.Match(m => m.Field("field1").Query("abc"))
+            || f.Term(t => t.Field("field2").Value("abc"))
+            || f.Match(m => m.Field("field1").Query("def"))
+            || f.Term(t => t.Field("field2").Value("def"))
+            || f.Match(m => m.Field("field1").Query("ghi"))
+            || f.Term(t => t.Field("field2").Value("ghi"))));
 
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task DefaultSearch_WithMixedFieldTypes_SplitsIntoSeparateQueries()
+    {
+        // When default fields include different types (text vs integer), we can't use multi_match
+        // because Elasticsearch multi_match expects compatible field types.
+        // We need to split into separate queries per field type.
+        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Field1))
+            .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyType { Field1 = "test value", Field4 = 42 },
+            new MyType { Field1 = "other value", Field4 = 100 },
+            new MyType { Field1 = "42", Field4 = 99 } // Field1 contains "42" as text
+        ], index);
+        await Client.Indices.RefreshAsync(index);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .SetDefaultFields(["field1", "field4"])
+            .UseMappings(Client, index));
+
+        // Search for "42" - should match field1 containing "42" text AND field4 = 42
+        var result = await processor.BuildQueryAsync("42", new ElasticQueryVisitorContext().UseSearchMode());
+
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(_ => result));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        // Expected: Split into match query for text field, term query for integer field
+        var expectedResponse = Client.Search<MyType>(d => d.Index(index)
+            .Query(q => q.Match(m => m.Field("field1").Query("42"))
+                || q.Term(t => t.Field("field4").Value(42))));
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        Assert.Equal(2, actualResponse.Total); // Should match doc with Field1="42" and doc with Field4=42
     }
 
     [Fact]
