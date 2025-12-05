@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -204,7 +203,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-        // multi-match on multiple default fields
+        // multi-match on multiple default fields with mixed types (text + keyword)
+        // Now splits into match for text fields and term for keyword fields
         processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).SetDefaultFields(["field1", "field2"]).UseMappings(Client, index));
         result = await processor.BuildQueryAsync("value1 abc def ghi", new ElasticQueryVisitorContext().UseSearchMode());
         actualResponse = Client.Search<MyType>(d => d.Index(index).Query(_ => result));
@@ -212,10 +212,14 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = Client.Search<MyType>(d => d.Index(index).Query(f =>
-            f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("value1"))
-            || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("abc"))
-            || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("def"))
-            || f.MultiMatch(m => m.Fields(mf => mf.Fields("field1", "field2")).Query("ghi"))));
+            f.Match(m => m.Field("field1").Query("value1"))
+            || f.Term(t => t.Field("field2").Value("value1"))
+            || f.Match(m => m.Field("field1").Query("abc"))
+            || f.Term(t => t.Field("field2").Value("abc"))
+            || f.Match(m => m.Field("field1").Query("def"))
+            || f.Term(t => t.Field("field2").Value("def"))
+            || f.Match(m => m.Field("field1").Query("ghi"))
+            || f.Term(t => t.Field("field2").Value("ghi"))));
 
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -225,7 +229,50 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public void CanGetMappingsFromCode()
+    public async Task DefaultSearch_WithMixedFieldTypes_SplitsIntoSeparateQueries()
+    {
+        // When default fields include different types (text vs integer), we can't use multi_match
+        // because Elasticsearch multi_match expects compatible field types.
+        // We need to split into separate queries per field type.
+        string index = CreateRandomIndex<MyType>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Field1))
+            .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyType { Field1 = "test value", Field4 = 42 },
+            new MyType { Field1 = "other value", Field4 = 100 },
+            new MyType { Field1 = "42", Field4 = 99 } // Field1 contains "42" as text
+        ], index);
+        await Client.Indices.RefreshAsync(index);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .SetDefaultFields(["field1", "field4"])
+            .UseMappings(Client, index));
+
+        // Search for "42" - should match field1 containing "42" text AND field4 = 42
+        var result = await processor.BuildQueryAsync("42", new ElasticQueryVisitorContext().UseSearchMode());
+
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Query(_ => result));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        // Expected: Split into match query for text field, term query for integer field
+        var expectedResponse = Client.Search<MyType>(d => d.Index(index)
+            .Query(q => q.Match(m => m.Field("field1").Query("42"))
+                || q.Term(t => t.Field("field4").Value(42))));
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        Assert.Equal(2, actualResponse.Total); // Should match doc with Field1="42" and doc with Field4=42
+    }
+
+    [Fact]
+    public async Task CanGetMappingsFromCode()
     {
         TypeMappingDescriptor<MyType> GetCodeMappings(TypeMappingDescriptor<MyType> d) =>
             d.Dynamic()
@@ -238,8 +285,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 .GeoPoint(g => g.Name(f => f.Field3))
                 .Keyword(e => e.Name(m => m.Field2))));
 
-        var res = Client.Index(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index));
-        Client.Indices.Refresh(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index));
+        await Client.Indices.RefreshAsync(index);
 
         var parser = new ElasticQueryParser(c => c.SetDefaultFields(["field1"]).UseMappings<MyType>(GetCodeMappings, Client, index));
 
@@ -840,127 +887,6 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public async Task NestedFilterProcessor()
-    {
-        string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
-            .Text(e => e.Name(n => n.Field1).Index())
-            .Text(e => e.Name(n => n.Field2).Index())
-            .Text(e => e.Name(n => n.Field3).Index())
-            .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
-            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
-                .Text(e => e.Name(n => n.Field1).Index())
-                .Text(e => e.Name(n => n.Field2).Index())
-                .Text(e => e.Name(n => n.Field3).Index())
-                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
-            ))
-        ));
-        await Client.IndexManyAsync([
-            new MyNestedType
-            {
-                Field1 = "value1",
-                Field2 = "value2",
-                Nested = { new MyType { Field1 = "value1", Field4 = 4 } }
-            },
-            new MyNestedType { Field1 = "value2", Field2 = "value2" },
-            new MyNestedType { Field1 = "value1", Field2 = "value4" }
-        ]);
-        await Client.Indices.RefreshAsync(index);
-
-        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseFieldMap(new FieldMap { { "blah", "nested" } }).UseMappings<MyNestedType>(Client).UseNested());
-        var result = await processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1)", new ElasticQueryVisitorContext().UseScoring());
-
-        var actualResponse = Client.Search<MyNestedType>(d => d.Query(_ => result));
-        string actualRequest = actualResponse.GetRequest();
-        _logger.LogInformation("Actual: {Request}", actualRequest);
-
-        var expectedResponse = Client.Search<MyNestedType>(d => d
-            .Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
-                && q.Nested(n => n
-                    .Path(p => p.Nested)
-                    .Query(q2 => q2
-                        .Match(m => m
-                            .Field("nested.field1")
-                            .Query("value1"))))));
-
-        string expectedRequest = expectedResponse.GetRequest();
-        _logger.LogInformation("Expected: {Request}", expectedRequest);
-
-        Assert.Equal(expectedRequest, actualRequest);
-        Assert.Equal(expectedResponse.Total, actualResponse.Total);
-
-        result = await processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1 blah.field4:4)", new ElasticQueryVisitorContext().UseScoring());
-
-        actualResponse = Client.Search<MyNestedType>(d => d.Query(_ => result));
-        actualRequest = actualResponse.GetRequest();
-        _logger.LogInformation("Actual: {Request}", actualRequest);
-
-        expectedResponse = Client.Search<MyNestedType>(d => d
-            .Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
-                && q.Nested(n => n
-                    .Path(p => p.Nested)
-                    .Query(q2 => q2
-                        .Match(m => m
-                            .Field("nested.field1")
-                            .Query("value1"))
-                        && q2.Term("nested.field4", "4")))));
-
-        expectedRequest = expectedResponse.GetRequest();
-        _logger.LogInformation("Expected: {Request}", expectedRequest);
-
-        Assert.Equal(expectedRequest, actualRequest);
-        Assert.Equal(expectedResponse.Total, actualResponse.Total);
-    }
-
-    [Fact]
-    public async Task NestedFilterProcessor2()
-    {
-        string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
-            .Text(e => e.Name(n => n.Field1).Index())
-            .Text(e => e.Name(n => n.Field2).Index())
-            .Text(e => e.Name(n => n.Field3).Index())
-            .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
-            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
-                .Text(e => e.Name(n => n.Field1).Index())
-                .Text(e => e.Name(n => n.Field2).Index())
-                .Text(e => e.Name(n => n.Field3).Index())
-                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
-            ))
-        ));
-
-        await Client.IndexManyAsync([
-            new MyNestedType
-            {
-                Field1 = "value1",
-                Field2 = "value2",
-                Nested = { new MyType { Field1 = "value1", Field4 = 4 } }
-            },
-            new MyNestedType { Field1 = "value2", Field2 = "value2" },
-            new MyNestedType { Field1 = "value1", Field2 = "value4", Field3 = "value3" }
-        ]);
-        await Client.Indices.RefreshAsync(index);
-
-        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
-        var result = await processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1 nested.field4:4 nested.field3:value3)",
-                new ElasticQueryVisitorContext { UseScoring = true });
-
-        var actualResponse = Client.Search<MyNestedType>(d => d.Query(_ => result));
-        string actualRequest = actualResponse.GetRequest();
-        _logger.LogInformation("Actual: {Request}", actualRequest);
-
-        var expectedResponse = Client.Search<MyNestedType>(d => d.Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
-            && q.Nested(n => n.Path(p => p.Nested).Query(q2 =>
-                q2.Match(m => m.Field("nested.field1").Query("value1"))
-                && q2.Term("nested.field4", "4")
-                && q2.Match(m => m.Field("nested.field3").Query("value3"))))));
-
-        string expectedRequest = expectedResponse.GetRequest();
-        _logger.LogInformation("Expected: {Request}", expectedRequest);
-
-        Assert.Equal(expectedRequest, actualRequest);
-        Assert.Equal(expectedResponse.Total, actualResponse.Total);
-    }
-
-    [Fact]
     public async Task CanGenerateMatchQuery()
     {
         string index = CreateRandomIndex<MyType>(m => m.Properties(p => p
@@ -1359,10 +1285,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [Fact]
     public async Task CanHandleSpacedFields()
     {
-        string index = CreateRandomIndex<MyNestedType>();
+        string index = CreateRandomIndex<ElasticNestedQueryParserTests.MyNestedType>();
 
         await Client.IndexManyAsync([
-            new MyNestedType
+            new ElasticNestedQueryParserTests.MyNestedType
             {
                 Field1 = "value1",
                 Field2 = "value2",
@@ -1379,8 +1305,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 }
             ]
             },
-            new MyNestedType { Field1 = "value2", Field2 = "value2" },
-            new MyNestedType { Field1 = "value1", Field2 = "value4" }
+            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value2", Field2 = "value2" },
+            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value1", Field2 = "value4" }
         ], index);
         await Client.Indices.RefreshAsync(index);
 
@@ -1537,20 +1463,8 @@ public class MyType
     public Dictionary<string, object> Data { get; set; } = new Dictionary<string, object>();
 }
 
-public class MyNestedType
-{
-    public string Field1 { get; set; }
-    public string Field2 { get; set; }
-    public string Field3 { get; set; }
-    public int Field4 { get; set; }
-    public string Field5 { get; set; }
-    public string Payload { get; set; }
-    public IList<MyType> Nested { get; set; } = new List<MyType>();
-}
-
 public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryVisitor
 {
-
     public override void Visit(TermNode node, IQueryVisitorContext context)
     {
         if (!String.Equals(node.Field, "fixed", StringComparison.OrdinalIgnoreCase))
