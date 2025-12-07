@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -281,14 +282,15 @@ public static class DefaultQueryNodeExtensions
         if (nameParts == null || nameParts.Length == 0)
             return null;
 
-        string fieldName = String.Empty;
+        var builder = new StringBuilder();
         for (int i = 0; i < nameParts.Length; i++)
         {
             if (i > 0)
-                fieldName += ".";
+                builder.Append('.');
 
-            fieldName += nameParts[i];
+            builder.Append(nameParts[i]);
 
+            string fieldName = builder.ToString();
             if (context.MappingResolver.IsNestedPropertyType(fieldName))
                 return fieldName;
         }
@@ -302,16 +304,9 @@ public static class DefaultQueryNodeExtensions
 
         foreach (var (nestedPath, fields) in fieldsByNestedPath)
         {
-            QueryBase query;
-
-            if (fields.Count == 1)
-            {
-                query = GetSingleFieldQuery(node, fields[0], context);
-            }
-            else
-            {
-                query = GetMultiFieldQuery(node, fields.ToArray(), context);
-            }
+            QueryBase query = fields.Count == 1
+                ? GetSingleFieldQuery(node, fields[0], context)
+                : GetMultiFieldQuery(node, fields.ToArray(), context);
 
             // Wrap in NestedQuery if this is a nested path (non-empty string)
             if (!String.IsNullOrEmpty(nestedPath))
