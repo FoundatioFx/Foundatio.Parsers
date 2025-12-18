@@ -415,8 +415,8 @@ public class SqlQueryParserTests : TestWithLoggingBase
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
         var context = parser.GetContext(db.Employees.EntityType);
-        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.FullName, "john")).ToQueryString();
-        string sqlActual = db.Employees.Where(parser.ParsingConfig, """FTS.Contains(FullName, "john")""").ToQueryString();
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.FullName, "\"*john*\"")).ToQueryString();
+        string sqlActual = db.Employees.Where(parser.ParsingConfig, """FTS.Contains(FullName, "\"*john*\"")""").ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
         string sql = await parser.ToDynamicLinqAsync("john", context);
         sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
