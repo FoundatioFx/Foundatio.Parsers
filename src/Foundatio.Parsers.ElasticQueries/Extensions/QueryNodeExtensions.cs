@@ -83,4 +83,18 @@ public static class QueryNodeExtensions
     {
         node.Data.Remove(SortKey);
     }
+
+    private const string NestedPathKey = "@NestedPath";
+    public static string GetNestedPath(this IQueryNode node)
+    {
+        if (!node.Data.TryGetValue(NestedPathKey, out object value))
+            return null;
+
+        return value as string;
+    }
+
+    public static void SetNestedPath(this IQueryNode node, string path)
+    {
+        node.Data[NestedPathKey] = path;
+    }
 }
