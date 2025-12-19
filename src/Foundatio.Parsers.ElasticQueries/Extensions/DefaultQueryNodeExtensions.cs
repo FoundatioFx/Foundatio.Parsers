@@ -1,16 +1,16 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class DefaultQueryNodeExtensions
 {
-    public static async Task<QueryBase> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static async Task<Query> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
     {
         if (node is TermNode termNode)
             return termNode.GetDefaultQuery(context);
@@ -27,12 +27,12 @@ public static class DefaultQueryNodeExtensions
         return null;
     }
 
-    public static QueryBase GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
+    public static Query GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        QueryBase query;
+        Query query;
         string field = node.UnescapedField;
         string[] defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
         if (field == null && defaultFields != null && defaultFields.Length == 1)
@@ -44,12 +44,11 @@ public static class DefaultQueryNodeExtensions
 
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
-                query = new QueryStringQuery
+                query = new QueryStringQuery(node.UnescapedTerm)
                 {
                     Fields = fields,
                     AllowLeadingWildcard = false,
-                    AnalyzeWildcard = true,
-                    Query = node.UnescapedTerm
+                    AnalyzeWildcard = true
                 };
             }
             else
@@ -58,30 +57,20 @@ public static class DefaultQueryNodeExtensions
                 {
                     if (node.IsQuotedTerm)
                     {
-                        query = new MatchPhraseQuery
-                        {
-                            Field = fields[0],
-                            Query = node.UnescapedTerm
-                        };
+                        query = new MatchPhraseQuery(fields[0], node.UnescapedTerm);
                     }
                     else
                     {
-                        query = new MatchQuery
-                        {
-                            Field = fields[0],
-                            Query = node.UnescapedTerm
-                        };
+                        query = new MatchQuery(fields[0], node.UnescapedTerm);
                     }
                 }
                 else
                 {
-                    query = new MultiMatchQuery
+                    query = new MultiMatchQuery(node.UnescapedTerm)
                     {
                         Fields = fields,
-                        Query = node.UnescapedTerm
+                        Type = node.IsQuotedTerm ? TextQueryType.Phrase : null
                     };
-                    if (node.IsQuotedTerm)
-                        ((MultiMatchQuery)query).Type = TextQueryType.Phrase;
                 }
             }
         }
@@ -89,26 +78,18 @@ public static class DefaultQueryNodeExtensions
         {
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
-                query = new PrefixQuery
-                {
-                    Field = field,
-                    Value = node.UnescapedTerm.TrimEnd('*')
-                };
+                query = new PrefixQuery(field, node.UnescapedTerm.TrimEnd('*'));
             }
             else
             {
-                query = new TermQuery
-                {
-                    Field = field,
-                    Value = node.UnescapedTerm
-                };
+                query = new TermQuery(field, node.UnescapedTerm);
             }
         }
 
         return query;
     }
 
-    public static async Task<QueryBase> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)
+    public static async Task<Query> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -116,63 +97,60 @@ public static class DefaultQueryNodeExtensions
         string field = node.UnescapedField;
         if (elasticContext.MappingResolver.IsDatePropertyType(field))
         {
-            var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()) };
+            var range = new DateRangeQuery(field) { TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()) };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
-                    range.GreaterThan = node.UnescapedMin;
+                    range.Gt = node.UnescapedMin;
                 else
-                    range.GreaterThanOrEqualTo = node.UnescapedMin;
+                    range.Gte = node.UnescapedMin;
             }
 
             if (!String.IsNullOrWhiteSpace(node.UnescapedMax) && node.UnescapedMax != "*")
             {
                 if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
-                    range.LessThan = node.UnescapedMax;
+                    range.Lt = node.UnescapedMax;
                 else
-                    range.LessThanOrEqualTo = node.UnescapedMax;
+                    range.Lte = node.UnescapedMax;
             }
 
             return range;
         }
         else
         {
-            var range = new TermRangeQuery { Field = field };
+            var range = new TermRangeQuery(field);
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
-                    range.GreaterThan = node.UnescapedMin;
+                    range.Gt = node.UnescapedMin;
                 else
-                    range.GreaterThanOrEqualTo = node.UnescapedMin;
+                    range.Gte = node.UnescapedMin;
             }
 
             if (!String.IsNullOrWhiteSpace(node.UnescapedMax) && node.UnescapedMax != "*")
             {
                 if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
-                    range.LessThan = node.UnescapedMax;
+                    range.Lt = node.UnescapedMax;
                 else
-                    range.LessThanOrEqualTo = node.UnescapedMax;
+                    range.Lte = node.UnescapedMax;
             }
 
             return range;
         }
     }
 
-    public static QueryBase GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context)
+    public static Query GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context)
     {
-        return new ExistsQuery { Field = node.UnescapedField };
+        return new ExistsQuery(node.UnescapedField);
     }
 
-    public static QueryBase GetDefaultQuery(this MissingNode node, IQueryVisitorContext context)
+    public static Query GetDefaultQuery(this MissingNode node, IQueryVisitorContext context)
     {
         return new BoolQuery
         {
             MustNot =
             [
-                new ExistsQuery
-                {
-                    Field = node.UnescapedField
-                }
+                new ExistsQuery(node.UnescapedField)
             ]
         };
     }
