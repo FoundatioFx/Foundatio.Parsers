@@ -30,7 +30,8 @@ Debug.WriteLine(DebugQueryVisitor.Run(result));
 ```
 
 Here is the parse result as shown from the `DebugQueryVisitor`
-```
+
+```txt
 Group:
   Left - Term:
       TermMax: 2
@@ -42,15 +43,18 @@ Group:
 ```
 
 Finally, lets translate the parse result back into the original query.
+
 ```csharp
 var generatedQuery = GenerateQueryVisitor.Run(result);
 System.Diagnostics.Debug.Assert(query == generatedQuery);
 ```
+
 ## [Query Syntax](docs/query.md)
 
 ## [Aggregation Syntax](docs/aggregations.md)
 
 ## Features
+
 - Lucene Query Syntax Parser
   - Parsers fairly standardized syntax from [Lucene](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html).
   - Visitors for extensibility

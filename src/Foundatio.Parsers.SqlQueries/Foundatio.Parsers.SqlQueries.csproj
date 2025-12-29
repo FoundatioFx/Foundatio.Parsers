@@ -6,7 +6,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
     <PackageReference Include="Exceptionless.DateTimeExtensions" Version="4.0.1" />
-    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.0" />
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.1" />
   </ItemGroup>
   <ItemGroup>
       <ProjectReference Include="..\..\src\Foundatio.Parsers.LuceneQueries\Foundatio.Parsers.LuceneQueries.csproj" />
