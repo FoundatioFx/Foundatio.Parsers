@@ -13,10 +13,10 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
-    private ITypeMapping MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
+    private ITypeMapping MapMyNestedType(TypeMappingDescriptor<ElasticNestedQueryParserTests.MyNestedType> m)
     {
         return m
-            .AutoMap<MyNestedType>()
+            .AutoMap<ElasticNestedQueryParserTests.MyNestedType>()
             .Dynamic()
             .DynamicTemplates(t => t.DynamicTemplate("idx_text", t => t.Match("text*").Mapping(m => m.Text(mp => mp.AddKeywordAndSortFields()))))
             .Properties(p => p
@@ -30,10 +30,10 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public void CanResolveCodedProperty()
     {
-        string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
+        string index = CreateRandomIndex<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType);
 
         Client.IndexMany([
-            new MyNestedType
+            new ElasticNestedQueryParserTests.MyNestedType
             {
                 Field1 = "value1",
                 Field2 = "value2",
@@ -50,12 +50,12 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
                 }
             ]
             },
-            new MyNestedType { Field1 = "value2", Field2 = "value2" },
-            new MyNestedType { Field1 = "value1", Field2 = "value4" }
+            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value2", Field2 = "value2" },
+            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value1", Field2 = "value4" }
         ], index);
         Client.Indices.Refresh(index);
 
-        var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
+        var resolver = ElasticMappingResolver.Create<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType, Client, index, _logger);
 
         var payloadProperty = resolver.GetMappingProperty("payload");
         Assert.IsType<TextProperty>(payloadProperty);
@@ -65,10 +65,10 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public void CanResolveProperties()
     {
-        string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
+        string index = CreateRandomIndex<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType);
 
         Client.IndexMany([
-            new MyNestedType
+            new ElasticNestedQueryParserTests.MyNestedType
             {
                 Field1 = "value1",
                 Field2 = "value2",
@@ -85,12 +85,12 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
                 }
             ]
             },
-            new MyNestedType { Field1 = "value2", Field2 = "value2" },
-            new MyNestedType { Field1 = "value1", Field2 = "value4" }
+            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value2", Field2 = "value2" },
+            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value1", Field2 = "value4" }
         ], index);
         Client.Indices.Refresh(index);
 
-        var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
+        var resolver = ElasticMappingResolver.Create<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType, Client, index, _logger);
 
         string dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001");
         Assert.Equal("nested.data.text-0001.keyword", dynamicTextAggregation);
@@ -131,7 +131,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         var field4Property = resolver.GetMappingProperty("Field4");
         Assert.IsType<TextProperty>(field4Property);
 
-        var field4ReflectionProperty = resolver.GetMappingProperty(new Field(typeof(MyNestedType).GetProperty("Field4")));
+        var field4ReflectionProperty = resolver.GetMappingProperty(new Field(typeof(ElasticNestedQueryParserTests.MyNestedType).GetProperty("Field4")));
         Assert.IsType<TextProperty>(field4ReflectionProperty);
 
         var field4ExpressionProperty = resolver.GetMappingProperty(new Field(GetObjectPath(p => p.Field4)));
@@ -172,7 +172,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<ObjectProperty>(nestedDataProperty);
     }
 
-    private static Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath)
+    private static Expression GetObjectPath(Expression<Func<ElasticNestedQueryParserTests.MyNestedType, object>> objectPath)
     {
         return objectPath;
     }
