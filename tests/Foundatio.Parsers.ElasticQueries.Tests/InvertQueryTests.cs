@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Core.Search;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
-using Nest;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -116,8 +117,8 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture>
         Assert.Equal(expected, invertedQuery);
 
         var total = await Client.CountAsync<InvertTest>();
-        var results = await Client.SearchAsync<InvertTest>(s => s.QueryOnQueryString(query).TrackTotalHits(true));
-        var invertedResults = await Client.SearchAsync<InvertTest>(s => s.QueryOnQueryString(invertedQuery).TrackTotalHits(true));
+        var results = await Client.SearchAsync<InvertTest>(s => s.QueryLuceneSyntax(query).TrackTotalHits(new TrackHits(true)));
+        var invertedResults = await Client.SearchAsync<InvertTest>(s => s.QueryLuceneSyntax(invertedQuery).TrackTotalHits(new TrackHits(true)));
 
         Assert.Equal(total.Count, results.Total + invertedResults.Total);
     }
@@ -142,13 +143,13 @@ public class SampleDataFixture : ElasticsearchFixture
         await base.InitializeAsync();
 
         const string indexName = "test_invert";
-        CreateNamedIndex<InvertTest>(indexName, m => m
+        await CreateNamedIndexAsync<InvertTest>(indexName, m => m
             .Properties(p => p
-                .Keyword(p1 => p1.Name(n => n.Id))
-                .Keyword(p1 => p1.Name(n => n.OrganizationId))
-                .Text(p1 => p1.Name(n => n.Description))
-                .Keyword(p1 => p1.Name(n => n.Status))
-                .Boolean(p1 => p1.Name(n => n.IsDeleted))
+                .Keyword(p1 => p1.Id)
+                .Keyword(p1 => p1.OrganizationId)
+                .Text(p1 => p1.Description)
+                .Keyword(p1 => p1.Status)
+                .Boolean(p1 => p1.IsDeleted)
             ));
 
         var records = new List<InvertTest>();
@@ -189,7 +190,6 @@ public class SampleDataFixture : ElasticsearchFixture
         }
 
         await Client.IndexManyAsync(records, indexName);
-
         await Client.Indices.RefreshAsync(indexName);
     }
 }

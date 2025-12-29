@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
@@ -19,7 +19,8 @@ public class NestedVisitor : ChainableQueryVisitor
         if (nestedProperty == null)
             return base.VisitAsync(node, context);
 
-        node.SetQuery(new NestedQuery { Path = nestedProperty });
+        // NOTE: This nested query will be updated in the CombineQueriesVisitor.
+        node.SetQuery(new NestedQuery(nestedProperty, new Query()));
 
         return base.VisitAsync(node, context);
     }

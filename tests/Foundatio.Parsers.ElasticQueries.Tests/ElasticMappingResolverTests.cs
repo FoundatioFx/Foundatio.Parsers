@@ -1,6 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq.Expressions;
-using Nest;
+using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -13,26 +17,25 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
-    private ITypeMapping MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
+    private TypeMappingDescriptor<MyNestedType> MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
     {
         return m
-            .AutoMap<MyNestedType>()
-            .Dynamic()
-            .DynamicTemplates(t => t.DynamicTemplate("idx_text", t => t.Match("text*").Mapping(m => m.Text(mp => mp.AddKeywordAndSortFields()))))
+            .Dynamic(DynamicMapping.True)
+            .DynamicTemplates(dt => dt.Add("idx_text", d => d.Mapping(dm => dm.Text(o => o.AddKeywordAndSortFields())).Match("text*")))
             .Properties(p => p
-                .Text(p1 => p1.Name(n => n.Field1).AddKeywordAndSortFields())
-                .Text(p1 => p1.Name(n => n.Field4).AddKeywordAndSortFields())
-                    .FieldAlias(a => a.Path(n => n.Field4).Name("field4alias"))
-                .Text(p1 => p1.Name(n => n.Field5).AddKeywordAndSortFields(true))
+                .Text(p1 => p1.Field1, o => o.AddKeywordAndSortFields())
+                .Text(p1 => p1.Field4, o => o.AddKeywordAndSortFields())
+                    .FieldAlias(a => a.Field4, o => o.Path("field4alias"))
+                .Text(p1 => p1.Field5, o => o.AddKeywordAndSortFields(true))
             );
     }
 
     [Fact]
-    public void CanResolveCodedProperty()
+    public async Task CanResolveCodedProperty()
     {
-        string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
+        string index = await CreateRandomIndexAsync<MyNestedType>(MapMyNestedType);
 
-        Client.IndexMany([
+        await Client.IndexManyAsync([
             new MyNestedType
             {
                 Field1 = "value1",
@@ -53,21 +56,22 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
         ], index);
-        Client.Indices.Refresh(index);
+
+        await Client.Indices.RefreshAsync(index);
 
         var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
 
         var payloadProperty = resolver.GetMappingProperty("payload");
         Assert.IsType<TextProperty>(payloadProperty);
-        Assert.NotNull(payloadProperty.Name);
+        Assert.NotNull(payloadProperty.TryGetName());
     }
 
     [Fact]
-    public void CanResolveProperties()
+    public async Task CanResolveProperties()
     {
-        string index = CreateRandomIndex<MyNestedType>(MapMyNestedType);
+        string index = await CreateRandomIndexAsync<MyNestedType>(MapMyNestedType);
 
-        Client.IndexMany([
+        await Client.IndexManyAsync([
             new MyNestedType
             {
                 Field1 = "value1",
@@ -88,7 +92,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
         ], index);
-        Client.Indices.Refresh(index);
+         await Client.Indices.RefreshAsync(index);
 
         var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
 
@@ -141,11 +145,11 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<TextProperty>(field4AliasMapping.Property);
         Assert.Same(field4Property, field4AliasMapping.Property);
 
-        string field4sort = resolver.GetSortFieldName("Field4Alias");
-        Assert.Equal("field4.sort", field4sort);
+        string field4Sort = resolver.GetSortFieldName("Field4Alias");
+        Assert.Equal("field4.sort", field4Sort);
 
-        string field4aggs = resolver.GetAggregationsFieldName("Field4Alias");
-        Assert.Equal("field4.keyword", field4aggs);
+        string field4Aggs = resolver.GetAggregationsFieldName("Field4Alias");
+        Assert.Equal("field4.keyword", field4Aggs);
 
         var nestedIdProperty = resolver.GetMappingProperty("Nested.Id");
         Assert.IsType<TextProperty>(nestedIdProperty);
@@ -163,7 +167,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<TextProperty>(nestedField1Property);
 
         var nestedField2Property = resolver.GetMappingProperty("Nested.Field4");
-        Assert.IsType<NumberProperty>(nestedField2Property);
+        Assert.IsType<IntegerNumberProperty>(nestedField2Property);
 
         var nestedField5Property = resolver.GetMappingProperty("Nested.Field5");
         Assert.IsType<DateProperty>(nestedField5Property);

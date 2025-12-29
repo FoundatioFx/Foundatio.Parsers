@@ -63,7 +63,7 @@ public class LoggingTracer : ITracer
         ruleStats.Locations.TryGetValue(key, out int count);
         ruleStats.Locations[key] = count + 1;
 
-        _logger.LogInformation($"{GetIndent()}Start '{ruleName}' at ({cursor.Line},{cursor.Column}) with state key {cursor.StateKey}");
+        _logger.LogInformation("{Indent}Start \'{RuleName}\' at ({CursorLine},{CursorColumn}) with state key {CursorStateKey}", GetIndent(), ruleName, cursor.Line, cursor.Column, cursor.StateKey);
         _indentLevel++;
     }
 
