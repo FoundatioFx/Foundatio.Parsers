@@ -2,7 +2,6 @@
 using System.Linq.Expressions;
 using Nest;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 

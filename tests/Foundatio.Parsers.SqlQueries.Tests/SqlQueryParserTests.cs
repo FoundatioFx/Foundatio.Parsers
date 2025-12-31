@@ -14,7 +14,6 @@ using Microsoft.Extensions.Logging;
 using Pegasus.Common.Tracing;
 using PhoneNumbers;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.SqlQueries.Tests;
 
@@ -79,7 +78,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
 
-        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync(TestCancellationToken);
         Assert.Single(results);
     }
 
@@ -115,20 +114,20 @@ public class SqlQueryParserTests : TestWithLoggingBase
         await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
 
         sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
-        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync(TestCancellationToken);
         Assert.Single(results);
 
         sql = await parser.ToDynamicLinqAsync("2142222222", context);
         _logger.LogInformation(sql);
         sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
-        results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync(TestCancellationToken);
         Assert.Single(results);
         Assert.Equal(sqlExpected, sqlActual);
 
         sql = await parser.ToDynamicLinqAsync("21422", context);
         _logger.LogInformation(sql);
         sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
-        results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync(TestCancellationToken);
         Assert.Single(results);
     }
 
@@ -149,7 +148,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         string sql = await parser.ToDynamicLinqAsync("test", context);
         _logger.LogInformation(sql);
         string sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
-        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync(TestCancellationToken);
         Assert.Empty(results);
     }
 
@@ -355,7 +354,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         string sqlActual = db.Employees.Where(parser.ParsingConfig, sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
-        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync();
+        var results = await db.Employees.Where(parser.ParsingConfig, sql).ToListAsync(TestCancellationToken);
         Assert.Equal(2, results.Count);
     }
 
@@ -378,7 +377,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.Equal(sqlExpected, sqlActual);
 
         var query = db.Companies.AsQueryable();
-        var companies = await query.Where(sql).ToListAsync();
+        var companies = await query.Where(sql).ToListAsync(TestCancellationToken);
 
         Assert.Single(companies);
     }
@@ -402,7 +401,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.Equal(sqlExpected, sqlActual);
 
         var query = db.Companies.AsQueryable();
-        var companies = await query.Where(sql).ToListAsync();
+        var companies = await query.Where(sql).ToListAsync(TestCancellationToken);
 
         Assert.Single(companies);
     }
@@ -449,7 +448,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         await Assert.ThrowsAsync<ValidationException>(() => parser.ToDynamicLinqAsync("companies.description:acme", context));
 
         var employees = await db.Employees.Where(e => e.Title == "software developer" && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30))
-            .ToListAsync();
+            .ToListAsync(TestCancellationToken);
 
         Assert.Single(employees);
         var employee = employees.Single();

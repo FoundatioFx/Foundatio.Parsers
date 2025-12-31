@@ -7,7 +7,6 @@ using Foundatio.Xunit;
 using Microsoft.Extensions.Logging;
 using Nest;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
@@ -46,17 +45,17 @@ public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLife
     /// <summary>
     /// per test setup
     /// </summary>
-    public virtual Task InitializeAsync()
+    public virtual ValueTask InitializeAsync()
     {
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     /// <summary>
     /// per test tear down
     /// </summary>
-    public virtual Task DisposeAsync()
+    public virtual ValueTask DisposeAsync()
     {
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }
 
@@ -141,14 +140,14 @@ public class ElasticsearchFixture : IAsyncLifetime
             client.Indices.Delete(Indices.Index(_createdIndexes));
     }
 
-    public virtual Task InitializeAsync()
+    public virtual ValueTask InitializeAsync()
     {
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public virtual Task DisposeAsync()
+    public virtual ValueTask DisposeAsync()
     {
         CleanupTestIndexes(Client);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }

@@ -10,7 +10,6 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
 using Nest;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
@@ -28,8 +27,8 @@ public class AggregationParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value3", Field4 = 3, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3)) },
             new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
             new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4");
@@ -59,8 +58,8 @@ public class AggregationParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value3", Field4 = 3, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3)) },
             new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
             new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var fieldMap = new FieldMap { { "heynow", "field4" } };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap).UseGeo(_ => "51.5032520,-0.1278990"));
@@ -95,8 +94,8 @@ public class AggregationParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value3", Field4 = 3, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3)) },
             new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
             new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var fieldMap = new FieldMap { { "heynow2", "field1" } };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap));
@@ -127,8 +126,8 @@ public class AggregationParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value3", Field4 = 3, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3)) },
             new MyType { Field1 = "value4", Field4 = 4, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(2)) },
             new MyType { Field1 = "value5", Field4 = 5, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1)) }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4~50,100 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
@@ -169,8 +168,8 @@ public class AggregationParserTests : ElasticsearchTestBase
                     .Text(f3 => f3.Name("identity")
                         .Fields(f => f.Keyword(k => k.Name("keyword").IgnoreAbove(256))))))))));
 
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" } };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(aliasMap));
@@ -199,8 +198,8 @@ public class AggregationParserTests : ElasticsearchTestBase
 
         await Client.IndexManyAsync([
             new MyType { Field2 = "field2" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var aliasMap = new FieldMap { { "alias2", "field2" } };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(aliasMap));
@@ -233,8 +232,8 @@ public class AggregationParserTests : ElasticsearchTestBase
 
         await Client.IndexManyAsync([
             new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990", Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)), Field2 = "field2" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" }, { "alias2", "field2" }, { "alias3", "field3" }, { "alias4", "field4" }, { "alias5", "field5" } };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
@@ -270,8 +269,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessTermAggregations()
     {
         string index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)");
@@ -299,8 +298,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessTermAggregationsWithRegex()
     {
         string index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 @exclude:/A.*/ @include:/B.*/)");
@@ -326,8 +325,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessHistogramIntervalAggregations()
     {
         string index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("histogram:(field1~0.1)");
@@ -353,8 +352,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessTermTopHitsAggregations()
     {
         string index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1~1000^2 tophits:(_~1000 @include:myinclude))");
@@ -381,8 +380,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessSortedTermAggregations()
     {
         string index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 -cardinality:field4)");
@@ -411,8 +410,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessDateHistogramAggregations()
     {
         string index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync([new MyType { Field5 = DateTime.UtcNow }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field5 = DateTime.UtcNow }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("date:(field5^1h @missing:\"0001-01-01T00:00:00\" min:field5^1h max:field5^1h)");
@@ -445,8 +444,8 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task CanSpecifyDefaultValuesAggregations()
     {
         string index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "test" }, new MyType { Field4 = 1 }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "test" }, new MyType { Field4 = 1 }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("min:field4~0 max:field4~0 avg:field4~0 sum:field4~0 cardinality:field4~0");

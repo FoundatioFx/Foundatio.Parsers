@@ -8,7 +8,6 @@ using Foundatio.Xunit;
 using Microsoft.Extensions.Logging;
 using Pegasus.Common;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
