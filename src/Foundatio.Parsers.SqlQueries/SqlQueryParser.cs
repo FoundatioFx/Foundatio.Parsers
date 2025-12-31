@@ -238,4 +238,4 @@ public static class FTS
     }
 }
 
-public class DynamicLinqTypeProvider() : DefaultDynamicLinqCustomTypeProvider(ParsingConfig.Default, [ typeof(EF), typeof(FTS) ]);
+public class DynamicLinqTypeProvider() : DefaultDynamicLinqCustomTypeProvider(ParsingConfig.Default, [typeof(EF), typeof(FTS)]);
