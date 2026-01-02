@@ -29,7 +29,8 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             if (aggregation == null)
                 continue;
 
-            if (container.Value.IsBucketAggregation())
+            // Add to root container (Value is null) or to bucket aggregations
+            if (container.Value == null || container.Value.IsBucketAggregation())
             {
                 container.Aggregations.Add(aggregation);
             }

@@ -13,6 +13,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors
         ICollection<ElasticRuntimeField> RuntimeFields { get; }
         bool? EnableRuntimeFieldResolver { get; set; }
         RuntimeFieldResolver RuntimeFieldResolver { get; set; }
+        Func<string, Task<string>> GeoLocationResolver { get; set; }
     }
 }
 

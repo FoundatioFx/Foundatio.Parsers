@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -18,6 +19,7 @@ public class ElasticMappingResolver
     private readonly TypeMapping _codeMapping;
     private readonly Inferrer _inferrer;
     private readonly ConcurrentDictionary<string, FieldMapping> _mappingCache = new();
+    private readonly ConditionalWeakTable<IProperty, ConcurrentDictionary<string, object>> _propertyMetadata = new();
     private readonly ILogger _logger;
 
     public static ElasticMappingResolver NullInstance = new(() => null);
@@ -85,15 +87,28 @@ public class ElasticMappingResolver
         {
             string fieldPart = fieldParts[depth];
             IProperty fieldMapping = null;
+            PropertyName foundPropertyName = null;
             if (currentProperties == null || !currentProperties.TryGetProperty(fieldPart, out fieldMapping))
             {
-                // check to see if there is a name match
+                // check to see if there is a name match by iterating through the dictionary keys
                 if (currentProperties != null)
-                    fieldMapping = ((IDictionary<PropertyName, IProperty>)currentProperties).Values.FirstOrDefault(m =>
+                {
+                    foreach (var kvp in (IDictionary<PropertyName, IProperty>)currentProperties)
                     {
-                        string propertyName = _inferrer.PropertyName(m?.TryGetName());
-                        return propertyName != null && propertyName.Equals(fieldPart, StringComparison.OrdinalIgnoreCase);
-                    });
+                        string propertyName = null;
+                        if (_inferrer != null && kvp.Key?.Name != null)
+                            propertyName = _inferrer.PropertyName(kvp.Key);
+                        else if (kvp.Key?.Name != null)
+                            propertyName = kvp.Key.Name;
+
+                        if (propertyName != null && propertyName.Equals(fieldPart, StringComparison.OrdinalIgnoreCase))
+                        {
+                            fieldMapping = kvp.Value;
+                            foundPropertyName = kvp.Key;
+                            break;
+                        }
+                    }
+                }
 
                 // no mapping found, call GetServerMapping again in case it hasn't been called recently and there are possibly new mappings
                 if (fieldMapping == null && GetServerMapping())
@@ -122,17 +137,32 @@ public class ElasticMappingResolver
                     break;
                 }
             }
+            else
+            {
+                // TryGetProperty succeeded, store the PropertyName used
+                foreach (var kvp in (IDictionary<PropertyName, IProperty>)currentProperties)
+                {
+                    if (kvp.Value == fieldMapping)
+                    {
+                        foundPropertyName = kvp.Key;
+                        break;
+                    }
+                }
+            }
 
-            // coded properties sometimes have null Name properties
-            string name = fieldMapping.TryGetName();
-            // TODO: ?
-            // if (name == null && fieldMapping is IPropertyWithClrOrigin clrOrigin && clrOrigin.ClrOrigin != null)
-            //     name = new PropertyName(clrOrigin.ClrOrigin);
+            // Determine the property name - use foundPropertyName if available, otherwise fall back to fieldPart
+            string resolvedName;
+            if (foundPropertyName != null && _inferrer != null && foundPropertyName.Name != null)
+                resolvedName = _inferrer.PropertyName(foundPropertyName);
+            else if (foundPropertyName != null && foundPropertyName.Name != null)
+                resolvedName = foundPropertyName.Name;
+            else
+                resolvedName = fieldPart;
 
             if (depth == 0)
-                resolvedFieldName += _inferrer.PropertyName(name);
+                resolvedFieldName += resolvedName;
             else
-                resolvedFieldName += "." + _inferrer.PropertyName(name);
+                resolvedFieldName += "." + resolvedName;
 
             if (depth == fieldParts.Length - 1)
             {
@@ -149,6 +179,10 @@ public class ElasticMappingResolver
             if (fieldMapping is ObjectProperty objectProperty)
             {
                 currentProperties = objectProperty.Properties;
+            }
+            else if (fieldMapping is NestedProperty nestedProperty)
+            {
+                currentProperties = nestedProperty.Properties;
             }
             else
             {
@@ -415,12 +449,13 @@ public class ElasticMappingResolver
                     if (kvp.Value is not FieldAliasProperty aliasProperty)
                         continue;
 
-                    mergedCodeProperties[kvp.Key] = new FieldAliasProperty
+                    var newAliasProperty = new FieldAliasProperty
                     {
-                        //LocalMetadata = aliasProperty.LocalMetadata,
                         Path = _inferrer?.Field(aliasProperty.Path) ?? aliasProperty.Path,
                         // Name = aliasProperty.Name
                     };
+                    CopyPropertyMetadata(aliasProperty, newAliasProperty);
+                    mergedCodeProperties[kvp.Key] = newAliasProperty;
                 }
             }
         }
@@ -433,11 +468,12 @@ public class ElasticMappingResolver
         foreach (var serverProperty in serverProperties)
         {
             var merged = serverProperty.Value;
-            // if (mergedCodeProperties.TryGetProperty(serverProperty.Key, out var codeProperty))
-            //     merged.LocalMetadata = codeProperty.LocalMetadata;
 
             if (mergedCodeProperties.TryGetProperty(serverProperty.Key, out var codeProperty))
             {
+                // Copy local metadata from code property to merged property
+                CopyPropertyMetadata(codeProperty, merged);
+
                 switch (merged)
                 {
                     case ObjectProperty objectProperty:
@@ -491,7 +527,7 @@ public class ElasticMappingResolver
         }
     }
 
-    public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, TypeMapping> mappingBuilder, ElasticsearchClient client, ILogger logger = null) where T : class
+    public static ElasticMappingResolver Create<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, ILogger logger = null) where T : class
     {
         logger ??= NullLogger.Instance;
 
@@ -506,7 +542,7 @@ public class ElasticMappingResolver
         }, logger);
     }
 
-    public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, TypeMapping> mappingBuilder, ElasticsearchClient client, string index, ILogger logger = null) where T : class
+    public static ElasticMappingResolver Create<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, string index, ILogger logger = null) where T : class
     {
         logger ??= NullLogger.Instance;
 
@@ -521,10 +557,11 @@ public class ElasticMappingResolver
         }, logger);
     }
 
-    public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, TypeMapping> mappingBuilder, Inferrer inferrer, Func<TypeMapping> getMapping, ILogger logger = null) where T : class
+    public static ElasticMappingResolver Create<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<TypeMapping> getMapping, ILogger logger = null) where T : class
     {
-        var codeMapping = mappingBuilder(new TypeMappingDescriptor<T>());
-        return new ElasticMappingResolver(codeMapping, inferrer, getMapping, logger: logger);
+        var descriptor = new TypeMappingDescriptor<T>();
+        mappingBuilder(descriptor);
+        return new ElasticMappingResolver(descriptor, inferrer, getMapping, logger: logger);
     }
 
 public static ElasticMappingResolver Create<T>(ElasticsearchClient client, ILogger logger = null)
@@ -562,6 +599,59 @@ public static ElasticMappingResolver Create<T>(ElasticsearchClient client, ILogg
     {
         return new ElasticMappingResolver(getMapping, inferrer, logger: logger);
     }
+
+    #region Property Metadata
+
+    public IDictionary<string, object> GetPropertyMetadata(IProperty property)
+    {
+        if (property == null)
+            return null;
+
+        return _propertyMetadata.GetOrCreateValue(property);
+    }
+
+    public T GetPropertyMetadataValue<T>(IProperty property, string key, T defaultValue = default)
+    {
+        var metadata = GetPropertyMetadata(property);
+        if (metadata == null || !metadata.TryGetValue(key, out var value))
+            return defaultValue;
+
+        if (value is T typedValue)
+            return typedValue;
+
+        try
+        {
+            return (T)Convert.ChangeType(value, typeof(T));
+        }
+        catch
+        {
+            return defaultValue;
+        }
+    }
+
+    public void SetPropertyMetadataValue(IProperty property, string key, object value)
+    {
+        if (property == null)
+            return;
+
+        var metadata = _propertyMetadata.GetOrCreateValue(property);
+        metadata[key] = value;
+    }
+
+    public void CopyPropertyMetadata(IProperty source, IProperty target)
+    {
+        if (source == null || target == null)
+            return;
+
+        if (!_propertyMetadata.TryGetValue(source, out var sourceMetadata))
+            return;
+
+        var targetMetadata = _propertyMetadata.GetOrCreateValue(target);
+        foreach (var kvp in sourceMetadata)
+            targetMetadata[kvp.Key] = kvp.Value;
+    }
+
+    #endregion
 }
 
 public class FieldMapping

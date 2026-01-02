@@ -44,12 +44,14 @@ public static class DefaultQueryNodeExtensions
 
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
-                query = new QueryStringQuery(node.UnescapedTerm)
+                var queryString = new QueryStringQuery(node.UnescapedTerm)
                 {
-                    Fields = fields,
                     AllowLeadingWildcard = false,
                     AnalyzeWildcard = true
                 };
+                if (fields != null && fields.Length > 0)
+                    queryString.Fields = fields;
+                query = queryString;
             }
             else
             {
@@ -66,11 +68,13 @@ public static class DefaultQueryNodeExtensions
                 }
                 else
                 {
-                    query = new MultiMatchQuery(node.UnescapedTerm)
+                    var multiMatch = new MultiMatchQuery(node.UnescapedTerm)
                     {
-                        Fields = fields,
                         Type = node.IsQuotedTerm ? TextQueryType.Phrase : null
                     };
+                    if (fields != null && fields.Length > 0)
+                        multiMatch.Fields = fields;
+                    query = multiMatch;
                 }
             }
         }

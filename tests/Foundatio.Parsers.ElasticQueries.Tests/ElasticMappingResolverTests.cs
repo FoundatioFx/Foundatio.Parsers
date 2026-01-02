@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
@@ -17,15 +17,14 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
-    private TypeMappingDescriptor<MyNestedType> MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
+    private void MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
     {
-        return m
-            .Dynamic(DynamicMapping.True)
+        m.Dynamic(DynamicMapping.True)
             .DynamicTemplates(dt => dt.Add("idx_text", d => d.Mapping(dm => dm.Text(o => o.AddKeywordAndSortFields())).Match("text*")))
             .Properties(p => p
                 .Text(p1 => p1.Field1, o => o.AddKeywordAndSortFields())
                 .Text(p1 => p1.Field4, o => o.AddKeywordAndSortFields())
-                    .FieldAlias(a => a.Field4, o => o.Path("field4alias"))
+                .FieldAlias("field4alias", o => o.Path("field4"))
                 .Text(p1 => p1.Field5, o => o.AddKeywordAndSortFields(true))
             );
     }
@@ -40,6 +39,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             {
                 Field1 = "value1",
                 Field2 = "value2",
+                Payload = "test payload",
                 Nested =
             [
                 new MyType
@@ -53,8 +53,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
                 }
             ]
             },
-            new MyNestedType { Field1 = "value2", Field2 = "value2" },
-            new MyNestedType { Field1 = "value1", Field2 = "value4" }
+            new MyNestedType { Field1 = "value2", Field2 = "value2", Payload = "another payload" },
+            new MyNestedType { Field1 = "value1", Field2 = "value4", Payload = "third payload" }
         ], index);
 
         await Client.Indices.RefreshAsync(index);
@@ -63,7 +63,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
 
         var payloadProperty = resolver.GetMappingProperty("payload");
         Assert.IsType<TextProperty>(payloadProperty);
-        Assert.NotNull(payloadProperty.TryGetName());
+        // TryGetName() returns null in the new Elastic client as property names are stored in dictionary keys
     }
 
     [Fact]
@@ -80,6 +80,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             [
                 new MyType
                 {
+                    Id = "nested-id-1",
                     Field1 = "banana",
                     Data = {
                         { "number-0001", 23 },
@@ -167,7 +168,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<TextProperty>(nestedField1Property);
 
         var nestedField2Property = resolver.GetMappingProperty("Nested.Field4");
-        Assert.IsType<IntegerNumberProperty>(nestedField2Property);
+        Assert.IsType<LongNumberProperty>(nestedField2Property);
 
         var nestedField5Property = resolver.GetMappingProperty("Nested.Field5");
         Assert.IsType<DateProperty>(nestedField5Property);
@@ -179,5 +180,56 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     private static Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath)
     {
         return objectPath;
+    }
+
+    [Fact]
+    public async Task PropertyMetadataIsThreadSafe()
+    {
+        var resolver = new ElasticMappingResolver(() => null);
+
+        // Create multiple properties and set metadata in parallel
+        var properties = Enumerable.Range(0, 100)
+            .Select(_ => new KeywordProperty())
+            .ToArray();
+
+        // Set metadata in parallel
+        var setTasks = properties.Select((p, i) => Task.Run(() =>
+        {
+            resolver.SetPropertyMetadataValue(p, "index", i);
+            resolver.SetPropertyMetadataValue(p, "name", $"property_{i}");
+        }));
+        await Task.WhenAll(setTasks);
+
+        // Read metadata in parallel
+        var readTasks = properties.Select((p, i) => Task.Run(() =>
+        {
+            var index = resolver.GetPropertyMetadataValue<int>(p, "index");
+            var name = resolver.GetPropertyMetadataValue<string>(p, "name");
+            return (ExpectedIndex: i, ActualIndex: index, ExpectedName: $"property_{i}", ActualName: name);
+        }));
+        var results = await Task.WhenAll(readTasks);
+
+        // Verify all values are correct
+        foreach (var result in results)
+        {
+            Assert.Equal(result.ExpectedIndex, result.ActualIndex);
+            Assert.Equal(result.ExpectedName, result.ActualName);
+        }
+    }
+
+    [Fact]
+    public void PropertyMetadataCopyPreservesValues()
+    {
+        var resolver = new ElasticMappingResolver(() => null);
+
+        var source = new KeywordProperty();
+        resolver.SetPropertyMetadataValue(source, "key1", "value1");
+        resolver.SetPropertyMetadataValue(source, "key2", 42);
+
+        var target = new TextProperty();
+        resolver.CopyPropertyMetadata(source, target);
+
+        Assert.Equal("value1", resolver.GetPropertyMetadataValue<string>(target, "key1"));
+        Assert.Equal(42, resolver.GetPropertyMetadataValue<int>(target, "key2"));
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch.QueryDsl;
@@ -11,7 +12,6 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
 public class CombineQueriesVisitor : ChainableQueryVisitor
 {
-
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         await base.VisitAsync(node, context).ConfigureAwait(false);
@@ -26,8 +26,12 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         Query query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
         Query container = query;
-        if (query.TryGet<NestedQuery>(out var nested) && node.Parent != null)
+        var nested = query?.Nested;
+        if (nested != null && node.Parent != null)
             container = null;
+
+        bool hasOrClauses = false;
+        var filterQueries = new List<Query>(); // Collect AND queries for filter mode
 
         foreach (var child in node.Children.OfType<IFieldQueryNode>())
         {
@@ -43,11 +47,54 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
             if (op == GroupOperator.And)
             {
-                container &= childQuery;
+                if (elasticContext.UseScoring)
+                {
+                    container &= childQuery;
+                }
+                else
+                {
+                    // For filter mode, collect queries to build filter array directly
+                    filterQueries.Add(childQuery);
+                }
             }
             else if (op == GroupOperator.Or)
             {
                 container |= childQuery;
+                hasOrClauses = true;
+            }
+        }
+
+        // For filter mode with AND queries, build a BoolQuery with filter array directly
+        // Only wrap in BoolQuery if we have more than one filter query
+        if (!elasticContext.UseScoring && filterQueries.Count > 1)
+        {
+            container = new BoolQuery
+            {
+                Filter = filterQueries
+            };
+        }
+        else if (!elasticContext.UseScoring && filterQueries.Count == 1)
+        {
+            container = filterQueries[0];
+        }
+
+        // If we have OR clauses and the container is a BoolQuery with only should clauses, set minimum_should_match = 1
+        // Set MinimumShouldMatch on root queries OR parens groups within an AND context.
+        // Don't set it on parens groups within an OR context - this allows proper flattening of nested OR groups.
+        bool isRootQuery = node.Parent == null;
+        bool parentUsesAndOperator = node.Parent is GroupNode parentGroup && parentGroup.GetOperator(elasticContext) == GroupOperator.And;
+        bool shouldSetMinimumShouldMatch = isRootQuery || (node.HasParens && parentUsesAndOperator);
+
+        if (hasOrClauses && container?.Bool != null && shouldSetMinimumShouldMatch)
+        {
+            var boolQuery = container.Bool;
+            bool hasOnlyShouldClauses = (boolQuery.Should?.Count > 0)
+                && (boolQuery.Must == null || boolQuery.Must.Count == 0)
+                && (boolQuery.Filter == null || boolQuery.Filter.Count == 0);
+
+            if (hasOnlyShouldClauses && boolQuery.MinimumShouldMatch == null)
+            {
+                boolQuery.MinimumShouldMatch = 1;
             }
         }
 

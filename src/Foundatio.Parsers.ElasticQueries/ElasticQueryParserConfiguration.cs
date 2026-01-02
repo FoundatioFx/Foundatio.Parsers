@@ -33,6 +33,7 @@ public class ElasticQueryParserConfiguration
     public bool? EnableRuntimeFieldResolver { get; private set; }
     public ElasticMappingResolver MappingResolver { get; private set; }
     public QueryValidationOptions ValidationOptions { get; private set; }
+    public Func<string, Task<string>> GeoLocationResolver { get; private set; }
     public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
     public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
     public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
@@ -74,6 +75,7 @@ public class ElasticQueryParserConfiguration
 
     public ElasticQueryParserConfiguration UseGeo(Func<string, Task<string>> resolveGeoLocation, int priority = 200)
     {
+        GeoLocationResolver = resolveGeoLocation;
         return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
     }
 
@@ -286,14 +288,14 @@ public class ElasticQueryParserConfiguration
 
     #endregion
 
-    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMapping> mappingBuilder, ElasticsearchClient client, string index) where T : class
+    public ElasticQueryParserConfiguration UseMappings<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, string index) where T : class
     {
         MappingResolver = ElasticMappingResolver.Create<T>(mappingBuilder, client, index, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMapping> mappingBuilder, Inferrer inferrer, Func<TypeMapping> getMapping) where T : class
+    public ElasticQueryParserConfiguration UseMappings<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<TypeMapping> getMapping) where T : class
     {
         MappingResolver = ElasticMappingResolver.Create<T>(mappingBuilder, inferrer, getMapping, logger: _logger);
 

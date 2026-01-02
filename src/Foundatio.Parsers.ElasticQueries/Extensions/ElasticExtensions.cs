@@ -17,17 +17,30 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class ElasticExtensions
 {
-    public static bool TryGet<T>(this Query query, out T result)
+    /// <summary>
+    /// Parses a Lucene query string and applies it as the query for the search request.
+    /// </summary>
+    /// <typeparam name="TDocument">The document type.</typeparam>
+    /// <param name="descriptor">The search request descriptor.</param>
+    /// <param name="query">The Lucene query string to parse.</param>
+    /// <param name="configure">Optional configuration for the ElasticQueryParser.</param>
+    /// <returns>The search request descriptor with the parsed query applied.</returns>
+    public static SearchRequestDescriptor<TDocument> QueryLuceneSyntax<TDocument>(
+        this SearchRequestDescriptor<TDocument> descriptor,
+        string query,
+        Action<ElasticQueryParserConfiguration> configure = null)
     {
-        // TODO: until: https://github.com/elastic/elasticsearch-net/issues/8496
-        result = default;
-        return false;
+        var parser = new ElasticQueryParser(configure);
+        var elasticQuery = parser.BuildQueryAsync(query).GetAwaiter().GetResult();
+        return descriptor.Query(elasticQuery);
     }
 
-    public static string TryGetName(this IProperty property)
+    public static SearchRequestDescriptor<TDocument> Aggregations<TDocument>(this SearchRequestDescriptor<TDocument> descriptor, AggregationMap aggregations)
     {
-        // TODO: until: https://github.com/elastic/elasticsearch-net/issues/8336
-        return null;
+        if (aggregations == null)
+            return descriptor;
+
+        return descriptor.Aggregations(aggregations.ToDictionary());
     }
 
     public static bool IsBucketAggregation(this object aggregation)
@@ -131,7 +144,7 @@ public static class ElasticExtensions
         if (!String.IsNullOrEmpty(message))
             sb.AppendLine(message);
 
-        if (includeDebugInformation && elasticResponse?.DebugInformation != null)
+        if (includeDebugInformation && elasticResponse.DebugInformation != null)
             sb.AppendLine(elasticResponse.DebugInformation);
 
         if (elasticResponse.TryGetOriginalException(out var exception) && exception is not null)
@@ -157,7 +170,7 @@ public static class ElasticExtensions
 
         if (includeResponse && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
         {
-            string body = Encoding.UTF8.GetString(apiCall?.ResponseBodyInBytes);
+            string body = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes);
             if (normalize)
                 body = JsonUtility.Normalize(body);
 
@@ -183,8 +196,8 @@ public static class ElasticExtensions
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var pingResponse = await client.PingAsync(cancellationToken);
-            if (pingResponse.IsValidResponse)
+            var healthResponse = await client.Cluster.HealthAsync(cancellationToken);
+            if (healthResponse.IsValidResponse)
                 return true;
 
             if (logger != null)
@@ -206,8 +219,8 @@ public static class ElasticExtensions
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var pingResponse = client.Ping();
-            if (pingResponse.IsValidResponse)
+            var healthResponse = client.Cluster.Health();
+            if (healthResponse.IsValidResponse)
                 return true;
 
             if (logger != null)

@@ -18,7 +18,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
 {
     public CustomVisitorTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture)
     {
-        Log.DefaultMinimumLevel = LogLevel.Trace;
+        Log.DefaultLogLevel = LogLevel.Trace;
     }
 
     [Fact]
@@ -139,12 +139,13 @@ public class CustomVisitorTests : ElasticsearchTestBase
                 .Bool(b => b
                     .Filter(filter => filter
                         .Bool(b1 => b1
+                            .MinimumShouldMatch(1)
                             .Should(
                                 s1 => s1.Terms(m => m.Field("id").Terms(new TermsQueryField(["1"]))),
                                 s2 => s2.Bool(b2 => b2
-                                    .Must(
-                                        m2 => m2.Terms(t1 => t1.Field("id").Terms(new TermsQueryField(["2"]))),
-                                        m2 => m2.Term(t1 => t1.Field("field1").Value("Test"))
+                                    .Filter(
+                                        m2 => m2.Term(t1 => t1.Field("field1").Value("Test")),
+                                        m2 => m2.Terms(t1 => t1.Field("id").Terms(new TermsQueryField(["2"])))
                                     )
                                 )
                             )
@@ -174,9 +175,9 @@ public sealed class CustomFilterVisitor : ChainableQueryVisitor
             string term = ToTerm(node);
             var ids = await GetIdsAsync(term);
             if (ids is { Count: > 0 })
-                node.Parent.SetQuery(new TermsQuery { Field = "id", Terms = new TermsQueryField(ids.Select(FieldValue.String).ToArray()) });
+                node.SetQuery(new TermsQuery { Field = "id", Terms = new TermsQueryField(ids.Select(FieldValue.String).ToArray()) });
             else
-                node.Parent.SetQuery(new TermQuery { Field = "id", Value = "none" });
+                node.SetQuery(new TermQuery { Field = "id", Value = "none" });
 
             node.Left = null;
             node.Right = null;

@@ -18,12 +18,11 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<ICollection<S
             return;
 
         var sort = node.GetSort(() => node.GetDefaultSort(context));
-        // TODO: SortKey https://github.com/elastic/elasticsearch-net/issues/8335
-        // if (sort.SortKey == null)
-            // return;
+        if (sort == null)
+            return;
 
-        object additionalPropertyName = sort.GetType().GetProperty("AdditionalPropertyName", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(sort);
-        if (additionalPropertyName is null)
+        // Check if the sort has a valid Field property set (discriminated union)
+        if (sort.Field == null && sort.GeoDistance == null && sort.Score == null && sort.Script == null)
             return;
 
         _fields.Add(sort);

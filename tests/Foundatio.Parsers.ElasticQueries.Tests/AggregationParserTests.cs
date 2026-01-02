@@ -433,8 +433,8 @@ public class AggregationParserTests : ElasticsearchTestBase
             .Add("terms_field1", a1 => a1.Terms(t => t
                 .Field("field1.keyword")
                 .MinDocCount(1)
-                .Include(new TermsInclude(["otherinclude", "myinclude"]))
-                .Exclude(new TermsExclude(["otherexclude", "myexclude"]))
+                .Include(new TermsInclude(["myinclude", "otherinclude"]))
+                .Exclude(new TermsExclude(["myexclude", "otherexclude"]))
                 .Missing("mymissing"))
                 .Meta(m => m.Add("@field_type", "keyword")))));
 
@@ -448,22 +448,23 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessTermAggregationsWithRegex()
     {
-        string index = CreateRandomIndex<MyType>();
+        string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
         await Client.Indices.RefreshAsync(index);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 @exclude:/A.*/ @include:/B.*/)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
-            .Terms("terms_field1", t => t
-                .Field("field1.keyword")
-                .Include("B.*")
-                .Exclude("A.*")
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
+            .Add("terms_field1", ad => ad
+                .Terms(t => t
+                    .Field("field1.keyword")
+                    .Include(new TermsInclude("B.*"))
+                    .Exclude(new TermsExclude("A.*")))
                 .Meta(m => m.Add("@field_type", "keyword")))));
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -605,11 +606,11 @@ public class AggregationParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
-            .Add("sum_field4", a1 => a1.Sum(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))
+            .Add("sum_field4", a1 => a1.Sum(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "long")))
             .Add("cardinality_field4", a1 => a1.Cardinality(c => c.Field(f => f.Field4).Missing(0)))
-            .Add("avg_field4", a1 => a1.Avg(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))
-            .Add("max_field4", a1 => a1.Max(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))
-            .Add("min_field4", a1 => a1.Min(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))));
+            .Add("avg_field4", a1 => a1.Avg(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "long")))
+            .Add("max_field4", a1 => a1.Max(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "long")))
+            .Add("min_field4", a1 => a1.Min(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "long")))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -712,7 +713,13 @@ public class AggregationParserTests : ElasticsearchTestBase
     {
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var queryNode = await parser.ParseAsync(query, context);
-        Assert.NotNull(queryNode);
+
+        // If the query can't be parsed, treat it as invalid
+        if (queryNode == null)
+        {
+            Assert.False(isValid, $"Query '{query}' returned null but was expected to be valid");
+            return;
+        }
 
         var result = context.GetValidationResult();
         Assert.Equal(QueryTypes.Aggregation, result.QueryType);

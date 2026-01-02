@@ -100,6 +100,12 @@ public class ElasticQueryParser : LuceneQueryParser
         if (Configuration.ValidationOptions != null && !context.HasValidationOptions())
             context.SetValidationOptions(Configuration.ValidationOptions);
 
+        if (context is IElasticQueryVisitorContext elasticVisitorContext)
+        {
+            if (Configuration.GeoLocationResolver != null && elasticVisitorContext.GeoLocationResolver == null)
+                elasticVisitorContext.GeoLocationResolver = Configuration.GeoLocationResolver;
+        }
+
         if (context.QueryType == QueryTypes.Query)
         {
             context.SetDefaultFields(Configuration.DefaultFields);
@@ -177,10 +183,22 @@ public class ElasticQueryParser : LuceneQueryParser
         var q = await query.GetQueryAsync() ?? new MatchAllQuery();
         if (context?.UseScoring == false)
         {
-            q = new BoolQuery
+            // If the query is already a filter-only BoolQuery, don't wrap it again
+            // CombineQueriesVisitor now builds filter queries directly for filter mode
+            var boolQuery = q.Bool;
+            bool isFilterOnlyBoolQuery = boolQuery != null
+                && boolQuery.Filter?.Count > 0
+                && (boolQuery.Must == null || boolQuery.Must.Count == 0)
+                && (boolQuery.Should == null || boolQuery.Should.Count == 0)
+                && (boolQuery.MustNot == null || boolQuery.MustNot.Count == 0);
+
+            if (!isFilterOnlyBoolQuery)
             {
-                Filter = [q]
-            };
+                q = new BoolQuery
+                {
+                    Filter = [q]
+                };
+            }
         }
 
         return q;

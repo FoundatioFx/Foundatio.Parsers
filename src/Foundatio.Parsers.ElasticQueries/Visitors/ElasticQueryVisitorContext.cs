@@ -13,4 +13,5 @@ public class ElasticQueryVisitorContext : QueryVisitorContext, IElasticQueryVisi
     public ICollection<ElasticRuntimeField> RuntimeFields { get; } = new List<ElasticRuntimeField>();
     public bool? EnableRuntimeFieldResolver { get; set; }
     public RuntimeFieldResolver RuntimeFieldResolver { get; set; }
+    public Func<string, Task<string>> GeoLocationResolver { get; set; }
 }

@@ -29,17 +29,17 @@ public static class DefaultAggregationNodeExtensions
         if (aggregation is null)
             return null;
 
-        if (aggregation is TermsAggregation termsAggregation)
+        if (aggregation.Value is TermsAggregation termsAggregation)
         {
             PopulateTermsAggregation(termsAggregation, node);
         }
 
-        if (aggregation is TopHitsAggregation topHitsAggregation)
+        if (aggregation.Value is TopHitsAggregation topHitsAggregation)
         {
             PopulateTopHitsAggregation(topHitsAggregation, node);
         }
 
-        if (aggregation is DateHistogramAggregation histogramAggregation)
+        if (aggregation.Value is DateHistogramAggregation histogramAggregation)
         {
             PopulateDateHistogramAggregation(histogramAggregation, node);
         }
@@ -69,7 +69,7 @@ public static class DefaultAggregationNodeExtensions
 
             case AggregationType.GeoHashGrid:
                 var precision = new GeohashPrecision(1);
-                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int64.TryParse(node.UnescapedProximity, out long parsedPrecision))
+                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out int parsedPrecision))
                 {
                     if (parsedPrecision is < 1 or > 12)
                         throw new ArgumentOutOfRangeException(nameof(node.UnescapedProximity), "Precision must be between 1 and 12");
@@ -118,6 +118,17 @@ public static class DefaultAggregationNodeExtensions
         var property = elasticContext.MappingResolver.GetMappingProperty(node.UnescapedField, true);
         string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync());
         string originalField = node.GetOriginalField().Unescape();
+
+        // Validate that field name is not empty for aggregations that require it
+        if (String.IsNullOrEmpty(aggField))
+        {
+            var operationType = node.GetOperationType();
+            if (operationType != AggregationType.TopHits)
+            {
+                context.AddValidationError($"Field is required for {operationType} aggregation.");
+                return null;
+            }
+        }
 
         switch (node.GetOperationType())
         {
@@ -182,7 +193,7 @@ public static class DefaultAggregationNodeExtensions
 
             case AggregationType.GeoHashGrid:
                 var precision = new GeohashPrecision(1);
-                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int64.TryParse(node.UnescapedProximity, out long parsedPrecision))
+                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out int parsedPrecision))
                 {
                     if (parsedPrecision is < 1 or > 12)
                         throw new ArgumentOutOfRangeException(nameof(node.UnescapedProximity), "Precision must be between 1 and 12");
@@ -260,7 +271,7 @@ public static class DefaultAggregationNodeExtensions
         var start = context.GetDate("StartDate");
         var end = context.GetDate("EndDate");
         bool isValidRange = start.HasValue && start.Value > DateTime.MinValue && end.HasValue && end.Value < DateTime.MaxValue && start.Value <= end.Value;
-        var bounds = isValidRange ? new ExtendedBounds<DateTime> { Min = start.Value, Max = end.Value } : null;
+        var bounds = isValidRange ? new ExtendedBounds<FieldDateMath> { Min = start.Value, Max = end.Value } : null;
 
         var interval = GetInterval(proximity, start, end);
         string timezone = TryConvertTimeUnitToUtcOffset(boost);
@@ -270,8 +281,7 @@ public static class DefaultAggregationNodeExtensions
             MinDocCount = 0,
             Format = "date_optional_time",
             TimeZone = timezone,
-            //ExtendedBounds = bounds
-            // TODO: https://github.com/elastic/elasticsearch-net/issues/8496
+            ExtendedBounds = bounds
         };
 
         interval.Match(d => agg.CalendarInterval = d, f => agg.FixedInterval = f);
