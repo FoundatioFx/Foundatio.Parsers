@@ -144,8 +144,8 @@ var parser = new ElasticQueryParser(c => c
         { "user_field", "actual.field.path" }
     }));
 
-// Option 3: Refresh mappings
-await parser.Configuration.MappingResolver.RefreshMapping();
+// Option 3: Refresh mappings (if recently added field, wait for auto-refresh or force it)
+parser.Configuration.MappingResolver.RefreshMapping();
 ```
 
 ## Elasticsearch Issues
@@ -362,11 +362,11 @@ public MyService()
 **Solution:**
 
 ```csharp
-// Mappings are cached by default
-// For manual refresh:
-await parser.Configuration.MappingResolver.RefreshMapping();
+// Mappings are cached by default (auto-refresh at most once per minute)
+// Manual refresh is typically only needed in unit tests:
+parser.Configuration.MappingResolver.RefreshMapping();
 
-// Or create resolver once and share
+// For production, create resolver once and share
 var resolver = ElasticMappingResolver.Create(client, "my-index");
 var parser1 = new ElasticQueryParser(c => c.UseMappings(resolver));
 var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));

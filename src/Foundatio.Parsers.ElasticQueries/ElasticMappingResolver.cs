@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using Exceptionless.DateTimeExtensions;
@@ -33,8 +33,13 @@ public class ElasticMappingResolver
     }
 
     /// <summary>
-    /// Allows you to refresh server side mapping. This should be used only in unit tests.
+    /// Clears the cached mapping, forcing a fresh fetch from the server on the next access.
     /// </summary>
+    /// <remarks>
+    /// Mappings are automatically refreshed at most once per minute. This method bypasses that
+    /// throttle and is primarily useful in unit tests where index mappings change rapidly.
+    /// In production, the automatic refresh is typically sufficient.
+    /// </remarks>
     public void RefreshMapping()
     {
         _logger.LogInformation("Mapping refresh triggered.");

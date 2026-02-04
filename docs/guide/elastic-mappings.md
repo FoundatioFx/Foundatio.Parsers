@@ -237,13 +237,15 @@ var createIndexResponse = await client.Indices.CreateAsync("my-index", c => c
 
 ## Refreshing Mappings
 
-If your index mappings change, refresh the resolver:
+Mappings are automatically refreshed from Elasticsearch at most once per minute. In most production scenarios, this automatic refresh is sufficient.
+
+For unit tests where you're creating or modifying indices and need immediate visibility of changes, you can force a refresh:
 
 ```csharp
 var resolver = parser.Configuration.MappingResolver;
 
-// Force refresh from Elasticsearch
-await resolver.RefreshMapping();
+// Force refresh from Elasticsearch (primarily for unit tests)
+resolver.RefreshMapping();
 ```
 
 ## Custom Mapping Resolver
