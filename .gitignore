@@ -8,6 +8,13 @@
 artifacts
 .vs/
 
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
 # MSTest test Results
 [Tt]est[Rr]esult*/
 

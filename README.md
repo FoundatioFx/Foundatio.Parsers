@@ -5,20 +5,28 @@
 [![feedz.io](https://img.shields.io/badge/endpoint.svg?url=https%3A%2F%2Ff.feedz.io%2Ffoundatio%2Ffoundatio%2Fshield%2FFoundatio.Parsers.LuceneQueries%2Flatest)](https://f.feedz.io/foundatio/foundatio/packages/Foundatio.Parsers.LuceneQueries/latest/download)
 [![Discord](https://img.shields.io/discord/715744504891703319)](https://discord.gg/6HxgFCx)
 
-A lucene style query parser that is extensible and allows additional syntax features. Also includes an Elasticsearch query_string query replacement that greatly enhances its capabilities for dynamic queries.
+An extensible Lucene-style query parser with support for Elasticsearch and SQL/Entity Framework Core. Build dynamic search APIs, custom dashboards, and powerful query interfaces.
 
-## Getting Started (Development)
+## Documentation
 
-[This package](https://www.nuget.org/packages/Foundatio.Parsers.LuceneQueries/) can be installed via the [NuGet package manager](https://docs.nuget.org/consume/Package-Manager-Dialog). If you need help, please contact us via in-app support or [open an issue](https://github.com/exceptionless/Foundatio.Parsers/issues/new). We’re always here to help if you have any questions!
+**[Read the full documentation](https://parsers.foundatio.dev/)**
 
-1. You will need to have [Visual Studio Code](https://code.visualstudio.com) installed.
-2. Open the `Foundatio.Parsers.slnx` Visual Studio solution file.
+## Installation
 
-## Using LuceneQueryParser
+```bash
+# Core Lucene parser
+dotnet add package Foundatio.Parsers.LuceneQueries
 
-Below is a small sampling of the things you can accomplish with LuceneQueryParser, so check it out! We use this library extensively in [Exceptionless](https://github.com/exceptionless/Exceptionless)!
+# Elasticsearch integration
+dotnet add package Foundatio.Parsers.ElasticQueries
 
-In the sample below we will parse a query and output it's structure using the `DebugQueryVisitor` and then generate the same exact query using the parse result.
+# SQL/EF Core integration
+dotnet add package Foundatio.Parsers.SqlQueries
+```
+
+## Quick Start
+
+### Parse and Inspect Queries
 
 ```csharp
 using Foundatio.Parsers.LuceneQueries;
@@ -26,12 +34,14 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 
 var parser = new LuceneQueryParser();
 var result = parser.Parse("field:[1 TO 2]");
-Debug.WriteLine(DebugQueryVisitor.Run(result));
+
+// Debug the AST structure
+Console.WriteLine(DebugQueryVisitor.Run(result));
 ```
 
-Here is the parse result as shown from the `DebugQueryVisitor`
+Output from `DebugQueryVisitor`:
 
-```txt
+```
 Group:
   Left - Term:
       TermMax: 2
@@ -42,48 +52,154 @@ Group:
           Name: field
 ```
 
-Finally, lets translate the parse result back into the original query.
+Regenerate the original query:
 
 ```csharp
-var generatedQuery = GenerateQueryVisitor.Run(result);
-System.Diagnostics.Debug.Assert(query == generatedQuery);
+string query = GenerateQueryVisitor.Run(result);
+// Output: "field:[1 TO 2]"
 ```
 
-## [Query Syntax](docs/query.md)
+### Build Elasticsearch Queries
 
-## [Aggregation Syntax](docs/aggregations.md)
+```csharp
+using Foundatio.Parsers.ElasticQueries;
+
+var parser = new ElasticQueryParser(c => c
+    .UseMappings(client, "my-index")
+    .UseFieldMap(new Dictionary<string, string> {
+        { "user", "data.user.identity" }
+    }));
+
+// Build NEST QueryContainer
+var query = await parser.BuildQueryAsync("user:john AND status:active");
+
+// Build aggregations
+var aggs = await parser.BuildAggregationsAsync("terms:(status min:created max:created)");
+
+// Build sort
+var sort = await parser.BuildSortAsync("-created +name");
+```
+
+### Build SQL/EF Core Queries
+
+```csharp
+using Foundatio.Parsers.SqlQueries;
+
+var parser = new SqlQueryParser(c => c
+    .SetDefaultFields(new[] { "Name", "Description" }));
+
+var context = parser.GetContext(db.Products.EntityType);
+string dynamicLinq = await parser.ToDynamicLinqAsync("status:active AND price:>100", context);
+
+var results = await db.Products
+    .Where(parser.ParsingConfig, dynamicLinq)
+    .ToListAsync();
+```
 
 ## Features
 
-- Lucene Query Syntax Parser
-  - Parsers fairly standardized syntax from [Lucene](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html).
-  - Visitors for extensibility
-- Field Aliases (static and dynamic)
-- Query Includes
-  - Define stored queries that can be included inside other queries as macros that will be expanded
-- Validation
-  - Validate query syntax
-  - Restrict access to specific fields
-  - Restrict the number of operations allowed
-  - Restrict nesting depth
-- Elasticsearch
-  - Elastic query string query replacement on steriods
-  - Dynamic search and filter expressions
-  - Dynamic aggregation expressions
-    - Supported bucket aggregations: terms, geo grid, date histogram, numeric histogram
-      - Bucket aggregations allow nesting other dynamic aggregations inside
-    - Supported metric aggregations: min, max, avg, sum, stats, extended stats, cardinality, missing, percentiles
-  - Dynamic sort expressions
-  - Dynamic expressions can be exposed to end users to allow for custom searches, filters, sorting and aggregations
-    - Enables allowing users to build custom views, charts and dashboards
-    - Enables powerful APIs that allow users to do things you never thought of
-  - Supports geo queries (proximity and radius)
-    - mygeo:75044~75mi
-      - Returns all documents that have a value in the mygeo field that is within a 75 mile radius of the 75044 zip code
-  - Supports nested document mappings
-  - Automatically resolves non-analyzed keyword sub-fields for sorting and aggregations
-  - Aliases can be defined right on your NEST mappings
-    - Supports both root and inner field name aliases
+### Query Syntax
+- **Term queries**: `field:value`, `field:"quoted phrase"`
+- **Range queries**: `field:[1 TO 10]`, `field:>100`, `field:>=2024-01-01`
+- **Boolean operators**: `AND`, `OR`, `NOT`, `+`, `-`
+- **Wildcards**: `field:val*`, `field:va?ue`
+- **Existence**: `_exists_:field`, `_missing_:field`
+- **Date math**: `created:[now-7d TO now]`
+- **Geo queries**: `location:75044~75mi`
+
+[Full Query Syntax Reference](https://parsers.foundatio.dev/guide/query-syntax)
+
+### Aggregations
+- **Metrics**: `min`, `max`, `avg`, `sum`, `stats`, `cardinality`, `percentiles`
+- **Buckets**: `terms`, `date`, `histogram`, `geogrid`, `missing`
+- **Nested**: `terms:(category min:price max:price)`
+
+[Full Aggregation Syntax Reference](https://parsers.foundatio.dev/guide/aggregation-syntax)
+
+### Field Aliases
+
+Map user-friendly names to actual field paths:
+
+```csharp
+var parser = new ElasticQueryParser(c => c
+    .UseFieldMap(new Dictionary<string, string> {
+        { "user", "data.user.identity" },
+        { "created", "metadata.createdAt" }
+    }));
+```
+
+[Field Aliases Guide](https://parsers.foundatio.dev/guide/field-aliases)
+
+### Query Includes
+
+Define reusable query macros:
+
+```csharp
+var parser = new ElasticQueryParser(c => c
+    .UseIncludes(new Dictionary<string, string> {
+        { "active", "status:active AND deleted:false" },
+        { "recent", "created:[now-7d TO now]" }
+    }));
+
+// Expands @include:active inline
+var query = await parser.BuildQueryAsync("@include:active AND category:electronics");
+```
+
+[Query Includes Guide](https://parsers.foundatio.dev/guide/query-includes)
+
+### Validation
+
+Validate and restrict queries:
+
+```csharp
+var parser = new ElasticQueryParser(c => c
+    .SetValidationOptions(new QueryValidationOptions {
+        AllowedFields = { "status", "name", "created" },
+        AllowLeadingWildcards = false,
+        AllowedMaxNodeDepth = 10
+    }));
+
+var result = await parser.ValidateQueryAsync(userQuery);
+if (!result.IsValid)
+    return BadRequest(result.Message);
+```
+
+[Validation Guide](https://parsers.foundatio.dev/guide/validation)
+
+### Visitor Pattern
+
+Extend with custom query transformations:
+
+```csharp
+public class CustomVisitor : ChainableQueryVisitor
+{
+    public override async Task VisitAsync(TermNode node, IQueryVisitorContext context)
+    {
+        // Custom transformation logic
+        await base.VisitAsync(node, context);
+    }
+}
+
+var parser = new ElasticQueryParser(c => c
+    .AddVisitor(new CustomVisitor(), priority: 100));
+```
+
+[Visitors Guide](https://parsers.foundatio.dev/guide/visitors)
+
+## Use Cases
+
+- **Dynamic Search APIs** - Let users build complex queries
+- **Custom Dashboards** - User-defined aggregations and visualizations
+- **Saved Searches** - Store and reuse query fragments
+- **Multi-tenant Filtering** - Apply tenant filters transparently
+- **Query Translation** - Parse once, output to multiple backends
+
+## Getting Started (Development)
+
+1. Clone the repository
+2. Open `Foundatio.Parsers.slnx` in Visual Studio or VS Code
+3. Build: `dotnet build`
+4. Test: `dotnet test`
 
 ## Thanks to all the people who have contributed
 
