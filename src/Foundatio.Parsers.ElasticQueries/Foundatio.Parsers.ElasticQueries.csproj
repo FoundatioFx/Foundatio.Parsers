@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\..\build\common.props" />
   <ItemGroup>
-    <PackageReference Include="Exceptionless.DateTimeExtensions" Version="4.0.1" />
+    <PackageReference Include="Exceptionless.DateTimeExtensions" Version="5.0.0" />
     <PackageReference Include="NEST" Version="7.17.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
   </ItemGroup>
