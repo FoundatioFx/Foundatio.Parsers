@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -22,7 +22,8 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveSimpleCustomFilter()
     {
         string index = CreateRandomIndex<MyType>();
-        Client.Index(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -47,7 +48,8 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveCustomFilterContainingIncludes()
     {
         string index = CreateRandomIndex<MyType>();
-        Client.Index(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -72,7 +74,8 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveIncludeToCustomFilterContainingIgnoredInclude()
     {
         string index = CreateRandomIndex<MyType>();
-        Client.Index(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -119,7 +122,8 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveMultipleCustomFilters()
     {
         string index = CreateRandomIndex<MyType>();
-        Client.Index(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
