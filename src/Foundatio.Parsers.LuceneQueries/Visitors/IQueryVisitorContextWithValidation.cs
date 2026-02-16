@@ -1,5 +1,3 @@
-using Foundatio.Parsers.LuceneQueries;
-
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
 /// <summary>
