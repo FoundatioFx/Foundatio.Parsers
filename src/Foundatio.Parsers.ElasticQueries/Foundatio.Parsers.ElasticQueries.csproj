@@ -3,7 +3,7 @@
   <ItemGroup>
     <PackageReference Include="Exceptionless.DateTimeExtensions" Version="5.0.0" />
     <PackageReference Include="NEST" Version="7.17.5" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
   </ItemGroup>
   <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))">
     <PackageReference Include="System.Text.Json" Version="8.0.6" />
