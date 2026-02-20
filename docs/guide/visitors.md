@@ -181,7 +181,8 @@ Simplifies and cleans up the AST:
 var parser = new LuceneQueryParser();
 var result = await parser.ParseAsync("((status:active))");
 
-var cleaned = await CleanupQueryVisitor.RunAsync(result);
+// Returns the cleaned query string
+string cleaned = await CleanupQueryVisitor.RunAsync(result);
 // Removes unnecessary nesting
 ```
 
@@ -193,7 +194,7 @@ Converts standalone terms to field queries (used for sort expressions):
 var parser = new LuceneQueryParser();
 var result = await parser.ParseAsync("-created +name");
 
-var converted = await TermToFieldVisitor.RunAsync(result);
+await TermToFieldVisitor.RunAsync(result);
 // Converts terms to field nodes for sort processing
 ```
 

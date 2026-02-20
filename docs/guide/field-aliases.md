@@ -207,7 +207,8 @@ var context = new QueryVisitorContext();
 await FieldResolverQueryVisitor.RunAsync(result, fieldMap, context);
 
 // Access original field name
-var termNode = result.Left as TermNode;
+var groupNode = result as GroupNode;
+var termNode = groupNode?.Left as TermNode;
 string original = termNode.GetOriginalField(); // "user"
 string resolved = termNode.Field;               // "data.user.identity"
 ```

@@ -380,10 +380,8 @@ var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));
 var parser = new ElasticQueryParser(c => c
     .SetLoggerFactory(loggerFactory));
 
-// Or for LuceneQueryParser with tracing
-var parser = new LuceneQueryParser {
-    Tracer = new LoggingTracer(logger)
-};
+// Or for LuceneQueryParser, use ILogger directly 
+var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
 ```
 
 ### Inspect AST

@@ -49,7 +49,7 @@ var parser = new LuceneQueryParser();
 var result = await parser.ParseAsync("status:active AND created:[2024-01-01 TO 2024-12-31]");
 
 var visitor = new FieldCollectorVisitor();
-await visitor.AcceptAsync(result, new QueryVisitorContext());
+await result.AcceptAsync(visitor, new QueryVisitorContext());
 
 foreach (var field in visitor.Fields)
 {
@@ -72,24 +72,18 @@ public class FieldPrefixVisitor : MutatingQueryNodeVisitorBase
         _prefix = prefix;
     }
 
-    public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
+    public override IQueryNode Visit(TermNode node, IQueryVisitorContext context)
     {
         if (!string.IsNullOrEmpty(node.Field) && !node.Field.StartsWith(_prefix))
-        {
             node.Field = _prefix + node.Field;
-        }
-        
-        return Task.CompletedTask;
+        return node;
     }
 
-    public override Task VisitAsync(TermRangeNode node, IQueryVisitorContext context)
+    public override IQueryNode Visit(TermRangeNode node, IQueryVisitorContext context)
     {
         if (!string.IsNullOrEmpty(node.Field) && !node.Field.StartsWith(_prefix))
-        {
             node.Field = _prefix + node.Field;
-        }
-        
-        return Task.CompletedTask;
+        return node;
     }
 }
 ```
@@ -101,7 +95,7 @@ var parser = new LuceneQueryParser();
 var result = await parser.ParseAsync("status:active");
 
 var visitor = new FieldPrefixVisitor("data.");
-await visitor.AcceptAsync(result, new QueryVisitorContext());
+await result.AcceptAsync(visitor, new QueryVisitorContext());
 
 string query = await GenerateQueryVisitor.RunAsync(result);
 // Output: "data.status:active"
@@ -171,14 +165,10 @@ public class QueryComplexityVisitor : QueryNodeVisitorWithResultBase<int>
         return base.VisitAsync(node, context);
     }
 
-    public override Task<int> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<int> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
         _complexity = 0;
-        return base.AcceptAsync(node, context);
-    }
-
-    protected override int GetResult()
-    {
+        await node.AcceptAsync(this, context);
         return _complexity;
     }
 }
@@ -337,7 +327,7 @@ public class DateRangeExpansionVisitor : ChainableMutatingQueryVisitor
 Log all queries for analytics:
 
 ```csharp
-public class QueryLoggingVisitor : QueryNodeVisitorBase
+public class QueryLoggingVisitor : ChainableQueryVisitor
 {
     private readonly ILogger _logger;
     private readonly List<string> _terms = new();

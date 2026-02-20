@@ -128,27 +128,22 @@ FieldType fieldType = resolver.GetFieldType("price");
 
 ### Field Type Enum
 
+`GetFieldType` returns `Nest.FieldType`, a NEST enum with values such as:
+
+- `FieldType.Text`
+- `FieldType.Keyword`
+- `FieldType.Date`
+- `FieldType.Boolean`
+- `FieldType.Long`, `FieldType.Integer`, `FieldType.Short`, `FieldType.Byte`
+- `FieldType.Double`, `FieldType.Float`, `FieldType.HalfFloat`, `FieldType.ScaledFloat`
+- `FieldType.GeoPoint`, `FieldType.GeoShape`
+- `FieldType.Nested`, `FieldType.Object`
+
 ```csharp
-public enum FieldType
+FieldType fieldType = resolver.GetFieldType("price");
+if (fieldType == FieldType.Double || fieldType == FieldType.Float)
 {
-    Unknown,
-    Text,
-    Keyword,
-    Date,
-    Boolean,
-    Long,
-    Integer,
-    Short,
-    Byte,
-    Double,
-    Float,
-    HalfFloat,
-    ScaledFloat,
-    GeoPoint,
-    GeoShape,
-    Nested,
-    Object,
-    // ... other types
+    // Handle numeric field
 }
 ```
 
@@ -228,7 +223,7 @@ Add a lowercase normalizer for case-insensitive sorting:
 
 ```csharp
 var createIndexResponse = await client.Indices.CreateAsync("my-index", c => c
-    .Settings(s => s.AddSortNormalizer())
+    .Settings(s => s.Analysis(a => a.AddSortNormalizer()))
     .Map<MyDocument>(m => m
         .Properties(p => p
             .Text(t => t.Name(n => n.Name).AddSortField())

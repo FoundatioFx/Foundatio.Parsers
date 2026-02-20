@@ -145,9 +145,9 @@ You can conditionally skip include expansion:
 var parser = new ElasticQueryParser(c => c
     .UseIncludes(
         includeResolver: name => includes.GetValueOrDefault(name),
-        shouldSkipInclude: (name, context) => {
+        shouldSkipInclude: (node, context) => {
             // Skip includes starting with "admin_" for non-admin users
-            if (name.StartsWith("admin_") && !context.GetValue<bool>("IsAdmin"))
+            if (node.Term.StartsWith("admin_") && !context.GetValue<bool>("IsAdmin"))
                 return true;
             
             return false;

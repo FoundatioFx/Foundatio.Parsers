@@ -40,11 +40,8 @@ var parser = new SqlQueryParser(c => c
     // Logging
     .SetLoggerFactory(loggerFactory)
     
-    // Default fields for unqualified search terms
-    .SetDefaultFields(new[] { "Name", "Description", "Tags" })
-    
-    // Search operator for default fields
-    .SetSearchOperator(SqlSearchOperator.Contains)
+    // Default fields for unqualified search terms (operator is second param)
+    .SetDefaultFields(new[] { "Name", "Description", "Tags" }, SqlSearchOperator.Contains)
     
     // Full-text search fields
     .SetFullTextFields(new[] { "Name", "Description" })
@@ -73,8 +70,7 @@ var parser = new SqlQueryParser(c => c
 | Method | Description |
 |--------|-------------|
 | `SetLoggerFactory(factory)` | Set logging factory |
-| `SetDefaultFields(fields)` | Default fields for unqualified terms |
-| `SetSearchOperator(operator)` | Default search operator (Equals, Contains, StartsWith) |
+| `SetDefaultFields(fields, op)` | Default fields for unqualified terms; optional `SqlSearchOperator` (Equals, Contains, StartsWith) |
 | `SetFullTextFields(fields)` | Fields using SQL full-text search |
 | `SetSearchTokenizer(tokenizer)` | Custom search term tokenization |
 | `SetDateTimeParser(parser)` | Custom DateTime parsing |
@@ -193,8 +189,7 @@ When no field is specified, the query searches default fields:
 
 ```csharp
 var parser = new SqlQueryParser(c => c
-    .SetDefaultFields(new[] { "Name", "Description" })
-    .SetSearchOperator(SqlSearchOperator.Contains));
+    .SetDefaultFields(new[] { "Name", "Description" }, SqlSearchOperator.Contains));
 
 var context = parser.GetContext(db.Products.EntityType);
 
@@ -287,13 +282,13 @@ var parser = new SqlQueryParser(c => c
 var parser = new SqlQueryParser(c => c
     .SetDateTimeParser(value => {
         if (value.StartsWith("now"))
-            return ParseDateMath(value);
-        return DateTime.Parse(value);
+            return ParseDateMath(value).ToString("O");
+        return DateTime.Parse(value).ToString("O");
     })
     .SetDateOnlyParser(value => {
         if (value.StartsWith("now"))
-            return DateOnly.FromDateTime(ParseDateMath(value));
-        return DateOnly.Parse(value);
+            return DateOnly.FromDateTime(ParseDateMath(value)).ToString("O");
+        return DateOnly.Parse(value).ToString("O");
     }));
 ```
 

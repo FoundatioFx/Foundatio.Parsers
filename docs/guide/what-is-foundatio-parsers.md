@@ -125,13 +125,16 @@ Translate queries between different backends:
 var luceneParser = new LuceneQueryParser();
 var ast = await luceneParser.ParseAsync("field:value AND other:[1 TO 10]");
 
+// Regenerate the query string from the AST
+string queryString = await GenerateQueryVisitor.RunAsync(ast);
+
 // Generate Elasticsearch query
 var elasticParser = new ElasticQueryParser();
 var esQuery = await elasticParser.BuildQueryAsync(ast);
 
-// Generate SQL
+// Generate SQL (requires a context with entity type info)
 var sqlParser = new SqlQueryParser();
-var sqlQuery = await sqlParser.ToDynamicLinqAsync(ast, context);
+var sqlQuery = await sqlParser.ToDynamicLinqAsync(queryString, context);
 ```
 
 ## Packages

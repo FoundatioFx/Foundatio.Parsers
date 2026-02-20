@@ -376,7 +376,7 @@ Add custom validation errors:
 var context = new ElasticQueryVisitorContext();
 
 // Add custom validation error
-context.AddValidationError("Custom error message", position: 5);
+context.AddValidationError("Custom error message", index: 5);
 
 // Check result
 var validation = context.GetValidationResult();
