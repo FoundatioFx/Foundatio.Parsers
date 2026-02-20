@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,7 +11,8 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
 {
     public InvertQueryVisitor(IEnumerable<string> nonInvertedFields = null)
     {
-        NonInvertedFields.AddRange(nonInvertedFields);
+        if (nonInvertedFields != null)
+            NonInvertedFields.AddRange(nonInvertedFields);
     }
 
     public List<string> NonInvertedFields { get; } = new List<string>();
