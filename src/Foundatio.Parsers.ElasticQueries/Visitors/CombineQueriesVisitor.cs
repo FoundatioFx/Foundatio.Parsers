@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,11 +16,6 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
     {
         await base.VisitAsync(node, context).ConfigureAwait(false);
 
-        // Only stop on scoped group nodes (parens). Gather all child queries (including scoped groups) and then combine them.
-        // Combining only happens at the scoped group level though.
-        // Merge all non-field terms together into a single match or multi-match query
-        // Merge all nested queries for the same nested field together
-
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
@@ -30,9 +25,8 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (nested != null && node.Parent != null)
             container = null;
 
-        var op = node.GetOperator(elasticContext);
+        var op = GetEffectiveOperator(node, elasticContext);
 
-        // Group nested queries by their path for combining
         var nestedQueries = new Dictionary<string, List<(IFieldQueryNode Node, QueryContainer InnerQuery)>>();
         var regularQueries = new List<(IFieldQueryNode Node, QueryBase Query)>();
 
@@ -41,10 +35,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             var childQuery = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).ConfigureAwait(false);
             if (childQuery == null) continue;
 
-            // Check if this is a nested query from an individual term node (not an explicit nested group)
-            // Explicit nested groups (like "nested:(...)") are GroupNodes with a nested Field
-            // We only want to combine nested queries from individual term nodes
-            bool isExplicitNestedGroup = child is GroupNode groupChild && !String.IsNullOrEmpty(groupChild.Field);
+            bool isExplicitNestedGroup = child is GroupNode groupChild && groupChild.GetNestedPath() != null;
 
             if (childQuery is NestedQuery childNested && childNested.Path != null && !isExplicitNestedGroup)
             {
@@ -59,55 +50,29 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             }
         }
 
-        // Process regular queries
         foreach (var (child, childQuery) in regularQueries)
         {
-            var q = childQuery;
+            QueryBase q = childQuery;
             if (child.IsExcluded())
                 q = !q;
 
-            var effectiveOp = op;
-            if (effectiveOp == GroupOperator.Or && node.IsRequired())
-                effectiveOp = GroupOperator.And;
-
-            if (effectiveOp == GroupOperator.And)
-                container &= q;
-            else if (effectiveOp == GroupOperator.Or)
-                container |= q;
+            container = Combine(container, q, op);
         }
 
-        // Process nested queries - combine queries with the same path
         foreach (var (path, pathQueries) in nestedQueries)
         {
             QueryContainer combinedInner = null;
-
             foreach (var (child, innerQuery) in pathQueries)
             {
                 QueryContainer q = innerQuery;
                 if (child.IsExcluded())
                     q = !q;
 
-                var effectiveOp = op;
-                if (effectiveOp == GroupOperator.Or && node.IsRequired())
-                    effectiveOp = GroupOperator.And;
-
-                if (effectiveOp == GroupOperator.And)
-                    combinedInner &= q;
-                else if (effectiveOp == GroupOperator.Or)
-                    combinedInner |= q;
+                combinedInner = Combine(combinedInner, q, op);
             }
 
-            var combinedNested = new NestedQuery { Path = path, Query = combinedInner };
-            QueryBase nestedToAdd = combinedNested;
-
-            var effectiveContainerOp = op;
-            if (effectiveContainerOp == GroupOperator.Or && node.IsRequired())
-                effectiveContainerOp = GroupOperator.And;
-
-            if (effectiveContainerOp == GroupOperator.And)
-                container &= nestedToAdd;
-            else if (effectiveContainerOp == GroupOperator.Or)
-                container |= nestedToAdd;
+            QueryBase combinedNested = new NestedQuery { Path = path, Query = combinedInner };
+            container = Combine(container, combinedNested, op);
         }
 
         if (nested != null)
@@ -119,5 +84,35 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         {
             node.SetQuery(container);
         }
+    }
+
+    private static GroupOperator GetEffectiveOperator(GroupNode node, IElasticQueryVisitorContext context)
+    {
+        var op = node.GetOperator(context);
+        if (op == GroupOperator.Or && node.IsRequired())
+            op = GroupOperator.And;
+        return op;
+    }
+
+    private static QueryBase Combine(QueryBase left, QueryBase right, GroupOperator op)
+    {
+        if (op == GroupOperator.And)
+            return left & right;
+
+        if (op == GroupOperator.Or)
+            return left | right;
+
+        return left;
+    }
+
+    private static QueryContainer Combine(QueryContainer left, QueryContainer right, GroupOperator op)
+    {
+        if (op == GroupOperator.And)
+            return left & right;
+
+        if (op == GroupOperator.Or)
+            return left | right;
+
+        return left;
     }
 }

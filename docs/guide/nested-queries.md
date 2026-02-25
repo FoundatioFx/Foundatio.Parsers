@@ -288,7 +288,9 @@ This registers the `NestedVisitor` at priority 300 in the visitor chain.
 
 ### How the NestedVisitor Works
 
-`NestedVisitor` is a pre-order visitor. For each `GroupNode` with a non-empty `Field`, it checks whether that field maps to a nested type in the Elasticsearch mapping:
+`NestedVisitor` is a pre-order visitor that handles two scenarios:
+
+**1. Explicit nested groups** -- For each `GroupNode` with a non-empty `Field` that maps to a nested type, it tags the node with the nested path and (for queries) sets a `NestedQuery`:
 
 ```csharp
 public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
@@ -300,12 +302,37 @@ public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     if (nestedProperty == null)
         return base.VisitAsync(node, context);
 
-    node.SetQuery(new NestedQuery { Path = nestedProperty });
+    node.SetNestedPath(nestedProperty);
+    if (context.QueryType != QueryTypes.Aggregation)
+        node.SetQuery(new NestedQuery { Path = nestedProperty });
+
     return base.VisitAsync(node, context);
 }
 ```
 
-It resolves the nested path by checking each segment of the dot-separated field name against `ElasticMappingResolver.IsNestedPropertyType`. If a match is found, it sets a `NestedQuery` on the node's data dictionary.
+**2. Individual nested field terms** -- For standalone term nodes like `nested.field1:value` (not inside an explicit nested group), the visitor wraps the term's query in a `NestedQuery`. This allows queries like `nested.field1:value1 OR nested.field4:10` to automatically produce correct nested queries without requiring the explicit `nested:(...)` syntax:
+
+```csharp
+private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
+{
+    if (IsInsideNestedGroup(node))
+        return;
+
+    string nestedProperty = GetNestedProperty(node.Field, context);
+    if (nestedProperty == null)
+        return;
+
+    if (context.QueryType == QueryTypes.Aggregation)
+        node.SetNestedPath(nestedProperty);
+    else if (context.QueryType == QueryTypes.Query)
+    {
+        var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context));
+        node.SetQuery(new NestedQuery { Path = nestedProperty, Query = innerQuery });
+    }
+}
+```
+
+The `IsInsideNestedGroup` check walks up the parent chain looking for any ancestor `GroupNode` that already has a nested path set, preventing double-wrapping.
 
 ### How CombineQueriesVisitor Assembles the Final Query
 
@@ -313,9 +340,36 @@ It resolves the nested path by checking each segment of the dot-separated field 
 
 1. Recurse into all children first (`base.VisitAsync`)
 2. Retrieve the node's query (which may be a `NestedQuery` set by `NestedVisitor`)
-3. Iterate child nodes and collect their built queries
-4. If the current node has a `NestedQuery`, set the combined child queries as its inner `Query` property
-5. Otherwise, combine child queries using boolean AND/OR logic
+3. Separate child queries into regular queries and nested queries (grouped by path)
+4. Combine regular queries using boolean AND/OR logic
+5. For nested queries with the same path, combine their inner queries into a single `NestedQuery`
+6. If the current node has a `NestedQuery`, set the combined child queries as its inner `Query` property
+
+This grouping ensures that multiple individual nested field terms targeting the same path (e.g., `nested.field1:value1 AND nested.field4:5`) are combined into a single `NestedQuery` rather than producing separate nested queries.
+
+### Nested Aggregation Support
+
+`CombineAggregationsVisitor` handles nested aggregations by:
+
+1. Collecting all leaf field nodes from the AST
+2. Grouping them by nested path (using the `@NestedPath` metadata set by `NestedVisitor`)
+3. Wrapping grouped aggregations in a `NestedAggregation` with the appropriate path
+
+For example, `terms:nested.field1 max:nested.field4` produces a single `nested` aggregation containing both the `terms` and `max` sub-aggregations.
+
+### Default Fields with Nested Types
+
+When default fields include both nested and non-nested fields, `DefaultQueryNodeExtensions` splits the query:
+
+```csharp
+// Configuration
+parser.SetDefaultFields(["field1", "nested.field1", "nested.field2"]);
+
+// Query: "searchterm"
+// Produces: match(field1, "searchterm") OR nested(match(nested.field1, "searchterm") OR match(nested.field2, "searchterm"))
+```
+
+Fields are grouped by their nested path. Non-nested fields use standard `match`/`term` queries, while nested fields from the same path are combined into a single `NestedQuery` with `multi_match` inside. Fields of different types (text vs keyword vs integer) are split into appropriate query types.
 
 ### Default Visitor Chain Priorities
 
@@ -341,22 +395,33 @@ Visitors do not maintain a field context stack when entering and leaving nested 
 - There is no automatic field path composition (e.g., `parent.child.field`) from nested GroupNode ancestry.
 - If you need to build composed paths from nested AST structure, you must walk `node.Parent` manually.
 
+Note: `NestedVisitor` does cache the resolved nested path on each `GroupNode` via `SetNestedPath()`, which child nodes can check via `GetNestedPath()` to determine if they are inside a nested group. This is used by `IsInsideNestedGroup` to prevent double-wrapping.
+
 ### Depth Tracking
 
 Only `ValidationVisitor` tracks nesting depth, and only for the purpose of enforcing `AllowedMaxNodeDepth`. There is no generic depth counter in `IQueryVisitorContext`. Any visitor that needs depth awareness must implement its own tracking.
+
+### Resolved Scenarios
+
+The following scenarios now have test coverage and working implementations:
+
+- **Negated nested groups**: `NOT nested:(nested.field1:value)` correctly produces `must_not` nested queries
+- **Individual nested field wrapping**: `nested.field1:value` automatically wraps in a `NestedQuery` without requiring the explicit `nested:(...)` syntax
+- **Multiple nested fields combining**: `nested.field1:value1 AND nested.field4:5` combines into a single `NestedQuery`
+- **OR conditions across nested fields**: `nested.field1:target OR nested.field4:10` produces correct combined nested queries
+- **Range queries on nested fields**: `nested.field4:[10 TO 20]` wraps in a `NestedQuery`
+- **Nested aggregations**: `terms:nested.field1 max:nested.field4` wraps in a single `NestedAggregation`
+- **Nested aggregations with include/exclude**: `terms:(nested.field1 @include:apple @include:banana)` correctly handles include/exclude within nested aggregation groups
+- **Default fields with nested types**: Mixed nested and non-nested default fields split into appropriate query structures
+- **Mixed query and aggregation operations**: Nested fields work correctly in both query and aggregation contexts simultaneously
 
 ### Untested Scenarios
 
 The following scenarios do not currently have test coverage:
 
-- **Negated nested groups**: `NOT nested:(nested.field1:value)` or `-nested:(nested.field1:value)`
 - **Deeply nested types**: Nested mappings within nested mappings (e.g., `parent.child:(parent.child.field:value)` where both `parent` and `parent.child` are nested types)
 - **Same-field nesting**: The pattern `@field:(-@field:(value) OR other)` where the same logical field appears at multiple nesting levels
-- **Mixed nested and non-nested siblings with negation**
-
-### CombineAggregationsVisitor TODO
-
-`CombineAggregationsVisitor` contains an open TODO regarding `@exclude` and `@include` handling within sub-groups. The comment notes that these should be gathered via a visitor walk that does not descend into sub-groups, but this has not yet been implemented.
+- **Mixed nested and non-nested siblings with negation**: Complex boolean combinations mixing negated nested and non-nested terms
 
 ## Next Steps
 

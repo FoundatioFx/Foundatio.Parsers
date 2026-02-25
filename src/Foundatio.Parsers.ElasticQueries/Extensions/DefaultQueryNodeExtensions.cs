@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -189,38 +189,6 @@ public static class DefaultQueryNodeExtensions
 
     private static QueryBase GetAnalyzedFieldsQuery(TermNode node, string[] fields)
     {
-        // For a single field, use match query instead of multi_match
-        if (fields.Length == 1)
-        {
-            string field = fields[0];
-            if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
-            {
-                return new QueryStringQuery
-                {
-                    Fields = Infer.Fields(field),
-                    AllowLeadingWildcard = false,
-                    AnalyzeWildcard = true,
-                    Query = node.UnescapedTerm
-                };
-            }
-
-            if (node.IsQuotedTerm)
-            {
-                return new MatchPhraseQuery
-                {
-                    Field = field,
-                    Query = node.UnescapedTerm
-                };
-            }
-
-            return new MatchQuery
-            {
-                Field = field,
-                Query = node.UnescapedTerm
-            };
-        }
-
-        // Multiple fields - use multi_match
         if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
         {
             return new QueryStringQuery
@@ -230,6 +198,14 @@ public static class DefaultQueryNodeExtensions
                 AnalyzeWildcard = true,
                 Query = node.UnescapedTerm
             };
+        }
+
+        if (fields.Length == 1)
+        {
+            if (node.IsQuotedTerm)
+                return new MatchPhraseQuery { Field = fields[0], Query = node.UnescapedTerm };
+
+            return new MatchQuery { Field = fields[0], Query = node.UnescapedTerm };
         }
 
         var query = new MultiMatchQuery
@@ -277,7 +253,7 @@ public static class DefaultQueryNodeExtensions
 
     private static string GetNestedPath(string fullName, IElasticQueryVisitorContext context)
     {
-        string[] nameParts = fullName?.Split('.').ToArray();
+        string[] nameParts = fullName?.Split('.');
 
         if (nameParts == null || nameParts.Length == 0)
             return null;
@@ -308,7 +284,6 @@ public static class DefaultQueryNodeExtensions
                 ? GetSingleFieldQuery(node, fields[0], context)
                 : GetMultiFieldQuery(node, fields.ToArray(), context);
 
-            // Wrap in NestedQuery if this is a nested path (non-empty string)
             if (!String.IsNullOrEmpty(nestedPath))
             {
                 queryContainers.Add(new NestedQuery
@@ -317,35 +292,18 @@ public static class DefaultQueryNodeExtensions
                     Query = query
                 });
             }
+            else if (query is BoolQuery boolQuery && boolQuery.Should != null)
+            {
+                foreach (var shouldClause in boolQuery.Should)
+                    queryContainers.Add(shouldClause);
+            }
             else
             {
-                // For non-nested fields, flatten BoolQuery should clauses if present
-                if (query is BoolQuery boolQuery && boolQuery.Should != null)
-                {
-                    foreach (var shouldClause in boolQuery.Should)
-                    {
-                        queryContainers.Add(shouldClause);
-                    }
-                }
-                else
-                {
-                    queryContainers.Add(query);
-                }
+                queryContainers.Add(query);
             }
         }
 
-        // Combine with OR (should)
-        if (queryContainers.Count == 1)
-        {
-            // Try to unwrap single QueryContainer to QueryBase
-            // Can't directly cast, so return in a minimal BoolQuery
-            return new BoolQuery { Should = queryContainers };
-        }
-
-        return new BoolQuery
-        {
-            Should = queryContainers
-        };
+        return new BoolQuery { Should = queryContainers };
     }
 
     public static async Task<QueryBase> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)

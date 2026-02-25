@@ -241,9 +241,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         await Client.IndexManyAsync([
             new MyType { Field1 = "test value", Field4 = 42 },
             new MyType { Field1 = "other value", Field4 = 100 },
-            new MyType { Field1 = "42", Field4 = 99 } // Field1 contains "42" as text
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+            new MyType { Field1 = "42", Field4 = 99 }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -284,8 +284,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 .GeoPoint(g => g.Name(f => f.Field3))
                 .Keyword(e => e.Name(m => m.Field2))));
 
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var parser = new ElasticQueryParser(c => c.SetDefaultFields(["field1"]).UseMappings<MyType>(GetCodeMappings, Client, index));
 

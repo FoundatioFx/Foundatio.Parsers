@@ -8,7 +8,6 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
 using Nest;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
@@ -43,8 +42,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseFieldMap(new FieldMap { { "blah", "nested" } }).UseMappings<MyNestedType>(Client).UseNested());
         var result = await processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1)", new ElasticQueryVisitorContext().UseScoring());
@@ -93,8 +92,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseFieldMap(new FieldMap { { "blah", "nested" } }).UseMappings<MyNestedType>(Client).UseNested());
         var result = await processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1 blah.field4:4)", new ElasticQueryVisitorContext().UseScoring());
@@ -145,8 +144,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4", Field3 = "value3" }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
         var result = await processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1 nested.field4:4 nested.field3:value3)",
@@ -192,8 +191,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 Field1 = "parent2",
                 Nested = { new MyType { Field1 = "child2", Field4 = 3 } }
             }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
@@ -241,8 +240,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 Field1 = "parent2",
                 Nested = { new MyType { Field1 = "other", Field4 = 10 } }
             }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
@@ -283,8 +282,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             new MyNestedType { Nested = { new MyType { Field4 = 5 } } },
             new MyNestedType { Nested = { new MyType { Field4 = 15 } } },
             new MyNestedType { Nested = { new MyType { Field4 = 25 } } }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
@@ -325,8 +324,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             new MyNestedType { Field1 = "parent1", Nested = { new MyType { Field1 = "excluded_value", Field4 = 10 } } },
             new MyNestedType { Field1 = "parent2", Nested = { new MyType { Field1 = "included_value", Field4 = 20 } } },
             new MyNestedType { Field1 = "parent3", Nested = { new MyType { Field1 = "another_value", Field4 = 30 } } }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
@@ -369,8 +368,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             new MyNestedType { Nested = { new MyType { Field4 = 5 } } },
             new MyNestedType { Nested = { new MyType { Field4 = 10 } } },
             new MyNestedType { Nested = { new MyType { Field4 = 5 } } }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
@@ -413,8 +412,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         await Client.IndexManyAsync([
             new MyNestedType { Nested = { new MyType { Field1 = "test", Field4 = 5 } } },
             new MyNestedType { Nested = { new MyType { Field1 = "other", Field4 = 10 } } }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
@@ -490,8 +489,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             new MyNestedType { Nested = { new MyType { Field1 = "banana", Field4 = 2 } } },
             new MyNestedType { Nested = { new MyType { Field1 = "cherry", Field4 = 3 } } },
             new MyNestedType { Nested = { new MyType { Field1 = "date", Field4 = 4 } } }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
@@ -535,8 +534,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             new MyNestedType { Nested = { new MyType { Field1 = "apple" } } },
             new MyNestedType { Nested = { new MyType { Field1 = "banana" } } },
             new MyNestedType { Nested = { new MyType { Field1 = "cherry" } } }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
@@ -595,8 +594,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 Field1 = "other_parent",
                 Nested = { new MyType { Field1 = "normal_value" } }
             }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -657,8 +656,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 Field1 = "nomatch",
                 Nested = { new MyType { Field1 = "no", Field2 = "match" } }
             }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -726,8 +725,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 Field4 = 100,
                 Nested = { new MyType { Field1 = "no", Field4 = 100 } }
             }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -776,8 +775,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             new MyNestedType { Nested = { new MyType { Field1 = "high", Field4 = 10 } } },
             new MyNestedType { Nested = { new MyType { Field1 = "medium", Field4 = 5 } } },
             new MyNestedType { Nested = { new MyType { Field1 = "low", Field4 = 1 } } }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 

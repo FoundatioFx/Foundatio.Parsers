@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries;
@@ -22,9 +20,14 @@ public class NestedVisitor : ChainableQueryVisitor
             return base.VisitAsync(node, context);
 
         if (context.QueryType == QueryTypes.Aggregation)
+        {
             node.SetNestedPath(nestedProperty);
+        }
         else
+        {
+            node.SetNestedPath(nestedProperty);
             node.SetQuery(new NestedQuery { Path = nestedProperty });
+        }
 
         return base.VisitAsync(node, context);
     }
@@ -52,7 +55,7 @@ public class NestedVisitor : ChainableQueryVisitor
     private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
     {
         // Skip if inside a group that references a nested path
-        if (IsInsideNestedGroup(node, context))
+        if (IsInsideNestedGroup(node))
             return;
 
         string nestedProperty = GetNestedProperty(node.Field, context);
@@ -81,17 +84,14 @@ public class NestedVisitor : ChainableQueryVisitor
         }
     }
 
-    private bool IsInsideNestedGroup(IQueryNode node, IQueryVisitorContext context)
+    private static bool IsInsideNestedGroup(IQueryNode node)
     {
         var parent = node.Parent;
         while (parent != null)
         {
-            if (parent is GroupNode groupNode && !String.IsNullOrEmpty(groupNode.Field))
-            {
-                string nestedProperty = GetNestedProperty(groupNode.Field, context);
-                if (nestedProperty != null)
-                    return true;
-            }
+            if (parent is GroupNode groupNode && groupNode.GetNestedPath() != null)
+                return true;
+
             parent = parent.Parent;
         }
         return false;
@@ -99,7 +99,7 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private string GetNestedProperty(string fullName, IQueryVisitorContext context)
     {
-        string[] nameParts = fullName?.Split('.').ToArray();
+        string[] nameParts = fullName?.Split('.');
 
         if (nameParts == null || context is not IElasticQueryVisitorContext elasticContext || nameParts.Length == 0)
             return null;
