@@ -407,9 +407,12 @@ The following scenarios now have test coverage and working implementations:
 
 - **Negated nested groups**: `NOT nested:(nested.field1:value)` correctly produces `must_not` nested queries
 - **Individual nested field wrapping**: `nested.field1:value` automatically wraps in a `NestedQuery` without requiring the explicit `nested:(...)` syntax
-- **Multiple nested fields combining**: `nested.field1:value1 AND nested.field4:5` combines into a single `NestedQuery`
-- **OR conditions across nested fields**: `nested.field1:target OR nested.field4:10` produces correct combined nested queries
+- **Multiple nested fields combining (AND)**: `nested.field1:value1 AND nested.field4:5` combines into a single `NestedQuery` with a `must` boolean
+- **Multiple nested fields combining (OR)**: `nested.field1:target OR nested.field4:10` combines into a single `NestedQuery` with a `should` boolean
 - **Range queries on nested fields**: `nested.field4:[10 TO 20]` wraps in a `NestedQuery`
+- **Exists on nested fields**: `_exists_:nested.field1` wraps the `ExistsQuery` in a `NestedQuery`
+- **Missing on nested fields**: `_missing_:nested.field1` wraps the `MustNot(ExistsQuery)` in a `NestedQuery`
+- **Mixed nested and non-nested explicit fields**: `field1:value nested.field1:value` produces a regular match for the non-nested field and a `NestedQuery` for the nested field
 - **Nested aggregations**: `terms:nested.field1 max:nested.field4` wraps in a single `NestedAggregation`
 - **Nested aggregations with include/exclude**: `terms:(nested.field1 @include:apple @include:banana)` correctly handles include/exclude within nested aggregation groups
 - **Default fields with nested types**: Mixed nested and non-nested default fields split into appropriate query structures
@@ -421,7 +424,10 @@ The following scenarios do not currently have test coverage:
 
 - **Deeply nested types**: Nested mappings within nested mappings (e.g., `parent.child:(parent.child.field:value)` where both `parent` and `parent.child` are nested types)
 - **Same-field nesting**: The pattern `@field:(-@field:(value) OR other)` where the same logical field appears at multiple nesting levels
-- **Mixed nested and non-nested siblings with negation**: Complex boolean combinations mixing negated nested and non-nested terms
+
+### Known Limitations
+
+- **Nested sort**: `GetSortFieldsVisitor` and `DefaultSortNodeExtensions` do not add nested context to sort operations. Elasticsearch requires a `nested` property in the sort clause for nested fields. Sorting on nested fields is not currently supported and will produce incorrect queries. This is a pre-existing limitation, not introduced by the nested query support.
 
 ## Next Steps
 

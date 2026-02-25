@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries;
@@ -19,15 +20,9 @@ public class NestedVisitor : ChainableQueryVisitor
         if (nestedProperty == null)
             return base.VisitAsync(node, context);
 
-        if (context.QueryType == QueryTypes.Aggregation)
-        {
-            node.SetNestedPath(nestedProperty);
-        }
-        else
-        {
-            node.SetNestedPath(nestedProperty);
+        node.SetNestedPath(nestedProperty);
+        if (context.QueryType != QueryTypes.Aggregation)
             node.SetQuery(new NestedQuery { Path = nestedProperty });
-        }
 
         return base.VisitAsync(node, context);
     }
@@ -97,21 +92,22 @@ public class NestedVisitor : ChainableQueryVisitor
         return false;
     }
 
-    private string GetNestedProperty(string fullName, IQueryVisitorContext context)
+    private static string GetNestedProperty(string fullName, IQueryVisitorContext context)
     {
         string[] nameParts = fullName?.Split('.');
 
         if (nameParts == null || context is not IElasticQueryVisitorContext elasticContext || nameParts.Length == 0)
             return null;
 
-        string fieldName = String.Empty;
+        var builder = new StringBuilder();
         for (int i = 0; i < nameParts.Length; i++)
         {
             if (i > 0)
-                fieldName += ".";
+                builder.Append('.');
 
-            fieldName += nameParts[i];
+            builder.Append(nameParts[i]);
 
+            string fieldName = builder.ToString();
             if (elasticContext.MappingResolver.IsNestedPropertyType(fieldName))
                 return fieldName;
         }
