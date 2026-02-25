@@ -442,8 +442,33 @@ public class StatelessVisitor : ChainableQueryVisitor
 }
 ```
 
+### 5. Understand Traversal Order for Nested Queries
+
+The base `VisitAsync(GroupNode)` only recurses into children -- it does not process the `GroupNode` itself. Where you place your logic relative to `base.VisitAsync()` determines whether your visitor is pre-order or post-order:
+
+```csharp
+public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+{
+    // PRE-ORDER: process this node before children
+    ProcessNode(node);
+    await base.VisitAsync(node, context);
+}
+
+public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+{
+    // POST-ORDER: process children before this node
+    await base.VisitAsync(node, context);
+    ProcessNode(node);
+}
+```
+
+For queries with nested field groups like `field:(-field:(value) OR other)`, both occurrences of the field are visited. Each node's `Field` property is independent -- there is no automatic field inheritance or path composition from parent groups. If your visitor needs to track nesting depth or field ancestry, you must implement that yourself using `node.Parent` or a depth counter in the visitor context.
+
+See [Nested Queries and Visitor Traversal](./nested-queries) for a complete breakdown of how the AST is structured and traversed for nested queries.
+
 ## Next Steps
 
+- [Nested Queries and Visitor Traversal](./nested-queries) - Nested query handling and traversal details
 - [Visitors](./visitors) - Built-in visitors reference
 - [Elasticsearch Integration](./elastic-query-parser) - Elasticsearch-specific visitors
 - [Validation](./validation) - Query validation

@@ -56,7 +56,7 @@ features:
   - icon: 📁
     title: Nested Documents
     details: Automatic handling of Elasticsearch nested document queries.
-    link: /guide/elastic-mappings
+    link: /guide/nested-queries
 ---
 
 ## Quick Example

@@ -377,6 +377,8 @@ aggs = await parser.BuildAggregationsAsync(
     "date:(created~month terms:(status count:_))");
 ```
 
+For details on how visitors traverse nested structures, see [Nested Queries and Visitor Traversal](./nested-queries).
+
 **Response structure for nested aggregations:**
 
 ```json

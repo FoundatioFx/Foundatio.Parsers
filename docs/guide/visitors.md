@@ -16,6 +16,21 @@ graph TD
     V3 --> Output[Result]
 ```
 
+## Traversal Order
+
+Visitors traverse the AST **depth-first, left-to-right**. The `GroupNode.Children` property yields `Left` first, then `Right`. The base class `QueryNodeVisitorBase.VisitAsync(GroupNode)` iterates these children in order but does **not** act on the GroupNode itself -- it only recurses into children.
+
+Whether a visitor processes a `GroupNode` before or after its children depends on where the subclass places its logic relative to the `base.VisitAsync()` call:
+
+- **Pre-order** (process node, then children): `FieldResolverQueryVisitor`, `NestedVisitor`
+- **Post-order** (process children, then node): `CombineQueriesVisitor`, `CombineAggregationsVisitor`
+- **Wrap-around** (before and after children): `ValidationVisitor`
+- **Short-circuit** (skip children): `InvertQueryVisitor` (when the entire group can be inverted at once)
+
+When multiple visitors are chained via `ChainedQueryVisitor`, each visitor completes a full traversal of the entire tree before the next visitor begins, in priority order (lower priority number runs first).
+
+For detailed coverage of how visitors handle nested and hierarchical query structures, field scoping, and the `@field:(-@field:(...))` pattern, see [Nested Queries and Visitor Traversal](./nested-queries).
+
 ## Built-in Visitors
 
 ### GenerateQueryVisitor
@@ -352,6 +367,7 @@ string tz = node.GetTimeZone();
 
 ## Next Steps
 
+- [Nested Queries and Visitor Traversal](./nested-queries) - Nested query handling and traversal details
 - [Custom Visitors](./custom-visitors) - Create your own visitors
 - [Elasticsearch Integration](./elastic-query-parser) - Elasticsearch-specific visitors
 - [Field Aliases](./field-aliases) - Field resolution

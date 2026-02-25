@@ -198,6 +198,8 @@ var resolver = parser.Configuration.MappingResolver;
 bool isNested = resolver.IsNestedPropertyType("comments");
 ```
 
+For more details on how nested queries are traversed and built, see [Nested Queries and Visitor Traversal](./nested-queries).
+
 ### Geo Query Fails
 
 **Cause:** Geo resolver not configured or returns invalid coordinates.

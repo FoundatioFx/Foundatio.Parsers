@@ -149,6 +149,8 @@ if (fieldType == FieldType.Double || fieldType == FieldType.Float)
 
 ## Nested Document Handling
 
+For a detailed explanation of how visitors traverse nested query structures, field scoping rules, and the full AST breakdown, see [Nested Queries and Visitor Traversal](./nested-queries).
+
 ### Automatic Nested Query Wrapping
 
 When `UseNested()` is enabled, queries on nested fields are automatically wrapped:
@@ -367,6 +369,7 @@ bool isNested = resolver.IsNestedPropertyType("comments");
 
 ## Next Steps
 
+- [Nested Queries and Visitor Traversal](./nested-queries) - How visitors handle nested document queries
 - [Elasticsearch Integration](./elastic-query-parser) - Full parser guide
 - [Query Syntax](./query-syntax) - Query syntax reference
 - [Aggregation Syntax](./aggregation-syntax) - Aggregation reference

@@ -351,6 +351,8 @@ var query = await parser.BuildQueryAsync("comments.author:john");
 Standard Elasticsearch `query_string` does not support nested documents. Foundatio.Parsers automatically detects nested fields and wraps queries appropriately.
 :::
 
+For a full explanation of how the AST is structured and traversed for nested queries, see [Nested Queries and Visitor Traversal](./nested-queries).
+
 ## Boosting
 
 Boost the relevance of specific terms:

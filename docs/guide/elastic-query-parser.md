@@ -290,10 +290,51 @@ Enable nested document support:
 var parser = new ElasticQueryParser(c => c
     .UseMappings(client, "my-index")
     .UseNested());
-
-// Queries on nested fields are automatically wrapped
-var query = await parser.BuildQueryAsync("comments.author:john");
 ```
+
+Calling `UseNested()` registers the `NestedVisitor` at priority 300 in the visitor chain. This visitor checks each `GroupNode` with a non-empty `Field` against the Elasticsearch mapping to determine if the field is a nested type. If it is, the visitor tags the node with a `NestedQuery` containing the resolved nested path.
+
+Later, `CombineQueriesVisitor` (priority 10000) assembles child queries and wraps them inside the `NestedQuery`, producing the correct Elasticsearch nested query structure automatically.
+
+### Grouped Nested Queries
+
+When querying nested fields, you can group them to produce a single nested query block:
+
+```csharp
+// Multiple nested fields grouped together
+var query = await parser.BuildQueryAsync(
+    "field1:value1 nested:(nested.field1:value1 nested.field4:4)");
+```
+
+This produces a top-level bool query combining a match on `field1` with a single `nested` query wrapping the inner terms.
+
+### Individual Nested Field Queries
+
+Queries on individual nested fields (without an explicit group) are also automatically wrapped:
+
+```csharp
+var query = await parser.BuildQueryAsync("nested.field4:5");
+```
+
+### Nested Aggregations
+
+Aggregations on nested fields are automatically wrapped in a nested aggregation:
+
+```csharp
+var aggs = await parser.BuildAggregationsAsync("terms:nested.field1 max:nested.field4");
+```
+
+### Known Limitations
+
+Nested support is actively being developed. Some scenarios are not yet fully covered:
+
+- Negated nested groups (e.g., `NOT nested:(nested.field1:value)`)
+- Deeply nested types (nested within nested mappings)
+- Same-field nesting patterns like `@field:(-@field:(value) OR other)`
+
+See PR [#143](https://github.com/FoundatioFx/Foundatio.Parsers/pull/143) for the latest progress.
+
+For a detailed explanation of how visitors traverse nested query structures, field scoping rules, and the full AST breakdown, see [Nested Queries and Visitor Traversal](./nested-queries).
 
 ## Runtime Fields
 
@@ -428,6 +469,7 @@ public class SearchService
 
 ## Next Steps
 
+- [Nested Queries and Visitor Traversal](./nested-queries) - Nested query handling and traversal details
 - [Elasticsearch Mappings](./elastic-mappings) - Mapping resolver details
 - [Aggregation Syntax](./aggregation-syntax) - Aggregation expression reference
 - [Query Syntax](./query-syntax) - Query syntax reference
