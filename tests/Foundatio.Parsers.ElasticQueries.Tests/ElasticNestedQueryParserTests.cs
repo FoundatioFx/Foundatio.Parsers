@@ -850,9 +850,9 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = Client.Search<MyNestedType>(d => d.Index(index)
-            .Query(q => q.Nested(n => n
+            .Query(q => q.Bool(b => b.Filter(f => f.Nested(n => n
                 .Path(p => p.Nested)
-                .Query(q2 => q2.Bool(b => b.Filter(f => f.Exists(e => e.Field("nested.field1"))))))));
+                .Query(q2 => q2.Exists(e => e.Field("nested.field1"))))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
