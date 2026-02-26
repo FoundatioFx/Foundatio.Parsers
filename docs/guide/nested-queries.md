@@ -371,6 +371,36 @@ parser.SetDefaultFields(["field1", "nested.field1", "nested.field2"]);
 
 Fields are grouped by their nested path. Non-nested fields use standard `match`/`term` queries, while nested fields from the same path are combined into a single `NestedQuery` with `multi_match` inside. Fields of different types (text vs keyword vs integer) are split into appropriate query types.
 
+### Exists and Missing Queries on Nested Fields
+
+Elasticsearch does not support plain `exists` queries on nested types without a `nested` query wrapper. The `NestedVisitor` handles this automatically for both `ExistsNode` and `MissingNode`, just like it does for term nodes.
+
+**Sub-field exists** -- `_exists_:nested.field1` checks whether a specific field within the nested object has a value:
+
+```json
+{
+  "nested": {
+    "path": "nested",
+    "query": { "exists": { "field": "nested.field1" } }
+  }
+}
+```
+
+**Root nested path exists** -- `_exists_:nested` checks whether the nested object itself exists (i.e., the array has at least one entry). This also requires the `nested` wrapper:
+
+```json
+{
+  "nested": {
+    "path": "nested",
+    "query": { "exists": { "field": "nested" } }
+  }
+}
+```
+
+**Missing queries** -- `_missing_:nested.field1` and `_missing_:nested` follow the same pattern but produce `bool { must_not: [exists] }` inside the nested wrapper.
+
+All four combinations (exists/missing on sub-field and root path) are handled by `HandleNestedFieldNodeAsync` in `NestedVisitor` and have full test coverage.
+
 ### Default Visitor Chain Priorities
 
 The `ElasticQueryParser` registers visitors in this order:
