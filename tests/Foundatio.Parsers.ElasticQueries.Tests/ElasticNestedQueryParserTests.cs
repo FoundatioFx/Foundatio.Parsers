@@ -911,6 +911,104 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
+    public async Task NestedExistsQuery_WithRootNestedPath_WrapsInNestedQuery()
+    {
+        // Arrange
+        string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Field1))
+            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
+                .Text(e => e.Name(n => n.Field1))
+                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyNestedType
+            {
+                Field1 = "parent1",
+                Nested = { new MyType { Field1 = "child1", Field4 = 5 } }
+            },
+            new MyNestedType
+            {
+                Field1 = "parent2",
+                Nested = { new MyType { Field1 = "child2", Field4 = 10 } }
+            },
+            new MyNestedType { Field1 = "parent3" }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
+
+        // Act
+        var result = await processor.BuildQueryAsync("_exists_:nested");
+
+        // Assert
+        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Query(_ => result));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = Client.Search<MyNestedType>(d => d.Index(index)
+            .Query(q => q.Bool(b => b.Filter(f => f.Nested(n => n
+                .Path(p => p.Nested)
+                .Query(q2 => q2.Exists(e => e.Field("nested"))))))));
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task NestedMissingQuery_WithRootNestedPath_WrapsInNestedQuery()
+    {
+        // Arrange
+        string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Field1))
+            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
+                .Text(e => e.Name(n => n.Field1))
+                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyNestedType
+            {
+                Field1 = "parent1",
+                Nested = { new MyType { Field1 = "child1", Field4 = 5 } }
+            },
+            new MyNestedType
+            {
+                Field1 = "parent2",
+                Nested = { new MyType { Field1 = "child2", Field4 = 10 } }
+            },
+            new MyNestedType { Field1 = "parent3" }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
+
+        // Act
+        var result = await processor.BuildQueryAsync("_missing_:nested", new ElasticQueryVisitorContext().UseScoring());
+
+        // Assert
+        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Query(_ => result));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = Client.Search<MyNestedType>(d => d.Index(index)
+            .Query(q => q.Nested(n => n
+                .Path(p => p.Nested)
+                .Query(q2 => q2.Bool(b => b.MustNot(mn => mn.Exists(e => e.Field("nested"))))))));
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
     public async Task NestedIndividualFieldQuery_WithAndCondition_CombinesIntoSingleNestedQueryWithMust()
     {
         // Arrange
