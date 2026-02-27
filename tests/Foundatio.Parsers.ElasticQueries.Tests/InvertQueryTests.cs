@@ -9,7 +9,6 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
@@ -138,7 +137,7 @@ public class InvertTest
 
 public class SampleDataFixture : ElasticsearchFixture
 {
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         await base.InitializeAsync();
 

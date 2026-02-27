@@ -6,7 +6,6 @@ using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 

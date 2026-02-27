@@ -196,7 +196,7 @@ public static class SqlNodeExtensions
                             builder.Append(argumentPrefix);
                             builder.Append(kvp.Key.Name);
                             builder.Append(", ");
-                            AppendField(builder, kvp.Key, token, context);
+                            AppendField(builder, kvp.Key, "\\\"*" + token + "*\\\"", context);
                             builder.Append(")");
                         }
                         else

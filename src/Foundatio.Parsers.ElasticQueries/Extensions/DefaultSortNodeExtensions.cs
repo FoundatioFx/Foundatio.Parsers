@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
@@ -25,13 +25,19 @@ public static class DefaultSortNodeExtensions
         if (fieldType == FieldType.GeoPoint)
             return GetGeoDistanceSortAsync(node, elasticContext, field).GetAwaiter().GetResult();
 
+        var fieldSort = new FieldSort(field)
+        {
+            UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType,
+            Order = node.IsNodeOrGroupNegated() ? SortOrder.Desc : SortOrder.Asc
+        };
+
+        string nestedPath = node.GetNestedPath();
+        if (nestedPath is not null)
+            fieldSort.Nested = new NestedSortValue { Path = nestedPath };
+
         return new SortOptions
         {
-            Field = new FieldSort(field)
-            {
-                UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType,
-                Order = node.IsNodeOrGroupNegated() ? SortOrder.Desc : SortOrder.Asc
-            }
+            Field = fieldSort
         };
     }
 

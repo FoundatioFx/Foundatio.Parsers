@@ -63,6 +63,7 @@ public record AggregationMap(string Name, object Value)
             TopHitsAggregation topHits => new Aggregation { TopHits = topHits },
             PercentilesAggregation percentiles => new Aggregation { Percentiles = percentiles },
             GeohashGridAggregation geohashGrid => new Aggregation { GeohashGrid = geohashGrid },
+            NestedAggregation nested => new Aggregation { Nested = nested },
             _ => null
         };
 

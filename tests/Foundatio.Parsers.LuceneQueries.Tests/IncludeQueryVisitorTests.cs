@@ -6,7 +6,6 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Xunit;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
