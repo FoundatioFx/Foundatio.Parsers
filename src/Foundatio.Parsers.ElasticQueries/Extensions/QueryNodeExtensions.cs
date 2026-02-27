@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Nest;
@@ -82,5 +82,21 @@ public static class QueryNodeExtensions
     public static void RemoveSort(this IQueryNode node)
     {
         node.Data.Remove(SortKey);
+    }
+
+    private const string NestedPathKey = "@NestedPath";
+    public static string GetNestedPath(this IQueryNode node)
+    {
+        if (!node.Data.TryGetValue(NestedPathKey, out object value))
+            return null;
+
+        return value as string;
+    }
+
+    public static void SetNestedPath(this IQueryNode node, string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
+        node.Data[NestedPathKey] = path;
     }
 }

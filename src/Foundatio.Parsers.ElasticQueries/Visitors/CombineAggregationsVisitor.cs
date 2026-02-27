@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -15,36 +14,62 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
     {
         await base.VisitAsync(node, context).ConfigureAwait(false);
 
-        if (context is not IElasticQueryVisitorContext elasticContext)
+        // Skip fieldless intermediate groups; their children are collected
+        // by GetLeafFieldNodes from the nearest root or named-field ancestor.
+        if (node.Parent is not null && String.IsNullOrEmpty(node.Field))
+            return;
+
+        if (context is not IElasticQueryVisitorContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
         var container = await GetParentContainerAsync(node, context);
         var termsAggregation = container as ITermsAggregation;
 
-        foreach (var child in node.Children.OfType<IFieldQueryNode>())
+        var nestedAggregations = new Dictionary<string, List<(IFieldQueryNode Node, AggregationBase Agg)>>();
+        var regularAggregations = new List<(IFieldQueryNode Node, AggregationBase Agg)>();
+
+        foreach (var child in GetLeafFieldNodes(node))
         {
             var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
-            if (aggregation == null)
+            if (aggregation is null)
                 continue;
+
+            string nestedPath = child.GetNestedPath();
+            if (nestedPath is not null)
+            {
+                if (!nestedAggregations.ContainsKey(nestedPath))
+                    nestedAggregations[nestedPath] = new List<(IFieldQueryNode, AggregationBase)>();
+                nestedAggregations[nestedPath].Add((child, aggregation));
+            }
+            else
+            {
+                regularAggregations.Add((child, aggregation));
+            }
+        }
+
+        foreach (var (child, aggregation) in regularAggregations)
+        {
+            AddAggregation(container, termsAggregation, child, aggregation);
+        }
+
+        foreach (var (nestedPath, childAggregations) in nestedAggregations)
+        {
+            var nestedAgg = new NestedAggregation("nested_" + nestedPath)
+            {
+                Path = nestedPath,
+                Aggregations = new AggregationDictionary()
+            };
+
+            foreach (var (child, aggregation) in childAggregations)
+            {
+                nestedAgg.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                AddTermsOrder(termsAggregation, child, aggregation);
+            }
 
             if (container is BucketAggregationBase bucketContainer)
             {
-                if (bucketContainer.Aggregations == null)
-                    bucketContainer.Aggregations = new AggregationDictionary();
-
-                bucketContainer.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
-            }
-
-            if (termsAggregation != null && (child.Prefix == "-" || child.Prefix == "+"))
-            {
-                if (termsAggregation.Order == null)
-                    termsAggregation.Order = new List<TermsOrder>();
-
-                termsAggregation.Order.Add(new TermsOrder
-                {
-                    Key = ((IAggregation)aggregation).Name,
-                    Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
-                });
+                bucketContainer.Aggregations ??= new AggregationDictionary();
+                bucketContainer.Aggregations[((IAggregation)nestedAgg).Name] = (AggregationContainer)nestedAgg;
             }
         }
 
@@ -52,29 +77,99 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             node.SetAggregation(container);
     }
 
+    private static void AddAggregation(AggregationBase container, ITermsAggregation termsAggregation, IFieldQueryNode child, AggregationBase aggregation)
+    {
+        if (container is BucketAggregationBase bucketContainer)
+        {
+            bucketContainer.Aggregations ??= new AggregationDictionary();
+            bucketContainer.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+        }
+
+        AddTermsOrder(termsAggregation, child, aggregation);
+    }
+
+    private static void AddTermsOrder(ITermsAggregation termsAggregation, IFieldQueryNode child, AggregationBase aggregation)
+    {
+        if (termsAggregation is null || (child.Prefix != "-" && child.Prefix != "+"))
+            return;
+
+        termsAggregation.Order ??= new List<TermsOrder>();
+        termsAggregation.Order.Add(new TermsOrder
+        {
+            Key = ((IAggregation)aggregation).Name,
+            Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
+        });
+    }
+
+    /// <summary>
+    /// Collects all leaf IFieldQueryNode descendants in the same order as the original
+    /// recursive post-order visitor. In a right-recursive AST, the Right subtree is
+    /// processed via recursion before the Left child is yielded at each level.
+    /// GroupNodes with a Field (explicit nested groups) are returned as-is.
+    /// </summary>
+    private static IEnumerable<IFieldQueryNode> GetLeafFieldNodes(GroupNode node)
+    {
+        if (node.Right is GroupNode rightGroup && String.IsNullOrEmpty(rightGroup.Field))
+        {
+            foreach (var descendant in GetLeafFieldNodes(rightGroup))
+                yield return descendant;
+
+            if (node.Left is GroupNode leftGroup && String.IsNullOrEmpty(leftGroup.Field))
+            {
+                foreach (var descendant in GetLeafFieldNodes(leftGroup))
+                    yield return descendant;
+            }
+            else if (node.Left is IFieldQueryNode leftField)
+            {
+                yield return leftField;
+            }
+        }
+        else
+        {
+            if (node.Left is GroupNode leftGroup && String.IsNullOrEmpty(leftGroup.Field))
+            {
+                foreach (var descendant in GetLeafFieldNodes(leftGroup))
+                    yield return descendant;
+            }
+            else if (node.Left is IFieldQueryNode leftField)
+            {
+                yield return leftField;
+            }
+
+            if (node.Right is GroupNode rightGroupWithField)
+            {
+                yield return rightGroupWithField;
+            }
+            else if (node.Right is IFieldQueryNode rightField)
+            {
+                yield return rightField;
+            }
+        }
+    }
+
     private async Task<AggregationBase> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context)
     {
         AggregationBase container = null;
         var currentNode = node;
-        while (container == null && currentNode != null)
+        while (container is null && currentNode is not null)
         {
             IQueryNode n = currentNode;
             container = await n.GetAggregationAsync(async () =>
             {
                 var result = await n.GetDefaultAggregationAsync(context);
-                if (result != null)
+                if (result is not null)
                     n.SetAggregation(result);
 
                 return result;
             });
 
-            if (currentNode.Parent != null)
+            if (currentNode.Parent is not null)
                 currentNode = currentNode.Parent;
             else
                 break;
         }
 
-        if (container == null)
+        if (container is null)
         {
             container = new ChildrenAggregation(null, null);
             currentNode.SetAggregation(container);
