@@ -88,6 +88,12 @@ public interface IFieldQueryWithProximityAndBoostNode : IFieldQueryNode
     /// <summary>
     /// The proximity/slop factor (~) for fuzzy or phrase proximity searches.
     /// </summary>
+    /// <remarks>
+    /// Non-null when the tilde (~) operator is present.
+    /// For unquoted terms (e.g., <c>roam~0.8</c>), this indicates a fuzzy search with edit distance.
+    /// For quoted terms (e.g., <c>"jakarta apache"~10</c>), this indicates a phrase proximity search with word slop.
+    /// An empty string means the bare tilde was used with no explicit value (e.g., <c>term~</c>).
+    /// </remarks>
     string Proximity { get; set; }
 
     /// <summary>

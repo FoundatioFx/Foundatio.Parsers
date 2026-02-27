@@ -1,4 +1,4 @@
-﻿#define ENABLE_TRACING
+#define ENABLE_TRACING
 
 using System;
 using System.Threading.Tasks;
@@ -515,6 +515,62 @@ public class QueryParserTests : TestWithLoggingBase
 
         await new AssignOperationTypeVisitor().AcceptAsync(result, null);
         _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
+    }
+
+    [Theory]
+    [InlineData("term~", null, false, "")]
+    [InlineData("term~1", null, false, "1")]
+    [InlineData("roam~0.8", null, false, "0.8")]
+    [InlineData("\"phrase query\"~2", null, true, "2")]
+    [InlineData("field:term~", "field", false, "")]
+    [InlineData("field:\"phrase\"~3", "field", true, "3")]
+    public void Parse_WithProximityModifier_SetsProximityOnTermNode(string query, string expectedField, bool expectedQuoted, string expectedProximity)
+    {
+        var parser = new LuceneQueryParser();
+        var result = parser.Parse(query);
+
+        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
+        string generatedQuery = GenerateQueryVisitor.Run(result);
+        Assert.Equal(query, generatedQuery);
+
+        var termNode = result.Left as TermNode;
+        Assert.NotNull(termNode);
+        Assert.Equal(expectedField, termNode.Field);
+        Assert.Equal(expectedQuoted, termNode.IsQuotedTerm);
+        Assert.Equal(expectedProximity, termNode.Proximity);
+    }
+
+    [Fact]
+    public void Parse_WithFuzzyTermInGroup_SetsProximityOnInnerTermNode()
+    {
+        var parser = new LuceneQueryParser();
+        var result = parser.Parse("searchKeywords:(\"Wellness\"~)");
+
+        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
+        string generatedQuery = GenerateQueryVisitor.Run(result);
+        Assert.Equal("searchKeywords:(\"Wellness\"~)", generatedQuery);
+
+        var groupNode = result.Left as GroupNode;
+        Assert.NotNull(groupNode);
+        Assert.Equal("searchKeywords", groupNode.Field);
+        Assert.True(groupNode.HasParens);
+
+        var termNode = groupNode.Left as TermNode;
+        Assert.NotNull(termNode);
+        Assert.Equal("Wellness", termNode.Term);
+        Assert.True(termNode.IsQuotedTerm);
+        Assert.Equal("", termNode.Proximity);
+    }
+
+    [Fact]
+    public void Parse_WithoutProximityModifier_ProximityIsNull()
+    {
+        var parser = new LuceneQueryParser();
+        var result = parser.Parse("field:value");
+
+        var termNode = result.Left as TermNode;
+        Assert.NotNull(termNode);
+        Assert.Null(termNode.Proximity);
     }
 }
 

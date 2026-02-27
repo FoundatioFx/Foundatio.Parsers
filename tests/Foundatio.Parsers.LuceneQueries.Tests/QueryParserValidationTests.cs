@@ -1,4 +1,4 @@
-﻿#define ENABLE_TRACING
+#define ENABLE_TRACING
 
 using System;
 using System.Threading.Tasks;
@@ -65,6 +65,11 @@ public class QueryParserValidationTests : TestWithLoggingBase
     [InlineData("roam~0.8")]
     [InlineData("criter^2")]
     [InlineData("\"blah criter\"~1")]
+    [InlineData("field:(\"Wellness\"~)")]
+    [InlineData("field:(\"Wellness\"~2)")]
+    [InlineData("field:\"Wellness\"~")]
+    [InlineData("field:Wellness~")]
+    [InlineData("field:Wellness~2")]
     [InlineData("count:>1")]
     [InlineData(@"book.\*:test")]
     [InlineData("count:>=1")]
