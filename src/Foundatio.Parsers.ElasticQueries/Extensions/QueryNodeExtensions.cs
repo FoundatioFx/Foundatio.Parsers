@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Nest;
@@ -95,6 +95,8 @@ public static class QueryNodeExtensions
 
     public static void SetNestedPath(this IQueryNode node, string path)
     {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
         node.Data[NestedPathKey] = path;
     }
 }

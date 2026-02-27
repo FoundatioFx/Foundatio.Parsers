@@ -43,11 +43,10 @@ public static class DefaultQueryNodeExtensions
             return GetSingleFieldQuery(node, field, elasticContext);
 
         // If only one default field, use single-field query
-        if (defaultFields != null && defaultFields.Length == 1)
+        if (defaultFields is { Length: 1 })
             return GetSingleFieldQuery(node, defaultFields[0], elasticContext);
 
-        // Multiple default fields - check if any are nested
-        if (defaultFields != null && defaultFields.Length > 1)
+        if (defaultFields is { Length: > 1 })
         {
             // Group fields by nested path (empty string for non-nested)
             var fieldsByNestedPath = GroupFieldsByNestedPath(defaultFields, elasticContext);
@@ -70,6 +69,7 @@ public static class DefaultQueryNodeExtensions
     {
         if (context.MappingResolver.IsPropertyAnalyzed(field))
         {
+            // MatchQuery treats '*' as literal; PrefixQuery only works on non-analyzed fields.
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
                 return new QueryStringQuery
@@ -134,7 +134,7 @@ public static class DefaultQueryNodeExtensions
     private static QueryBase GetMultiFieldQuery(TermNode node, string[] fields, IElasticQueryVisitorContext context)
     {
         // Handle null or empty fields - use default multi_match behavior
-        if (fields == null || fields.Length == 0)
+        if (fields is null or { Length: 0 })
         {
             var defaultQuery = new MultiMatchQuery
             {
@@ -169,7 +169,8 @@ public static class DefaultQueryNodeExtensions
             return GetNonAnalyzedFieldsQuery(node, nonAnalyzedFields, context);
         }
 
-        // Mixed types - combine with bool should
+        // multi_match doesn't work well across analyzed + non-analyzed field types,
+        // so split into separate queries and combine with bool should.
         var queries = new List<QueryBase>();
 
         // Add query for analyzed fields
@@ -255,7 +256,7 @@ public static class DefaultQueryNodeExtensions
     {
         string[] nameParts = fullName?.Split('.');
 
-        if (nameParts == null || nameParts.Length == 0)
+        if (nameParts is null or { Length: 0 })
             return null;
 
         var builder = new StringBuilder();
@@ -292,7 +293,8 @@ public static class DefaultQueryNodeExtensions
                     Query = query
                 });
             }
-            else if (query is BoolQuery boolQuery && boolQuery.Should != null)
+            // Flatten inner should clauses to avoid unnecessary bool nesting.
+            else if (query is BoolQuery boolQuery && boolQuery.Should is not null)
             {
                 foreach (var shouldClause in boolQuery.Should)
                     queryContainers.Add(shouldClause);

@@ -1118,6 +1118,253 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         Assert.Equal(1, actualResponse.Total);
     }
 
+    [Fact]
+    public async Task NestedSort_WithNestedField_AddsNestedPathToSort()
+    {
+        // Arrange
+        string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Field1))
+            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
+                .Text(e => e.Name(n => n.Field1))
+                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyNestedType { Field1 = "a", Nested = { new MyType { Field4 = 10 } } },
+            new MyNestedType { Field1 = "b", Nested = { new MyType { Field4 = 1 } } },
+            new MyNestedType { Field1 = "c", Nested = { new MyType { Field4 = 5 } } }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
+
+        // Act
+        var sort = await processor.BuildSortAsync("-nested.field4");
+
+        // Assert
+        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Sort(sort));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = Client.Search<MyNestedType>(d => d.Index(index)
+            .Sort(s => s.Field(f => f
+                .Field("nested.field4")
+                .Order(SortOrder.Descending)
+                .UnmappedType(FieldType.Integer)
+                .Nested(n => n.Path("nested")))));
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.True(actualResponse.IsValid);
+    }
+
+    [Fact]
+    public async Task NestedQuery_WithWildcardOnAnalyzedField_WrapsQueryStringInNestedQuery()
+    {
+        // Arrange
+        string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Field1))
+            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
+                .Text(e => e.Name(n => n.Field1))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyNestedType { Nested = { new MyType { Field1 = "testing" } } },
+            new MyNestedType { Nested = { new MyType { Field1 = "other" } } }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
+
+        // Act
+        var result = await processor.BuildQueryAsync("nested.field1:test*", new ElasticQueryVisitorContext().UseScoring());
+
+        // Assert
+        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Query(_ => result));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = Client.Search<MyNestedType>(d => d.Index(index)
+            .Query(q => q.Nested(n => n
+                .Path(p => p.Nested)
+                .Query(q2 => q2.QueryString(qs => qs
+                    .Fields(f => f.Field("nested.field1"))
+                    .AllowLeadingWildcard(false)
+                    .AnalyzeWildcard()
+                    .Query("test*"))))));
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        Assert.Equal(1, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task NestedQuery_WithWildcardOnNonAnalyzedField_WrapsPrefixInNestedQuery()
+    {
+        // Arrange
+        string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Field1))
+            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
+                .Keyword(e => e.Name(n => n.Field1))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyNestedType { Nested = { new MyType { Field1 = "testing" } } },
+            new MyNestedType { Nested = { new MyType { Field1 = "other" } } }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
+
+        // Act
+        var result = await processor.BuildQueryAsync("nested.field1:test*", new ElasticQueryVisitorContext().UseScoring());
+
+        // Assert
+        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Query(_ => result));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = Client.Search<MyNestedType>(d => d.Index(index)
+            .Query(q => q.Nested(n => n
+                .Path(p => p.Nested)
+                .Query(q2 => q2.Prefix(pq => pq
+                    .Field("nested.field1")
+                    .Value("test"))))));
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        Assert.Equal(1, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task NestedQuery_WithDeeplyNestedType_ProducesNestedWrapper()
+    {
+        // Arrange
+        string index = CreateRandomIndex<MyDeeplyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Field1))
+            .Nested<MyMiddleNestedType>(r => r.Name(n => n.Parent.First()).Properties(p1 => p1
+                .Text(e => e.Name(n => n.Field1))
+                .Nested<MyType>(r2 => r2.Name(n => n.Child.First()).Properties(p2 => p2
+                    .Text(e => e.Name(n => n.Field1))
+                    .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+                ))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyDeeplyNestedType
+            {
+                Field1 = "root",
+                Parent =
+                {
+                    new MyMiddleNestedType
+                    {
+                        Field1 = "mid",
+                        Child = { new MyType { Field1 = "deep_value", Field4 = 42 } }
+                    }
+                }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyDeeplyNestedType>(Client).UseNested());
+
+        // Act - query a field on the first level of nesting
+        var result = await processor.BuildQueryAsync("parent.field1:mid", new ElasticQueryVisitorContext().UseScoring());
+
+        // Assert
+        var actualResponse = Client.Search<MyDeeplyNestedType>(d => d.Index(index).Query(_ => result));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = Client.Search<MyDeeplyNestedType>(d => d.Index(index)
+            .Query(q => q.Nested(n => n
+                .Path("parent")
+                .Query(q2 => q2.Match(m => m.Field("parent.field1").Query("mid"))))));
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        Assert.Equal(1, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task NestedQuery_WithSameFieldAtMultipleLevels_BuildsCorrectBooleanStructure()
+    {
+        // Arrange
+        string index = CreateRandomIndex<MyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Field1))
+            .Nested<MyType>(r => r.Name(n => n.Nested.First()).Properties(p1 => p1
+                .Text(e => e.Name(n => n.Field1))
+                .Number(e => e.Name(n => n.Field4).Type(NumberType.Integer))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyNestedType
+            {
+                Field1 = "parent1",
+                Nested = { new MyType { Field1 = "excluded", Field4 = 5 } }
+            },
+            new MyNestedType
+            {
+                Field1 = "parent2",
+                Nested = { new MyType { Field1 = "other", Field4 = 10 } }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
+
+        // Act - nested group containing negation and alternative
+        var result = await processor.BuildQueryAsync("nested:(-nested:(nested.field1:excluded) OR nested.field4:10)", new ElasticQueryVisitorContext().UseScoring());
+
+        // Assert
+        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Query(_ => result));
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = Client.Search<MyNestedType>(d => d.Index(index)
+            .Query(q => q.Nested(n => n
+                .Path(p => p.Nested)
+                .Query(q2 =>
+                    q2.Bool(b => b.MustNot(mn => mn.Nested(n2 => n2
+                        .Path(p => p.Nested)
+                        .Query(nq => nq.Match(m => m.Field("nested.field1").Query("excluded"))))))
+                    || q2.Term(t => t.Field("nested.field4").Value(10))))));
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    public class MyDeeplyNestedType
+    {
+        public string Field1 { get; set; }
+        public IList<MyMiddleNestedType> Parent { get; set; } = new List<MyMiddleNestedType>();
+    }
+
+    public class MyMiddleNestedType
+    {
+        public string Field1 { get; set; }
+        public IList<MyType> Child { get; set; } = new List<MyType>();
+    }
+
     public class MyNestedType
     {
         public string Field1 { get; set; }

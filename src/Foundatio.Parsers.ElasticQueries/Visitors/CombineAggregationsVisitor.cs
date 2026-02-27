@@ -14,7 +14,9 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
     {
         await base.VisitAsync(node, context).ConfigureAwait(false);
 
-        if (node.Parent != null && String.IsNullOrEmpty(node.Field))
+        // Skip fieldless intermediate groups; their children are collected
+        // by GetLeafFieldNodes from the nearest root or named-field ancestor.
+        if (node.Parent is not null && String.IsNullOrEmpty(node.Field))
             return;
 
         if (context is not IElasticQueryVisitorContext)
@@ -29,11 +31,11 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         foreach (var child in GetLeafFieldNodes(node))
         {
             var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
-            if (aggregation == null)
+            if (aggregation is null)
                 continue;
 
             string nestedPath = child.GetNestedPath();
-            if (nestedPath != null)
+            if (nestedPath is not null)
             {
                 if (!nestedAggregations.ContainsKey(nestedPath))
                     nestedAggregations[nestedPath] = new List<(IFieldQueryNode, AggregationBase)>();
@@ -88,7 +90,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
     private static void AddTermsOrder(ITermsAggregation termsAggregation, IFieldQueryNode child, AggregationBase aggregation)
     {
-        if (termsAggregation == null || (child.Prefix != "-" && child.Prefix != "+"))
+        if (termsAggregation is null || (child.Prefix != "-" && child.Prefix != "+"))
             return;
 
         termsAggregation.Order ??= new List<TermsOrder>();
@@ -149,25 +151,25 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
     {
         AggregationBase container = null;
         var currentNode = node;
-        while (container == null && currentNode != null)
+        while (container is null && currentNode is not null)
         {
             IQueryNode n = currentNode;
             container = await n.GetAggregationAsync(async () =>
             {
                 var result = await n.GetDefaultAggregationAsync(context);
-                if (result != null)
+                if (result is not null)
                     n.SetAggregation(result);
 
                 return result;
             });
 
-            if (currentNode.Parent != null)
+            if (currentNode.Parent is not null)
                 currentNode = currentNode.Parent;
             else
                 break;
         }
 
-        if (container == null)
+        if (container is null)
         {
             container = new ChildrenAggregation(null, null);
             currentNode.SetAggregation(container);

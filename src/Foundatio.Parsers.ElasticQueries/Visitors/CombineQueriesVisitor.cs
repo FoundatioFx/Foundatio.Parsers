@@ -22,7 +22,10 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         QueryBase query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
         QueryBase container = query;
         var nested = query as NestedQuery;
-        if (nested != null && node.Parent != null)
+
+        // Reset container for non-root nested groups so children combine into a fresh
+        // query that becomes the NestedQuery's inner query at the end of this method.
+        if (nested is not null && node.Parent is not null)
             container = null;
 
         var op = GetEffectiveOperator(node, elasticContext);
@@ -33,11 +36,14 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         foreach (var child in node.Children.OfType<IFieldQueryNode>())
         {
             var childQuery = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).ConfigureAwait(false);
-            if (childQuery == null) continue;
+            if (childQuery is null)
+                continue;
 
-            bool isExplicitNestedGroup = child is GroupNode groupChild && groupChild.GetNestedPath() != null;
+            // Explicit nested groups (e.g., nested:(...)) were already combined by a recursive
+            // visit, so treat them as atomic queries rather than coalescing their inner queries.
+            bool isExplicitNestedGroup = child is GroupNode groupChild && groupChild.GetNestedPath() is not null;
 
-            if (childQuery is NestedQuery childNested && childNested.Path != null && !isExplicitNestedGroup)
+            if (childQuery is NestedQuery childNested && childNested.Path is not null && !isExplicitNestedGroup)
             {
                 string pathKey = childNested.Path.Name;
                 if (!nestedQueries.ContainsKey(pathKey))
@@ -75,7 +81,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             container = Combine(container, combinedNested, op);
         }
 
-        if (nested != null)
+        if (nested is not null)
         {
             nested.Query = container;
             node.SetQuery(nested);

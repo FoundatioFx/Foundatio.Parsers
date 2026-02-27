@@ -17,11 +17,11 @@ public class NestedVisitor : ChainableQueryVisitor
             return base.VisitAsync(node, context);
 
         string nestedProperty = GetNestedProperty(node.Field, context);
-        if (nestedProperty == null)
+        if (nestedProperty is null)
             return base.VisitAsync(node, context);
 
         node.SetNestedPath(nestedProperty);
-        if (context.QueryType != QueryTypes.Aggregation)
+        if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
             node.SetQuery(new NestedQuery { Path = nestedProperty });
 
         return base.VisitAsync(node, context);
@@ -54,41 +54,34 @@ public class NestedVisitor : ChainableQueryVisitor
             return;
 
         string nestedProperty = GetNestedProperty(node.Field, context);
-        if (nestedProperty == null)
+        if (nestedProperty is null)
             return;
 
-        if (context.QueryType == QueryTypes.Aggregation)
+        if (context.QueryType is QueryTypes.Aggregation or QueryTypes.Sort)
         {
-            // For aggregations, just mark the node with its nested path
             node.SetNestedPath(nestedProperty);
         }
         else if (context.QueryType == QueryTypes.Query)
         {
-            // For queries, wrap the query in a nested query
             var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context));
-            if (innerQuery == null)
+            if (innerQuery is null)
                 return;
 
-            var nestedQuery = new NestedQuery
-            {
-                Path = nestedProperty,
-                Query = innerQuery
-            };
-
-            node.SetQuery(nestedQuery);
+            node.SetQuery(new NestedQuery { Path = nestedProperty, Query = innerQuery });
         }
     }
 
     private static bool IsInsideNestedGroup(IQueryNode node)
     {
         var parent = node.Parent;
-        while (parent != null)
+        while (parent is not null)
         {
-            if (parent is GroupNode groupNode && groupNode.GetNestedPath() != null)
+            if (parent is GroupNode groupNode && groupNode.GetNestedPath() is not null)
                 return true;
 
             parent = parent.Parent;
         }
+
         return false;
     }
 
@@ -96,7 +89,7 @@ public class NestedVisitor : ChainableQueryVisitor
     {
         string[] nameParts = fullName?.Split('.');
 
-        if (nameParts == null || context is not IElasticQueryVisitorContext elasticContext || nameParts.Length == 0)
+        if (nameParts is null || context is not IElasticQueryVisitorContext elasticContext || nameParts is { Length: 0 })
             return null;
 
         var builder = new StringBuilder();

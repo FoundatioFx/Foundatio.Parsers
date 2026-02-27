@@ -165,6 +165,9 @@ public static string[] GetDefaultFields(this IQueryNode node, string[] rootDefau
 ```csharp
 public static GroupNode GetGroupNode(this IQueryNode node, bool onlyParensOrRoot = true)
 {
+    if (node is null)
+        return null;
+
     var current = node;
     do
     {
@@ -173,6 +176,7 @@ public static GroupNode GetGroupNode(this IQueryNode node, bool onlyParensOrRoot
             return groupNode;
         current = current.Parent;
     } while (current != null);
+
     return null;
 }
 ```
@@ -299,11 +303,11 @@ public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
         return base.VisitAsync(node, context);
 
     string nestedProperty = GetNestedProperty(node.Field, context);
-    if (nestedProperty == null)
+    if (nestedProperty is null)
         return base.VisitAsync(node, context);
 
     node.SetNestedPath(nestedProperty);
-    if (context.QueryType != QueryTypes.Aggregation)
+    if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
         node.SetQuery(new NestedQuery { Path = nestedProperty });
 
     return base.VisitAsync(node, context);
@@ -319,10 +323,10 @@ private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisito
         return;
 
     string nestedProperty = GetNestedProperty(node.Field, context);
-    if (nestedProperty == null)
+    if (nestedProperty is null)
         return;
 
-    if (context.QueryType == QueryTypes.Aggregation)
+    if (context.QueryType is QueryTypes.Aggregation or QueryTypes.Sort)
         node.SetNestedPath(nestedProperty);
     else if (context.QueryType == QueryTypes.Query)
     {
@@ -356,6 +360,18 @@ This grouping ensures that multiple individual nested field terms targeting the 
 3. Wrapping grouped aggregations in a `NestedAggregation` with the appropriate path
 
 For example, `terms:nested.field1 max:nested.field4` produces a single `nested` aggregation containing both the `terms` and `max` sub-aggregations.
+
+### Nested Sort Support
+
+When sorting by a nested field (e.g., `-nested.field4`), `NestedVisitor` tags the `TermNode` with its nested path. `DefaultSortNodeExtensions.GetDefaultSort` reads this tag and adds a `Nested` property to the `FieldSort`:
+
+```csharp
+string nestedPath = node.GetNestedPath();
+if (nestedPath is not null)
+    sort.Nested = new NestedSort { Path = nestedPath };
+```
+
+This produces the correct Elasticsearch sort clause with the required `nested` context.
 
 ### Default Fields with Nested Types
 
@@ -430,36 +446,6 @@ Note: `NestedVisitor` does cache the resolved nested path on each `GroupNode` vi
 ### Depth Tracking
 
 Only `ValidationVisitor` tracks nesting depth, and only for the purpose of enforcing `AllowedMaxNodeDepth`. There is no generic depth counter in `IQueryVisitorContext`. Any visitor that needs depth awareness must implement its own tracking.
-
-### Resolved Scenarios
-
-The following scenarios now have test coverage and working implementations:
-
-- **Negated nested groups**: `NOT nested:(nested.field1:value)` correctly produces `must_not` nested queries
-- **Individual nested field wrapping**: `nested.field1:value` automatically wraps in a `NestedQuery` without requiring the explicit `nested:(...)` syntax
-- **Multiple nested fields combining (AND)**: `nested.field1:value1 AND nested.field4:5` combines into a single `NestedQuery` with a `must` boolean
-- **Multiple nested fields combining (OR)**: `nested.field1:target OR nested.field4:10` combines into a single `NestedQuery` with a `should` boolean
-- **Range queries on nested fields**: `nested.field4:[10 TO 20]` wraps in a `NestedQuery`
-- **Exists on nested fields**: `_exists_:nested.field1` wraps the `ExistsQuery` in a `NestedQuery`
-- **Exists on root nested path**: `_exists_:nested` (the nested object itself) wraps in a `NestedQuery` with `ExistsQuery` targeting the path
-- **Missing on nested fields**: `_missing_:nested.field1` wraps the `MustNot(ExistsQuery)` in a `NestedQuery`
-- **Missing on root nested path**: `_missing_:nested` (the nested object itself) wraps in a `NestedQuery` with `MustNot(ExistsQuery)` targeting the path
-- **Mixed nested and non-nested explicit fields**: `field1:value nested.field1:value` produces a regular match for the non-nested field and a `NestedQuery` for the nested field
-- **Nested aggregations**: `terms:nested.field1 max:nested.field4` wraps in a single `NestedAggregation`
-- **Nested aggregations with include/exclude**: `terms:(nested.field1 @include:apple @include:banana)` correctly handles include/exclude within nested aggregation groups
-- **Default fields with nested types**: Mixed nested and non-nested default fields split into appropriate query structures
-- **Mixed query and aggregation operations**: Nested fields work correctly in both query and aggregation contexts simultaneously
-
-### Untested Scenarios
-
-The following scenarios do not currently have test coverage:
-
-- **Deeply nested types**: Nested mappings within nested mappings (e.g., `parent.child:(parent.child.field:value)` where both `parent` and `parent.child` are nested types)
-- **Same-field nesting**: The pattern `@field:(-@field:(value) OR other)` where the same logical field appears at multiple nesting levels
-
-### Known Limitations
-
-- **Nested sort**: `GetSortFieldsVisitor` and `DefaultSortNodeExtensions` do not add nested context to sort operations. Elasticsearch requires a `nested` property in the sort clause for nested fields. Sorting on nested fields is not currently supported and will produce incorrect queries. This is a pre-existing limitation, not introduced by the nested query support.
 
 ## Next Steps
 

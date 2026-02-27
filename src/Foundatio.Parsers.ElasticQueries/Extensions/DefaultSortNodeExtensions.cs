@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -23,6 +23,10 @@ public static class DefaultSortNodeExtensions
             UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType,
             Order = node.IsNodeOrGroupNegated() ? SortOrder.Descending : SortOrder.Ascending
         };
+
+        string nestedPath = node.GetNestedPath();
+        if (nestedPath is not null)
+            sort.Nested = new NestedSort { Path = nestedPath };
 
         return sort;
     }
