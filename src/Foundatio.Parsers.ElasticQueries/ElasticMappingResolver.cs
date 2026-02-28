@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -84,7 +85,7 @@ public class ElasticMappingResolver
         }
 
         string[] fieldParts = field.Split('.');
-        string resolvedFieldName = "";
+        var resolvedFieldName = new StringBuilder();
         var mappingServerTime = _lastMappingUpdate;
         var currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
 
@@ -120,23 +121,22 @@ public class ElasticMappingResolver
                 {
                     // we got updated mapping, start over from the top
                     depth = -1;
-                    resolvedFieldName = "";
+                    resolvedFieldName.Clear();
                     currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
                     continue;
                 }
 
                 if (fieldMapping is null)
                 {
-                    if (depth == 0)
-                        resolvedFieldName += fieldPart;
-                    else
-                        resolvedFieldName += "." + fieldPart;
+                    if (depth > 0)
+                        resolvedFieldName.Append('.');
+                    resolvedFieldName.Append(fieldPart);
 
                     // mapping is not fully resolved, append the rest of the parts unmodified and break
-                    if (fieldParts.Length - 1 > depth)
+                    for (int i = depth + 1; i < fieldParts.Length; i++)
                     {
-                        for (int i = depth + 1; i < fieldParts.Length; i++)
-                            resolvedFieldName += "." + fieldParts[i];
+                        resolvedFieldName.Append('.');
+                        resolvedFieldName.Append(fieldParts[i]);
                     }
 
                     break;
@@ -144,15 +144,9 @@ public class ElasticMappingResolver
             }
             else
             {
-                // TryGetProperty succeeded, store the PropertyName used
-                foreach (var kvp in (IDictionary<PropertyName, IProperty>)currentProperties)
-                {
-                    if (kvp.Value == fieldMapping)
-                    {
-                        foundPropertyName = kvp.Key;
-                        break;
-                    }
-                }
+                // TryGetProperty succeeded, find the PropertyName key for this mapping
+                foundPropertyName = ((IDictionary<PropertyName, IProperty>)currentProperties)
+                    .FirstOrDefault(kvp => kvp.Value == fieldMapping).Key;
             }
 
             // Determine the property name - use foundPropertyName if available, otherwise fall back to fieldPart
@@ -164,14 +158,13 @@ public class ElasticMappingResolver
             else
                 resolvedName = fieldPart;
 
-            if (depth == 0)
-                resolvedFieldName += resolvedName;
-            else
-                resolvedFieldName += "." + resolvedName;
+            if (depth > 0)
+                resolvedFieldName.Append('.');
+            resolvedFieldName.Append(resolvedName);
 
             if (depth == fieldParts.Length - 1)
             {
-                var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping, mappingServerTime);
+                var resolvedMapping = new FieldMapping(resolvedFieldName.ToString(), fieldMapping, mappingServerTime);
                 _mappingCache.AddOrUpdate(field, resolvedMapping, (_, _) => resolvedMapping);
                 _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property?.Type);
 
@@ -199,7 +192,7 @@ public class ElasticMappingResolver
         }
 
         _logger.LogTrace("Mapping not found: {field}", field);
-        var notFoundMapping = new FieldMapping(resolvedFieldName, null, mappingServerTime);
+        var notFoundMapping = new FieldMapping(resolvedFieldName.ToString(), null, mappingServerTime);
         _mappingCache.AddOrUpdate(field, notFoundMapping, (_, _) => notFoundMapping);
 
         return notFoundMapping;

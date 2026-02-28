@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Elastic.Clients.Elasticsearch.Aggregations;
 
 namespace Foundatio.Parsers.ElasticQueries;
@@ -86,12 +87,9 @@ public class AggregationMap
 
         if (map.Meta.Count > 0)
         {
-            aggregation.Meta = new Dictionary<string, object>();
-            foreach (var kvp in map.Meta)
-            {
-                if (kvp.Value is not null)
-                    aggregation.Meta[kvp.Key] = kvp.Value;
-            }
+            aggregation.Meta = map.Meta
+                .Where(kvp => kvp.Value is not null)
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
             if (aggregation.Meta.Count == 0)
                 aggregation.Meta = null;

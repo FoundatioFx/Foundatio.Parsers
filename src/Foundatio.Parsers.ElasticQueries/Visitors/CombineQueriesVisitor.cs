@@ -43,7 +43,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             // visit, so treat them as atomic queries rather than coalescing their inner queries.
             bool isExplicitNestedGroup = child is GroupNode groupChild && groupChild.GetNestedPath() is not null;
 
-            var childNested = childQuery?.Nested;
+            var childNested = childQuery.Nested;
             if (childNested is not null && childNested.Path is not null && !isExplicitNestedGroup)
             {
                 string pathKey = childNested.Path.ToString();
