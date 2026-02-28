@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -70,18 +70,27 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         foreach (var (path, pathQueries) in nestedQueries)
         {
-            Query combinedInner = null;
+            Query combinedIncluded = null;
             foreach (var (child, innerQuery) in pathQueries)
             {
-                Query q = innerQuery;
                 if (child.IsExcluded())
-                    q = !q;
-
-                combinedInner = Combine(combinedInner, q, op, useScoring);
+                {
+                    // Negate the NestedQuery wrapper, not the inner query, to avoid
+                    // matching documents that have any nested doc not matching the term.
+                    Query negatedNested = !(Query)(new NestedQuery(path, innerQuery));
+                    container = Combine(container, negatedNested, op, useScoring);
+                }
+                else
+                {
+                    combinedIncluded = Combine(combinedIncluded, innerQuery, op, useScoring);
+                }
             }
 
-            Query combinedNested = new NestedQuery(path, combinedInner);
-            container = Combine(container, combinedNested, op, useScoring);
+            if (combinedIncluded is not null)
+            {
+                Query combinedNested = new NestedQuery(path, combinedIncluded);
+                container = Combine(container, combinedNested, op, useScoring);
+            }
         }
 
         // If we have OR clauses and the container is a BoolQuery with only should clauses,

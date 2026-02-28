@@ -25,6 +25,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     {
         string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -50,6 +51,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     {
         string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -75,6 +77,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     {
         string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -122,6 +125,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     {
         string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
