@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
@@ -18,11 +18,11 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<ICollection<S
             return;
 
         var sort = node.GetSort(() => node.GetDefaultSort(context));
-        if (sort == null)
+        if (sort is null)
             return;
 
         // Check if the sort has a valid Field property set (discriminated union)
-        if (sort.Field == null && sort.GeoDistance == null && sort.Score == null && sort.Script == null)
+        if (sort.Field is null && sort.GeoDistance is null && sort.Score is null && sort.Script is null)
             return;
 
         _fields.Add(sort);

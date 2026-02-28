@@ -24,7 +24,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveSimpleCustomFilter()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -32,12 +32,12 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one)");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1"])))))));
+            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1"])))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -49,7 +49,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveCustomFilterContainingIncludes()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -57,12 +57,12 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one @include:3)");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1", "3"])))))));
+            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1", "3"])))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -74,7 +74,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveIncludeToCustomFilterContainingIgnoredInclude()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -82,12 +82,12 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor(), 1));
 
         var result = await processor.BuildQueryAsync("@include:test");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1", "3"])))))));
+            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Terms(m => m.Field("id").Terms(new TermsQueryField(["1", "3"])))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -121,7 +121,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
     public async Task CanResolveMultipleCustomFilters()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Id = "1" }, i => i.Index(index), TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
@@ -129,7 +129,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
             .AddVisitor(new CustomFilterVisitor()));
 
         var result = await processor.BuildQueryAsync("@custom:(one) OR (field1:Test @custom:(two))");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -152,7 +152,7 @@ public class CustomVisitorTests : ElasticsearchTestBase
                     )
                 )
             )
-        );
+        , TestCancellationToken);
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -57,7 +59,7 @@ public static class DefaultQueryNodeExtensions
                 return GetMultiFieldQuery(node, defaultFields, elasticContext);
             }
 
-            // Otherwise, split into separate queries for each group
+            // Otherwise, split into separate queries for each nested group
             return GetSplitNestedQuery(node, fieldsByNestedPath, elasticContext);
         }
 
@@ -69,7 +71,7 @@ public static class DefaultQueryNodeExtensions
     {
         if (context.MappingResolver.IsPropertyAnalyzed(field))
         {
-            // MatchQuery treats '*' as literal; PrefixQuery only works on non-analyzed fields.
+            // MatchQuery treats '*' as literal; use QueryStringQuery for wildcard support on analyzed fields
             if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
             {
                 return new QueryStringQuery(node.UnescapedTerm)
@@ -81,42 +83,109 @@ public static class DefaultQueryNodeExtensions
             }
 
             if (node.IsQuotedTerm)
-            {
                 return new MatchPhraseQuery(field, node.UnescapedTerm);
-            }
 
             return new MatchQuery(field, node.UnescapedTerm);
         }
 
         if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
-        {
             return new PrefixQuery(field, node.UnescapedTerm.TrimEnd('*'));
-        }
 
-        return new TermQuery(field, node.UnescapedTerm);
+        // For non-analyzed fields, convert value to appropriate type
+        FieldValue termValue = GetTypedFieldValue(node.UnescapedTerm, field, context);
+        return new TermQuery(field, termValue);
+    }
+
+    private static FieldValue GetTypedFieldValue(string value, string field, IElasticQueryVisitorContext context)
+    {
+        var fieldType = context.MappingResolver.GetFieldType(field);
+
+        return fieldType switch
+        {
+            FieldType.Integer or FieldType.Short or FieldType.Byte when Int32.TryParse(value, out int intValue) => intValue,
+            FieldType.Long when Int64.TryParse(value, out long longValue) => longValue,
+            FieldType.Float or FieldType.HalfFloat when Single.TryParse(value, out float floatValue) => floatValue,
+            FieldType.Double or FieldType.ScaledFloat when Double.TryParse(value, out double doubleValue) => doubleValue,
+            FieldType.Boolean when Boolean.TryParse(value, out bool boolValue) => boolValue,
+            _ => value
+        };
     }
 
     private static Query GetMultiFieldQuery(TermNode node, string[] fields, IElasticQueryVisitorContext context)
     {
+        // Handle null or empty fields - use default multi_match behavior
+        if (fields is null or { Length: 0 })
+        {
+            var defaultQuery = new MultiMatchQuery(node.UnescapedTerm);
+            if (node.IsQuotedTerm)
+                defaultQuery.Type = TextQueryType.Phrase;
+            return defaultQuery;
+        }
+
+        // Split fields by analyzed vs non-analyzed
+        var analyzedFields = new List<string>();
+        var nonAnalyzedFields = new List<string>();
+
+        foreach (string field in fields)
+        {
+            if (context.MappingResolver.IsPropertyAnalyzed(field))
+                analyzedFields.Add(field);
+            else
+                nonAnalyzedFields.Add(field);
+        }
+
+        if (nonAnalyzedFields.Count == 0)
+            return GetAnalyzedFieldsQuery(node, analyzedFields.ToArray());
+
+        if (analyzedFields.Count == 0)
+            return GetNonAnalyzedFieldsQuery(node, nonAnalyzedFields, context);
+
+        // multi_match doesn't work well across analyzed + non-analyzed field types,
+        // so split into separate queries and combine with bool should.
+        var queries = new List<Query>();
+        queries.Add(GetAnalyzedFieldsQuery(node, analyzedFields.ToArray()));
+
+        foreach (string field in nonAnalyzedFields)
+            queries.Add(GetSingleFieldQuery(node, field, context));
+
+        return new BoolQuery { Should = queries };
+    }
+
+    private static Query GetAnalyzedFieldsQuery(TermNode node, string[] fields)
+    {
         if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
         {
-            var wildcardQuery = new QueryStringQuery(node.UnescapedTerm)
+            return new QueryStringQuery(node.UnescapedTerm)
             {
+                Fields = fields,
                 AllowLeadingWildcard = false,
                 AnalyzeWildcard = true
             };
-            if (fields is { Length: > 0 })
-                wildcardQuery.Fields = fields;
-            return wildcardQuery;
+        }
+
+        if (fields.Length == 1)
+        {
+            if (node.IsQuotedTerm)
+                return new MatchPhraseQuery(fields[0], node.UnescapedTerm);
+
+            return new MatchQuery(fields[0], node.UnescapedTerm);
         }
 
         var query = new MultiMatchQuery(node.UnescapedTerm);
-        if (fields is { Length: > 0 })
-            query.Fields = fields;
+        query.Fields = fields;
         if (node.IsQuotedTerm)
             query.Type = TextQueryType.Phrase;
 
         return query;
+    }
+
+    private static Query GetNonAnalyzedFieldsQuery(TermNode node, List<string> fields, IElasticQueryVisitorContext context)
+    {
+        if (fields.Count == 1)
+            return GetSingleFieldQuery(node, fields[0], context);
+
+        var queries = fields.Select(f => GetSingleFieldQuery(node, f, context)).ToList();
+        return new BoolQuery { Should = queries };
     }
 
     private static Dictionary<string, List<string>> GroupFieldsByNestedPath(string[] fields, IElasticQueryVisitorContext context)
@@ -174,7 +243,7 @@ public static class DefaultQueryNodeExtensions
             {
                 queryList.Add(new NestedQuery(nestedPath, query));
             }
-            // Flatten inner should clauses to avoid unnecessary bool nesting.
+            // Flatten inner should clauses to avoid unnecessary bool nesting
             else if (query is { Bool: { Should: not null } boolQuery })
             {
                 foreach (var shouldClause in boolQuery.Should)

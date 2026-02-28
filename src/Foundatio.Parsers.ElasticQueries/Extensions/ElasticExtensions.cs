@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
 using Elastic.Clients.Elasticsearch.Mapping;
-using Elastic.Clients.Elasticsearch.QueryDsl;
 using Elastic.Transport.Products.Elasticsearch;
 using Microsoft.Extensions.Logging;
 
@@ -20,24 +19,26 @@ public static class ElasticExtensions
     /// <summary>
     /// Parses a Lucene query string and applies it as the query for the search request.
     /// </summary>
-    /// <typeparam name="TDocument">The document type.</typeparam>
-    /// <param name="descriptor">The search request descriptor.</param>
-    /// <param name="query">The Lucene query string to parse.</param>
-    /// <param name="configure">Optional configuration for the ElasticQueryParser.</param>
-    /// <returns>The search request descriptor with the parsed query applied.</returns>
-    public static SearchRequestDescriptor<TDocument> QueryLuceneSyntax<TDocument>(
+    public static async Task<SearchRequestDescriptor<TDocument>> QueryLuceneSyntaxAsync<TDocument>(
         this SearchRequestDescriptor<TDocument> descriptor,
         string query,
         Action<ElasticQueryParserConfiguration> configure = null)
     {
         var parser = new ElasticQueryParser(configure);
-        var elasticQuery = parser.BuildQueryAsync(query).GetAwaiter().GetResult();
+        var elasticQuery = await parser.BuildQueryAsync(query).ConfigureAwait(false);
         return descriptor.Query(elasticQuery);
+    }
+
+    public static SearchRequestDescriptor<TDocument> QueryOnQueryString<TDocument>(
+        this SearchRequestDescriptor<TDocument> descriptor,
+        string query)
+    {
+        return descriptor.Query(q => q.QueryString(qs => qs.Query(query)));
     }
 
     public static SearchRequestDescriptor<TDocument> Aggregations<TDocument>(this SearchRequestDescriptor<TDocument> descriptor, AggregationMap aggregations)
     {
-        if (aggregations == null)
+        if (aggregations is null)
             return descriptor;
 
         return descriptor.Aggregations(aggregations.ToDictionary());
@@ -45,16 +46,22 @@ public static class ElasticExtensions
 
     public static bool IsBucketAggregation(this object aggregation)
     {
-        // NOTE FilterAggregate was called FilterAggregation in the past.
-        return aggregation is AdjacencyMatrixAggregation or AutoDateHistogramAggregation or ChildrenAggregation
-            or CompositeAggregation or DateHistogramAggregation or DateRangeAggregation or DiversifiedSamplerAggregation
-            or FilterAggregate or FiltersAggregation or GeoDistanceAggregation or GeohashGridAggregation
-            or GeotileGridAggregation or GlobalAggregation or HistogramAggregation or IpRangeAggregation
-            or MissingAggregation or MultiTermsAggregation or NestedAggregation or ParentAggregation or RangeAggregation
-            or RareTermsAggregation or ReverseNestedAggregation or SamplerAggregation or SignificantTermsAggregation
-            or SignificantTextAggregation or TermsAggregation or VariableWidthHistogramAggregation;
+        return aggregation is AdjacencyMatrixAggregation or AutoDateHistogramAggregation or CategorizeTextAggregation
+            or ChildrenAggregation or CompositeAggregation or DateHistogramAggregation or DateRangeAggregation
+            or DiversifiedSamplerAggregation or FiltersAggregation or FrequentItemSetsAggregation
+            or GeoDistanceAggregation or GeohashGridAggregation or GeohexGridAggregation or GeotileGridAggregation
+            or GlobalAggregation or HistogramAggregation or IpPrefixAggregation or IpRangeAggregation
+            or MissingAggregation or MultiTermsAggregation or NestedAggregation or ParentAggregation
+            or RandomSamplerAggregation or RangeAggregation or RareTermsAggregation or ReverseNestedAggregation
+            or SamplerAggregation or SignificantTermsAggregation or SignificantTextAggregation or TermsAggregation
+            or TimeSeriesAggregation or VariableWidthHistogramAggregation;
     }
 
+    /// <summary>
+    /// Returns the sub-fields (multi-fields) of a property. ES 9.x removed the base interface
+    /// accessor, so each concrete type must be matched. When upgrading the client, verify that
+    /// newly added property types are included here.
+    /// </summary>
     public static Properties GetFields(this IProperty property)
     {
         return property switch
@@ -65,6 +72,7 @@ public static class ElasticExtensions
             ByteNumberProperty p => p.Fields,
             CompletionProperty p => p.Fields,
             ConstantKeywordProperty p => p.Fields,
+            CountedKeywordProperty p => p.Fields,
             DateNanosProperty p => p.Fields,
             DateProperty p => p.Fields,
             DateRangeProperty p => p.Fields,
@@ -72,6 +80,7 @@ public static class ElasticExtensions
             DoubleNumberProperty p => p.Fields,
             DoubleRangeProperty p => p.Fields,
             DynamicProperty p => p.Fields,
+            ExponentialHistogramProperty p => p.Fields,
             FieldAliasProperty p => p.Fields,
             FlattenedProperty p => p.Fields,
             FloatNumberProperty p => p.Fields,
@@ -93,12 +102,15 @@ public static class ElasticExtensions
             Murmur3HashProperty p => p.Fields,
             NestedProperty p => p.Fields,
             ObjectProperty p => p.Fields,
+            PassthroughObjectProperty p => p.Fields,
             PercolatorProperty p => p.Fields,
             PointProperty p => p.Fields,
             RankFeatureProperty p => p.Fields,
             RankFeaturesProperty p => p.Fields,
+            RankVectorProperty p => p.Fields,
             ScaledFloatNumberProperty p => p.Fields,
             SearchAsYouTypeProperty p => p.Fields,
+            SemanticTextProperty p => p.Fields,
             ShapeProperty p => p.Fields,
             ShortNumberProperty p => p.Fields,
             SparseVectorProperty p => p.Fields,
@@ -144,13 +156,13 @@ public static class ElasticExtensions
         if (!String.IsNullOrEmpty(message))
             sb.AppendLine(message);
 
-        if (includeDebugInformation && elasticResponse.DebugInformation != null)
+        if (includeDebugInformation && elasticResponse.DebugInformation is not null)
             sb.AppendLine(elasticResponse.DebugInformation);
 
         if (elasticResponse.TryGetOriginalException(out var exception) && exception is not null)
             sb.AppendLine($"Original: [{exception.GetType().Name}] {exception.Message}");
 
-        if (elasticResponse.ElasticsearchServerError?.Error != null)
+        if (elasticResponse.ElasticsearchServerError?.Error is not null)
             sb.AppendLine($"Server Error (Index={elasticResponse.ElasticsearchServerError.Error?.Index}): {elasticResponse.ElasticsearchServerError.Error.Reason}");
 
         if (elasticResponse is BulkResponse bulkResponse)

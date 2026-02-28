@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Core.Search;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -115,9 +116,9 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture>
         _logger.LogInformation("{Result}", nodes);
         Assert.Equal(expected, invertedQuery);
 
-        var total = await Client.CountAsync<InvertTest>();
-        var results = await Client.SearchAsync<InvertTest>(s => s.QueryLuceneSyntax(query).TrackTotalHits(new TrackHits(true)));
-        var invertedResults = await Client.SearchAsync<InvertTest>(s => s.QueryLuceneSyntax(invertedQuery).TrackTotalHits(new TrackHits(true)));
+        var total = await Client.CountAsync<InvertTest>(c => c.Indices("test_invert"), TestCancellationToken);
+        var results = await Client.SearchAsync<InvertTest>(s => s.Indices("test_invert").QueryOnQueryString(query).TrackTotalHits(new TrackHits(true)), TestCancellationToken);
+        var invertedResults = await Client.SearchAsync<InvertTest>(s => s.Indices("test_invert").QueryOnQueryString(invertedQuery).TrackTotalHits(new TrackHits(true)), TestCancellationToken);
 
         Assert.Equal(total.Count, results.Total + invertedResults.Total);
     }
@@ -144,7 +145,9 @@ public class SampleDataFixture : ElasticsearchFixture
         const string indexName = "test_invert";
 
         // Delete the index if it already exists to ensure clean state
-        await Client.Indices.DeleteAsync(indexName);
+        var existsResponse = await Client.Indices.ExistsAsync(indexName);
+        if (existsResponse.Exists)
+            await Client.Indices.DeleteAsync(indexName);
 
         await CreateNamedIndexAsync<InvertTest>(indexName, m => m
             .Properties(p => p

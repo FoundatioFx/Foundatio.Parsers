@@ -22,7 +22,7 @@ public class NestedVisitor : ChainableQueryVisitor
 
         node.SetNestedPath(nestedProperty);
         if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
-            node.SetQuery(new NestedQuery { Path = nestedProperty, Query = new Query() });
+            node.SetQuery(new NestedQuery { Path = nestedProperty, Query = new MatchAllQuery() });
 
         return base.VisitAsync(node, context);
     }

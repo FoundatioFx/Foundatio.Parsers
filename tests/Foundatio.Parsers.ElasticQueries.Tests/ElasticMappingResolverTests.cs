@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -54,9 +54,9 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2", Payload = "another payload" },
             new MyNestedType { Field1 = "value1", Field2 = "value4", Payload = "third payload" }
-        ], index);
+        ], index, TestCancellationToken);
 
-        await Client.Indices.RefreshAsync(index);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
 
@@ -91,8 +91,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-         await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
 

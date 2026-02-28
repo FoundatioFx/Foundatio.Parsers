@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -20,10 +19,8 @@ public static class DefaultSortNodeExtensions
         string field = elasticContext.MappingResolver.GetSortFieldName(node.UnescapedField);
         var fieldType = elasticContext.MappingResolver.GetFieldType(field);
 
-        // ES 9.x doesn't support simple field sorting on geo_point fields
-        // Geo_point fields require geo_distance sort with a reference point
-        if (fieldType == FieldType.GeoPoint)
-            return GetGeoDistanceSortAsync(node, elasticContext, field).GetAwaiter().GetResult();
+        if (fieldType == FieldType.GeoPoint && !String.IsNullOrEmpty(node.UnescapedTerm))
+            return GetGeoDistanceSort(node, elasticContext, field);
 
         var fieldSort = new FieldSort(field)
         {
@@ -41,21 +38,11 @@ public static class DefaultSortNodeExtensions
         };
     }
 
-    private static async Task<SortOptions> GetGeoDistanceSortAsync(TermNode node, IElasticQueryVisitorContext context, string field)
+    private static SortOptions GetGeoDistanceSort(TermNode node, IElasticQueryVisitorContext context, string field)
     {
-        // For geo_distance sort, we need a reference location
-        // If no term is provided, we can't create a geo_distance sort
-        if (String.IsNullOrEmpty(node.UnescapedTerm))
-            return null;
-
-        // Resolve the location using the geo resolver if available
         string location = node.UnescapedTerm;
-        if (context.GeoLocationResolver != null)
-            location = await context.GeoLocationResolver(location).ConfigureAwait(false) ?? location;
-
-        // Parse the location string (expected format: "lat,lon" or similar)
         var geoLocations = ParseGeoLocations(location);
-        if (geoLocations == null || geoLocations.Count == 0)
+        if (geoLocations is null || geoLocations.Count == 0)
             return null;
 
         return new SortOptions
@@ -75,19 +62,14 @@ public static class DefaultSortNodeExtensions
         if (String.IsNullOrEmpty(location))
             return null;
 
-        // Try parsing as "lat,lon" format
         var parts = location.Split(',');
         if (parts.Length == 2 &&
             Double.TryParse(parts[0].Trim(), out double lat) &&
             Double.TryParse(parts[1].Trim(), out double lon))
         {
-            return new List<GeoLocation>
-            {
-                GeoLocation.LatitudeLongitude(new LatLonGeoLocation { Lat = lat, Lon = lon })
-            };
+            return [GeoLocation.LatitudeLongitude(new LatLonGeoLocation { Lat = lat, Lon = lon })];
         }
 
-        // Return as text format (geohash or other string representation)
-        return new List<GeoLocation> { GeoLocation.Text(location) };
+        return [GeoLocation.Text(location)];
     }
 }

@@ -1,12 +1,19 @@
+using System;
 using System.Collections.Generic;
 using Elastic.Clients.Elasticsearch.Aggregations;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
-public record AggregationMap(string Name, object Value)
+public class AggregationMap
 {
-    public string Name { get; set; } = Name;
-    public object Value { get; set; } = Value;
+    public AggregationMap(string name, object value)
+    {
+        Name = name;
+        Value = value;
+    }
+
+    public string Name { get; set; }
+    public object Value { get; set; }
     public List<AggregationMap> Aggregations { get; } = new();
     public Dictionary<string, object> Meta { get; } = new();
 
@@ -14,13 +21,12 @@ public record AggregationMap(string Name, object Value)
     {
         var result = new Dictionary<string, Aggregation>();
 
-        // If this is a root container (Value is null), process all sub-aggregations
-        if (Value == null)
+        if (Value is null)
         {
             foreach (var subAgg in Aggregations)
             {
                 var subAggregation = CreateAggregation(subAgg);
-                if (subAggregation != null)
+                if (subAggregation is not null)
                     result[subAgg.Name] = subAggregation;
             }
         }
@@ -34,17 +40,17 @@ public record AggregationMap(string Name, object Value)
 
     private static void AddToDictionary(AggregationMap map, Dictionary<string, Aggregation> result)
     {
-        if (map?.Value == null)
+        if (map?.Value is null)
             return;
 
         var aggregation = CreateAggregation(map);
-        if (aggregation != null)
+        if (aggregation is not null)
             result[map.Name] = aggregation;
     }
 
     private static Aggregation CreateAggregation(AggregationMap map)
     {
-        if (map?.Value == null)
+        if (map?.Value is null)
             return null;
 
         var aggregation = map.Value switch
@@ -64,35 +70,29 @@ public record AggregationMap(string Name, object Value)
             PercentilesAggregation percentiles => new Aggregation { Percentiles = percentiles },
             GeohashGridAggregation geohashGrid => new Aggregation { GeohashGrid = geohashGrid },
             NestedAggregation nested => new Aggregation { Nested = nested },
-            _ => null
+            _ => throw new NotSupportedException($"Aggregation type '{map.Value.GetType().Name}' is not supported by AggregationMap. Add a case to CreateAggregation.")
         };
 
-        if (aggregation == null)
-            return null;
-
-        // Add sub-aggregations
         if (map.Aggregations.Count > 0)
         {
             aggregation.Aggregations = new Dictionary<string, Aggregation>();
             foreach (var subAgg in map.Aggregations)
             {
                 var subAggregation = CreateAggregation(subAgg);
-                if (subAggregation != null)
+                if (subAggregation is not null)
                     aggregation.Aggregations[subAgg.Name] = subAggregation;
             }
         }
 
-        // Add meta (exclude null values)
         if (map.Meta.Count > 0)
         {
             aggregation.Meta = new Dictionary<string, object>();
             foreach (var kvp in map.Meta)
             {
-                if (kvp.Value != null)
+                if (kvp.Value is not null)
                     aggregation.Meta[kvp.Key] = kvp.Value;
             }
 
-            // Remove meta if empty after filtering nulls
             if (aggregation.Meta.Count == 0)
                 aggregation.Meta = null;
         }
