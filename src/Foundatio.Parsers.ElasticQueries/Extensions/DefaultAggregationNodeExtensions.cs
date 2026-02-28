@@ -71,10 +71,10 @@ public static class DefaultAggregationNodeExtensions
                 var precision = new GeohashPrecision(1);
                 if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out int parsedPrecision))
                 {
-                    if (parsedPrecision is < 1 or > 12)
-                        throw new ArgumentOutOfRangeException(nameof(node.UnescapedProximity), "Precision must be between 1 and 12");
-
-                    precision = new GeohashPrecision(parsedPrecision);
+                    if (parsedPrecision is >= 1 and <= 12)
+                        precision = new GeohashPrecision(parsedPrecision);
+                    else
+                        context.AddValidationError("GeoHashGrid precision must be between 1 and 12.");
                 }
 
                 return new AggregationMap($"geogrid_{originalField}", new GeohashGridAggregation { Field = field, Precision = precision })
@@ -195,10 +195,10 @@ public static class DefaultAggregationNodeExtensions
                 var precision = new GeohashPrecision(1);
                 if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out int parsedPrecision))
                 {
-                    if (parsedPrecision is < 1 or > 12)
-                        throw new ArgumentOutOfRangeException(nameof(node.UnescapedProximity), "Precision must be between 1 and 12");
-
-                    precision = new GeohashPrecision(parsedPrecision);
+                    if (parsedPrecision is >= 1 and <= 12)
+                        precision = new GeohashPrecision(parsedPrecision);
+                    else
+                        context.AddValidationError("GeoHashGrid precision must be between 1 and 12.");
                 }
 
                 return new AggregationMap($"geogrid_{originalField}", new GeohashGridAggregation { Field = aggField, Precision = precision })

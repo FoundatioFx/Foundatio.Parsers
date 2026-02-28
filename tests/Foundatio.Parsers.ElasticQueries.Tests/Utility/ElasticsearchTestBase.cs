@@ -64,7 +64,7 @@ public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLife
 public class ElasticsearchFixture : IAsyncLifetime
 {
     private readonly List<IndexName> _createdIndexes = new();
-    private static bool _elaticsearchReady;
+    private static bool _elasticsearchReady;
     protected readonly ILogger _logger;
     private readonly Lazy<ElasticsearchClient> _client;
 
@@ -84,12 +84,12 @@ public class ElasticsearchFixture : IAsyncLifetime
 
         var client = new ElasticsearchClient(settings.DisableDirectStreaming().PrettyJson());
 
-        if (!_elaticsearchReady)
+        if (!_elasticsearchReady)
         {
             if (!client.WaitForReady(new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token, _logger))
                 throw new ApplicationException("Unable to connect to Elasticsearch.");
 
-            _elaticsearchReady = true;
+            _elasticsearchReady = true;
         }
 
         return client;

@@ -23,7 +23,16 @@ public class GeoVisitor : ChainableQueryVisitor
         if (context.QueryType != QueryTypes.Query || context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
             return;
 
-        string location = _resolveGeoLocation != null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;
+        string location = null;
+
+        if (elasticContext.GeoLocationResolver != null)
+            location = await elasticContext.GeoLocationResolver(node.Term).ConfigureAwait(false);
+
+        if (location == null && _resolveGeoLocation != null)
+            location = await _resolveGeoLocation(node.Term).ConfigureAwait(false);
+
+        location ??= node.Term;
+
         var query = new GeoDistanceQuery(node.Proximity ?? "10mi", node.Field, location);
         node.SetQuery(query);
     }
