@@ -1,4 +1,4 @@
-﻿#define ENABLE_TRACING
+#define ENABLE_TRACING
 
 using System;
 using System.Threading.Tasks;
@@ -8,7 +8,6 @@ using Foundatio.Xunit;
 using Microsoft.Extensions.Logging;
 using Pegasus.Common;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
@@ -51,6 +50,10 @@ public class QueryParserValidationTests : TestWithLoggingBase
     [InlineData("book.\\*:(quick brown)")]
     [InlineData("date:[now/d-4d TO now/d+1d}")]
     [InlineData("(date:[now/d-4d TO now/d+1d})")]
+    [InlineData("date:[now/d TO now/d+30d/d]")]
+    [InlineData("date:[now/d TO now+30d/d]")]
+    [InlineData("date:>now+1h")]
+    [InlineData("date:<now-1d/d")]
     [InlineData("data.date:>now")]
     [InlineData("data.date:[now/d-4d TO now/d+1d}")]
     [InlineData("data.date:[2012-01-01 TO 2012-12-31]")]
@@ -62,6 +65,11 @@ public class QueryParserValidationTests : TestWithLoggingBase
     [InlineData("roam~0.8")]
     [InlineData("criter^2")]
     [InlineData("\"blah criter\"~1")]
+    [InlineData("field:(\"Wellness\"~)")]
+    [InlineData("field:(\"Wellness\"~2)")]
+    [InlineData("field:\"Wellness\"~")]
+    [InlineData("field:Wellness~")]
+    [InlineData("field:Wellness~2")]
     [InlineData("count:>1")]
     [InlineData(@"book.\*:test")]
     [InlineData("count:>=1")]

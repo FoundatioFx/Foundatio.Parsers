@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
 using Elastic.Clients.Elasticsearch.Mapping;
-using Elastic.Clients.Elasticsearch.QueryDsl;
 using Elastic.Transport.Products.Elasticsearch;
 using Microsoft.Extensions.Logging;
 
@@ -17,31 +16,52 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class ElasticExtensions
 {
-    public static bool TryGet<T>(this Query query, out T result)
+    /// <summary>
+    /// Parses a Lucene query string and applies it as the query for the search request.
+    /// </summary>
+    public static async Task<SearchRequestDescriptor<TDocument>> QueryLuceneSyntaxAsync<TDocument>(
+        this SearchRequestDescriptor<TDocument> descriptor,
+        string query,
+        Action<ElasticQueryParserConfiguration> configure = null)
     {
-        // TODO: until: https://github.com/elastic/elasticsearch-net/issues/8496
-        result = default;
-        return false;
+        var parser = new ElasticQueryParser(configure);
+        var elasticQuery = await parser.BuildQueryAsync(query).ConfigureAwait(false);
+        return descriptor.Query(elasticQuery);
     }
 
-    public static string TryGetName(this IProperty property)
+    public static SearchRequestDescriptor<TDocument> QueryOnQueryString<TDocument>(
+        this SearchRequestDescriptor<TDocument> descriptor,
+        string query)
     {
-        // TODO: until: https://github.com/elastic/elasticsearch-net/issues/8336
-        return null;
+        return descriptor.Query(q => q.QueryString(qs => qs.Query(query)));
+    }
+
+    public static SearchRequestDescriptor<TDocument> Aggregations<TDocument>(this SearchRequestDescriptor<TDocument> descriptor, AggregationMap aggregations)
+    {
+        if (aggregations is null)
+            return descriptor;
+
+        return descriptor.Aggregations(aggregations.ToDictionary());
     }
 
     public static bool IsBucketAggregation(this object aggregation)
     {
-        // NOTE FilterAggregate was called FilterAggregation in the past.
-        return aggregation is AdjacencyMatrixAggregation or AutoDateHistogramAggregation or ChildrenAggregation
-            or CompositeAggregation or DateHistogramAggregation or DateRangeAggregation or DiversifiedSamplerAggregation
-            or FilterAggregate or FiltersAggregation or GeoDistanceAggregation or GeohashGridAggregation
-            or GeotileGridAggregation or GlobalAggregation or HistogramAggregation or IpRangeAggregation
-            or MissingAggregation or MultiTermsAggregation or NestedAggregation or ParentAggregation or RangeAggregation
-            or RareTermsAggregation or ReverseNestedAggregation or SamplerAggregation or SignificantTermsAggregation
-            or SignificantTextAggregation or TermsAggregation or VariableWidthHistogramAggregation;
+        return aggregation is AdjacencyMatrixAggregation or AutoDateHistogramAggregation or CategorizeTextAggregation
+            or ChildrenAggregation or CompositeAggregation or DateHistogramAggregation or DateRangeAggregation
+            or DiversifiedSamplerAggregation or FiltersAggregation or FrequentItemSetsAggregation
+            or GeoDistanceAggregation or GeohashGridAggregation or GeohexGridAggregation or GeotileGridAggregation
+            or GlobalAggregation or HistogramAggregation or IpPrefixAggregation or IpRangeAggregation
+            or MissingAggregation or MultiTermsAggregation or NestedAggregation or ParentAggregation
+            or RandomSamplerAggregation or RangeAggregation or RareTermsAggregation or ReverseNestedAggregation
+            or SamplerAggregation or SignificantTermsAggregation or SignificantTextAggregation or TermsAggregation
+            or TimeSeriesAggregation or VariableWidthHistogramAggregation;
     }
 
+    /// <summary>
+    /// Returns the sub-fields (multi-fields) of a property. ES 9.x removed the base interface
+    /// accessor, so each concrete type must be matched. When upgrading the client, verify that
+    /// newly added property types are included here.
+    /// </summary>
     public static Properties GetFields(this IProperty property)
     {
         return property switch
@@ -52,6 +72,7 @@ public static class ElasticExtensions
             ByteNumberProperty p => p.Fields,
             CompletionProperty p => p.Fields,
             ConstantKeywordProperty p => p.Fields,
+            CountedKeywordProperty p => p.Fields,
             DateNanosProperty p => p.Fields,
             DateProperty p => p.Fields,
             DateRangeProperty p => p.Fields,
@@ -59,6 +80,7 @@ public static class ElasticExtensions
             DoubleNumberProperty p => p.Fields,
             DoubleRangeProperty p => p.Fields,
             DynamicProperty p => p.Fields,
+            ExponentialHistogramProperty p => p.Fields,
             FieldAliasProperty p => p.Fields,
             FlattenedProperty p => p.Fields,
             FloatNumberProperty p => p.Fields,
@@ -80,12 +102,15 @@ public static class ElasticExtensions
             Murmur3HashProperty p => p.Fields,
             NestedProperty p => p.Fields,
             ObjectProperty p => p.Fields,
+            PassthroughObjectProperty p => p.Fields,
             PercolatorProperty p => p.Fields,
             PointProperty p => p.Fields,
             RankFeatureProperty p => p.Fields,
             RankFeaturesProperty p => p.Fields,
+            RankVectorProperty p => p.Fields,
             ScaledFloatNumberProperty p => p.Fields,
             SearchAsYouTypeProperty p => p.Fields,
+            SemanticTextProperty p => p.Fields,
             ShapeProperty p => p.Fields,
             ShortNumberProperty p => p.Fields,
             SparseVectorProperty p => p.Fields,
@@ -120,7 +145,6 @@ public static class ElasticExtensions
         return new TermsExclude(values);
     }
 
-    // TODO: Handle IFailureReason/BulkIndexByScrollFailure and other bulk response types.
     public static string GetErrorMessage(this ElasticsearchResponse elasticResponse, string message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
     {
         if (elasticResponse == null)
@@ -131,13 +155,13 @@ public static class ElasticExtensions
         if (!String.IsNullOrEmpty(message))
             sb.AppendLine(message);
 
-        if (includeDebugInformation && elasticResponse?.DebugInformation != null)
+        if (includeDebugInformation && elasticResponse.DebugInformation is not null)
             sb.AppendLine(elasticResponse.DebugInformation);
 
         if (elasticResponse.TryGetOriginalException(out var exception) && exception is not null)
             sb.AppendLine($"Original: [{exception.GetType().Name}] {exception.Message}");
 
-        if (elasticResponse.ElasticsearchServerError?.Error != null)
+        if (elasticResponse.ElasticsearchServerError?.Error is not null)
             sb.AppendLine($"Server Error (Index={elasticResponse.ElasticsearchServerError.Error?.Index}): {elasticResponse.ElasticsearchServerError.Error.Reason}");
 
         if (elasticResponse is BulkResponse bulkResponse)
@@ -155,9 +179,9 @@ public static class ElasticExtensions
             sb.AppendLine(body);
         }
 
-        if (includeResponse && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
+        if (includeResponse && apiCall?.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
         {
-            string body = Encoding.UTF8.GetString(apiCall?.ResponseBodyInBytes);
+            string body = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes);
             if (normalize)
                 body = JsonUtility.Normalize(body);
 
@@ -183,18 +207,16 @@ public static class ElasticExtensions
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var pingResponse = await client.PingAsync(cancellationToken);
-            if (pingResponse.IsValidResponse)
+            var healthResponse = await client.Cluster.HealthAsync(cancellationToken);
+            if (healthResponse.IsValidResponse)
                 return true;
 
-            if (logger != null)
-                logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+            logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
             await Task.Delay(1000, cancellationToken);
         }
 
-        if (logger != null)
-            logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+        logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
     }
@@ -206,18 +228,16 @@ public static class ElasticExtensions
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var pingResponse = client.Ping();
-            if (pingResponse.IsValidResponse)
+            var healthResponse = client.Cluster.Health();
+            if (healthResponse.IsValidResponse)
                 return true;
 
-            if (logger != null)
-                logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+            logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
             Thread.Sleep(1000);
         }
 
-        if (logger != null)
-            logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+        logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
     }

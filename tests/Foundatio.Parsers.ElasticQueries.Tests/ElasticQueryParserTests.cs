@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
@@ -14,7 +13,6 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
@@ -22,7 +20,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 {
     public ElasticQueryParserTests(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture)
     {
-        Log.DefaultMinimumLevel = LogLevel.Trace;
+        Log.DefaultLogLevel = LogLevel.Trace;
     }
 
     [Fact]
@@ -85,16 +83,16 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value2" },
             new MyType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field1:value1");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.Bool(b => b.Filter(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1"))))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.Bool(b => b.Filter(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1"))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -110,8 +108,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value2" },
             new MyType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var includes = new Dictionary<string, string> {
                 {"stuff", "field2:value2"}
@@ -119,13 +117,15 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.UseIncludes(includes).SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field1:value1 @include:stuff", new ElasticQueryVisitorContext { UseScoring = true });
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(f =>
-            f.Term(m => m.Field(tf => tf.Field1).Value("value1"))
-            && f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q =>
+            q.Bool(b => b.Must(
+                m => m.Term(t => t.Field(tf => tf.Field1).Value("value1")),
+                m => m.Term(t => t.Field(tf => tf.Field2).Value("value2"))
+            ))), TestCancellationToken);
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -138,18 +138,22 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task ShouldGenerateORedTermsQuery()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field1:value1 field2:value2 field3:value3",
                 new ElasticQueryVisitorContext().UseSearchMode());
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(f =>
-            f.Term(m => m.Field(tf => tf.Field1).Value("value1")) || f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(tf => tf.Field3).Value("value3"))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q =>
+            q.Bool(b => b.Should(
+                s => s.Term(t => t.Field(tf => tf.Field1).Value("value1")),
+                s => s.Term(t => t.Field(tf => tf.Field2).Value("value2")),
+                s => s.Term(t => t.Field(tf => tf.Field3).Value("value3"))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -166,23 +170,26 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")))
                 .Keyword(e => e.Field2)
             ));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field3 = "value3" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetDefaultFields(["field1"]).UseMappings(Client, index));
 
         var result = await processor.BuildQueryAsync("field1:(value1 abc def ghi) field2:(value2 jhk)",
                 new ElasticQueryVisitorContext().UseSearchMode());
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(f =>
-            f.Match(m => m.Field(mf => mf.Field1).Query("value1"))
-            || f.Match(m => m.Field(mf => mf.Field1).Query("abc"))
-            || f.Match(m => m.Field(mf => mf.Field1).Query("def"))
-            || f.Match(m => m.Field(mf => mf.Field1).Query("ghi"))
-            || f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(mf => mf.Field2).Value("jhk"))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q =>
+            q.Bool(b => b.Should(
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("value1")),
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("abc")),
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("def")),
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("ghi")),
+                s => s.Term(t => t.Field(tf => tf.Field2).Value("value2")),
+                s => s.Term(t => t.Field(mf => mf.Field2).Value("jhk"))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -192,15 +199,17 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).SetDefaultFields(["field1"]).UseMappings(Client, index));
         result = await processor.BuildQueryAsync("value1 abc def ghi", new ElasticQueryVisitorContext().UseSearchMode());
-        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(f =>
-            f.Match(m => m.Field(mf => mf.Field1).Query("value1"))
-            || f.Match(m => m.Field(mf => mf.Field1).Query("abc"))
-            || f.Match(m => m.Field(mf => mf.Field1).Query("def"))
-            || f.Match(m => m.Field(mf => mf.Field1).Query("ghi"))));
+        expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q =>
+            q.Bool(b => b.Should(
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("value1")),
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("abc")),
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("def")),
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("ghi"))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
 
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -208,18 +217,24 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
-        // multi-match on multiple default fields
+        // multi-match on multiple default fields with mixed types (text + keyword)
         processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).SetDefaultFields(["field1", "field2"]).UseMappings(Client, index));
         result = await processor.BuildQueryAsync("value1 abc def ghi", new ElasticQueryVisitorContext().UseSearchMode());
-        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(f =>
-            f.MultiMatch(m => m.Fields(Fields.FromStrings(["field1", "field2"])).Query("value1"))
-            || f.MultiMatch(m => m.Fields(Fields.FromStrings(["field1", "field2"])).Query("abc"))
-            || f.MultiMatch(m => m.Fields(Fields.FromStrings(["field1", "field2"])).Query("def"))
-            || f.MultiMatch(m => m.Fields(Fields.FromStrings(["field1", "field2"])).Query("ghi"))));
+        expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q =>
+            q.Bool(b => b.Should(
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("value1")),
+                s => s.Term(t => t.Field(tf => tf.Field2).Value("value1")),
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("abc")),
+                s => s.Term(t => t.Field(tf => tf.Field2).Value("abc")),
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("def")),
+                s => s.Term(t => t.Field(tf => tf.Field2).Value("def")),
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("ghi")),
+                s => s.Term(t => t.Field(tf => tf.Field2).Value("ghi"))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
 
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -229,9 +244,49 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
+    public async Task DefaultSearch_WithMixedFieldTypes_SplitsIntoSeparateQueries()
+    {
+        string index = await CreateRandomIndexAsync<MyType>(d => d.Properties(p => p
+            .Text(e => e.Field1)
+            .IntegerNumber(e => e.Field4)
+        ));
+
+        await Client.IndexManyAsync([
+            new MyType { Field1 = "test value", Field4 = 42 },
+            new MyType { Field1 = "other value", Field4 = 100 },
+            new MyType { Field1 = "42", Field4 = 99 }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .SetDefaultFields(["field1", "field4"])
+            .UseMappings(Client, index));
+
+        var result = await processor.BuildQueryAsync("42", new ElasticQueryVisitorContext().UseSearchMode());
+
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
+            .Query(q => q.Bool(b => b.Should(
+                s => s.Match(m => m.Field(mf => mf.Field1).Query("42")),
+                s => s.Term(t => t.Field(tf => tf.Field4).Value(42))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        Assert.Equal(2, actualResponse.Total);
+    }
+
+    [Fact]
     public async Task CanGetMappingsFromCode()
     {
-        TypeMappingDescriptor<MyType> GetCodeMappings(TypeMappingDescriptor<MyType> d) =>
+        void GetCodeMappings(TypeMappingDescriptor<MyType> d) =>
             d.Dynamic(DynamicMapping.True)
                 .Properties(p => p
                     .GeoPoint(g => g.Field3)
@@ -242,8 +297,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 .GeoPoint(g => g.Field3)
                 .Keyword(e => e.Field2)));
 
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field2 = "value2", Field4 = 1, Field5 = DateTime.Now }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
         var parser = new ElasticQueryParser(c => c.SetDefaultFields(["field1"]).UseMappings<MyType>(GetCodeMappings, Client, index));
 
         var dynamicServerMappingProperty = parser.Configuration.MappingResolver.GetMapping("field5").Property;
@@ -265,12 +320,12 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "\"now there\"", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value2" },
             new MyType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildQueryAsync("\"\\\"now there\"");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest(true);
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -278,7 +333,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             .Query(q => q
                 .Bool(b => b
                     .Filter(f => f
-                        .MultiMatch(m => m.Query("\"now there").Type(TextQueryType.Phrase))))));
+                        .MultiMatch(m => m.Query("\"now there").Type(TextQueryType.Phrase))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest(true);
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -293,19 +348,19 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([
             new MyType { Field1 = "one/two/three" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildQueryAsync(@"field1:one\\/two*");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest(true);
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
             .Query(q => q
                 .Bool(b => b
-                    .Filter(f => f.QueryString(m => m.Query("one\\/two*").Fields(Fields.FromExpression((MyType f1) => f1.Field1)).AllowLeadingWildcard(false).AnalyzeWildcard())))));
+                    .Filter(f => f.QueryString(m => m.Query("one\\/two*").Fields(Fields.FromExpression((MyType f1) => f1.Field1)).AllowLeadingWildcard(false).AnalyzeWildcard())))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest(true);
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -320,12 +375,12 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([
             new MyType { Field1 = "one/two/three" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildQueryAsync(@"field1:one\\/two");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest(true);
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -333,7 +388,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             .Query(q => q
                 .Bool(b => b
                     .Filter(f => f
-                        .Match(m => m.Query("one\\/two").Field(f => f.Field1))))));
+                        .Match(m => m.Query("one\\/two").Field(f => f.Field1))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest(true);
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -350,18 +405,18 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value2" },
             new MyType { Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync($"_exists_:{nameof(MyType.Field2)}");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Indices(index)
-            .Query(q => q.Bool(b => b.Filter(f => f.Exists(e => e.Field(nameof(MyType.Field2)))))));
+            .Query(q => q.Bool(b => b.Filter(f => f.Exists(e => e.Field(nameof(MyType.Field2)))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -377,19 +432,19 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value2" },
             new MyType { Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync($"_missing_:{nameof(MyType.Field2)}",
                 new ElasticQueryVisitorContext { UseScoring = true });
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
                 .Indices(index)
-                .Query(q => q.Bool(b => b.MustNot(f => f.Exists(e => e.Field(nameof(MyType.Field2)))))));
+                .Query(q => q.Bool(b => b.MustNot(f => f.Exists(e => e.Field(nameof(MyType.Field2)))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -402,21 +457,20 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     {
         string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([
-            new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now },
-            new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now },
-            new MyType { Field2 = "value4", Field5 = DateTime.Now }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+            new MyType { Field1 = "value1", Field4 = 10, Field5 = DateTime.Now },
+            new MyType { Field1 = "value2", Field4 = 20, Field5 = DateTime.Now },
+            new MyType { Field4 = 30, Field5 = DateTime.Now }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
-        var result = await processor.BuildAggregationsAsync("min:field2 max:field2 date:(field5~1d^\"America/Chicago\" min:field2 max:field2 min:field1 @offset:-6h)");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(result));
+        var result = await processor.BuildAggregationsAsync("min:field4 max:field4 date:(field5~1d^\"America/Chicago\" min:field4 max:field4 min:field5 @offset:-6h)");
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(i => i.Indices(index).Aggregations(f => f
-            .Add("min_field2", m => m.Max(d => d.Field(df => df.Field2)).Meta(m2 => m2.Add("@field_type", "text")))
-            .Add("max_field2", m => m.Max(d => d.Field(df => df.Field2)).Meta(m2 => m2.Add("@field_type", "text")))
+            .Add("max_field4", m => m.Max(d => d.Field(df => df.Field4)).Meta(m2 => m2.Add("@field_type", "long")))
             .Add("date_field5", m => m.DateHistogram(
                 d =>
                     d.Field(d2 => d2.Field5)
@@ -427,11 +481,12 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                         .Offset("-6h"))
                         .Meta(m2 => m2.Add("@timezone", "America/Chicago"))
                         .Aggregations(l => l
-                            .Add("min_field1", m3 => m3.Min(d => d.Field(df => df.Field1)).Meta(m2 => m2.Add("@field_type", "text")))
-                            .Add("max_field2", m3 => m3.Max(d => d.Field(df => df.Field2)).Meta(m2 => m2.Add("@field_type", "text")))
-                            .Add("min_field2", m3 => m3.Min(d => d.Field(df => df.Field2)).Meta(m2 => m2.Add("@field_type", "text")))
+                            .Add("min_field5", m3 => m3.Min(d => d.Field(df => df.Field5)).Meta(m2 => m2.Add("@field_type", "date")))
+                            .Add("max_field4", m3 => m3.Max(d => d.Field(df => df.Field4)).Meta(m2 => m2.Add("@field_type", "long")))
+                            .Add("min_field4", m3 => m3.Min(d => d.Field(df => df.Field4)).Meta(m2 => m2.Add("@field_type", "long")))
                         ))
-        ));
+            .Add("min_field4", m => m.Min(d => d.Field(df => df.Field4)).Meta(m2 => m2.Add("@field_type", "long")))
+        ), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -472,13 +527,13 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanUseDateHistogramAggregationInterval(string interval, object expectedInterval = null)
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexManyAsync([new MyType { Field5 = DateTime.Now }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field5 = DateTime.Now }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
 
         var result = await processor.BuildAggregationsAsync($"date:(field5~{interval})");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -497,7 +552,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 d.Format("date_optional_time");
                 d.MinDocCount(0);
             }))
-        ));
+        ), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -509,12 +564,12 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanDoNestDateHistogram()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexManyAsync([new MyType { Field5 = DateTime.Now }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field5 = DateTime.Now }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var response = await Client.SearchAsync<MyType>(i => i.Indices(index).Aggregations(f => f
             .Add("myagg", m => m.DateHistogram(d => d.Field(d2 => d2.Field5).CalendarInterval(CalendarInterval.Day)))
-        ));
+        ), TestCancellationToken);
 
         Assert.True(response.IsValidResponse);
     }
@@ -527,18 +582,18 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2", Field5 = DateTime.Now },
             new MyType { Field1 = "value2", Field2 = "value2", Field5 = DateTime.Now },
             new MyType { Field2 = "value4", Field5 = DateTime.Now }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildAggregationsAsync("date:field5");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(i => i.Indices(index).Aggregations(f => f
             .Add("date_field5", m => m.DateHistogram(d => d.Field(d2 => d2.Field5).CalendarInterval(CalendarInterval.Day).Format("date_optional_time").MinDocCount(0)))
-        ));
+        ), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -557,16 +612,16 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value2" },
             new MyType { Field1 = "value1", Field2 = "value4", Field3 = "hey now" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildQueryAsync("field1:value1", new ElasticQueryVisitorContext().UseSearchMode());
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.Match(e => e.Field(m => m.Field1).Query("value1"))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.Match(e => e.Field(m => m.Field1).Query("value1"))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -574,13 +629,13 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
         result = await processor.BuildQueryAsync("field3:hey", new ElasticQueryVisitorContext().UseSearchMode());
-        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
         expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.Match(m => m
             .Field(f => f.Field3)
             .Query("hey")
-        )));
+        )), TestCancellationToken);
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -588,13 +643,13 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
         result = await processor.BuildQueryAsync("field3:\"hey now\"", new ElasticQueryVisitorContext().UseSearchMode());
-        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
         expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.MatchPhrase(m => m
             .Field(f => f.Field3)
             .Query("hey now")
-        )));
+        )), TestCancellationToken);
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -602,7 +657,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
         result = await processor.BuildQueryAsync("field3:hey*", new ElasticQueryVisitorContext().UseSearchMode());
-        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
         expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.QueryString(m => m
@@ -610,7 +665,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             .AnalyzeWildcard(true)
             .Fields(Fields.FromExpression((MyType f1) => f1.Field3))
             .Query("hey*")
-        )));
+        )), TestCancellationToken);
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -626,18 +681,20 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value3" },
             new MyType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field1:value1 AND -field2:value2",
                 new ElasticQueryVisitorContext().UseSearchMode());
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Indices(index).Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) && !f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
+            .Indices(index).Query(q => q.Bool(b => b
+                .Must(m => m.Term(t => t.Field(tf => tf.Field1).Value("value1")))
+                .MustNot(n => n.Term(t => t.Field(tf => tf.Field2).Value("value2"))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -647,12 +704,14 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         result = await processor.BuildQueryAsync("field1:value1 AND NOT field2:value2",
                 new ElasticQueryVisitorContext().UseSearchMode());
-        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Indices(index).Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) && !f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
+            .Indices(index).Query(q => q.Bool(b => b
+                .Must(m => m.Term(t => t.Field(tf => tf.Field1).Value("value1")))
+                .MustNot(n => n.Term(t => t.Field(tf => tf.Field2).Value("value2"))))), TestCancellationToken);
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -662,12 +721,15 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         result = await processor.BuildQueryAsync("field1:value1 OR NOT field2:value2",
                 new ElasticQueryVisitorContext().UseSearchMode());
-        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Indices(index).Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) || !f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
+            .Indices(index).Query(q => q.Bool(b => b.Should(
+                s => s.Term(t => t.Field(tf => tf.Field1).Value("value1")),
+                s => s.Bool(b2 => b2.MustNot(n => n.Term(t => t.Field(tf => tf.Field2).Value("value2"))))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -677,12 +739,15 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         result = await processor.BuildQueryAsync("field1:value1 OR -field2:value2",
                 new ElasticQueryVisitorContext().UseSearchMode());
-        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Indices(index).Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) || !f.Term(m => m.Field(tf => tf.Field2).Value("value2"))));
+            .Indices(index).Query(q => q.Bool(b => b.Should(
+                s => s.Term(t => t.Field(tf => tf.Field1).Value("value1")),
+                s => s.Bool(b2 => b2.MustNot(n => n.Term(t => t.Field(tf => tf.Field2).Value("value2"))))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -698,20 +763,23 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value2" },
             new MyType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field1:value1 (field2:value2 OR field3:value3)",
                 new ElasticQueryVisitorContext().UseSearchMode());
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
-                .Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) ||
-                    (f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(tf => tf.Field3).Value("value3")))));
+                .Query(q => q.Bool(b => b.Should(
+                    s => s.Term(t => t.Field(tf => tf.Field1).Value("value1")),
+                    s => s.Term(t => t.Field(tf => tf.Field2).Value("value2")),
+                    s => s.Term(t => t.Field(tf => tf.Field3).Value("value3"))
+                ).MinimumShouldMatch(1))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -727,21 +795,24 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value2" },
             new MyType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field1:value1 (field2:value2 OR field3:value3)");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse =
             await Client.SearchAsync<MyType>(d => d.Indices(index)
-                .Query(q => q.Bool(b => b.Filter(f => f
-                    .Term(m => m.Field(tf => tf.Field1).Value("value1")) &&
-                        (f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(tf => tf.Field3).Value("value3")))))));
+                .Query(q => q.Bool(b => b.Filter(
+                    f => f.Term(t => t.Field(tf => tf.Field1).Value("value1")),
+                    f => f.Bool(b2 => b2.Should(
+                        s => s.Term(t => t.Field(tf => tf.Field2).Value("value2")),
+                        s => s.Term(t => t.Field(tf => tf.Field3).Value("value3"))
+                    ).MinimumShouldMatch(1))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -753,15 +824,15 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task MixedCaseTermFilterQueryProcessor()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "Testing.Casing" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Field1 = "Testing.Casing" }, i => i.Index(index), TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field1:Testing.Casing", new ElasticQueryVisitorContext { UseScoring = true });
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(f => f.Term(m => m.Field(mf => mf.Field1).Value("Testing.Casing"))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(f => f.Term(m => m.Field(mf => mf.Field1).Value("Testing.Casing"))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -773,15 +844,15 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task MultipleWordsTermFilterQueryProcessor()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "Blake Niemyjski" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Field1 = "Blake Niemyjski" }, i => i.Index(index), TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field1:\"Blake Niemyjski\"", new ElasticQueryVisitorContext { UseScoring = true });
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(f => f.Term(m => m.Field(mf => mf.Field1).Value("Blake Niemyjski"))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(f => f.Term(m => m.Field(mf => mf.Field1).Value("Blake Niemyjski"))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -793,16 +864,16 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanTranslateTermQueryProcessor()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "Testing.Casing" }, i => i.Index(index));
+        await Client.IndexAsync(new MyType { Field1 = "Testing.Casing" }, i => i.Index(index), TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).AddVisitor(new UpdateFixedTermFieldToDateFixedExistsQueryVisitor()));
         var result = await processor.BuildQueryAsync("fixed:true");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
-            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Exists(m => m.Field("date_fixed"))))));
+            .Indices(index).Query(f => f.Bool(b => b.Filter(filter => filter.Exists(m => m.Field("date_fixed"))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -818,20 +889,24 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             new MyType { Field1 = "value1", Field2 = "value2" },
             new MyType { Field1 = "value2", Field2 = "value2" },
             new MyType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field1:value1 (field2:value2 OR field3:value3)",
                 new ElasticQueryVisitorContext().SetDefaultOperator(Operator.And).UseScoring());
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
-            .Query(f => f.Term(m => m.Field(tf => tf.Field1).Value("value1")) &&
-                    (f.Term(m => m.Field(tf => tf.Field2).Value("value2")) || f.Term(m => m.Field(tf => tf.Field3).Value("value3")))));
+            .Query(q => q.Bool(b => b.Must(
+                m => m.Term(t => t.Field(tf => tf.Field1).Value("value1")),
+                m => m.Bool(b2 => b2.Should(
+                    s => s.Term(t => t.Field(tf => tf.Field2).Value("value2")),
+                    s => s.Term(t => t.Field(tf => tf.Field3).Value("value3"))
+                ).MinimumShouldMatch(1))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -863,24 +938,25 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseFieldMap(new FieldMap { { "blah", "nested" } }).UseMappings<MyNestedType>(Client).UseNested());
         var result = await processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1)", new ElasticQueryVisitorContext().UseScoring());
 
-        var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(result));
+        var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyNestedType>(d => d
-            .Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
-                && q.Nested(n => n
+            .Query(q => q.Bool(b => b.Must(
+                m => m.Match(ma => ma.Field(e => e.Field1).Query("value1")),
+                m => m.Nested(n => n
                     .Path(p => p.Nested)
                     .Query(q2 => q2
-                        .Match(m => m
+                        .Match(ma => ma
                             .Field("nested.field1")
-                            .Query("value1"))))));
+                            .Query("value1"))))))), TestCancellationToken);
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -890,20 +966,20 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         result = await processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1 blah.field4:4)", new ElasticQueryVisitorContext().UseScoring());
 
-        actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(result));
+        actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = await Client.SearchAsync<MyNestedType>(d => d
-            .Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
-                && q.Nested(n => n
+            .Query(q => q.Bool(b => b.Must(
+                m => m.Match(ma => ma.Field(e => e.Field1).Query("value1")),
+                m => m.Nested(n => n
                     .Path(p => p.Nested)
-                    .Query(q2 => q2
-                        .Match(m => m
+                    .Query(q2 => q2.Bool(b2 => b2.Must(
+                        m2 => m2.Match(ma => ma
                             .Field("nested.field1")
-                            .Query("value1"))
-                        && q2.Term(mt => mt.Field("nested.field4").Value("4"))))));
-
+                            .Query("value1")),
+                        m2 => m2.Term(mt => mt.Field("nested.field4").Value(4))))))))), TestCancellationToken);
         expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -936,23 +1012,23 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4", Field3 = "value3" }
-        ]);
-        await Client.Indices.RefreshAsync(index);
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
         var result = await processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1 nested.field4:4 nested.field3:value3)",
                 new ElasticQueryVisitorContext { UseScoring = true });
 
-        var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(result));
+        var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(q => q.Match(m => m.Field(e => e.Field1).Query("value1"))
-            && q.Nested(n => n.Path(p => p.Nested).Query(q2 =>
-                q2.Match(m => m.Field("nested.field1").Query("value1"))
-                && q2.Term(m => m.Field("nested.field4").Value("4"))
-                && q2.Match(m => m.Field("nested.field3").Query("value3"))))));
-
+        var expectedResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(q => q.Bool(b => b.Must(
+            m => m.Match(ma => ma.Field(e => e.Field1).Query("value1")),
+            m => m.Nested(n => n.Path(p => p.Nested).Query(q2 => q2.Bool(b2 => b2.Must(
+                m2 => m2.Match(ma => ma.Field("nested.field1").Query("value1")),
+                m2 => m2.Term(mt => mt.Field("nested.field4").Value(4)),
+                m2 => m2.Match(ma => ma.Field("nested.field3").Query("value3"))))))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -964,16 +1040,16 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanGenerateMatchQuery()
     {
         string index = await CreateRandomIndexAsync<MyType>(m => m.Properties(p => p
-           .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")).IgnoreAbove(256))));
+           .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword", k => k.IgnoreAbove(256))))));
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildQueryAsync("field1:test", new ElasticQueryVisitorContext().UseScoring());
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.Match(m => m.Field(e => e.Field1).Query("test"))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.Match(m => m.Field(e => e.Field1).Query("test"))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -992,11 +1068,11 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("browser.version:1", new ElasticQueryVisitorContext().UseScoring());
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.Term(m => m.Field("browser.version").Value("1"))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.Term(m => m.Field("browser.version").Value("1"))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1008,19 +1084,19 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task NonAnalyzedPrefixQuery()
     {
         string index = await CreateRandomIndexAsync<MyType>(d => d.Properties(p => p.Keyword(e => e.Field1)));
-        await Client.IndexAsync(new MyType { Field1 = "value123" }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value123" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.UseMappings(Client, index));
         var result = await processor.BuildQueryAsync("field1:value*", new ElasticQueryVisitorContext().UseSearchMode());
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualResponse);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Indices(index)
-            .Query(f => f.Prefix(m => m.Field(f2 => f2.Field1).Value("value"))));
+            .Query(f => f.Prefix(m => m.Field(f2 => f2.Field1).Value("value"))), TestCancellationToken);
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -1033,17 +1109,17 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task RangeQueryProcessor()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result =
             await processor.BuildQueryAsync("field4:[1 TO 2} OR field1:value1",
                 new ElasticQueryVisitorContext { UseScoring = true });
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -1051,10 +1127,11 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             await Client.SearchAsync<MyType>(
                 d =>
                     d.Indices(index)
-                        .Query(
-                            f =>
-                                f.Range(r => r.Term(rtr => rtr.Field(rtf => rtf.Field4).Gte("1").Lt("2"))) ||
-                                f.Term(m => m.Field(tf => tf.Field1).Value("value1"))));
+                        .Query(q =>
+                            q.Bool(b => b.Should(
+                                s => s.Range(r => r.Term(rtr => rtr.Field(rtf => rtf.Field4).Gte("1").Lt("2"))),
+                                s => s.Term(t => t.Field(tf => tf.Field1).Value("value1"))
+                            ).MinimumShouldMatch(1))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1066,10 +1143,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task DateRangeWithWildcardMinQueryProcessor()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = () => Task.FromResult("America/Chicago") };
 
@@ -1077,15 +1154,16 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var result = await processor.BuildQueryAsync("field5:[* TO 2017-01-31} OR field1:value1", ctx);
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualResponse);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
                 .Indices(index)
-                .Query(f => f
-                    .Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Lt("2017-01-31").TimeZone("America/Chicago")))
-                        || f.Match(e => e.Field(m => m.Field1).Query("value1"))));
+                .Query(q => q.Bool(b => b.Should(
+                    s => s.Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Lt("2017-01-31").TimeZone("America/Chicago"))),
+                    s => s.Match(e => e.Field(m => m.Field1).Query("value1"))
+                ).MinimumShouldMatch(1))), TestCancellationToken);
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -1098,10 +1176,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task DateRangeWithDateMathQueryProcessor()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = () => Task.FromResult("America/Chicago") };
 
@@ -1109,13 +1187,13 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var result = await processor.BuildQueryAsync("field5:[now-1d/d TO now/d]", ctx);
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualResponse);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Indices(index)
-            .Query(f => f.Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Gte("now-1d/d").Lte("now/d").TimeZone("America/Chicago")))));
+            .Query(f => f.Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Gte("now-1d/d").Lte("now/d").TimeZone("America/Chicago")))), TestCancellationToken);
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -1128,10 +1206,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task DateRangeWithWildcardMaxQueryProcessor()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = () => Task.FromResult("America/Chicago") };
 
@@ -1139,15 +1217,16 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var result = await processor.BuildQueryAsync("field5:[2017-01-31 TO   *  } OR field1:value1", ctx);
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualResponse);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Indices(index)
-            .Query(f => f
-                .Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Gte("2017-01-31").TimeZone("America/Chicago")))
-                    || f.Match(e => e.Field(m => m.Field1).Query("value1"))));
+            .Query(q => q.Bool(b => b.Should(
+                s => s.Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Gte("2017-01-31").TimeZone("America/Chicago"))),
+                s => s.Match(e => e.Field(m => m.Field1).Query("value1"))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1159,10 +1238,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task DateRangeWithTimeZone()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var ctx = new ElasticQueryVisitorContext { UseScoring = true };
 
@@ -1170,15 +1249,16 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var result = await processor.BuildQueryAsync("field5:[2017-01-31 TO   *  }^\"America/Chicago\" OR field1:value1", ctx);
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualResponse);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d
             .Indices(index)
-            .Query(f =>
-                f.Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Gte("2017-01-31").TimeZone("America/Chicago")))
-                    || f.Match(e => e.Field(m => m.Field1).Query("value1"))));
+            .Query(q => q.Bool(b => b.Should(
+                s => s.Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Gte("2017-01-31").TimeZone("America/Chicago"))),
+                s => s.Match(e => e.Field(m => m.Field1).Query("value1"))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1190,25 +1270,27 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task DateRangeQueryProcessor()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3, Field5 = DateTime.UtcNow }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var ctx = new ElasticQueryVisitorContext { UseScoring = true, DefaultTimeZone = () => Task.FromResult("America/Chicago") };
 
         var processor = new ElasticQueryParser(c => c.UseMappings(Client, index).SetLoggerFactory(Log));
         var result = await processor.BuildQueryAsync("field5:[2017-01-01T00\\:00\\:00Z TO 2017-01-31} OR field1:value1", ctx);
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse =
             await Client.SearchAsync<MyType>(d => d
                 .Indices(index)
-                .Query(f => f.Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Gte("2017-01-01T00:00:00Z").Lt("2017-01-31").TimeZone("America/Chicago")))
-                            || f.Match(e => e.Field(m => m.Field1).Query("value1"))));
+                .Query(q => q.Bool(b => b.Should(
+                    s => s.Range(r => r.Date(dr => dr.Field(drf => drf.Field5).Gte("2017-01-01T00:00:00Z").Lt("2017-01-31").TimeZone("America/Chicago"))),
+                    s => s.Match(e => e.Field(m => m.Field1).Query("value1"))
+                ).MinimumShouldMatch(1))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1221,10 +1303,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     {
         string index = await CreateRandomIndexAsync<MyType>(m => m.Properties(p => p.GeoPoint(g => g.Field3)));
         await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" },
-            i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+            i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c
             .UseMappings(Client, index)
@@ -1233,7 +1315,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             await processor.BuildQueryAsync("field3:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990]",
                 new ElasticQueryVisitorContext { UseScoring = true });
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -1243,7 +1325,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 {
                     TopLeft = "51.5032520,-0.1278990",
                     BottomRight = "51.5032520,-0.1278990"
-                }))));
+                }))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1255,8 +1337,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     public async Task CanUseValidationToGetUnresolvedFields()
     {
         string index = await CreateRandomIndexAsync<MyType>(d => d.Properties(p => p.Keyword(e => e.Field1)));
-        await Client.IndexAsync(new MyType { Field1 = "value123" }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value123" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var context = new ElasticQueryVisitorContext();
         var parser = new ElasticQueryParser(c => c.UseMappings(Client, index).SetValidationOptions(new QueryValidationOptions { AllowUnresolvedFields = false }));
@@ -1300,7 +1382,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.UseMappings(Client, index));
         var sort = await processor.BuildSortAsync("-field1");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(sort));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(sort), TestCancellationToken);
 
         Assert.True(actualResponse.IsValidResponse);
 
@@ -1309,7 +1391,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
             .Sort(
                 s => s.Field(f => f.Field1, so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword))
-            ));
+            ), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest(true);
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1324,10 +1406,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")))
                 .Text(e => e.Field2, o => o.Fields(f2 => f2.Keyword("keyword").Keyword("sort")))
             ));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var aliasMap = new FieldMap { { "geo", "field3" } };
         var processor = new ElasticQueryParser(c => c
@@ -1335,19 +1417,68 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             .UseFieldMap(aliasMap));
         var sort = await processor.BuildSortAsync("geo -field1 -(field2 field3 +field4) (field5 field3)");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(sort));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(sort), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest(true);
         _logger.LogInformation("Actual: {Request}", actualResponse);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(s => s
-            .Field(f => f.Field3, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.GeoPoint))
-            .Field("field1.keyword", so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword))
-            .Field("field2.sort", so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword))
-            .Field(f => f.Field3, so => so.Order(SortOrder.Desc).UnmappedType(FieldType.GeoPoint))
-            .Field(f => f.Field4, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.Long))
-            .Field(f => f.Field5, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.Date))
-            .Field(f => f.Field3, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.GeoPoint))
-        ));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(
+            s => s.Field(f => f.Field3, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.GeoPoint)),
+            s => s.Field("field1.keyword", so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword)),
+            s => s.Field("field2.sort", so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword)),
+            s => s.Field(f => f.Field3, so => so.Order(SortOrder.Desc).UnmappedType(FieldType.GeoPoint)),
+            s => s.Field(f => f.Field4, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.Long)),
+            s => s.Field(f => f.Field5, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.Date)),
+            s => s.Field(f => f.Field3, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.GeoPoint))
+        ), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest(true);
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task CanParseGeoDistanceSort()
+    {
+        string index = await CreateRandomIndexAsync<MyType>(d => d.Properties(p => p
+            .GeoPoint(g => g.Field3)
+            .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")))));
+
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var aliasMap = new FieldMap { { "geo", "field3" } };
+        var processor = new ElasticQueryParser(c => c
+            .UseMappings(Client, index)
+            .UseFieldMap(aliasMap)
+            .SetLoggerFactory(Log));
+
+        // Geo_point fields produce geo_distance sort when a TermNode has a reference point.
+        // Build the sort programmatically via a TermNode with both field and term set.
+        var geoNode = new TermNode { Field = "field3", Term = "51.5032520,-0.1278990" };
+        var sort = geoNode.GetDefaultSort(new ElasticQueryVisitorContext
+        {
+            QueryType = QueryTypes.Sort,
+            MappingResolver = processor.Configuration.MappingResolver
+        });
+
+        Assert.NotNull(sort);
+        Assert.NotNull(sort.GeoDistance);
+        Assert.Equal("field3", sort.GeoDistance.Field.ToString());
+        Assert.Equal(SortOrder.Asc, sort.GeoDistance.Order);
+
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(new[] { sort }), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest(true);
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(
+            s => s.GeoDistance(g => g
+                .Field("field3")
+                .Location(GeoLocation.LatitudeLongitude(new LatLonGeoLocation { Lat = 51.5032520, Lon = -0.1278990 }))
+                .Order(SortOrder.Asc)
+                .DistanceType(GeoDistanceType.Arc))
+        ), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest(true);
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1380,24 +1511,24 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var sort = await processor.BuildSortAsync("nested.data.spaced\\ field");
         var query = await processor.BuildQueryAsync("nested.data.spaced\\ field:hey");
         var aggs = await processor.BuildAggregationsAsync("terms:nested.data.spaced\\ field");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(sort).Query(query).Aggregations(aggs));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(sort).Query(query).Aggregations(aggs), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
-            .Sort(s => s
-                .Field("nested.data.spaced field.keyword", so => so.Order(SortOrder.Asc).UnmappedType(FieldType.Keyword))
+            .Sort(
+                s => s.Field("nested.data.spaced field.keyword", so => so.Order(SortOrder.Asc).UnmappedType(FieldType.Keyword))
             )
             .Query(q => q.Bool(b => b.Filter(f => f
                 .Match(mf => mf.Field("nested.data.spaced field").Query("hey")))))
             .Aggregations(a => a
-                .Add("terms_nested.data.spaced field.keyword", ad => ad.Terms(t => t.Field("nested.data.spaced field.keyword")).Meta(m2 => m2.Add("@field_type", "text")))));
+                .Add("terms_nested.data.spaced field", ad => ad.Terms(t => t.Field("nested.data.spaced field.keyword")).Meta(m2 => m2.Add("@field_type", "text")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
         Assert.Equal(expectedRequest, actualRequest);
@@ -1411,18 +1542,18 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             .Text(e => e.MultiWord, o => o.Fields(f1 => f1.Keyword("keyword")))
         ));
 
-        await Client.IndexAsync(new MyType { MultiWord = "value1" }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { MultiWord = "value1" }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var sort = await processor.BuildSortAsync("multiWord -multiword");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(sort));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(sort), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
-            .Sort(s => s
-                .Field("multiWord.keyword", so => so.Order(SortOrder.Asc).UnmappedType(FieldType.Keyword))
-                .Field("multiWord.keyword", so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword))
-            ));
+            .Sort(
+                s => s.Field("multiWord.keyword", so => so.Order(SortOrder.Asc).UnmappedType(FieldType.Keyword)),
+                s => s.Field("multiWord.keyword", so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword))
+            ), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
         Assert.Equal(expectedRequest, actualRequest);
@@ -1436,10 +1567,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
                 .GeoPoint(g => g.Field3)
                 .Text(e => e.Field1, o => o.Fields(f1 => f1.Keyword("keyword")))));
 
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index));
-        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index));
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 1, Field3 = "51.5032520,-0.1278990" }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field4 = 2 }, i => i.Index(index), TestCancellationToken);
+        await Client.IndexAsync(new MyType { Field1 = "value1", Field4 = 3 }, i => i.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var aliasMap = new FieldMap { { "geo", "field3" } };
         var processor = new ElasticQueryParser(c => c
@@ -1451,24 +1582,25 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var result = await processor.BuildQueryAsync("geo:[51.5032520,-0.1278990 TO 51.5032520,-0.1278990] OR field1:value1 OR field2:[1 TO 4] OR -geo:\"Dallas, TX\"~75mi",
                 new ElasticQueryVisitorContext { UseScoring = true });
         var sort = await processor.BuildSortAsync("geo -field1");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result).Sort(sort));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result).Sort(sort), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest(true);
         _logger.LogInformation("Actual: {Request}", actualResponse);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
-            .Sort(s => s
-                .Field(f => f.Field3, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.GeoPoint))
-                .Field("field1.keyword", so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword))
-            ).Query(q => q
-                .GeoBoundingBox(m => m
+            .Sort(
+                s => s.Field(f => f.Field3, so => so.Order(SortOrder.Asc).UnmappedType(FieldType.GeoPoint)),
+                s => s.Field("field1.keyword", so => so.Order(SortOrder.Desc).UnmappedType(FieldType.Keyword))
+            ).Query(q => q.Bool(b => b.Should(
+                s => s.GeoBoundingBox(m => m
                     .Field(p => p.Field3).BoundingBox(new TopLeftBottomRightGeoBounds
                     {
                         TopLeft = "51.5032520,-0.1278990",
                         BottomRight = "51.5032520,-0.1278990"
-                    }))
-                || q.Match(y => y.Field(e => e.Field1).Query("value1"))
-                || q.Range(qr => qr.Term(m => m.Field(g => g.Field2).Gte("1").Lte("4")))
-                || !q.GeoDistance(m => m.Field(p => p.Field3).Location("51.5032520,-0.1278990").Distance("75mi"))));
+                    })),
+                s => s.Match(y => y.Field(e => e.Field1).Query("value1")),
+                s => s.Range(qr => qr.Term(m => m.Field(g => g.Field2).Gte("1").Lte("4"))),
+                s => s.Bool(b2 => b2.MustNot(n => n.GeoDistance(m => m.Field(p => p.Field3).Location("51.5032520,-0.1278990").Distance("75mi"))))
+            ).MinimumShouldMatch(1))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest(true);
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1483,11 +1615,11 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(GetIncludeAsync).UseFieldMap(aliases));
         var result = await processor.BuildQueryAsync("@include:other");
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices("stuff").Query(result));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices("stuff").Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices("stuff").Query(f => f.Bool(b => b.Filter(f1 => f1.Term(t => t.Field("aliasedincluded").Value("value"))))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices("stuff").Query(f => f.Bool(b => b.Filter(f1 => f1.Term(t => t.Field("aliasedincluded").Value("value"))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1495,7 +1627,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
 
         result = await processor.BuildQueryAsync("@include:other");
-        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices("stuff").Query(result));
+        actualResponse = await Client.SearchAsync<MyType>(d => d.Indices("stuff").Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
         _logger.LogInformation("Expected: {Request}", expectedRequest);

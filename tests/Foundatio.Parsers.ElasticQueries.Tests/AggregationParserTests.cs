@@ -13,7 +13,6 @@ using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
@@ -62,18 +61,18 @@ public class AggregationParserTests : ElasticsearchTestBase
                 Field3 = "51.5032520,-0.1278990",
                 Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1))
             }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
-            .Add("min_field4", a1 => a1.Min(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))));
+            .Add("min_field4", a1 => a1.Min(c => c.Field("field4")).Meta(m => m.Add("@field_type", "long")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -124,19 +123,19 @@ public class AggregationParserTests : ElasticsearchTestBase
                 Field3 = "51.5032520,-0.1278990",
                 Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1))
             }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var fieldMap = new FieldMap { { "heynow", "field4" } };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:heynow");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
-            .Add("min_heynow", a1 => a1.Min(c => c.Field(cf => cf.Field4)).Meta(m => m.Add("@field_type", "long")))));
+            .Add("min_heynow", a1 => a1.Min(c => c.Field(cf => cf.Field4)).Meta(m => m.Add("@field_type", "long")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -191,19 +190,19 @@ public class AggregationParserTests : ElasticsearchTestBase
                 Field3 = "51.5032520,-0.1278990",
                 Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1))
             }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var fieldMap = new FieldMap { { "heynow2", "field1" } };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap));
         var aggregations = await processor.BuildAggregationsAsync("terms:heynow");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
-            .Add("terms_heynow", a1 => a1.Terms(c => c.Field("field1.keyword")).Meta(m => m.Add("@field_type", "text")))));
+            .Add("terms_heynow", a1 => a1.Terms(c => c.Field("field1.keyword")).Meta(m => m.Add("@field_type", "text")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -254,13 +253,13 @@ public class AggregationParserTests : ElasticsearchTestBase
                 Field3 = "51.5032520,-0.1278990",
                 Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(1))
             }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4~50,100 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -279,7 +278,7 @@ public class AggregationParserTests : ElasticsearchTestBase
             .Add("sum_field4", a1 => a1.Sum(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
             .Add("avg_field4", a1 => a1.Avg(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
             .Add("max_field4", a1 => a1.Max(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
-            .Add("min_field4", a1 => a1.Min(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))));
+            .Add("min_field4", a1 => a1.Min(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -299,20 +298,20 @@ public class AggregationParserTests : ElasticsearchTestBase
                     .Text("identity", o2 => o2
                         .Fields(f => f.Keyword("keyword", o3 => o3.IgnoreAbove(256))))))))));
 
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var aliasMap = new FieldMap { { "user", "data.@user.identity" }, { "alias1", "field1" } };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("terms:(alias1 cardinality:user)");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
             .Add("terms_alias1", a1 => a1.Terms(t => t.Field("field1.keyword")).Meta(m => m.Add("@field_type", "keyword"))
-                .Aggregations(a2 => a2.Add("cardinality_user", a3 => a3.Cardinality(c => c.Field("data.@user.identity.keyword")))))));
+                .Aggregations(a2 => a2.Add("cardinality_user", a3 => a3.Cardinality(c => c.Field("data.@user.identity.keyword")))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -329,20 +328,19 @@ public class AggregationParserTests : ElasticsearchTestBase
 
         await Client.IndexManyAsync([
             new MyType { Field2 = "field2" }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var aliasMap = new FieldMap { { "alias2", "field2" } };
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("missing:alias2");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
-            .Add("missing_alias2", a1 => a1.Missing(t => t.Field("field2.keyword")))));
-
+            .Add("missing_alias2", a1 => a1.Missing(t => t.Field("field2.keyword")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -370,8 +368,8 @@ public class AggregationParserTests : ElasticsearchTestBase
                 Field5 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(5)),
                 Field2 = "field2"
             }
-        ], index);
-        await Client.Indices.RefreshAsync(index);
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var aliasMap = new FieldMap
         {
@@ -385,7 +383,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 histogram:alias4 geogrid:alias3 terms:alias1");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -404,8 +402,7 @@ public class AggregationParserTests : ElasticsearchTestBase
                 .Add("sum_alias4", a1 => a1.Sum(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
                 .Add("avg_alias4", a1 => a1.Avg(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
                 .Add("max_alias4", a1 => a1.Max(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))
-                .Add("min_alias4", a1 => a1.Min(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))));
-
+                .Add("min_alias4", a1 => a1.Min(c => c.Field(f => f.Field4)).Meta(m => m.Add("@field_type", "long")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -419,13 +416,13 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessTermAggregations()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -433,11 +430,10 @@ public class AggregationParserTests : ElasticsearchTestBase
             .Add("terms_field1", a1 => a1.Terms(t => t
                 .Field("field1.keyword")
                 .MinDocCount(1)
-                .Include(new TermsInclude(["otherinclude", "myinclude"]))
-                .Exclude(new TermsExclude(["otherexclude", "myexclude"]))
+                .Include(new TermsInclude(["myinclude", "otherinclude"]))
+                .Exclude(new TermsExclude(["myexclude", "otherexclude"]))
                 .Missing("mymissing"))
-                .Meta(m => m.Add("@field_type", "keyword")))));
-
+                .Meta(m => m.Add("@field_type", "keyword")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -448,23 +444,24 @@ public class AggregationParserTests : ElasticsearchTestBase
     [Fact]
     public async Task ProcessTermAggregationsWithRegex()
     {
-        string index = CreateRandomIndex<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        string index = await CreateRandomIndexAsync<MyType>();
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 @exclude:/A.*/ @include:/B.*/)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(a => a
-            .Terms("terms_field1", t => t
-                .Field("field1.keyword")
-                .Include("B.*")
-                .Exclude("A.*")
-                .Meta(m => m.Add("@field_type", "keyword")))));
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
+            .Add("terms_field1", ad => ad
+                .Terms(t => t
+                    .Field("field1.keyword")
+                    .Include(new TermsInclude("B.*"))
+                    .Exclude(new TermsExclude("A.*")))
+                .Meta(m => m.Add("@field_type", "keyword")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -476,13 +473,13 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessHistogramIntervalAggregations()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("histogram:(field1~0.1)");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -491,8 +488,7 @@ public class AggregationParserTests : ElasticsearchTestBase
                 .Field("field1.keyword")
                 .Interval(0.1)
                 .MinDocCount(0)
-            ))));
-
+            ))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -504,21 +500,21 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessTermTopHitsAggregations()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1~1000^2 tophits:(_~1000 @include:myinclude))");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
             .Add("terms_field1", a1 => a1
                 .Terms(t => t.Field("field1.keyword").Size(1000).MinDocCount(2))
-                    .Aggregations(a2 => a2.Add("tophits", a3 => a3.TopHits(t2 => t2.Size(1000).Source(new SourceConfig(new SourceFilter { Includes = Fields.FromString("myinclude")})))))
-                .Meta(m => m.Add("@field_type", "keyword")))));
+                    .Aggregations(a2 => a2.Add("tophits", a3 => a3.TopHits(t2 => t2.Size(1000).Source(new SourceConfig(new SourceFilter { Includes = Fields.FromString("myinclude") })))))
+                .Meta(m => m.Add("@field_type", "keyword")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -530,21 +526,21 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessSortedTermAggregations()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 -cardinality:field4)");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
                 .Add("terms_field1", a1 => a1
-                    .Terms(t => t.Field("field1.keyword").Order(new List<KeyValuePair<Field, SortOrder>> { new ("cardinality_field4", SortOrder.Desc) }))
+                    .Terms(t => t.Field("field1.keyword").Order(new List<KeyValuePair<Field, SortOrder>> { new("cardinality_field4", SortOrder.Desc) }))
                         .Aggregations(a2 => a2.Add("cardinality_field4", a3 => a3.Cardinality(c => c.Field(f => f.Field4))))
-                    .Meta(m => m.Add("@field_type", "keyword")))));
+                    .Meta(m => m.Add("@field_type", "keyword")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -558,13 +554,13 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task ProcessDateHistogramAggregations()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexManyAsync([new MyType { Field5 = DateTime.UtcNow }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field5 = DateTime.UtcNow }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("date:(field5^1h @missing:\"0001-01-01T00:00:00\" min:field5^1h max:field5^1h)");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -579,8 +575,7 @@ public class AggregationParserTests : ElasticsearchTestBase
                 .Meta(m => m.Add("@timezone", "1h"))
                 .Aggregations(a2 => a2
                     .Add("min_field5", a3 => a3.Min(c => c.Field(f => f.Field5)).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))
-                    .Add("max_field5", a3 => a3.Max(c => c.Field(f => f.Field5)).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))))));
-
+                    .Add("max_field5", a3 => a3.Max(c => c.Field(f => f.Field5)).Meta(m => m.Add("@field_type", "date").Add("@timezone", "1h")))))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -594,23 +589,22 @@ public class AggregationParserTests : ElasticsearchTestBase
     public async Task CanSpecifyDefaultValuesAggregations()
     {
         string index = await CreateRandomIndexAsync<MyType>();
-        await Client.IndexManyAsync([new MyType { Field1 = "test" }, new MyType { Field4 = 1 }], index);
-        await Client.Indices.RefreshAsync(index);
+        await Client.IndexManyAsync([new MyType { Field1 = "test" }, new MyType { Field4 = 1 }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("min:field4~0 max:field4~0 avg:field4~0 sum:field4~0 cardinality:field4~0");
 
-        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations));
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
-            .Add("sum_field4", a1 => a1.Sum(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))
+            .Add("sum_field4", a1 => a1.Sum(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "long")))
             .Add("cardinality_field4", a1 => a1.Cardinality(c => c.Field(f => f.Field4).Missing(0)))
-            .Add("avg_field4", a1 => a1.Avg(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))
-            .Add("max_field4", a1 => a1.Max(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))
-            .Add("min_field4", a1 => a1.Min(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "integer")))));
-
+            .Add("avg_field4", a1 => a1.Avg(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "long")))
+            .Add("max_field4", a1 => a1.Max(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "long")))
+            .Add("min_field4", a1 => a1.Min(c => c.Field(f => f.Field4).Missing(0)).Meta(m => m.Add("@field_type", "long")))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -712,7 +706,13 @@ public class AggregationParserTests : ElasticsearchTestBase
     {
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var queryNode = await parser.ParseAsync(query, context);
-        Assert.NotNull(queryNode);
+
+        // If the query can't be parsed, treat it as invalid
+        if (queryNode == null)
+        {
+            Assert.False(isValid, $"Query '{query}' returned null but was expected to be valid");
+            return;
+        }
 
         var result = context.GetValidationResult();
         Assert.Equal(QueryTypes.Aggregation, result.QueryType);

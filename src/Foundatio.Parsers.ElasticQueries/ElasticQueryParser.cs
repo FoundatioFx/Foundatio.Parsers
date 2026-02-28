@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
-using Elastic.Clients.Elasticsearch.Aggregations;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -100,6 +99,12 @@ public class ElasticQueryParser : LuceneQueryParser
         if (Configuration.ValidationOptions != null && !context.HasValidationOptions())
             context.SetValidationOptions(Configuration.ValidationOptions);
 
+        if (context is IElasticQueryVisitorContext elasticVisitorContext)
+        {
+            if (Configuration.GeoLocationResolver is not null && elasticVisitorContext.GeoLocationResolver is null)
+                elasticVisitorContext.GeoLocationResolver = Configuration.GeoLocationResolver;
+        }
+
         if (context.QueryType == QueryTypes.Query)
         {
             context.SetDefaultFields(Configuration.DefaultFields);
@@ -177,10 +182,22 @@ public class ElasticQueryParser : LuceneQueryParser
         var q = await query.GetQueryAsync() ?? new MatchAllQuery();
         if (context?.UseScoring == false)
         {
-            q = new BoolQuery
+            // If the query is already a filter-only BoolQuery, don't wrap it again
+            // CombineQueriesVisitor now builds filter queries directly for filter mode
+            var boolQuery = q.Bool;
+            bool isFilterOnlyBoolQuery = boolQuery is not null
+                && boolQuery.Filter?.Count > 0
+                && (boolQuery.Must is null || boolQuery.Must.Count == 0)
+                && (boolQuery.Should is null || boolQuery.Should.Count == 0)
+                && (boolQuery.MustNot is null || boolQuery.MustNot.Count == 0);
+
+            if (!isFilterOnlyBoolQuery)
             {
-                Filter = [q]
-            };
+                q = new BoolQuery
+                {
+                    Filter = [q]
+                };
+            }
         }
 
         return q;
@@ -208,14 +225,12 @@ public class ElasticQueryParser : LuceneQueryParser
         return await BuildAggregationsAsync(result, context).ConfigureAwait(false);
     }
 
-#pragma warning disable IDE0060 // Remove unused parameter
     public async Task<AggregationMap> BuildAggregationsAsync(IQueryNode aggregations, IElasticQueryVisitorContext context = null)
     {
         if (aggregations == null)
             return null;
 
-#pragma warning restore IDE0060 // Remove unused parameter
-        return await aggregations?.GetAggregationAsync();
+        return await aggregations.GetAggregationAsync();
     }
 
     public async Task<QueryValidationResult> ValidateSortAsync(string query, QueryValidationOptions options = null, IElasticQueryVisitorContext context = null)

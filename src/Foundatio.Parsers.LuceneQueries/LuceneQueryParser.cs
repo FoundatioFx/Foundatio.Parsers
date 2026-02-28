@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
@@ -18,7 +18,16 @@ public partial class LuceneQueryParser : IQueryParser
     }
 }
 
+/// <summary>
+/// Defines a parser that converts query strings into an AST.
+/// </summary>
 public interface IQueryParser
 {
+    /// <summary>
+    /// Parses a query string into an abstract syntax tree.
+    /// </summary>
+    /// <param name="query">The query string to parse.</param>
+    /// <param name="context">Optional visitor context for parsing configuration.</param>
+    /// <returns>The root node of the parsed query AST.</returns>
     Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null);
 }

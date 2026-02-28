@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.QueryDsl;
@@ -34,7 +34,7 @@ public class GeoVisitor : ChainableQueryVisitor
             return;
 
         // NOTE: Feedback here: https://github.com/elastic/elasticsearch-net/issues/8496
-        var box = GeoBounds.TopLeftBottomRight(new TopLeftBottomRightGeoBounds(node.Max, node.Min));
+        var box = GeoBounds.TopLeftBottomRight(new TopLeftBottomRightGeoBounds { TopLeft = node.Min, BottomRight = node.Max });
         var query = new GeoBoundingBoxQuery(box, node.Field);
         node.SetQuery(query);
     }

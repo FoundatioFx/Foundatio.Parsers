@@ -1,8 +1,9 @@
-﻿using System;
-using System.Linq;
+using System;
+using System.Text;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
@@ -16,30 +17,90 @@ public class NestedVisitor : ChainableQueryVisitor
             return base.VisitAsync(node, context);
 
         string nestedProperty = GetNestedProperty(node.Field, context);
-        if (nestedProperty == null)
+        if (nestedProperty is null)
             return base.VisitAsync(node, context);
 
-        // NOTE: This nested query will be updated in the CombineQueriesVisitor.
-        node.SetQuery(new NestedQuery(nestedProperty, new Query()));
+        node.SetNestedPath(nestedProperty);
+        if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
+            node.SetQuery(new NestedQuery { Path = nestedProperty, Query = new MatchAllQuery() });
 
         return base.VisitAsync(node, context);
     }
 
-    private string GetNestedProperty(string fullName, IQueryVisitorContext context)
+    public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
     {
-        string[] nameParts = fullName?.Split('.').ToArray();
+        return HandleNestedFieldNodeAsync(node, context);
+    }
 
-        if (nameParts == null || context is not IElasticQueryVisitorContext elasticContext || nameParts.Length == 0)
+    public override Task VisitAsync(TermRangeNode node, IQueryVisitorContext context)
+    {
+        return HandleNestedFieldNodeAsync(node, context);
+    }
+
+    public override Task VisitAsync(ExistsNode node, IQueryVisitorContext context)
+    {
+        return HandleNestedFieldNodeAsync(node, context);
+    }
+
+    public override Task VisitAsync(MissingNode node, IQueryVisitorContext context)
+    {
+        return HandleNestedFieldNodeAsync(node, context);
+    }
+
+    private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
+    {
+        // Skip if inside a group that references a nested path
+        if (IsInsideNestedGroup(node))
+            return;
+
+        string nestedProperty = GetNestedProperty(node.Field, context);
+        if (nestedProperty is null)
+            return;
+
+        if (context.QueryType is QueryTypes.Aggregation or QueryTypes.Sort)
+        {
+            node.SetNestedPath(nestedProperty);
+        }
+        else if (context.QueryType == QueryTypes.Query)
+        {
+            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context));
+            if (innerQuery is null)
+                return;
+
+            node.SetQuery(new NestedQuery { Path = nestedProperty, Query = innerQuery });
+        }
+    }
+
+    private static bool IsInsideNestedGroup(IQueryNode node)
+    {
+        var parent = node.Parent;
+        while (parent is not null)
+        {
+            if (parent is GroupNode groupNode && groupNode.GetNestedPath() is not null)
+                return true;
+
+            parent = parent.Parent;
+        }
+
+        return false;
+    }
+
+    private static string GetNestedProperty(string fullName, IQueryVisitorContext context)
+    {
+        string[] nameParts = fullName?.Split('.');
+
+        if (nameParts is null || context is not IElasticQueryVisitorContext elasticContext || nameParts is { Length: 0 })
             return null;
 
-        string fieldName = String.Empty;
+        var builder = new StringBuilder();
         for (int i = 0; i < nameParts.Length; i++)
         {
             if (i > 0)
-                fieldName += ".";
+                builder.Append('.');
 
-            fieldName += nameParts[i];
+            builder.Append(nameParts[i]);
 
+            string fieldName = builder.ToString();
             if (elasticContext.MappingResolver.IsNestedPropertyType(fieldName))
                 return fieldName;
         }

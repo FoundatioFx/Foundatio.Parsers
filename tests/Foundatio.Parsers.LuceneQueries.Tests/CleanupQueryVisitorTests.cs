@@ -6,7 +6,6 @@ using Foundatio.Xunit;
 using Microsoft.Extensions.Logging;
 using Pegasus.Common.Tracing;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
