@@ -41,7 +41,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors
         RuntimeFieldResolver RuntimeFieldResolver { get; set; }
         /// <summary>
         /// Resolves user-entered geo text (e.g., zip codes, place names) to a "lat,lon" coordinate
-        /// string. Used by <see cref="GeoVisitor"/> for geo-distance queries and by geo-distance sorts.
+        /// string. Used by <see cref="GeoVisitor"/> for geo-distance queries.
         /// When null, the raw term value is used directly as the location.
         /// </summary>
         Func<string, Task<string>> GeoLocationResolver { get; set; }

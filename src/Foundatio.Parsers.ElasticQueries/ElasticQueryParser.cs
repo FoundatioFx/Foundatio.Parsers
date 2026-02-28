@@ -99,10 +99,11 @@ public class ElasticQueryParser : LuceneQueryParser
         if (Configuration.ValidationOptions != null && !context.HasValidationOptions())
             context.SetValidationOptions(Configuration.ValidationOptions);
 
-        if (context is IElasticQueryVisitorContext elasticVisitorContext)
+        if (context is IElasticQueryVisitorContext elasticVisitorContext
+            && Configuration.GeoLocationResolver is not null
+            && elasticVisitorContext.GeoLocationResolver is null)
         {
-            if (Configuration.GeoLocationResolver is not null && elasticVisitorContext.GeoLocationResolver is null)
-                elasticVisitorContext.GeoLocationResolver = Configuration.GeoLocationResolver;
+            elasticVisitorContext.GeoLocationResolver = Configuration.GeoLocationResolver;
         }
 
         if (context.QueryType == QueryTypes.Query)

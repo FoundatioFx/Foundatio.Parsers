@@ -621,7 +621,7 @@ public class ElasticMappingResolver
         {
             return (T)Convert.ChangeType(value, typeof(T));
         }
-        catch
+        catch (Exception)
         {
             return defaultValue;
         }

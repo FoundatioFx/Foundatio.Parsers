@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -63,7 +63,7 @@ public class LoggingTracer : ITracer
         ruleStats.Locations.TryGetValue(key, out int count);
         ruleStats.Locations[key] = count + 1;
 
-        _logger.LogInformation("{Indent}Start \'{RuleName}\' at ({CursorLine},{CursorColumn}) with state key {CursorStateKey}", GetIndent(), ruleName, cursor.Line, cursor.Column, cursor.StateKey);
+        _logger.LogInformation("{Indent}Start '{RuleName}' at ({CursorLine},{CursorColumn}) with state key {CursorStateKey}", GetIndent(), ruleName, cursor.Line, cursor.Column, cursor.StateKey);
         _indentLevel++;
     }
 
@@ -85,7 +85,7 @@ public class LoggingTracer : ITracer
             _stats[ruleName].TotalTicks += ticks;
         }
 
-        _logger.LogInformation("{Indent}End \'{RuleName}\' with {Success} at ({CursorLine},{CursorColumn}) with state key {CursorStateKey}", GetIndent(), ruleName, (success ? "success" : "failure"), cursor.Line, cursor.Column, cursor.StateKey);
+        _logger.LogInformation("{Indent}End '{RuleName}' with {Success} at ({CursorLine},{CursorColumn}) with state key {CursorStateKey}", GetIndent(), ruleName, (success ? "success" : "failure"), cursor.Line, cursor.Column, cursor.StateKey);
 
         if (!_reportPerformance)
             return;

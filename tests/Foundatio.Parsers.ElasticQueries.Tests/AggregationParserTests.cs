@@ -717,7 +717,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var result = context.GetValidationResult();
         Assert.Equal(QueryTypes.Aggregation, result.QueryType);
         if (!result.IsValid)
-            _logger.LogInformation("Result {Request}", result.Message);
+            _logger.LogInformation("Result {Message}", result.Message);
 
         Assert.Equal(isValid, result.IsValid);
         if (maxNodeDepth >= 0)
