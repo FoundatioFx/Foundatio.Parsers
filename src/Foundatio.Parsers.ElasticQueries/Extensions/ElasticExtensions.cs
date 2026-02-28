@@ -145,7 +145,6 @@ public static class ElasticExtensions
         return new TermsExclude(values);
     }
 
-    // TODO: Handle IFailureReason/BulkIndexByScrollFailure and other bulk response types.
     public static string GetErrorMessage(this ElasticsearchResponse elasticResponse, string message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
     {
         if (elasticResponse == null)
@@ -180,7 +179,7 @@ public static class ElasticExtensions
             sb.AppendLine(body);
         }
 
-        if (includeResponse && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
+        if (includeResponse && apiCall?.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
         {
             string body = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes);
             if (normalize)
@@ -212,14 +211,12 @@ public static class ElasticExtensions
             if (healthResponse.IsValidResponse)
                 return true;
 
-            if (logger != null)
-                logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+            logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
             await Task.Delay(1000, cancellationToken);
         }
 
-        if (logger != null)
-            logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+        logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
     }
@@ -235,14 +232,12 @@ public static class ElasticExtensions
             if (healthResponse.IsValidResponse)
                 return true;
 
-            if (logger != null)
-                logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+            logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
             Thread.Sleep(1000);
         }
 
-        if (logger != null)
-            logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+        logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
     }

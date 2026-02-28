@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -64,8 +65,8 @@ public static class DefaultSortNodeExtensions
 
         var parts = location.Split(',');
         if (parts.Length == 2 &&
-            Double.TryParse(parts[0].Trim(), out double lat) &&
-            Double.TryParse(parts[1].Trim(), out double lon))
+            Double.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double lat) &&
+            Double.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double lon))
         {
             return [GeoLocation.LatitudeLongitude(new LatLonGeoLocation { Lat = lat, Lon = lon })];
         }

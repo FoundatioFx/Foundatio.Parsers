@@ -22,7 +22,7 @@ public class ElasticMappingResolver
     private readonly ConditionalWeakTable<IProperty, ConcurrentDictionary<string, object>> _propertyMetadata = new();
     private readonly ILogger _logger;
 
-    public static ElasticMappingResolver NullInstance = new(() => null);
+    public static readonly ElasticMappingResolver NullInstance = new(() => null);
 
     public ElasticMappingResolver(Func<TypeMapping> getMapping, Inferrer inferrer = null, ILogger logger = null)
     {
@@ -671,6 +671,6 @@ public class FieldMapping
     public bool Found => Property != null;
     public string FullPath { get; private set; }
     public IProperty Property { get; private set; }
-    public DateTime Date { get; private set; } = DateTime.Now;
+    public DateTime Date { get; private set; } = DateTime.UtcNow;
     internal DateTime? ServerMapTime { get; private set; }
 }
