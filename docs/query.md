@@ -80,4 +80,4 @@ Examples:
 
 ## Nested Document Queries
 
-Elasticsearch does not support querying nested documents using the query_string query, but when using this library queries on those fields should work automatically.
+Elasticsearch does not support querying nested documents using the query_string query, but when using this library queries on those fields work automatically. Supported features include grouped and individual nested field queries, negated nested groups, exists/missing on nested fields, wildcard queries, nested aggregations, and nested sort. See the [Nested Queries documentation](./guide/nested-queries) for full details.

@@ -153,7 +153,7 @@ For a detailed explanation of how visitors traverse nested query structures, fie
 
 ### Automatic Nested Query Wrapping
 
-When `UseNested()` is enabled, queries on nested fields are automatically wrapped:
+When `UseNested()` is enabled, queries on nested fields are automatically wrapped. This includes individual field queries, grouped queries, negated groups, exists/missing queries, wildcard queries, aggregations, and sorting:
 
 ```csharp
 var parser = new ElasticQueryParser(c => c
@@ -172,6 +172,12 @@ var query = await parser.BuildQueryAsync("comments.author:john");
 //     }
 //   }
 // }
+
+// Negated nested groups also produce correct structure
+query = await parser.BuildQueryAsync("NOT comments:(comments.author:spammer)");
+
+// Exists/missing on nested fields are wrapped automatically
+query = await parser.BuildQueryAsync("_exists_:comments.author");
 ```
 
 ### Nested Field Detection
