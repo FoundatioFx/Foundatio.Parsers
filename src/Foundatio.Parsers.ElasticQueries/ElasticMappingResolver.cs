@@ -598,7 +598,6 @@ public class ElasticMappingResolver
         return new ElasticMappingResolver(getMapping, inferrer, logger: logger);
     }
 
-    #region Property Metadata
 
     public IDictionary<string, object> GetPropertyMetadata(IProperty property)
     {
@@ -648,8 +647,6 @@ public class ElasticMappingResolver
         foreach (var kvp in sourceMetadata)
             targetMetadata[kvp.Key] = kvp.Value;
     }
-
-    #endregion
 }
 
 public class FieldMapping

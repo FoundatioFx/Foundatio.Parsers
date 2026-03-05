@@ -181,18 +181,9 @@ public class ElasticQueryParser : LuceneQueryParser
     {
         context ??= new ElasticQueryVisitorContext();
         var q = await query.GetQueryAsync() ?? new MatchAllQuery();
-        if (context?.UseScoring == false)
+        if (context.UseScoring == false)
         {
-            // If the query is already a filter-only BoolQuery, don't wrap it again
-            // CombineQueriesVisitor now builds filter queries directly for filter mode
-            var boolQuery = q.Bool;
-            bool isFilterOnlyBoolQuery = boolQuery is not null
-                && boolQuery.Filter?.Count > 0
-                && (boolQuery.Must is null || boolQuery.Must.Count == 0)
-                && (boolQuery.Should is null || boolQuery.Should.Count == 0)
-                && (boolQuery.MustNot is null || boolQuery.MustNot.Count == 0);
-
-            if (!isFilterOnlyBoolQuery)
+            if (!q.IsFilterOnlyBoolQuery())
             {
                 q = new BoolQuery
                 {

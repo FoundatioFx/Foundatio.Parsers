@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
 using Elastic.Clients.Elasticsearch.Mapping;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Elastic.Transport.Products.Elasticsearch;
 using Microsoft.Extensions.Logging;
 
@@ -16,6 +17,22 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class ElasticExtensions
 {
+    /// <summary>
+    /// Returns true when the query is a <see cref="BoolQuery"/> that contains only
+    /// filter clauses (no must, should, or must_not). Used to avoid double-wrapping
+    /// queries inside <c>bool { filter: [bool { filter: [...] }] }</c>.
+    /// </summary>
+    public static bool IsFilterOnlyBoolQuery(this Query query)
+    {
+        if (query?.Bool is not { } boolQuery)
+            return false;
+
+        return boolQuery.Filter is { Count: > 0 }
+            && (boolQuery.Must is null or { Count: 0 })
+            && (boolQuery.Should is null or { Count: 0 })
+            && (boolQuery.MustNot is null or { Count: 0 });
+    }
+
     /// <summary>
     /// Parses a Lucene query string and applies it as the query for the search request.
     /// </summary>
@@ -58,9 +75,11 @@ public static class ElasticExtensions
     }
 
     /// <summary>
-    /// Returns the sub-fields (multi-fields) of a property. ES 9.x removed the base interface
-    /// accessor, so each concrete type must be matched. When upgrading the client, verify that
-    /// newly added property types are included here.
+    /// Returns the sub-fields (multi-fields) of a property. The new
+    /// Elastic.Clients.Elasticsearch client removed the base
+    /// <c>IProperty.Fields</c> accessor, so each concrete type must be matched.
+    /// When upgrading the client, verify that newly added property types are
+    /// included here.
     /// </summary>
     public static Properties GetFields(this IProperty property)
     {
@@ -162,7 +181,7 @@ public static class ElasticExtensions
             sb.AppendLine($"Original: [{exception.GetType().Name}] {exception.Message}");
 
         if (elasticResponse.ElasticsearchServerError?.Error is not null)
-            sb.AppendLine($"Server Error (Index={elasticResponse.ElasticsearchServerError.Error?.Index}): {elasticResponse.ElasticsearchServerError.Error.Reason}");
+            sb.AppendLine($"Server Error (Index={elasticResponse.ElasticsearchServerError.Error.Index}): {elasticResponse.ElasticsearchServerError.Error.Reason}");
 
         if (elasticResponse is BulkResponse bulkResponse)
             sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
@@ -171,7 +190,7 @@ public static class ElasticExtensions
         if (apiCall is not null)
             sb.AppendLine($"[{apiCall.HttpStatusCode}] {apiCall.HttpMethod} {apiCall.Uri?.PathAndQuery}");
 
-        if (apiCall?.RequestBodyInBytes is not null)
+        if (apiCall is not null && apiCall.RequestBodyInBytes is not null)
         {
             string body = Encoding.UTF8.GetString(apiCall.RequestBodyInBytes);
             if (normalize)
@@ -179,7 +198,7 @@ public static class ElasticExtensions
             sb.AppendLine(body);
         }
 
-        if (includeResponse && apiCall?.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
+        if (includeResponse && apiCall is not null && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
         {
             string body = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes);
             if (normalize)

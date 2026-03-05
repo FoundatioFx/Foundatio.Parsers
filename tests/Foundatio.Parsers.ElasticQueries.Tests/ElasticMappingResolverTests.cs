@@ -166,8 +166,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         nestedField1Property = resolver.GetMappingProperty("nEsted.fieLD1");
         Assert.IsType<TextProperty>(nestedField1Property);
 
-        var nestedField2Property = resolver.GetMappingProperty("Nested.Field4");
-        Assert.IsType<LongNumberProperty>(nestedField2Property);
+        var nestedField4Property = resolver.GetMappingProperty("Nested.Field4");
+        Assert.IsType<LongNumberProperty>(nestedField4Property);
 
         var nestedField5Property = resolver.GetMappingProperty("Nested.Field5");
         Assert.IsType<DateProperty>(nestedField5Property);

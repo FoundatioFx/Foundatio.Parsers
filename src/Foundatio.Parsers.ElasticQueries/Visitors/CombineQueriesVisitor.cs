@@ -166,14 +166,9 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (query is null)
             return;
 
-        // Flatten filter-only BoolQueries to keep a flat filter list
-        if (query.Bool is { } boolQuery
-            && boolQuery.Filter is { Count: > 0 }
-            && (boolQuery.Must is null or { Count: 0 })
-            && (boolQuery.Should is null or { Count: 0 })
-            && (boolQuery.MustNot is null or { Count: 0 }))
+        if (query.IsFilterOnlyBoolQuery())
         {
-            filters.AddRange(boolQuery.Filter);
+            filters.AddRange(query.Bool.Filter);
         }
         else
         {

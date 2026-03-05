@@ -42,7 +42,7 @@ public class GeoVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
             return;
 
-        // NOTE: Feedback here: https://github.com/elastic/elasticsearch-net/issues/8496
+        // GeoBoundingBoxQuery ergonomic feedback: https://github.com/elastic/elasticsearch-net/issues/8496
         var box = GeoBounds.TopLeftBottomRight(new TopLeftBottomRightGeoBounds { TopLeft = node.Min, BottomRight = node.Max });
         var query = new GeoBoundingBoxQuery(box, node.Field);
         node.SetQuery(query);

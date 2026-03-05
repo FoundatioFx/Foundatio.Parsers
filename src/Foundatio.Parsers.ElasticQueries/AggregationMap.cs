@@ -5,6 +5,16 @@ using Elastic.Clients.Elasticsearch.Aggregations;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
+/// <summary>
+/// Intermediate representation for building aggregation trees during query parsing.
+/// <para>
+/// The Elastic.Clients.Elasticsearch <see cref="Aggregation"/> type is a discriminated union
+/// that does not support attaching child aggregations during tree construction. This class
+/// provides a mutable tree structure that is converted to
+/// <see cref="IDictionary{TKey,TValue}">IDictionary&lt;string, Aggregation&gt;</see> via
+/// <see cref="ToDictionary"/> once the tree is fully built.
+/// </para>
+/// </summary>
 public class AggregationMap
 {
     public AggregationMap(string name, object value)
@@ -13,11 +23,22 @@ public class AggregationMap
         Value = value;
     }
 
+    /// <summary>The aggregation name used as the dictionary key in the Elasticsearch request.</summary>
     public string Name { get; set; }
-    public object Value { get; set; }
-    public List<AggregationMap> Aggregations { get; } = new();
-    public Dictionary<string, object> Meta { get; } = new();
 
+    /// <summary>The concrete aggregation instance (e.g. <see cref="TermsAggregation"/>, <see cref="MinAggregation"/>).</summary>
+    public object Value { get; set; }
+
+    /// <summary>Child (sub) aggregations nested under this bucket aggregation.</summary>
+    public List<AggregationMap> Aggregations { get; } = [];
+
+    /// <summary>Metadata key/value pairs attached to this aggregation via the <c>meta</c> field.</summary>
+    public Dictionary<string, object> Meta { get; } = [];
+
+    /// <summary>
+    /// Converts the tree into an Elasticsearch aggregation dictionary suitable for
+    /// passing to <c>SearchRequestDescriptor&lt;T&gt;.Aggregations()</c>.
+    /// </summary>
     public IDictionary<string, Aggregation> ToDictionary()
     {
         var result = new Dictionary<string, Aggregation>();

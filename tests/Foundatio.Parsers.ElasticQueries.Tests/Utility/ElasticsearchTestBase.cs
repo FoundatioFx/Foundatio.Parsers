@@ -64,7 +64,7 @@ public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLife
 public class ElasticsearchFixture : IAsyncLifetime
 {
     private readonly List<IndexName> _createdIndexes = new();
-    private static bool _elasticsearchReady;
+    private bool _elasticsearchReady;
     protected readonly ILogger _logger;
     private readonly Lazy<ElasticsearchClient> _client;
 
