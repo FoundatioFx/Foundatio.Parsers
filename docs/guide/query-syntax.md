@@ -345,10 +345,20 @@ var parser = new ElasticQueryParser(c => c
 
 // Query nested field - automatically wrapped in nested query
 var query = await parser.BuildQueryAsync("comments.author:john");
+
+// Grouped nested query
+query = await parser.BuildQueryAsync("comments:(comments.author:john comments.text:hello)");
+
+// Negated nested query
+query = await parser.BuildQueryAsync("NOT comments:(comments.author:spammer)");
+
+// Exists/missing on nested fields
+query = await parser.BuildQueryAsync("_exists_:comments.author");
+query = await parser.BuildQueryAsync("_missing_:comments");
 ```
 
 ::: info Elasticsearch Limitation
-Standard Elasticsearch `query_string` does not support nested documents. Foundatio.Parsers automatically detects nested fields and wraps queries appropriately.
+Standard Elasticsearch `query_string` does not support nested documents. Foundatio.Parsers automatically detects nested fields and wraps queries appropriately, including support for negation, exists/missing, wildcards, and sorting.
 :::
 
 For a full explanation of how the AST is structured and traversed for nested queries, see [Nested Queries and Visitor Traversal](./nested-queries).

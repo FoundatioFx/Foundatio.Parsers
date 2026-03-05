@@ -431,9 +431,36 @@ The `ElasticQueryParser` registers visitors in this order:
 
 Each visitor completes a full tree traversal before the next one starts. By the time `CombineQueriesVisitor` runs, field aliases are resolved, validation is complete, and nested groups are tagged.
 
-## Known Limitations and Gaps
+## Supported Nested Scenarios
 
-> **Note:** Nested document support is actively being developed. See PR [#143](https://github.com/FoundatioFx/Foundatio.Parsers/pull/143) (draft) and the related external contribution PR [#145](https://github.com/FoundatioFx/Foundatio.Parsers/pull/145) for the latest progress. The companion repository change is tracked in [Foundatio.Repositories#150](https://github.com/FoundatioFx/Foundatio.Repositories/pull/150).
+The following nested query scenarios are fully supported with test coverage:
+
+| Scenario | Example | Status |
+|----------|---------|--------|
+| Grouped nested queries | `nested:(nested.field1:value nested.field4:4)` | Supported |
+| Individual nested field queries | `nested.field1:value` (auto-wrapped) | Supported |
+| Multiple nested fields coalesced | `nested.field1:x AND nested.field4:5` | Supported |
+| Negated nested groups | `NOT nested:(nested.field1:value)` | Supported |
+| Inner negation with OR | `nested:(-nested:(field:excluded) OR field:10)` | Supported |
+| Nested aggregations | `terms:nested.field1 max:nested.field4` | Supported |
+| Nested sort | `-nested.field4` | Supported |
+| Exists on nested sub-field | `_exists_:nested.field1` | Supported |
+| Exists on nested root path | `_exists_:nested` | Supported |
+| Missing on nested sub-field | `_missing_:nested.field1` | Supported |
+| Missing on nested root path | `_missing_:nested` | Supported |
+| Wildcard on analyzed nested field | `nested.field1:val*` (query_string) | Supported |
+| Wildcard on non-analyzed nested field | `nested.field5:val*` (prefix) | Supported |
+| Mixed nested/non-nested default fields | `SetDefaultFields(["field1", "nested.field1"])` | Supported |
+| Mixed field types in defaults | Text + keyword + integer across nested/non-nested | Supported |
+| Field aliases to nested paths | `UseFieldMap({ "alias", "nested" })` | Supported |
+
+## Known Limitations
+
+### Multi-Level Deeply Nested Types
+
+Fields nested more than one level deep (e.g., `parent.child.field1` where both `parent` and `parent.child` are nested types) are wrapped at the **outermost** nested path only. The `GetNestedProperty` method in `NestedVisitor` returns the first nested ancestor found when walking the dot-separated path, so a query like `parent.child.field1:value` produces `nested(path=parent, query=...)` but does **not** generate the doubly-nested structure `nested(path=parent, query=nested(path=parent.child, query=...))` that Elasticsearch requires for true multi-level nesting.
+
+Single-level nested queries (e.g., `parent.field1:value` where only `parent` is nested) work correctly.
 
 ### No Nested Field Context Stack
 

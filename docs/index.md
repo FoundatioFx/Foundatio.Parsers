@@ -55,7 +55,7 @@ features:
     link: /guide/query-syntax#geo-proximity-queries
   - icon: 📁
     title: Nested Documents
-    details: Automatic handling of Elasticsearch nested document queries.
+    details: Automatic handling of Elasticsearch nested document queries, aggregations, sorting, negation, and exists/missing.
     link: /guide/nested-queries
 ---
 

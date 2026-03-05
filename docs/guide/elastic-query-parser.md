@@ -324,15 +324,76 @@ Aggregations on nested fields are automatically wrapped in a nested aggregation:
 var aggs = await parser.BuildAggregationsAsync("terms:nested.field1 max:nested.field4");
 ```
 
+### Negated Nested Queries
+
+Negated nested groups are fully supported. Use `NOT` to exclude nested documents matching specific criteria:
+
+```csharp
+// Exclude documents where nested.field1 matches "excluded_value"
+var query = await parser.BuildQueryAsync("NOT nested:(nested.field1:excluded_value)");
+```
+
+This produces a `bool > must_not > nested` query structure.
+
+You can also combine negation with other nested conditions inside a single group:
+
+```csharp
+// Negated inner nested group OR'd with another nested field
+var query = await parser.BuildQueryAsync(
+    "nested:(-nested:(nested.field1:excluded) OR nested.field4:10)");
+```
+
+### Nested Sort
+
+Sorting by nested fields is automatically handled with the correct `nested` context:
+
+```csharp
+// Sort descending by a nested field
+var sort = await parser.BuildSortAsync("-nested.field4");
+```
+
+### Exists and Missing on Nested Fields
+
+Exists and missing queries on nested fields are automatically wrapped in nested queries:
+
+```csharp
+// Check if a specific nested sub-field exists
+var query = await parser.BuildQueryAsync("_exists_:nested.field1");
+
+// Check if the nested object itself exists
+query = await parser.BuildQueryAsync("_exists_:nested");
+
+// Missing queries also work
+query = await parser.BuildQueryAsync("_missing_:nested.field1");
+```
+
+### Wildcards on Nested Fields
+
+Wildcard queries on nested fields are wrapped appropriately based on the field's analysis type:
+
+```csharp
+// Wildcard on an analyzed (text) field -- produces query_string inside nested
+var query = await parser.BuildQueryAsync("nested.field1:val*");
+
+// Wildcard on a non-analyzed (keyword) field -- produces prefix inside nested
+query = await parser.BuildQueryAsync("nested.field5:val*");
+```
+
+### Default Fields with Nested Types
+
+When default fields include both nested and non-nested fields, queries are automatically split and combined:
+
+```csharp
+parser.SetDefaultFields(["field1", "nested.field1", "nested.field2"]);
+
+// Unqualified search term produces:
+// match(field1, "term") OR nested(multi_match(nested.field1, nested.field2, "term"))
+var query = await parser.BuildQueryAsync("searchterm");
+```
+
 ### Known Limitations
 
-Nested support is actively being developed. Some scenarios are not yet fully covered:
-
-- Negated nested groups (e.g., `NOT nested:(nested.field1:value)`)
-- Deeply nested types (nested within nested mappings)
-- Same-field nesting patterns like `@field:(-@field:(value) OR other)`
-
-See PR [#143](https://github.com/FoundatioFx/Foundatio.Parsers/pull/143) for the latest progress.
+- **Multi-level deeply nested types** -- Fields nested more than one level deep (e.g., `parent.child.field1` where both `parent` and `parent.child` are nested types) are wrapped at the outermost nested path only. The inner nested wrapper required by Elasticsearch for multi-level nesting is not generated automatically.
 
 For a detailed explanation of how visitors traverse nested query structures, field scoping rules, and the full AST breakdown, see [Nested Queries and Visitor Traversal](./nested-queries).
 
