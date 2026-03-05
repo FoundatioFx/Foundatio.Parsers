@@ -21,10 +21,10 @@ public static class DefaultAggregationNodeExtensions
     {
         AggregationMap aggregation = null;
         if (node is GroupNode groupNode)
-            aggregation = await groupNode.GetDefaultAggregationAsync(context);
+            aggregation = await groupNode.GetDefaultAggregationAsync(context).AnyContext();
 
         if (node is TermNode termNode)
-            aggregation = await termNode.GetDefaultAggregationAsync(context);
+            aggregation = await termNode.GetDefaultAggregationAsync(context).AnyContext();
 
         if (aggregation is null)
             return null;
@@ -62,7 +62,7 @@ public static class DefaultAggregationNodeExtensions
         switch (node.GetOperationType())
         {
             case AggregationType.DateHistogram:
-                return GetDateHistogramAggregation($"date_{originalField}", field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()), context);
+                return GetDateHistogramAggregation($"date_{originalField}", field, node.UnescapedProximity, node.UnescapedBoost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext()), context);
 
             case AggregationType.Histogram:
                 return GetHistogramAggregation($"histogram_{originalField}", field, node.UnescapedProximity, node.UnescapedBoost, context);
@@ -121,7 +121,7 @@ public static class DefaultAggregationNodeExtensions
 
         string aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
         var property = elasticContext.MappingResolver.GetMappingProperty(node.UnescapedField, true);
-        string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync());
+        string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext());
         string originalField = node.GetOriginalField().Unescape();
 
         // Validate that field name is not empty for aggregations that require it

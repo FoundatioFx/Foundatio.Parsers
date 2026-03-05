@@ -70,18 +70,18 @@ public class SqlQueryParser : LuceneQueryParser
     private static readonly ConcurrentDictionary<IEntityType, List<EntityFieldInfo>> _entityFieldCache = new();
     public async Task<QueryValidationResult> ValidateAsync(string query, SqlQueryVisitorContext context)
     {
-        var node = await ParseAsync(query, context);
-        return await ValidationVisitor.RunAsync(node, context);
+        var node = await ParseAsync(query, context).AnyContext();
+        return await ValidationVisitor.RunAsync(node, context).AnyContext();
     }
 
     public async Task<string> ToDynamicLinqAsync(string query, SqlQueryVisitorContext context)
     {
-        var node = await ParseAsync(query, context);
+        var node = await ParseAsync(query, context).AnyContext();
         var result = context.GetValidationResult();
         if (!result.IsValid)
             throw new ValidationException("Invalid query: " + result.Message);
 
-        return await GenerateSqlVisitor.RunAsync(node, context);
+        return await GenerateSqlVisitor.RunAsync(node, context).AnyContext();
     }
 
     public SqlQueryVisitorContext GetContext(IEntityType entityType)

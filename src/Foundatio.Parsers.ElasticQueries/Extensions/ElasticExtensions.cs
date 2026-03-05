@@ -226,13 +226,13 @@ public static class ElasticExtensions
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var healthResponse = await client.Cluster.HealthAsync(cancellationToken);
+            var healthResponse = await client.Cluster.HealthAsync(cancellationToken).AnyContext();
             if (healthResponse.IsValidResponse)
                 return true;
 
             logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
-            await Task.Delay(1000, cancellationToken);
+            await Task.Delay(1000, cancellationToken).AnyContext();
         }
 
         logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));

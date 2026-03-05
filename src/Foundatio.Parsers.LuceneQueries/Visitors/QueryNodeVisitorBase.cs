@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
@@ -47,31 +48,31 @@ public abstract class QueryNodeVisitorBase : IQueryNodeVisitor
     {
         if (node is GroupNode groupNode)
         {
-            await VisitAsync(groupNode, context);
+            await VisitAsync(groupNode, context).AnyContext();
             return node;
         }
 
         if (node is TermNode termNode)
         {
-            await VisitAsync(termNode, context);
+            await VisitAsync(termNode, context).AnyContext();
             return node;
         }
 
         if (node is TermRangeNode termRangeNode)
         {
-            await VisitAsync(termRangeNode, context);
+            await VisitAsync(termRangeNode, context).AnyContext();
             return node;
         }
 
         if (node is MissingNode missingNode)
         {
-            await VisitAsync(missingNode, context);
+            await VisitAsync(missingNode, context).AnyContext();
             return node;
         }
 
         if (node is ExistsNode existsNode)
         {
-            await VisitAsync(existsNode, context);
+            await VisitAsync(existsNode, context).AnyContext();
             return node;
         }
 

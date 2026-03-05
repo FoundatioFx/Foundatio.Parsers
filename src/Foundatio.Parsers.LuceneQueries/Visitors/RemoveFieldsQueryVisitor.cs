@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -41,19 +41,19 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
 
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        await node.AcceptAsync(this, context);
+        await node.AcceptAsync(this, context).AnyContext();
         return node;
     }
 
     public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null)
     {
-        var result = await new RemoveFieldsQueryVisitor(nonInvertedFields).AcceptAsync(node, context);
+        var result = await new RemoveFieldsQueryVisitor(nonInvertedFields).AcceptAsync(node, context).AnyContext();
         return result.ToString();
     }
 
     public static async Task<string> RunAsync(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext context = null)
     {
-        var result = await new RemoveFieldsQueryVisitor(shouldRemoveFieldFunc).AcceptAsync(node, context);
+        var result = await new RemoveFieldsQueryVisitor(shouldRemoveFieldFunc).AcceptAsync(node, context).AnyContext();
         return result.ToString();
     }
 

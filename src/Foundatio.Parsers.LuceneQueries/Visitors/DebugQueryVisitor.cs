@@ -131,7 +131,7 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        await node.AcceptAsync(this, context);
+        await node.AcceptAsync(this, context).AnyContext();
         return _builder.ToString();
     }
 

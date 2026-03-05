@@ -144,7 +144,7 @@ public class ElasticQueryParser : LuceneQueryParser
         // try to use the runtime field resolver to dynamically discover a new runtime field and, if so, add it to the list of runtime fields
         if ((elasticContext.EnableRuntimeFieldResolver.HasValue == false || elasticContext.EnableRuntimeFieldResolver.Value) && elasticContext.RuntimeFieldResolver != null)
         {
-            var newRuntimeField = await elasticContext.RuntimeFieldResolver(field);
+            var newRuntimeField = await elasticContext.RuntimeFieldResolver(field).AnyContext();
             if (newRuntimeField != null)
             {
                 elasticContext.RuntimeFields.Add(newRuntimeField);
@@ -180,7 +180,7 @@ public class ElasticQueryParser : LuceneQueryParser
     public async Task<Query> BuildQueryAsync(IQueryNode query, IElasticQueryVisitorContext context = null)
     {
         context ??= new ElasticQueryVisitorContext();
-        var q = await query.GetQueryAsync() ?? new MatchAllQuery();
+        var q = await query.GetQueryAsync().AnyContext() ?? new MatchAllQuery();
         if (context.UseScoring == false)
         {
             if (!q.IsFilterOnlyBoolQuery())
@@ -222,7 +222,7 @@ public class ElasticQueryParser : LuceneQueryParser
         if (aggregations == null)
             return null;
 
-        return await aggregations.GetAggregationAsync();
+        return await aggregations.GetAggregationAsync().AnyContext();
     }
 
     public async Task<QueryValidationResult> ValidateSortAsync(string query, QueryValidationOptions options = null, IElasticQueryVisitorContext context = null)

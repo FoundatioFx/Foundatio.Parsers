@@ -94,7 +94,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         await node.AcceptAsync(this, context).AnyContext();
         var validationResult = context.GetValidationResult();
         validationResult.QueryType = context.QueryType;
-        await ApplyQueryRestrictions(context);
+        await ApplyQueryRestrictions(context).AnyContext();
 
         return node;
     }
@@ -110,7 +110,7 @@ public class ValidationVisitor : ChainableQueryVisitor
             var restrictedFields = new List<string>();
             foreach (string field in options.RestrictedFields)
             {
-                string resolvedField = fieldResolver == null ? field : await fieldResolver(field, context);
+                string resolvedField = fieldResolver == null ? field : await fieldResolver(field, context).AnyContext();
                 if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField.Equals(f) || field.Equals(f))))
                     restrictedFields.Add(field);
             }
@@ -171,7 +171,7 @@ public class ValidationVisitor : ChainableQueryVisitor
             visitor.AddVisitor(new TermToFieldVisitor());
         visitor.AddVisitor(new ValidationVisitor());
 
-        await visitor.AcceptAsync(node, context);
+        await visitor.AcceptAsync(node, context).AnyContext();
         return context.GetValidationResult();
     }
 
@@ -187,7 +187,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         if (options != null)
             context.SetValidationOptions(options);
 
-        await new ValidationVisitor().AcceptAsync(node, context);
+        await new ValidationVisitor().AcceptAsync(node, context).AnyContext();
         var validationResult = context.GetValidationResult();
         return validationResult;
     }

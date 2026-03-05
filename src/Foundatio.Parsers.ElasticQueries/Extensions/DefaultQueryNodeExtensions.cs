@@ -21,7 +21,7 @@ public static class DefaultQueryNodeExtensions
             return termNode.GetDefaultQuery(context);
 
         if (node is TermRangeNode termRangeNode)
-            return await termRangeNode.GetDefaultQueryAsync(context);
+            return await termRangeNode.GetDefaultQueryAsync(context).AnyContext();
 
         if (node is ExistsNode existsNode)
             return existsNode.GetDefaultQuery(context);
@@ -266,7 +266,7 @@ public static class DefaultQueryNodeExtensions
         string field = node.UnescapedField;
         if (elasticContext.MappingResolver.IsDatePropertyType(field))
         {
-            var range = new DateRangeQuery(field) { TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()) };
+            var range = new DateRangeQuery(field) { TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext()) };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)

@@ -23,7 +23,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        var container = await GetParentContainerAsync(node, context);
+        var container = await GetParentContainerAsync(node, context).AnyContext();
         var termsAggregation = container.Value as TermsAggregation;
 
         var nestedAggregations = new Dictionary<string, List<(IFieldQueryNode Node, AggregationMap Agg)>>();
@@ -31,7 +31,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         foreach (var child in GetLeafFieldNodes(node))
         {
-            var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
+            var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context)).AnyContext();
             if (aggregation is null)
                 continue;
 
@@ -147,12 +147,12 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             IQueryNode n = currentNode;
             container = await n.GetAggregationAsync(async () =>
             {
-                var result = await n.GetDefaultAggregationAsync(context);
+                var result = await n.GetDefaultAggregationAsync(context).AnyContext();
                 if (result is not null)
                     n.SetAggregation(result);
 
                 return result;
-            });
+            }).AnyContext();
 
             if (currentNode.Parent is not null)
                 currentNode = currentNode.Parent;

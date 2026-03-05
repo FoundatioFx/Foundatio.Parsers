@@ -63,7 +63,7 @@ public class NestedVisitor : ChainableQueryVisitor
         }
         else if (context.QueryType == QueryTypes.Query)
         {
-            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context));
+            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
             if (innerQuery is null)
                 return;
 

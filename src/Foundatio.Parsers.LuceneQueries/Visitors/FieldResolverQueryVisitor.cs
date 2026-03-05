@@ -17,8 +17,8 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
 
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        await ResolveField(node, context);
-        await base.VisitAsync(node, context);
+        await ResolveField(node, context).AnyContext();
+        await base.VisitAsync(node, context).AnyContext();
     }
 
     public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
