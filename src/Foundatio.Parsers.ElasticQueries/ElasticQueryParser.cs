@@ -181,7 +181,7 @@ public class ElasticQueryParser : LuceneQueryParser
     {
         context ??= new ElasticQueryVisitorContext();
         var q = await query.GetQueryAsync().AnyContext() ?? new MatchAllQuery();
-        if (context.UseScoring == false)
+        if (!context.UseScoring)
         {
             if (!q.IsFilterOnlyBoolQuery())
             {
