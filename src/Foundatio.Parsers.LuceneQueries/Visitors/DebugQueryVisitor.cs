@@ -1,4 +1,4 @@
-﻿using System.CodeDom.Compiler;
+using System.CodeDom.Compiler;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,7 +19,7 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        await _writer.WriteLineAsync("Group:").ConfigureAwait(false);
+        await _writer.WriteLineAsync("Group:").AnyContext();
         _writer.Indent++;
         _writer.WriteLineIf(node.IsNegated.HasValue, "IsNegated: {0}", node.IsNegated);
         _writer.WriteLineIf(node.Field != null, "Field: {0}", node.Field);
@@ -30,11 +30,11 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string>
 
         _writer.WriteIf(node.Left != null, "Left - ");
         if (node.Left != null)
-            await node.Left.AcceptAsync(this, context).ConfigureAwait(false);
+            await node.Left.AcceptAsync(this, context).AnyContext();
 
         _writer.WriteIf(node.Right != null, "Right - ");
         if (node.Right != null)
-            await node.Right.AcceptAsync(this, context).ConfigureAwait(false);
+            await node.Right.AcceptAsync(this, context).AnyContext();
 
         _writer.WriteLineIf(node.Operator != GroupOperator.Default, "Operator: {0}", node.Operator);
         _writer.WriteLineIf(node.HasParens, "Parens: true");

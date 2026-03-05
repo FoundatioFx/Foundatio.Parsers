@@ -42,7 +42,7 @@ public static class ElasticExtensions
         Action<ElasticQueryParserConfiguration> configure = null)
     {
         var parser = new ElasticQueryParser(configure);
-        var elasticQuery = await parser.BuildQueryAsync(query).ConfigureAwait(false);
+        var elasticQuery = await parser.BuildQueryAsync(query).AnyContext();
         return descriptor.Query(elasticQuery);
     }
 

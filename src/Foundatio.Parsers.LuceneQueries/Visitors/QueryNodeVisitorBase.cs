@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
@@ -8,7 +8,7 @@ public abstract class QueryNodeVisitorBase : IQueryNodeVisitor
     public virtual async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         foreach (var child in node.Children)
-            await VisitAsync(child, context).ConfigureAwait(false);
+            await VisitAsync(child, context).AnyContext();
     }
 
     public virtual void Visit(TermNode node, IQueryVisitorContext context) { }
@@ -84,7 +84,7 @@ public abstract class MutatingQueryNodeVisitorBase : IQueryNodeVisitor
     public virtual async Task<IQueryNode> VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         foreach (var child in node.Children)
-            await VisitAsync(child, context).ConfigureAwait(false);
+            await VisitAsync(child, context).AnyContext();
 
         return node;
     }

@@ -26,10 +26,10 @@ public class GeoVisitor : ChainableQueryVisitor
         string location = null;
 
         if (elasticContext.GeoLocationResolver != null)
-            location = await elasticContext.GeoLocationResolver(node.Term).ConfigureAwait(false);
+            location = await elasticContext.GeoLocationResolver(node.Term).AnyContext();
 
         if (location == null && _resolveGeoLocation != null)
-            location = await _resolveGeoLocation(node.Term).ConfigureAwait(false);
+            location = await _resolveGeoLocation(node.Term).AnyContext();
 
         location ??= node.Term;
 

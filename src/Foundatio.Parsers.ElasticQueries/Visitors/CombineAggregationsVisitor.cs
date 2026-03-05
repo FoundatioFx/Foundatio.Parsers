@@ -13,7 +13,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 {
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        await base.VisitAsync(node, context).ConfigureAwait(false);
+        await base.VisitAsync(node, context).AnyContext();
 
         // Skip fieldless intermediate groups; their children are collected
         // by GetLeafFieldNodes from the nearest root or named-field ancestor.

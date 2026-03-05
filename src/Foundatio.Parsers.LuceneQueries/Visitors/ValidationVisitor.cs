@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,7 +20,7 @@ public class ValidationVisitor : ChainableQueryVisitor
             AddField(validationResult, node, context);
 
         AddOperation(validationResult, node.GetOperationType(), node.Field);
-        await base.VisitAsync(node, context).ConfigureAwait(false);
+        await base.VisitAsync(node, context).AnyContext();
 
         if (node.HasParens)
             validationResult.CurrentNodeDepth--;
@@ -91,7 +91,7 @@ public class ValidationVisitor : ChainableQueryVisitor
 
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        await node.AcceptAsync(this, context).ConfigureAwait(false);
+        await node.AcceptAsync(this, context).AnyContext();
         var validationResult = context.GetValidationResult();
         validationResult.QueryType = context.QueryType;
         await ApplyQueryRestrictions(context);

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -81,7 +81,7 @@ public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode>, I
             _frozenVisitors = _visitors.OrderBy(v => v.Priority).ToArray();
 
         foreach (var visitor in _frozenVisitors)
-            node = await visitor.AcceptAsync(node, context).ConfigureAwait(false);
+            node = await visitor.AcceptAsync(node, context).AnyContext();
 
         return node;
     }

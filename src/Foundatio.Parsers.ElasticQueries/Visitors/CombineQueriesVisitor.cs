@@ -14,12 +14,12 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 {
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        await base.VisitAsync(node, context).ConfigureAwait(false);
+        await base.VisitAsync(node, context).AnyContext();
 
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        Query query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
+        Query query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
         Query container = query;
         var nested = query?.Nested;
 
@@ -35,7 +35,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         foreach (var child in node.Children.OfType<IFieldQueryNode>())
         {
-            var childQuery = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).ConfigureAwait(false);
+            var childQuery = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).AnyContext();
             if (childQuery is null)
                 continue;
 

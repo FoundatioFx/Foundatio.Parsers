@@ -33,17 +33,17 @@ public class ElasticQueryParser : LuceneQueryParser
         SetupQueryVisitorContextDefaults(context);
         try
         {
-            var result = await base.ParseAsync(query, context).ConfigureAwait(false);
+            var result = await base.ParseAsync(query, context).AnyContext();
             switch (context.QueryType)
             {
                 case QueryTypes.Aggregation:
-                    result = await Configuration.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    result = await Configuration.AggregationVisitor.AcceptAsync(result, context).AnyContext();
                     break;
                 case QueryTypes.Query:
-                    result = await Configuration.QueryVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    result = await Configuration.QueryVisitor.AcceptAsync(result, context).AnyContext();
                     break;
                 case QueryTypes.Sort:
-                    result = await Configuration.SortVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    result = await Configuration.SortVisitor.AcceptAsync(result, context).AnyContext();
                     break;
             }
 
@@ -77,19 +77,19 @@ public class ElasticQueryParser : LuceneQueryParser
             string resolvedField = null;
             if (context.Data.TryGetValue("@OriginalContextResolver", out object data) && data is QueryFieldResolver resolver)
             {
-                string contextResolvedField = await resolver(field, context).ConfigureAwait(false);
+                string contextResolvedField = await resolver(field, context).AnyContext();
                 if (contextResolvedField != null)
                     resolvedField = contextResolvedField;
             }
 
             if (Configuration.FieldResolver != null)
             {
-                string configResolvedField = await Configuration.FieldResolver(resolvedField ?? field, context).ConfigureAwait(false);
+                string configResolvedField = await Configuration.FieldResolver(resolvedField ?? field, context).AnyContext();
                 if (configResolvedField != null)
                     resolvedField = configResolvedField;
             }
 
-            string mappingResolvedField = await MappingFieldResolver(resolvedField ?? field, context).ConfigureAwait(false);
+            string mappingResolvedField = await MappingFieldResolver(resolvedField ?? field, context).AnyContext();
             if (mappingResolvedField != null)
                 resolvedField = mappingResolvedField;
 
@@ -161,7 +161,7 @@ public class ElasticQueryParser : LuceneQueryParser
         context.QueryType = QueryTypes.Query;
         context.SetValidationOptions(options);
 
-        await ParseAsync(query, context).ConfigureAwait(false);
+        await ParseAsync(query, context).AnyContext();
 
         return context.GetValidationResult();
     }
@@ -171,10 +171,10 @@ public class ElasticQueryParser : LuceneQueryParser
         context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Query;
 
-        var result = await ParseAsync(query, context).ConfigureAwait(false);
+        var result = await ParseAsync(query, context).AnyContext();
         context.ThrowIfInvalid();
 
-        return await BuildQueryAsync(result, context).ConfigureAwait(false);
+        return await BuildQueryAsync(result, context).AnyContext();
     }
 
     public async Task<Query> BuildQueryAsync(IQueryNode query, IElasticQueryVisitorContext context = null)
@@ -201,7 +201,7 @@ public class ElasticQueryParser : LuceneQueryParser
         context.QueryType = QueryTypes.Aggregation;
         context.SetValidationOptions(options);
 
-        await ParseAsync(query, context).ConfigureAwait(false);
+        await ParseAsync(query, context).AnyContext();
 
         return context.GetValidationResult();
     }
@@ -211,10 +211,10 @@ public class ElasticQueryParser : LuceneQueryParser
         context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Aggregation;
 
-        var result = await ParseAsync(aggregations, context).ConfigureAwait(false);
+        var result = await ParseAsync(aggregations, context).AnyContext();
         context.ThrowIfInvalid();
 
-        return await BuildAggregationsAsync(result, context).ConfigureAwait(false);
+        return await BuildAggregationsAsync(result, context).AnyContext();
     }
 
     public async Task<AggregationMap> BuildAggregationsAsync(IQueryNode aggregations, IElasticQueryVisitorContext context = null)
@@ -231,7 +231,7 @@ public class ElasticQueryParser : LuceneQueryParser
         context.QueryType = QueryTypes.Sort;
         context.SetValidationOptions(options);
 
-        await ParseAsync(query, context).ConfigureAwait(false);
+        await ParseAsync(query, context).AnyContext();
 
         return context.GetValidationResult();
     }
@@ -241,10 +241,10 @@ public class ElasticQueryParser : LuceneQueryParser
         context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Sort;
 
-        var result = await ParseAsync(sort, context).ConfigureAwait(false);
+        var result = await ParseAsync(sort, context).AnyContext();
         context.ThrowIfInvalid();
 
-        return await BuildSortAsync(result, context).ConfigureAwait(false);
+        return await BuildSortAsync(result, context).AnyContext();
     }
 
     public Task<ICollection<SortOptions>> BuildSortAsync(IQueryNode sort, IElasticQueryVisitorContext context = null)
