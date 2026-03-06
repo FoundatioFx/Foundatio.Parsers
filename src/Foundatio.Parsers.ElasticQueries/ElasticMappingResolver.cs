@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Threading;
 using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,8 @@ public class ElasticMappingResolver
     private readonly Inferrer _inferrer;
     private readonly ConcurrentDictionary<string, FieldMapping> _mappingCache = new();
     private readonly object _mappingLock = new();
+    private readonly SemaphoreSlim _fetchSemaphore = new(1, 1);
+    private long _refreshEpoch;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
 
@@ -45,10 +48,9 @@ public class ElasticMappingResolver
     /// </remarks>
     public void RefreshMapping()
     {
-        // Lock ensures _serverMapping, _lastMappingUpdate, and _mappingCache are reset atomically
-        // so no reader sees a partially-cleared state (e.g., null mapping with stale cache entries).
         lock (_mappingLock)
         {
+            Interlocked.Increment(ref _refreshEpoch);
             _serverMapping = null;
             _lastMappingUpdate = null;
             _mappingCache.Clear();
@@ -480,35 +482,53 @@ public class ElasticMappingResolver
         if (GetServerMappingFunc == null)
             return false;
 
-        // Check throttle under lock; _lastMappingUpdate is set atomically with _serverMapping.
+        long epochBeforeFetch;
         lock (_mappingLock)
         {
             if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > _timeProvider.GetUtcNow().UtcDateTime.SubtractMinutes(1))
                 return false;
+            epochBeforeFetch = Interlocked.Read(ref _refreshEpoch);
         }
 
-        // I/O happens outside the lock to avoid blocking concurrent readers.
-        ITypeMapping newMapping;
+        if (!_fetchSemaphore.Wait(0))
+            return false;
+
         try
         {
-            newMapping = GetServerMappingFunc();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting server mapping: {Message}", ex.Message);
-            return false;
-        }
+            lock (_mappingLock)
+            {
+                if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > _timeProvider.GetUtcNow().UtcDateTime.SubtractMinutes(1))
+                    return false;
+            }
 
-        // Publish results atomically: mapping + timestamp + cache clear must be visible together.
-        lock (_mappingLock)
-        {
-            _serverMapping = newMapping;
-            _lastMappingUpdate = _timeProvider.GetUtcNow().UtcDateTime;
-            _mappingCache.Clear();
-        }
+            ITypeMapping newMapping;
+            try
+            {
+                newMapping = GetServerMappingFunc();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+            {
+                _logger.LogError(ex, "Error getting server mapping: {Message}", ex.Message);
+                return false;
+            }
 
-        _logger.LogInformation("Got server mapping");
-        return true;
+            lock (_mappingLock)
+            {
+                if (Interlocked.Read(ref _refreshEpoch) != epochBeforeFetch)
+                    return false;
+
+                _serverMapping = newMapping;
+                _lastMappingUpdate = _timeProvider.GetUtcNow().UtcDateTime;
+                _mappingCache.Clear();
+            }
+
+            _logger.LogInformation("Got server mapping");
+            return true;
+        }
+        finally
+        {
+            _fetchSemaphore.Release();
+        }
     }
 
     public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, ILogger logger = null) where T : class

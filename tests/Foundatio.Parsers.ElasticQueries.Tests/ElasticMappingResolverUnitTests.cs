@@ -17,7 +17,8 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
 
     private static Inferrer CreateInferrer()
     {
-        return new Inferrer(new ConnectionSettings(new Uri("http://localhost:9200")));
+        var settings = new ConnectionSettings(new Uri("http://localhost:9200"));
+        return new Inferrer(settings);
     }
 
     [Fact]
@@ -241,42 +242,36 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
             return CreateTextWithKeywordMapping("name");
         }, CreateInferrer(), timeProvider: timeProvider, logger: _logger);
 
-        // Act - first fetch
+        // Act - first call triggers initial server fetch
         resolver.GetNonAnalyzedFieldName("name", "keyword");
         int afterFirst = fetchCount;
-
-        // Act - second call within throttle window, no refresh
-        resolver.GetNonAnalyzedFieldName("name", "keyword");
-        int afterSecond = fetchCount;
-
-        // Assert - throttled, no new fetch
         Assert.True(afterFirst >= 1, "First call should trigger at least one fetch");
-        Assert.Equal(afterFirst, afterSecond);
 
-        // Act - refresh clears state, allows new fetch even within window
+        // Act - second call within throttle window should use cache, no new fetch
+        resolver.GetNonAnalyzedFieldName("name", "keyword");
+        Assert.Equal(afterFirst, fetchCount);
+
+        // Act - advance 30s (still within 1-minute window), query unknown field to bypass cache
         timeProvider.Advance(TimeSpan.FromSeconds(30));
+        resolver.GetNonAnalyzedFieldName("unknown_field", "keyword");
+        Assert.Equal(afterFirst, fetchCount);
+
+        // Act - RefreshMapping bypasses throttle even within window
         resolver.RefreshMapping();
         resolver.GetNonAnalyzedFieldName("name", "keyword");
-        int afterThird = fetchCount;
-
-        // Assert
-        Assert.True(afterThird > afterSecond, "Refresh should allow a new fetch");
+        int afterRefresh = fetchCount;
+        Assert.True(afterRefresh > afterFirst, "Refresh should allow a new fetch");
 
         // Act - call again without refresh, should be throttled
         resolver.GetNonAnalyzedFieldName("name", "keyword");
-        int afterFourth = fetchCount;
+        Assert.Equal(afterRefresh, fetchCount);
 
-        // Assert
-        Assert.Equal(afterThird, afterFourth);
-
-        // Act - advance past throttle window
+        // Act - advance past the 1-minute throttle window, refresh to clear cache
         timeProvider.Advance(TimeSpan.FromMinutes(2));
         resolver.RefreshMapping();
         resolver.GetNonAnalyzedFieldName("name", "keyword");
-        int afterFifth = fetchCount;
-
-        // Assert
-        Assert.True(afterFifth > afterFourth, "Fetch should happen after time advances past throttle");
+        int afterTimeAdvance = fetchCount;
+        Assert.True(afterTimeAdvance > afterRefresh, "Fetch should happen after time advances past throttle");
     }
 
     private static ITypeMapping CreateTextWithKeywordMapping(string fieldName)
