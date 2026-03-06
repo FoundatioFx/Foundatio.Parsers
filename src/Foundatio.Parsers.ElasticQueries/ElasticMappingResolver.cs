@@ -21,16 +21,16 @@ public class ElasticMappingResolver
 
     public static ElasticMappingResolver NullInstance = new(() => null);
 
-    public ElasticMappingResolver(Func<ITypeMapping> getMapping, Inferrer inferrer = null, ILogger logger = null, TimeProvider timeProvider = null)
+    public ElasticMappingResolver(Func<ITypeMapping> getMapping, Inferrer inferrer = null, TimeProvider timeProvider = null, ILogger logger = null)
     {
         GetServerMappingFunc = getMapping;
         _inferrer = inferrer;
-        _logger = logger ?? NullLogger.Instance;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _logger = logger ?? NullLogger.Instance;
     }
 
-    public ElasticMappingResolver(ITypeMapping codeMapping, Inferrer inferrer, Func<ITypeMapping> getMapping, ILogger logger = null)
-        : this(getMapping, inferrer, logger)
+    public ElasticMappingResolver(ITypeMapping codeMapping, Inferrer inferrer, Func<ITypeMapping> getMapping, TimeProvider timeProvider = null, ILogger logger = null)
+        : this(getMapping, inferrer, timeProvider, logger)
     {
         _codeMapping = codeMapping;
     }
@@ -495,7 +495,7 @@ public class ElasticMappingResolver
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting server mapping: " + ex.Message);
+            _logger.LogError(ex, "Error getting server mapping: {Message}", ex.Message);
             return false;
         }
 
@@ -596,6 +596,6 @@ public class FieldMapping
     public bool Found => Property != null;
     public string FullPath { get; private set; }
     public IProperty Property { get; private set; }
-    public DateTime Date { get; private set; } = DateTime.Now;
+    public DateTime Date { get; private set; } = DateTime.UtcNow;
     internal DateTime? ServerMapTime { get; private set; }
 }
