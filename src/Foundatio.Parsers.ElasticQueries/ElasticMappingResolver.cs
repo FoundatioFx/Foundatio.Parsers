@@ -10,7 +10,7 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
-public class ElasticMappingResolver
+public class ElasticMappingResolver : IDisposable
 {
     private ITypeMapping _serverMapping;
     private readonly ITypeMapping _codeMapping;
@@ -36,6 +36,11 @@ public class ElasticMappingResolver
         : this(getMapping, inferrer, timeProvider, logger)
     {
         _codeMapping = codeMapping;
+    }
+
+    public void Dispose()
+    {
+        _fetchSemaphore.Dispose();
     }
 
     /// <summary>
@@ -186,7 +191,8 @@ public class ElasticMappingResolver
             {
                 var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping, mappingServerTime, currentEpoch);
                 if (Interlocked.Read(ref _refreshEpoch) == currentEpoch)
-                    _mappingCache.AddOrUpdate(field, resolvedMapping, (_, _) => resolvedMapping);
+                    _mappingCache.AddOrUpdate(field, resolvedMapping, (_, existing) =>
+                        existing.Epoch > resolvedMapping.Epoch ? existing : resolvedMapping);
                 _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property?.Type);
 
                 if (followAlias && resolvedMapping.Property is IFieldAliasProperty fieldAlias)
@@ -211,7 +217,8 @@ public class ElasticMappingResolver
         _logger.LogTrace("Mapping not found: {field}", field);
         var notFoundMapping = new FieldMapping(resolvedFieldName, null, mappingServerTime, currentEpoch);
         if (Interlocked.Read(ref _refreshEpoch) == currentEpoch)
-            _mappingCache.AddOrUpdate(field, notFoundMapping, (_, _) => notFoundMapping);
+            _mappingCache.AddOrUpdate(field, notFoundMapping, (_, existing) =>
+                existing.Epoch > notFoundMapping.Epoch ? existing : notFoundMapping);
 
         return notFoundMapping;
     }
