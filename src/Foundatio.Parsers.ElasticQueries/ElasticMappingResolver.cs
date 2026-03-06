@@ -71,31 +71,27 @@ public class ElasticMappingResolver : IDisposable
 
         if (_mappingCache.TryGetValue(field, out var mapping) && mapping.Epoch >= currentEpoch)
         {
-            if (followAlias && mapping.Found && mapping.Property is IFieldAliasProperty fieldAlias)
-            {
-                _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
-                return GetMapping(fieldAlias.Path.Name);
-            }
+            long lastUpdateTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
+            bool mappingCurrent = lastUpdateTicks == 0
+                || (mapping.ServerMapTime.HasValue && mapping.ServerMapTime.Value.Ticks >= lastUpdateTicks);
 
-            if (mapping.Found)
+            if (mapping.Found && mappingCurrent)
             {
+                if (followAlias && mapping.Property is IFieldAliasProperty fieldAlias)
+                {
+                    _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
+                    return GetMapping(fieldAlias.Path.Name);
+                }
+
                 _logger.LogTrace("Cached mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
                 return mapping;
             }
 
-            // Cached "not found" entry. If server mapping hasn't changed since this entry was
-            // created, and no new server mapping is available, return the cached miss.
-            long lastUpdateTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
-            bool mappingUnchanged = lastUpdateTicks == 0
-                ? !mapping.ServerMapTime.HasValue
-                : mapping.ServerMapTime.HasValue && mapping.ServerMapTime.Value.Ticks >= lastUpdateTicks;
-            if (mappingUnchanged && !GetServerMapping())
+            if (!mapping.Found && mappingCurrent && !GetServerMapping())
             {
                 _logger.LogTrace("Cached mapping (not found): {field}=<null>", field);
                 return mapping;
             }
-
-            _logger.LogTrace("Cached mapping (not found), got new server mapping.");
         }
 
         string[] fieldParts = field.Split('.');
@@ -185,7 +181,7 @@ public class ElasticMappingResolver : IDisposable
             if (depth == fieldParts.Length - 1)
             {
                 var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping, mappingServerTime, currentEpoch);
-                if (Interlocked.Read(ref _refreshEpoch) == currentEpoch)
+                if (IsSnapshotCurrent(currentEpoch, mappingServerTime))
                     _mappingCache.AddOrUpdate(field, resolvedMapping, (_, existing) =>
                         existing.Epoch > resolvedMapping.Epoch ? existing : resolvedMapping);
                 _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property?.Type);
@@ -211,7 +207,7 @@ public class ElasticMappingResolver : IDisposable
 
         _logger.LogTrace("Mapping not found: {field}", field);
         var notFoundMapping = new FieldMapping(resolvedFieldName, null, mappingServerTime, currentEpoch);
-        if (Interlocked.Read(ref _refreshEpoch) == currentEpoch)
+        if (IsSnapshotCurrent(currentEpoch, mappingServerTime))
             _mappingCache.AddOrUpdate(field, notFoundMapping, (_, existing) =>
                 existing.Epoch > notFoundMapping.Epoch ? existing : notFoundMapping);
 
@@ -488,6 +484,18 @@ public class ElasticMappingResolver : IDisposable
 
     private Func<ITypeMapping> GetServerMappingFunc { get; set; }
     private long _lastMappingUpdateTicks;
+
+    private bool IsSnapshotCurrent(long snapshotEpoch, DateTime? snapshotServerTime)
+    {
+        if (Interlocked.Read(ref _refreshEpoch) != snapshotEpoch)
+            return false;
+
+        long currentTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
+        if (currentTicks == 0)
+            return true;
+
+        return snapshotServerTime.HasValue && snapshotServerTime.Value.Ticks >= currentTicks;
+    }
 
     /// <returns>true if a new mapping was fetched and applied; false if throttled or unavailable.</returns>
     private bool GetServerMapping()
