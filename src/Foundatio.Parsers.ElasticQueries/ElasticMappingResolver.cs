@@ -84,8 +84,10 @@ public class ElasticMappingResolver
             // Cached "not found" entry. If server mapping hasn't changed since this entry was
             // created, and no new server mapping is available, return the cached miss.
             long lastUpdateTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
-            var lastUpdate = lastUpdateTicks > 0 ? new DateTime(lastUpdateTicks, DateTimeKind.Utc) : (DateTime?)null;
-            if (mapping.ServerMapTime >= lastUpdate && !GetServerMapping())
+            bool mappingUnchanged = lastUpdateTicks == 0
+                ? !mapping.ServerMapTime.HasValue
+                : mapping.ServerMapTime.HasValue && mapping.ServerMapTime.Value.Ticks >= lastUpdateTicks;
+            if (mappingUnchanged && !GetServerMapping())
             {
                 _logger.LogTrace("Cached mapping (not found): {field}=<null>", field);
                 return mapping;

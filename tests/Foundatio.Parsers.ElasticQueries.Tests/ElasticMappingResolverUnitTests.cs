@@ -8,14 +8,21 @@ using Xunit;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
-public class ElasticMappingResolverUnitTests : TestWithLoggingBase
+public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
 {
+    private readonly ConnectionSettings _connectionSettings;
     private readonly Inferrer _inferrer;
 
     public ElasticMappingResolverUnitTests(ITestOutputHelper output) : base(output)
     {
         Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
-        _inferrer = new Inferrer(new ConnectionSettings(new Uri("http://localhost:9200")));
+        _connectionSettings = new ConnectionSettings(new Uri("http://localhost:9200"));
+        _inferrer = new Inferrer(_connectionSettings);
+    }
+
+    public void Dispose()
+    {
+        (_connectionSettings as IDisposable)?.Dispose();
     }
 
     [Fact]
