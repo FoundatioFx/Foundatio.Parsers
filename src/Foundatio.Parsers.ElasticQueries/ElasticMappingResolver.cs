@@ -79,7 +79,7 @@ public class ElasticMappingResolver : IDisposable
             {
                 if (followAlias && mapping.Property is IFieldAliasProperty fieldAlias)
                 {
-                    _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
+                    _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property.Type);
                     return GetMapping(fieldAlias.Path.Name);
                 }
 
