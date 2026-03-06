@@ -10,15 +10,12 @@ namespace Foundatio.Parsers.ElasticQueries.Tests;
 
 public class ElasticMappingResolverUnitTests : TestWithLoggingBase
 {
+    private readonly Inferrer _inferrer;
+
     public ElasticMappingResolverUnitTests(ITestOutputHelper output) : base(output)
     {
         Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
-    }
-
-    private static Inferrer CreateInferrer()
-    {
-        var settings = new ConnectionSettings(new Uri("http://localhost:9200"));
-        return new Inferrer(settings);
+        _inferrer = new Inferrer(new ConnectionSettings(new Uri("http://localhost:9200")));
     }
 
     [Fact]
@@ -26,7 +23,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
     {
         // Arrange
         var resolver = new ElasticMappingResolver(
-            CreateTextWithKeywordMapping("title"), CreateInferrer(), () => null, logger: _logger);
+            CreateTextWithKeywordMapping("title"), _inferrer, () => null, logger: _logger);
 
         // Act
         string result = resolver.GetNonAnalyzedFieldName("title", "keyword");
@@ -40,7 +37,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
     {
         // Arrange
         var resolver = new ElasticMappingResolver(
-            CreateTextWithKeywordMapping("title"), CreateInferrer(), () => null, logger: _logger);
+            CreateTextWithKeywordMapping("title"), _inferrer, () => null, logger: _logger);
 
         // Act
         string result = resolver.GetAggregationsFieldName("title");
@@ -54,7 +51,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
     {
         // Arrange
         var resolver = new ElasticMappingResolver(
-            CreateTextWithKeywordAndSortMapping("title"), CreateInferrer(), () => null, logger: _logger);
+            CreateTextWithKeywordAndSortMapping("title"), _inferrer, () => null, logger: _logger);
 
         // Act
         string result = resolver.GetSortFieldName("title");
@@ -74,7 +71,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
                 { "status", new KeywordProperty { Name = "status" } }
             }
         };
-        var resolver = new ElasticMappingResolver(codeMapping, CreateInferrer(), () => null, logger: _logger);
+        var resolver = new ElasticMappingResolver(codeMapping, _inferrer, () => null, logger: _logger);
 
         // Act
         string result = resolver.GetNonAnalyzedFieldName("status", "keyword");
@@ -88,7 +85,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
     {
         // Arrange
         var resolver = new ElasticMappingResolver(
-            CreateTextOnlyMapping("body"), CreateInferrer(), () => null, logger: _logger);
+            CreateTextOnlyMapping("body"), _inferrer, () => null, logger: _logger);
 
         // Act
         string result = resolver.GetNonAnalyzedFieldName("body", "keyword");
@@ -108,7 +105,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
             return callNumber <= 1
                 ? CreateTextOnlyMapping("name")
                 : CreateTextWithKeywordMapping("name");
-        }, CreateInferrer(), logger: _logger);
+        }, _inferrer, logger: _logger);
 
         // Act
         string beforeRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword");
@@ -132,7 +129,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
             return callNumber == 1
                 ? CreateTextOnlyMapping("name")
                 : CreateTextWithKeywordMapping("name");
-        }, CreateInferrer(), logger: _logger);
+        }, _inferrer, logger: _logger);
 
         // Act
         string first = resolver.GetNonAnalyzedFieldName("name", "keyword");
@@ -149,7 +146,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
     {
         // Arrange
         var resolver = new ElasticMappingResolver(
-            CreateTextWithKeywordMapping("name"), CreateInferrer(),
+            CreateTextWithKeywordMapping("name"), _inferrer,
             () => CreateTextOnlyMapping("name"), logger: _logger);
         resolver.RefreshMapping();
 
@@ -166,7 +163,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
         // Arrange
         int callCount = 0;
         var resolver = new ElasticMappingResolver(
-            CreateTextOnlyMapping("name"), CreateInferrer(), () =>
+            CreateTextOnlyMapping("name"), _inferrer, () =>
             {
                 int callNumber = Interlocked.Increment(ref callCount);
                 return callNumber <= 1 ? null : CreateTextWithKeywordMapping("name");
@@ -187,7 +184,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
     {
         // Arrange
         var resolver = new ElasticMappingResolver(
-            CreateTextWithKeywordMapping("name"), CreateInferrer(), () =>
+            CreateTextWithKeywordMapping("name"), _inferrer, () =>
             {
                 Thread.Yield();
                 return CreateTextWithKeywordMapping("name");
@@ -240,7 +237,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
         {
             Interlocked.Increment(ref fetchCount);
             return CreateTextWithKeywordMapping("name");
-        }, CreateInferrer(), timeProvider: timeProvider, logger: _logger);
+        }, _inferrer, timeProvider: timeProvider, logger: _logger);
 
         // Act - first call triggers initial server fetch
         resolver.GetNonAnalyzedFieldName("name", "keyword");
@@ -266,12 +263,12 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
         resolver.GetNonAnalyzedFieldName("name", "keyword");
         Assert.Equal(afterRefresh, fetchCount);
 
-        // Act - advance past the 1-minute throttle window, refresh to clear cache
+        // Act - advance past the 1-minute throttle window; resolve an uncached field
+        // WITHOUT calling RefreshMapping() to prove time-based expiry works on its own.
         timeProvider.Advance(TimeSpan.FromMinutes(2));
-        resolver.RefreshMapping();
-        resolver.GetNonAnalyzedFieldName("name", "keyword");
+        resolver.GetNonAnalyzedFieldName("another_unknown_field", "keyword");
         int afterTimeAdvance = fetchCount;
-        Assert.True(afterTimeAdvance > afterRefresh, "Fetch should happen after time advances past throttle");
+        Assert.True(afterTimeAdvance > afterRefresh, "Fetch should happen after time advances past throttle without RefreshMapping");
     }
 
     private static ITypeMapping CreateTextWithKeywordMapping(string fieldName)
