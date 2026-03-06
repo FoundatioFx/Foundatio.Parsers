@@ -169,7 +169,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
             {
                 int callNumber = Interlocked.Increment(ref callCount);
                 return callNumber <= 1 ? null : CreateTextWithKeywordMapping("name");
-            }, CreateInferrer(), logger: _logger);
+            }, logger: _logger);
 
         // Act
         string initial = resolver.GetNonAnalyzedFieldName("name", "keyword");
@@ -190,7 +190,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase
             {
                 Thread.Yield();
                 return CreateTextWithKeywordMapping("name");
-            }, CreateInferrer(), logger: _logger);
+            }, logger: _logger);
         const int iterations = 200;
         using var barrier = new Barrier(3);
 
