@@ -52,7 +52,7 @@ public class ElasticMappingResolver
         {
             Interlocked.Increment(ref _refreshEpoch);
             _serverMapping = null;
-            _lastMappingUpdate = null;
+            Interlocked.Exchange(ref _lastMappingUpdateTicks, 0);
             _mappingCache.Clear();
         }
 
@@ -83,7 +83,9 @@ public class ElasticMappingResolver
 
             // Cached "not found" entry. If server mapping hasn't changed since this entry was
             // created, and no new server mapping is available, return the cached miss.
-            if (mapping.ServerMapTime >= _lastMappingUpdate && !GetServerMapping())
+            long lastUpdateTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
+            var lastUpdate = lastUpdateTicks > 0 ? new DateTime(lastUpdateTicks, DateTimeKind.Utc) : (DateTime?)null;
+            if (mapping.ServerMapTime >= lastUpdate && !GetServerMapping())
             {
                 _logger.LogTrace("Cached mapping (not found): {field}=<null>", field);
                 return mapping;
@@ -96,13 +98,14 @@ public class ElasticMappingResolver
         string resolvedFieldName = "";
 
         // Snapshot server mapping under lock so readers see a consistent pair of
-        // _serverMapping + _lastMappingUpdate (both are set together in GetServerMapping).
+        // _serverMapping + _lastMappingUpdateTicks (both are set together in GetServerMapping).
         ITypeMapping serverMapping;
         DateTime? mappingServerTime;
         lock (_mappingLock)
         {
             serverMapping = _serverMapping;
-            mappingServerTime = _lastMappingUpdate;
+            long ticks = Interlocked.Read(ref _lastMappingUpdateTicks);
+            mappingServerTime = ticks > 0 ? new DateTime(ticks, DateTimeKind.Utc) : null;
         }
 
         // Lazily fetch server mapping only when none is loaded yet.
@@ -111,7 +114,8 @@ public class ElasticMappingResolver
             lock (_mappingLock)
             {
                 serverMapping = _serverMapping;
-                mappingServerTime = _lastMappingUpdate;
+                long ticks = Interlocked.Read(ref _lastMappingUpdateTicks);
+                mappingServerTime = ticks > 0 ? new DateTime(ticks, DateTimeKind.Utc) : null;
             }
         }
 
@@ -140,7 +144,8 @@ public class ElasticMappingResolver
                     lock (_mappingLock)
                     {
                         serverMapping = _serverMapping;
-                        mappingServerTime = _lastMappingUpdate;
+                        long ticks = Interlocked.Read(ref _lastMappingUpdateTicks);
+                        mappingServerTime = ticks > 0 ? new DateTime(ticks, DateTimeKind.Utc) : null;
                     }
                     currentProperties = MergeProperties(_codeMapping?.Properties, serverMapping?.Properties);
                     continue;
@@ -474,7 +479,7 @@ public class ElasticMappingResolver
     }
 
     private Func<ITypeMapping> GetServerMappingFunc { get; set; }
-    private DateTime? _lastMappingUpdate = null;
+    private long _lastMappingUpdateTicks;
 
     /// <returns>true if a new mapping was fetched and applied; false if throttled or unavailable.</returns>
     private bool GetServerMapping()
@@ -485,7 +490,8 @@ public class ElasticMappingResolver
         long epochBeforeFetch;
         lock (_mappingLock)
         {
-            if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > _timeProvider.GetUtcNow().UtcDateTime.SubtractMinutes(1))
+            long lastTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
+            if (lastTicks > 0 && new DateTime(lastTicks, DateTimeKind.Utc) > _timeProvider.GetUtcNow().UtcDateTime.SubtractMinutes(1))
                 return false;
             epochBeforeFetch = Interlocked.Read(ref _refreshEpoch);
         }
@@ -497,7 +503,8 @@ public class ElasticMappingResolver
         {
             lock (_mappingLock)
             {
-                if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > _timeProvider.GetUtcNow().UtcDateTime.SubtractMinutes(1))
+                long lastTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
+                if (lastTicks > 0 && new DateTime(lastTicks, DateTimeKind.Utc) > _timeProvider.GetUtcNow().UtcDateTime.SubtractMinutes(1))
                     return false;
             }
 
@@ -518,7 +525,7 @@ public class ElasticMappingResolver
                     return false;
 
                 _serverMapping = newMapping;
-                _lastMappingUpdate = _timeProvider.GetUtcNow().UtcDateTime;
+                Interlocked.Exchange(ref _lastMappingUpdateTicks, _timeProvider.GetUtcNow().UtcDateTime.Ticks);
                 _mappingCache.Clear();
             }
 
