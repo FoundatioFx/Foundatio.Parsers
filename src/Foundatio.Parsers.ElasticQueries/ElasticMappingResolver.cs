@@ -38,11 +38,6 @@ public class ElasticMappingResolver : IDisposable
         _codeMapping = codeMapping;
     }
 
-    public void Dispose()
-    {
-        _fetchSemaphore.Dispose();
-    }
-
     /// <summary>
     /// Clears the cached mapping, forcing a fresh fetch from the server on the next access.
     /// </summary>
@@ -621,6 +616,11 @@ public class ElasticMappingResolver : IDisposable
     public static ElasticMappingResolver Create(Func<ITypeMapping> getMapping, Inferrer inferrer, ILogger logger = null)
     {
         return new ElasticMappingResolver(getMapping, inferrer, logger: logger);
+    }
+
+    public void Dispose()
+    {
+        _fetchSemaphore.Dispose();
     }
 }
 
