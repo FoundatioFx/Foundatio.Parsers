@@ -15,6 +15,7 @@ public class ElasticMappingResolver
     private readonly ITypeMapping _codeMapping;
     private readonly Inferrer _inferrer;
     private readonly ConcurrentDictionary<string, FieldMapping> _mappingCache = new();
+    private readonly object _mappingLock = new();
     private readonly ILogger _logger;
 
     public static ElasticMappingResolver NullInstance = new(() => null);
@@ -42,9 +43,13 @@ public class ElasticMappingResolver
     /// </remarks>
     public void RefreshMapping()
     {
-        _logger.LogInformation("Mapping refresh triggered.");
-        _serverMapping = null;
-        _lastMappingUpdate = null;
+        lock (_mappingLock)
+        {
+            _logger.LogInformation("Mapping refresh triggered.");
+            _serverMapping = null;
+            _lastMappingUpdate = null;
+            _mappingCache.Clear();
+        }
     }
 
     public FieldMapping GetMapping(string field, bool followAlias = false)
@@ -80,8 +85,17 @@ public class ElasticMappingResolver
 
         string[] fieldParts = field.Split('.');
         string resolvedFieldName = "";
-        var mappingServerTime = _lastMappingUpdate;
-        var currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
+
+        GetServerMapping();
+
+        ITypeMapping serverMapping;
+        DateTime? mappingServerTime;
+        lock (_mappingLock)
+        {
+            serverMapping = _serverMapping;
+            mappingServerTime = _lastMappingUpdate;
+        }
+        var currentProperties = MergeProperties(_codeMapping?.Properties, serverMapping?.Properties);
 
         for (int depth = 0; depth < fieldParts.Length; depth++)
         {
@@ -103,7 +117,12 @@ public class ElasticMappingResolver
                     // we got updated mapping, start over from the top
                     depth = -1;
                     resolvedFieldName = "";
-                    currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
+                    lock (_mappingLock)
+                    {
+                        serverMapping = _serverMapping;
+                        mappingServerTime = _lastMappingUpdate;
+                    }
+                    currentProperties = MergeProperties(_codeMapping?.Properties, serverMapping?.Properties);
                     continue;
                 }
 
@@ -441,21 +460,25 @@ public class ElasticMappingResolver
         if (GetServerMappingFunc == null)
             return false;
 
-        if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.UtcNow.SubtractMinutes(1))
-            return false;
-
-        try
+        lock (_mappingLock)
         {
-            _serverMapping = GetServerMappingFunc();
-            _lastMappingUpdate = DateTime.UtcNow;
-            _logger.LogInformation("Got server mapping");
+            if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.UtcNow.SubtractMinutes(1))
+                return false;
 
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting server mapping: " + ex.Message);
-            return false;
+            try
+            {
+                _serverMapping = GetServerMappingFunc();
+                _lastMappingUpdate = DateTime.UtcNow;
+                _mappingCache.Clear();
+                _logger.LogInformation("Got server mapping");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting server mapping: " + ex.Message);
+                return false;
+            }
         }
     }
 
