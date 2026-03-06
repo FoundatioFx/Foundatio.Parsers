@@ -67,7 +67,9 @@ public class ElasticMappingResolver
         if (GetServerMappingFunc == null && _codeMapping == null)
             throw new InvalidOperationException("No mappings are available.");
 
-        if (_mappingCache.TryGetValue(field, out var mapping))
+        long currentEpoch = Interlocked.Read(ref _refreshEpoch);
+
+        if (_mappingCache.TryGetValue(field, out var mapping) && mapping.Epoch >= currentEpoch)
         {
             if (followAlias && mapping.Found && mapping.Property is IFieldAliasProperty fieldAlias)
             {
@@ -182,8 +184,9 @@ public class ElasticMappingResolver
 
             if (depth == fieldParts.Length - 1)
             {
-                var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping, mappingServerTime);
-                _mappingCache.AddOrUpdate(field, resolvedMapping, (_, _) => resolvedMapping);
+                var resolvedMapping = new FieldMapping(resolvedFieldName, fieldMapping, mappingServerTime, currentEpoch);
+                if (Interlocked.Read(ref _refreshEpoch) == currentEpoch)
+                    _mappingCache.AddOrUpdate(field, resolvedMapping, (_, _) => resolvedMapping);
                 _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property?.Type);
 
                 if (followAlias && resolvedMapping.Property is IFieldAliasProperty fieldAlias)
@@ -206,8 +209,9 @@ public class ElasticMappingResolver
         }
 
         _logger.LogTrace("Mapping not found: {field}", field);
-        var notFoundMapping = new FieldMapping(resolvedFieldName, null, mappingServerTime);
-        _mappingCache.AddOrUpdate(field, notFoundMapping, (_, _) => notFoundMapping);
+        var notFoundMapping = new FieldMapping(resolvedFieldName, null, mappingServerTime, currentEpoch);
+        if (Interlocked.Read(ref _refreshEpoch) == currentEpoch)
+            _mappingCache.AddOrUpdate(field, notFoundMapping, (_, _) => notFoundMapping);
 
         return notFoundMapping;
     }
@@ -615,11 +619,12 @@ public class ElasticMappingResolver
 
 public class FieldMapping
 {
-    public FieldMapping(string path, IProperty property, DateTime? serverMapTime)
+    public FieldMapping(string path, IProperty property, DateTime? serverMapTime, long epoch = 0)
     {
         FullPath = path;
         Property = property;
         ServerMapTime = serverMapTime;
+        Epoch = epoch;
     }
 
     public bool Found => Property != null;
@@ -627,4 +632,5 @@ public class FieldMapping
     public IProperty Property { get; private set; }
     public DateTime Date { get; private set; } = DateTime.UtcNow;
     internal DateTime? ServerMapTime { get; private set; }
+    internal long Epoch { get; private set; }
 }
