@@ -312,33 +312,35 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public void RefreshMapping_WhenCalled_ClearsCachedMappings()
     {
-        // Arrange: resolver starts with code mapping that has no keyword sub-field,
-        // then server mapping provides one after refresh.
         int serverFetchCount = 0;
-        var codeMapping = new TypeMapping
+        var resolver = new ElasticMappingResolver(() =>
         {
-            Properties = new Properties
+            int n = Interlocked.Increment(ref serverFetchCount);
+            if (n <= 1)
             {
-                { "name", new TextProperty { Name = "name" } }
+                return new TypeMapping
+                {
+                    Properties = new Properties
+                    {
+                        { "name", new TextProperty { Name = "name" } }
+                    }
+                };
             }
-        };
-        var resolver = new ElasticMappingResolver(codeMapping, CreateInferrer(), () =>
-        {
-            Interlocked.Increment(ref serverFetchCount);
-            return CreateTextWithKeywordMapping("name");
-        }, _logger);
 
-        // First resolution caches as "found" with code-only TextProperty (no sub-fields).
+            return CreateTextWithKeywordMapping("name");
+        }, CreateInferrer(), _logger);
+
+        // First resolution: server returns TextProperty without keyword sub-field.
         string beforeRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword");
         Assert.Equal("name", beforeRefresh);
 
-        // Act: refresh should clear cache so next resolution picks up server mapping.
+        // Act: refresh should clear cache so next resolution picks up new server mapping.
         resolver.RefreshMapping();
 
-        // Assert: after refresh, server mapping is fetched and keyword sub-field is found.
+        // Assert: after refresh, server mapping is fetched again and keyword sub-field is found.
         string afterRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword");
         Assert.Equal("name.keyword", afterRefresh);
-        Assert.True(serverFetchCount > 0, "Server mapping should have been fetched after refresh");
+        Assert.True(serverFetchCount >= 2, "Server mapping should have been fetched at least twice");
     }
 
     [Fact]
@@ -448,7 +450,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
 
         const int iterations = 200;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var barrier = new Barrier(3);
+        using var barrier = new Barrier(3);
 
         // Act & Assert
         var readerTask = Task.Run(() =>

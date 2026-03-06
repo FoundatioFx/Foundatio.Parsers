@@ -74,7 +74,13 @@ public class ElasticMappingResolver
                 return mapping;
             }
 
-            if (mapping.ServerMapTime >= _lastMappingUpdate && !GetServerMapping())
+            DateTime? lastUpdate;
+            lock (_mappingLock)
+            {
+                lastUpdate = _lastMappingUpdate;
+            }
+
+            if (mapping.ServerMapTime >= lastUpdate && !GetServerMapping())
             {
                 _logger.LogTrace("Cached mapping (not found): {field}=<null>", field);
                 return mapping;
@@ -464,22 +470,28 @@ public class ElasticMappingResolver
         {
             if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.UtcNow.SubtractMinutes(1))
                 return false;
-
-            try
-            {
-                _serverMapping = GetServerMappingFunc();
-                _lastMappingUpdate = DateTime.UtcNow;
-                _mappingCache.Clear();
-                _logger.LogInformation("Got server mapping");
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting server mapping: " + ex.Message);
-                return false;
-            }
         }
+
+        ITypeMapping newMapping;
+        try
+        {
+            newMapping = GetServerMappingFunc();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting server mapping: " + ex.Message);
+            return false;
+        }
+
+        lock (_mappingLock)
+        {
+            _serverMapping = newMapping;
+            _lastMappingUpdate = DateTime.UtcNow;
+            _mappingCache.Clear();
+        }
+
+        _logger.LogInformation("Got server mapping");
+        return true;
     }
 
     public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, ILogger logger = null) where T : class
