@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -14,26 +15,31 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
-public class ElasticMappingResolver
+public class ElasticMappingResolver : IDisposable
 {
     private TypeMapping _serverMapping;
     private readonly TypeMapping _codeMapping;
     private readonly Inferrer _inferrer;
     private readonly ConcurrentDictionary<string, FieldMapping> _mappingCache = new();
+    private readonly object _mappingLock = new();
+    private readonly SemaphoreSlim _fetchSemaphore = new(1, 1);
+    private long _refreshEpoch;
+    private readonly TimeProvider _timeProvider;
     private readonly ConditionalWeakTable<IProperty, ConcurrentDictionary<string, object>> _propertyMetadata = new();
     private readonly ILogger _logger;
 
     public static readonly ElasticMappingResolver NullInstance = new(() => null);
 
-    public ElasticMappingResolver(Func<TypeMapping> getMapping, Inferrer inferrer = null, ILogger logger = null)
+    public ElasticMappingResolver(Func<TypeMapping> getMapping, Inferrer inferrer = null, TimeProvider timeProvider = null, ILogger logger = null)
     {
         GetServerMappingFunc = getMapping;
         _inferrer = inferrer;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger ?? NullLogger.Instance;
     }
 
-    public ElasticMappingResolver(TypeMapping codeMapping, Inferrer inferrer, Func<TypeMapping> getMapping, ILogger logger = null)
-        : this(getMapping, inferrer, logger)
+    public ElasticMappingResolver(TypeMapping codeMapping, Inferrer inferrer, Func<TypeMapping> getMapping, TimeProvider timeProvider = null, ILogger logger = null)
+        : this(getMapping, inferrer, timeProvider, logger)
     {
         _codeMapping = codeMapping;
     }
@@ -48,9 +54,15 @@ public class ElasticMappingResolver
     /// </remarks>
     public void RefreshMapping()
     {
+        lock (_mappingLock)
+        {
+            Interlocked.Increment(ref _refreshEpoch);
+            _serverMapping = null;
+            Interlocked.Exchange(ref _lastMappingUpdateTicks, 0);
+            _mappingCache.Clear();
+        }
+
         _logger.LogInformation("Mapping refresh triggered");
-        _serverMapping = null;
-        _lastMappingUpdate = null;
     }
 
     public FieldMapping GetMapping(string field, bool followAlias = false)
@@ -61,33 +73,56 @@ public class ElasticMappingResolver
         if (GetServerMappingFunc == null && _codeMapping == null)
             throw new InvalidOperationException("No mappings are available.");
 
-        if (_mappingCache.TryGetValue(field, out var mapping))
-        {
-            if (followAlias && mapping.Found && mapping.Property is FieldAliasProperty fieldAlias)
-            {
-                _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
-                return GetMapping(fieldAlias.Path.Name);
-            }
+        long currentEpoch = Interlocked.Read(ref _refreshEpoch);
 
-            if (mapping.Found)
+        if (_mappingCache.TryGetValue(field, out var mapping) && mapping.Epoch >= currentEpoch)
+        {
+            long lastUpdateTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
+            bool mappingCurrent = lastUpdateTicks == 0
+                || (mapping.ServerMapTime.HasValue && mapping.ServerMapTime.Value.Ticks >= lastUpdateTicks);
+
+            if (mapping.Found && mappingCurrent)
             {
+                if (followAlias && mapping.Property is FieldAliasProperty fieldAlias)
+                {
+                    _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property.Type);
+                    return GetMapping(fieldAlias.Path.Name);
+                }
+
                 _logger.LogTrace("Cached mapping: {Field}={FieldPath}:{FieldType}", field, mapping.FullPath, mapping.Property?.Type);
                 return mapping;
             }
 
-            if (mapping.ServerMapTime >= _lastMappingUpdate && !GetServerMapping())
+            if (!mapping.Found && mappingCurrent && !GetServerMapping())
             {
                 _logger.LogTrace("Cached mapping (not found): {Field}=<null>", field);
                 return mapping;
             }
-
-            _logger.LogTrace("Cached mapping (not found), got new server mapping");
         }
 
         string[] fieldParts = field.Split('.');
         var resolvedFieldName = new StringBuilder();
-        var mappingServerTime = _lastMappingUpdate;
-        var currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
+
+        TypeMapping serverMapping;
+        DateTime? mappingServerTime;
+        lock (_mappingLock)
+        {
+            serverMapping = _serverMapping;
+            long ticks = Interlocked.Read(ref _lastMappingUpdateTicks);
+            mappingServerTime = ticks > 0 ? new DateTime(ticks, DateTimeKind.Utc) : null;
+        }
+
+        if (serverMapping == null && GetServerMappingFunc != null && GetServerMapping())
+        {
+            lock (_mappingLock)
+            {
+                serverMapping = _serverMapping;
+                long ticks = Interlocked.Read(ref _lastMappingUpdateTicks);
+                mappingServerTime = ticks > 0 ? new DateTime(ticks, DateTimeKind.Utc) : null;
+            }
+        }
+
+        var currentProperties = MergeProperties(_codeMapping?.Properties, serverMapping?.Properties);
 
         for (int depth = 0; depth < fieldParts.Length; depth++)
         {
@@ -119,10 +154,15 @@ public class ElasticMappingResolver
                 // no mapping found, call GetServerMapping again in case it hasn't been called recently and there are possibly new mappings
                 if (fieldMapping is null && GetServerMapping())
                 {
-                    // we got updated mapping, start over from the top
                     depth = -1;
                     resolvedFieldName.Clear();
-                    currentProperties = MergeProperties(_codeMapping?.Properties, _serverMapping?.Properties);
+                    lock (_mappingLock)
+                    {
+                        serverMapping = _serverMapping;
+                        long ticks = Interlocked.Read(ref _lastMappingUpdateTicks);
+                        mappingServerTime = ticks > 0 ? new DateTime(ticks, DateTimeKind.Utc) : null;
+                    }
+                    currentProperties = MergeProperties(_codeMapping?.Properties, serverMapping?.Properties);
                     continue;
                 }
 
@@ -164,8 +204,10 @@ public class ElasticMappingResolver
 
             if (depth == fieldParts.Length - 1)
             {
-                var resolvedMapping = new FieldMapping(resolvedFieldName.ToString(), fieldMapping, mappingServerTime);
-                _mappingCache.AddOrUpdate(field, resolvedMapping, (_, _) => resolvedMapping);
+                var resolvedMapping = new FieldMapping(resolvedFieldName.ToString(), fieldMapping, mappingServerTime, currentEpoch);
+                if (IsSnapshotCurrent(currentEpoch, mappingServerTime))
+                    _mappingCache.AddOrUpdate(field, resolvedMapping, (_, existing) =>
+                        existing.Epoch > resolvedMapping.Epoch ? existing : resolvedMapping);
                 _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property?.Type);
 
                 if (followAlias && resolvedMapping.Property is FieldAliasProperty fieldAlias)
@@ -192,8 +234,10 @@ public class ElasticMappingResolver
         }
 
         _logger.LogTrace("Mapping not found: {field}", field);
-        var notFoundMapping = new FieldMapping(resolvedFieldName.ToString(), null, mappingServerTime);
-        _mappingCache.AddOrUpdate(field, notFoundMapping, (_, _) => notFoundMapping);
+        var notFoundMapping = new FieldMapping(resolvedFieldName.ToString(), null, mappingServerTime, currentEpoch);
+        if (IsSnapshotCurrent(currentEpoch, mappingServerTime))
+            _mappingCache.AddOrUpdate(field, notFoundMapping, (_, existing) =>
+                existing.Epoch > notFoundMapping.Epoch ? existing : notFoundMapping);
 
         return notFoundMapping;
     }
@@ -502,27 +546,74 @@ public class ElasticMappingResolver
     }
 
     private Func<TypeMapping> GetServerMappingFunc { get; set; }
-    private DateTime? _lastMappingUpdate = null;
+    private long _lastMappingUpdateTicks;
+
+    private bool IsSnapshotCurrent(long snapshotEpoch, DateTime? snapshotServerTime)
+    {
+        if (Interlocked.Read(ref _refreshEpoch) != snapshotEpoch)
+            return false;
+
+        long currentTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
+        if (currentTicks == 0)
+            return true;
+
+        return snapshotServerTime.HasValue && snapshotServerTime.Value.Ticks >= currentTicks;
+    }
+
+    /// <returns>true if a new mapping was fetched and applied; false if throttled or unavailable.</returns>
     private bool GetServerMapping()
     {
         if (GetServerMappingFunc == null)
             return false;
 
-        if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.UtcNow.SubtractMinutes(1))
+        long epochBeforeFetch;
+        lock (_mappingLock)
+        {
+            long lastTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
+            if (lastTicks > 0 && new DateTime(lastTicks, DateTimeKind.Utc) > _timeProvider.GetUtcNow().UtcDateTime.SubtractMinutes(1))
+                return false;
+            epochBeforeFetch = Interlocked.Read(ref _refreshEpoch);
+        }
+
+        if (!_fetchSemaphore.Wait(0))
             return false;
 
         try
         {
-            _serverMapping = GetServerMappingFunc();
-            _lastMappingUpdate = DateTime.UtcNow;
-            _logger.LogInformation("Got server mapping");
+            lock (_mappingLock)
+            {
+                long lastTicks = Interlocked.Read(ref _lastMappingUpdateTicks);
+                if (lastTicks > 0 && new DateTime(lastTicks, DateTimeKind.Utc) > _timeProvider.GetUtcNow().UtcDateTime.SubtractMinutes(1))
+                    return false;
+            }
 
+            TypeMapping newMapping;
+            try
+            {
+                newMapping = GetServerMappingFunc();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+            {
+                _logger.LogError(ex, "Error getting server mapping: {Message}", ex.Message);
+                return false;
+            }
+
+            lock (_mappingLock)
+            {
+                if (Interlocked.Read(ref _refreshEpoch) != epochBeforeFetch)
+                    return false;
+
+                _serverMapping = newMapping;
+                Interlocked.Exchange(ref _lastMappingUpdateTicks, _timeProvider.GetUtcNow().UtcDateTime.Ticks);
+                _mappingCache.Clear();
+            }
+
+            _logger.LogInformation("Got server mapping");
             return true;
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogError(ex, "Error getting server mapping: {Message}", ex.Message);
-            return false;
+            _fetchSemaphore.Release();
         }
     }
 
@@ -647,15 +738,21 @@ public class ElasticMappingResolver
         foreach (var kvp in sourceMetadata)
             targetMetadata[kvp.Key] = kvp.Value;
     }
+
+    public void Dispose()
+    {
+        _fetchSemaphore.Dispose();
+    }
 }
 
 public class FieldMapping
 {
-    public FieldMapping(string path, IProperty property, DateTime? serverMapTime)
+    public FieldMapping(string path, IProperty property, DateTime? serverMapTime, long epoch = 0)
     {
         FullPath = path;
         Property = property;
         ServerMapTime = serverMapTime;
+        Epoch = epoch;
     }
 
     public bool Found => Property != null;
@@ -663,4 +760,5 @@ public class FieldMapping
     public IProperty Property { get; private set; }
     public DateTime Date { get; private set; } = DateTime.UtcNow;
     internal DateTime? ServerMapTime { get; private set; }
+    internal long Epoch { get; private set; }
 }
