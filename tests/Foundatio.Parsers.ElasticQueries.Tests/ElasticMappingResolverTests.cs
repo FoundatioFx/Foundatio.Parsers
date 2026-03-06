@@ -2,6 +2,7 @@ using System;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Time.Testing;
 using Nest;
 using Xunit;
 
@@ -182,8 +183,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
 
     private static Inferrer CreateInferrer()
     {
-        var settings = new ConnectionSettings(new Uri("http://localhost:9200"));
-        return new Inferrer(settings);
+        return new Inferrer(new ConnectionSettings(new Uri("http://localhost:9200")));
     }
 
     private static ITypeMapping CreateTextWithKeywordMapping(string fieldName)
@@ -312,11 +312,12 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public void RefreshMapping_WhenCalled_ClearsCachedMappings()
     {
+        // Arrange
         int serverFetchCount = 0;
         var resolver = new ElasticMappingResolver(() =>
         {
-            int n = Interlocked.Increment(ref serverFetchCount);
-            if (n <= 1)
+            int callNumber = Interlocked.Increment(ref serverFetchCount);
+            if (callNumber <= 1)
             {
                 return new TypeMapping
                 {
@@ -330,15 +331,13 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             return CreateTextWithKeywordMapping("name");
         }, CreateInferrer(), _logger);
 
-        // First resolution: server returns TextProperty without keyword sub-field.
+        // Act: first resolution gets text-only mapping, then refresh forces re-fetch.
         string beforeRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword");
-        Assert.Equal("name", beforeRefresh);
-
-        // Act: refresh should clear cache so next resolution picks up new server mapping.
         resolver.RefreshMapping();
-
-        // Assert: after refresh, server mapping is fetched again and keyword sub-field is found.
         string afterRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword");
+
+        // Assert
+        Assert.Equal("name", beforeRefresh);
         Assert.Equal("name.keyword", afterRefresh);
         Assert.True(serverFetchCount >= 2, "Server mapping should have been fetched at least twice");
     }
@@ -346,13 +345,12 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public void RefreshMapping_ClearsFoundCacheEntries_ForcesReResolution()
     {
-        // Arrange: prove that a "found" cache entry is evicted on RefreshMapping.
-        // Server mapping changes between first and second resolution.
-        int version = 0;
+        // Arrange: server mapping changes between first and second fetch.
+        int serverFetchCount = 0;
         var resolver = new ElasticMappingResolver(() =>
         {
-            int v = Interlocked.Increment(ref version);
-            if (v == 1)
+            int callNumber = Interlocked.Increment(ref serverFetchCount);
+            if (callNumber == 1)
             {
                 return new TypeMapping
                 {
@@ -366,15 +364,13 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             return CreateTextWithKeywordMapping("name");
         }, CreateInferrer(), _logger);
 
-        // First resolution: server returns TextProperty without keyword sub-field.
+        // Act
         string first = resolver.GetNonAnalyzedFieldName("name", "keyword");
-        Assert.Equal("name", first);
-
-        // Act: refresh to clear cache; next fetch returns mapping with keyword.
         resolver.RefreshMapping();
-
-        // Assert: the stale "found" entry should be gone; new server mapping with keyword resolves.
         string second = resolver.GetNonAnalyzedFieldName("name", "keyword");
+
+        // Assert
+        Assert.Equal("name", first);
         Assert.Equal("name.keyword", second);
     }
 
@@ -406,7 +402,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     [Fact]
     public void GetNonAnalyzedFieldName_AfterRefreshAndServerMappingChange_ReturnsUpdatedKeywordPath()
     {
-        // Arrange: code mapping has no sub-fields. Server mapping starts empty,
+        // Arrange: code mapping has no sub-fields. Server starts returning null,
         // then after refresh provides keyword sub-field.
         int callCount = 0;
         var codeMapping = new TypeMapping
@@ -418,22 +414,20 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         };
         var resolver = new ElasticMappingResolver(codeMapping, CreateInferrer(), () =>
         {
-            int n = Interlocked.Increment(ref callCount);
-            if (n <= 1)
+            int callNumber = Interlocked.Increment(ref callCount);
+            if (callNumber <= 1)
                 return null;
 
             return CreateTextWithKeywordMapping("name");
         }, _logger);
 
-        // First call: code mapping only, no sub-fields.
+        // Act
         string initial = resolver.GetNonAnalyzedFieldName("name", "keyword");
-        Assert.Equal("name", initial);
-
-        // Act: refresh and resolve again (server now returns keyword sub-field).
         resolver.RefreshMapping();
+        string updated = resolver.GetNonAnalyzedFieldName("name", "keyword");
 
         // Assert
-        string updated = resolver.GetNonAnalyzedFieldName("name", "keyword");
+        Assert.Equal("name", initial);
         Assert.Equal("name.keyword", updated);
     }
 
@@ -444,46 +438,82 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         var codeMapping = CreateTextWithKeywordMapping("name");
         var resolver = new ElasticMappingResolver(codeMapping, CreateInferrer(), () =>
         {
-            Thread.Sleep(1);
+            Thread.Yield();
             return CreateTextWithKeywordMapping("name");
         }, _logger);
 
         const int iterations = 200;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var barrier = new Barrier(3);
 
-        // Act & Assert
+        // Act
         var readerTask = Task.Run(() =>
         {
-            barrier.SignalAndWait(cts.Token);
+            barrier.SignalAndWait(TestCancellationToken);
             for (int i = 0; i < iterations; i++)
             {
                 string result = resolver.GetNonAnalyzedFieldName("name", "keyword");
                 Assert.Equal("name.keyword", result);
             }
-        }, cts.Token);
+        }, TestCancellationToken);
 
         var aggregationReaderTask = Task.Run(() =>
         {
-            barrier.SignalAndWait(cts.Token);
+            barrier.SignalAndWait(TestCancellationToken);
             for (int i = 0; i < iterations; i++)
             {
                 string result = resolver.GetAggregationsFieldName("name");
                 Assert.Equal("name.keyword", result);
             }
-        }, cts.Token);
+        }, TestCancellationToken);
 
         var refreshTask = Task.Run(() =>
         {
-            barrier.SignalAndWait(cts.Token);
+            barrier.SignalAndWait(TestCancellationToken);
             for (int i = 0; i < iterations; i++)
             {
                 resolver.RefreshMapping();
-                Thread.Sleep(0);
+                Thread.Yield();
             }
-        }, cts.Token);
+        }, TestCancellationToken);
 
+        // Assert: no exceptions from any concurrent task.
         await Task.WhenAll(readerTask, aggregationReaderTask, refreshTask);
+    }
+
+    [Fact]
+    public void GetServerMapping_WhenThrottled_DoesNotRefetchWithinOneMinute()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return CreateTextWithKeywordMapping("name");
+        }, CreateInferrer(), _logger, timeProvider);
+
+        // Act: first call triggers server fetch.
+        resolver.GetNonAnalyzedFieldName("name", "keyword");
+        int afterFirst = fetchCount;
+
+        // Refresh clears cache and _lastMappingUpdate; next call re-fetches because
+        // _lastMappingUpdate is null after refresh.
+        resolver.RefreshMapping();
+        resolver.GetNonAnalyzedFieldName("name", "keyword");
+        int afterSecond = fetchCount;
+
+        // Assert: both calls triggered fetches (first call + after refresh).
+        Assert.True(afterFirst >= 1, "First call should trigger at least one fetch");
+        Assert.True(afterSecond > afterFirst, "Refresh should allow a new fetch");
+
+        // Act: advance time past the 1-minute throttle window.
+        timeProvider.Advance(TimeSpan.FromMinutes(2));
+        resolver.RefreshMapping();
+        resolver.GetNonAnalyzedFieldName("name", "keyword");
+        int afterThird = fetchCount;
+
+        // Assert: fetch should happen after time advances past throttle.
+        Assert.True(afterThird > afterSecond, "Fetch should happen after time advances past throttle");
     }
 
     #endregion

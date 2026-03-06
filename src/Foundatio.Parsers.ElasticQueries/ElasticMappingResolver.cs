@@ -16,15 +16,17 @@ public class ElasticMappingResolver
     private readonly Inferrer _inferrer;
     private readonly ConcurrentDictionary<string, FieldMapping> _mappingCache = new();
     private readonly object _mappingLock = new();
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
 
     public static ElasticMappingResolver NullInstance = new(() => null);
 
-    public ElasticMappingResolver(Func<ITypeMapping> getMapping, Inferrer inferrer = null, ILogger logger = null)
+    public ElasticMappingResolver(Func<ITypeMapping> getMapping, Inferrer inferrer = null, ILogger logger = null, TimeProvider timeProvider = null)
     {
         GetServerMappingFunc = getMapping;
         _inferrer = inferrer;
         _logger = logger ?? NullLogger.Instance;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public ElasticMappingResolver(ITypeMapping codeMapping, Inferrer inferrer, Func<ITypeMapping> getMapping, ILogger logger = null)
@@ -43,13 +45,16 @@ public class ElasticMappingResolver
     /// </remarks>
     public void RefreshMapping()
     {
+        // Lock ensures _serverMapping, _lastMappingUpdate, and _mappingCache are reset atomically
+        // so no reader sees a partially-cleared state (e.g., null mapping with stale cache entries).
         lock (_mappingLock)
         {
-            _logger.LogInformation("Mapping refresh triggered.");
             _serverMapping = null;
             _lastMappingUpdate = null;
             _mappingCache.Clear();
         }
+
+        _logger.LogInformation("Mapping refresh triggered.");
     }
 
     public FieldMapping GetMapping(string field, bool followAlias = false)
@@ -74,13 +79,9 @@ public class ElasticMappingResolver
                 return mapping;
             }
 
-            DateTime? lastUpdate;
-            lock (_mappingLock)
-            {
-                lastUpdate = _lastMappingUpdate;
-            }
-
-            if (mapping.ServerMapTime >= lastUpdate && !GetServerMapping())
+            // Cached "not found" entry. If server mapping hasn't changed since this entry was
+            // created, and no new server mapping is available, return the cached miss.
+            if (mapping.ServerMapTime >= _lastMappingUpdate && !GetServerMapping())
             {
                 _logger.LogTrace("Cached mapping (not found): {field}=<null>", field);
                 return mapping;
@@ -92,8 +93,8 @@ public class ElasticMappingResolver
         string[] fieldParts = field.Split('.');
         string resolvedFieldName = "";
 
-        GetServerMapping();
-
+        // Snapshot server mapping under lock so readers see a consistent pair of
+        // _serverMapping + _lastMappingUpdate (both are set together in GetServerMapping).
         ITypeMapping serverMapping;
         DateTime? mappingServerTime;
         lock (_mappingLock)
@@ -101,6 +102,17 @@ public class ElasticMappingResolver
             serverMapping = _serverMapping;
             mappingServerTime = _lastMappingUpdate;
         }
+
+        // Lazily fetch server mapping only when none is loaded yet.
+        if (serverMapping == null && GetServerMappingFunc != null && GetServerMapping())
+        {
+            lock (_mappingLock)
+            {
+                serverMapping = _serverMapping;
+                mappingServerTime = _lastMappingUpdate;
+            }
+        }
+
         var currentProperties = MergeProperties(_codeMapping?.Properties, serverMapping?.Properties);
 
         for (int depth = 0; depth < fieldParts.Length; depth++)
@@ -120,7 +132,7 @@ public class ElasticMappingResolver
                 // no mapping found, call GetServerMapping again in case it hasn't been called recently and there are possibly new mappings
                 if (fieldMapping == null && GetServerMapping())
                 {
-                    // we got updated mapping, start over from the top
+                    // Re-snapshot under lock because GetServerMapping updated the shared state.
                     depth = -1;
                     resolvedFieldName = "";
                     lock (_mappingLock)
@@ -461,17 +473,21 @@ public class ElasticMappingResolver
 
     private Func<ITypeMapping> GetServerMappingFunc { get; set; }
     private DateTime? _lastMappingUpdate = null;
+
+    /// <returns>true if a new mapping was fetched and applied; false if throttled or unavailable.</returns>
     private bool GetServerMapping()
     {
         if (GetServerMappingFunc == null)
             return false;
 
+        // Check throttle under lock; _lastMappingUpdate is set atomically with _serverMapping.
         lock (_mappingLock)
         {
-            if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > DateTime.UtcNow.SubtractMinutes(1))
+            if (_lastMappingUpdate.HasValue && _lastMappingUpdate.Value > _timeProvider.GetUtcNow().UtcDateTime.SubtractMinutes(1))
                 return false;
         }
 
+        // I/O happens outside the lock to avoid blocking concurrent readers.
         ITypeMapping newMapping;
         try
         {
@@ -483,10 +499,11 @@ public class ElasticMappingResolver
             return false;
         }
 
+        // Publish results atomically: mapping + timestamp + cache clear must be visible together.
         lock (_mappingLock)
         {
             _serverMapping = newMapping;
-            _lastMappingUpdate = DateTime.UtcNow;
+            _lastMappingUpdate = _timeProvider.GetUtcNow().UtcDateTime;
             _mappingCache.Clear();
         }
 
