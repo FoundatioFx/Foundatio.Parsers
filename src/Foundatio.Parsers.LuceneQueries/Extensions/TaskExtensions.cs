@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Foundatio.Parsers;
 
-public static class TaskExtensions
+internal static class TaskExtensions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ConfiguredTaskAwaitable AnyContext(this Task task)

@@ -99,7 +99,9 @@ public static class ElasticExtensions
             DoubleNumberProperty p => p.Fields,
             DoubleRangeProperty p => p.Fields,
             DynamicProperty p => p.Fields,
+#if ELASTICSEARCH9
             ExponentialHistogramProperty p => p.Fields,
+#endif
             FieldAliasProperty p => p.Fields,
             FlattenedProperty p => p.Fields,
             FloatNumberProperty p => p.Fields,
