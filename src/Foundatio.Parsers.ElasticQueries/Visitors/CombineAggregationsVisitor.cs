@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Aggregations;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
@@ -12,7 +13,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 {
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        await base.VisitAsync(node, context).ConfigureAwait(false);
+        await base.VisitAsync(node, context).AnyContext();
 
         // Skip fieldless intermediate groups; their children are collected
         // by GetLeafFieldNodes from the nearest root or named-field ancestor.
@@ -22,15 +23,15 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        var container = await GetParentContainerAsync(node, context);
-        var termsAggregation = container as ITermsAggregation;
+        var container = await GetParentContainerAsync(node, context).AnyContext();
+        var termsAggregation = container.Value as TermsAggregation;
 
-        var nestedAggregations = new Dictionary<string, List<(IFieldQueryNode Node, AggregationBase Agg)>>();
-        var regularAggregations = new List<(IFieldQueryNode Node, AggregationBase Agg)>();
+        var nestedAggregations = new Dictionary<string, List<(IFieldQueryNode Node, AggregationMap Agg)>>();
+        var regularAggregations = new List<(IFieldQueryNode Node, AggregationMap Agg)>();
 
         foreach (var child in GetLeafFieldNodes(node))
         {
-            var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context));
+            var aggregation = await child.GetAggregationAsync(() => child.GetDefaultAggregationAsync(context)).AnyContext();
             if (aggregation is null)
                 continue;
 
@@ -38,7 +39,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             if (nestedPath is not null)
             {
                 if (!nestedAggregations.ContainsKey(nestedPath))
-                    nestedAggregations[nestedPath] = new List<(IFieldQueryNode, AggregationBase)>();
+                    nestedAggregations[nestedPath] = [];
                 nestedAggregations[nestedPath].Add((child, aggregation));
             }
             else
@@ -54,51 +55,41 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         foreach (var (nestedPath, childAggregations) in nestedAggregations)
         {
-            var nestedAgg = new NestedAggregation("nested_" + nestedPath)
-            {
-                Path = nestedPath,
-                Aggregations = new AggregationDictionary()
-            };
+            var nestedAgg = new AggregationMap("nested_" + nestedPath, new NestedAggregation { Path = nestedPath });
 
             foreach (var (child, aggregation) in childAggregations)
             {
-                nestedAgg.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                nestedAgg.Aggregations.Add(aggregation);
                 AddTermsOrder(termsAggregation, child, aggregation);
             }
 
-            if (container is BucketAggregationBase bucketContainer)
+            if (container.Value is null || container.Value.IsBucketAggregation())
             {
-                bucketContainer.Aggregations ??= new AggregationDictionary();
-                bucketContainer.Aggregations[((IAggregation)nestedAgg).Name] = (AggregationContainer)nestedAgg;
+                container.Aggregations.Add(nestedAgg);
             }
         }
 
-        if (node.Parent == null)
+        if (node.Parent is null)
             node.SetAggregation(container);
     }
 
-    private static void AddAggregation(AggregationBase container, ITermsAggregation termsAggregation, IFieldQueryNode child, AggregationBase aggregation)
+    private static void AddAggregation(AggregationMap container, TermsAggregation termsAggregation, IFieldQueryNode child, AggregationMap aggregation)
     {
-        if (container is BucketAggregationBase bucketContainer)
+        if (container.Value is null || container.Value.IsBucketAggregation())
         {
-            bucketContainer.Aggregations ??= new AggregationDictionary();
-            bucketContainer.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+            container.Aggregations.Add(aggregation);
         }
 
         AddTermsOrder(termsAggregation, child, aggregation);
     }
 
-    private static void AddTermsOrder(ITermsAggregation termsAggregation, IFieldQueryNode child, AggregationBase aggregation)
+    private static void AddTermsOrder(TermsAggregation termsAggregation, IFieldQueryNode child, AggregationMap aggregation)
     {
         if (termsAggregation is null || (child.Prefix != "-" && child.Prefix != "+"))
             return;
 
-        termsAggregation.Order ??= new List<TermsOrder>();
-        termsAggregation.Order.Add(new TermsOrder
-        {
-            Key = ((IAggregation)aggregation).Name,
-            Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
-        });
+        termsAggregation.Order ??= new List<KeyValuePair<Field, SortOrder>>();
+        termsAggregation.Order.Add(new KeyValuePair<Field, SortOrder>(aggregation.Name, child.Prefix == "-" ? SortOrder.Desc : SortOrder.Asc));
     }
 
     /// <summary>
@@ -147,21 +138,21 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         }
     }
 
-    private async Task<AggregationBase> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context)
+    private async Task<AggregationMap> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        AggregationBase container = null;
+        AggregationMap container = null;
         var currentNode = node;
         while (container is null && currentNode is not null)
         {
             IQueryNode n = currentNode;
             container = await n.GetAggregationAsync(async () =>
             {
-                var result = await n.GetDefaultAggregationAsync(context);
+                var result = await n.GetDefaultAggregationAsync(context).AnyContext();
                 if (result is not null)
                     n.SetAggregation(result);
 
                 return result;
-            });
+            }).AnyContext();
 
             if (currentNode.Parent is not null)
                 currentNode = currentNode.Parent;
@@ -171,7 +162,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         if (container is null)
         {
-            container = new ChildrenAggregation(null, null);
+            container = new AggregationMap(null, null);
             currentNode.SetAggregation(container);
         }
 

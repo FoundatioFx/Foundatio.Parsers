@@ -1,11 +1,11 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
@@ -22,7 +22,7 @@ public class NestedVisitor : ChainableQueryVisitor
 
         node.SetNestedPath(nestedProperty);
         if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
-            node.SetQuery(new NestedQuery { Path = nestedProperty });
+            node.SetQuery(new NestedQuery { Path = nestedProperty, Query = new MatchAllQuery() });
 
         return base.VisitAsync(node, context);
     }
@@ -63,7 +63,7 @@ public class NestedVisitor : ChainableQueryVisitor
         }
         else if (context.QueryType == QueryTypes.Query)
         {
-            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context));
+            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
             if (innerQuery is null)
                 return;
 

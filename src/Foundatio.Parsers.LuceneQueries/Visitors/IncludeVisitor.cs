@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -42,7 +42,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
 
         try
         {
-            string includedQuery = await includeResolver(node.Term).ConfigureAwait(false);
+            string includedQuery = await includeResolver(node.Term).AnyContext();
             if (includedQuery == null)
             {
                 context.AddValidationError($"Unresolved {_includeName} ({node.Term})");
@@ -54,9 +54,9 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
 
             includeStack.Push(node.Term);
 
-            var result = (GroupNode)await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
+            var result = (GroupNode)await _parser.ParseAsync(includedQuery).AnyContext();
             result.HasParens = true;
-            await VisitAsync(result, context).ConfigureAwait(false);
+            await VisitAsync(result, context).AnyContext();
 
             includeStack.Pop();
 

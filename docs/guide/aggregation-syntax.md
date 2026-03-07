@@ -437,9 +437,9 @@ var aggs = await parser.BuildAggregationsAsync("terms:(user sum:amount)");
 
 ```csharp
 using Foundatio.Parsers.ElasticQueries;
-using Nest;
+using Elastic.Clients.Elasticsearch;
 
-var client = new ElasticClient();
+var client = new ElasticsearchClient();
 
 var parser = new ElasticQueryParser(c => c
     .SetLoggerFactory(loggerFactory)
