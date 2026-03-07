@@ -711,7 +711,7 @@ public class ElasticMappingResolver : IDisposable
         {
             return (T)Convert.ChangeType(value, typeof(T));
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
         {
             return defaultValue;
         }
