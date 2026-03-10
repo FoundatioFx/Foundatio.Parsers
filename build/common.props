@@ -6,6 +6,7 @@
     <Description>A lucene style query parser that is extensible and allows additional syntax features.</Description>
     <PackageProjectUrl>https://github.com/FoundatioFx/Foundatio.Parsers</PackageProjectUrl>
     <PackageReleaseNotes>https://github.com/FoundatioFx/Foundatio.Parsers/releases</PackageReleaseNotes>
+    <MinVerMinimumMajorMinor>8.0</MinVerMinimumMajorMinor>
     <MinVerSkip Condition="'$(Configuration)' == 'Debug'">true</MinVerSkip>
     <MinVerTagPrefix>v</MinVerTagPrefix>
     <ReferenceFoundatioSource Condition="$(SolutionName.Contains('All')) Or !$(SolutionName.Contains('Foundatio'))">true</ReferenceFoundatioSource>

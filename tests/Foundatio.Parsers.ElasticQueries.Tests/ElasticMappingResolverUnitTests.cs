@@ -1,28 +1,29 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Foundatio.Xunit;
 using Microsoft.Extensions.Time.Testing;
-using Nest;
 using Xunit;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
 public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
 {
-    private readonly ConnectionSettings _connectionSettings;
+    private readonly ElasticsearchClientSettings _clientSettings;
     private readonly Inferrer _inferrer;
 
     public ElasticMappingResolverUnitTests(ITestOutputHelper output) : base(output)
     {
         Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
-        _connectionSettings = new ConnectionSettings(new Uri("http://localhost:9200"));
-        _inferrer = new Inferrer(_connectionSettings);
+        _clientSettings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
+        _inferrer = new Inferrer(_clientSettings);
     }
 
     public void Dispose()
     {
-        (_connectionSettings as IDisposable)?.Dispose();
+        (_clientSettings as IDisposable)?.Dispose();
     }
 
     [Fact]
@@ -71,13 +72,9 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     public void GetNonAnalyzedFieldName_WithKeywordProperty_ReturnsBareFieldName()
     {
         // Arrange
-        var codeMapping = new TypeMapping
-        {
-            Properties = new Properties
-            {
-                { "status", new KeywordProperty { Name = "status" } }
-            }
-        };
+        var props = new Properties();
+        props.Add("status", new KeywordProperty());
+        var codeMapping = new TypeMapping { Properties = props };
         var resolver = new ElasticMappingResolver(codeMapping, _inferrer, () => null, logger: _logger);
 
         // Act
@@ -278,55 +275,34 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.True(afterTimeAdvance > afterRefresh, "Fetch should happen after time advances past throttle without RefreshMapping");
     }
 
-    private static ITypeMapping CreateTextWithKeywordMapping(string fieldName)
+    private static TypeMapping CreateTextWithKeywordMapping(string fieldName)
     {
-        return new TypeMapping
-        {
-            Properties = new Properties
-            {
-                {
-                    fieldName, new TextProperty
-                    {
-                        Name = fieldName,
-                        Fields = new Properties
-                        {
-                            { "keyword", new KeywordProperty { Name = "keyword", IgnoreAbove = 256 } }
-                        }
-                    }
-                }
-            }
-        };
+        var subFields = new Properties();
+        subFields.Add("keyword", new KeywordProperty { IgnoreAbove = 256 });
+
+        var props = new Properties();
+        props.Add(fieldName, new TextProperty { Fields = subFields });
+
+        return new TypeMapping { Properties = props };
     }
 
-    private static ITypeMapping CreateTextWithKeywordAndSortMapping(string fieldName)
+    private static TypeMapping CreateTextWithKeywordAndSortMapping(string fieldName)
     {
-        return new TypeMapping
-        {
-            Properties = new Properties
-            {
-                {
-                    fieldName, new TextProperty
-                    {
-                        Name = fieldName,
-                        Fields = new Properties
-                        {
-                            { "keyword", new KeywordProperty { Name = "keyword", IgnoreAbove = 256 } },
-                            { "sort", new KeywordProperty { Name = "sort", IgnoreAbove = 256 } }
-                        }
-                    }
-                }
-            }
-        };
+        var subFields = new Properties();
+        subFields.Add("keyword", new KeywordProperty { IgnoreAbove = 256 });
+        subFields.Add("sort", new KeywordProperty { IgnoreAbove = 256 });
+
+        var props = new Properties();
+        props.Add(fieldName, new TextProperty { Fields = subFields });
+
+        return new TypeMapping { Properties = props };
     }
 
-    private static ITypeMapping CreateTextOnlyMapping(string fieldName)
+    private static TypeMapping CreateTextOnlyMapping(string fieldName)
     {
-        return new TypeMapping
-        {
-            Properties = new Properties
-            {
-                { fieldName, new TextProperty { Name = fieldName } }
-            }
-        };
+        var props = new Properties();
+        props.Add(fieldName, new TextProperty());
+
+        return new TypeMapping { Properties = props };
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -43,7 +43,7 @@ public class QueryValidator
         var parser = new LuceneQueryParser();
         try
         {
-            var node = await parser.ParseAsync(query);
+            var node = await parser.ParseAsync(query).AnyContext();
             if (context == null)
                 context = new QueryVisitorContext();
 
@@ -52,13 +52,13 @@ public class QueryValidator
 
             var fieldResolver = context.GetFieldResolver();
             if (fieldResolver != null)
-                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver);
+                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver).AnyContext();
 
             var includeResolver = context.GetIncludeResolver();
             if (includeResolver != null)
-                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
+                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver).AnyContext();
 
-            return await ValidationVisitor.RunAsync(node, context);
+            return await ValidationVisitor.RunAsync(node, context).AnyContext();
         }
         catch (FormatException ex)
         {
@@ -104,7 +104,7 @@ public class QueryValidator
         var parser = new LuceneQueryParser();
         try
         {
-            var node = await parser.ParseAsync(query);
+            var node = await parser.ParseAsync(query).AnyContext();
             if (context == null)
                 context = new QueryVisitorContext();
 
@@ -114,13 +114,13 @@ public class QueryValidator
 
             var fieldResolver = context.GetFieldResolver();
             if (fieldResolver != null)
-                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver);
+                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver).AnyContext();
 
             var includeResolver = context.GetIncludeResolver();
             if (includeResolver != null)
-                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
+                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver).AnyContext();
 
-            return await ValidationVisitor.RunAsync(node, context);
+            return await ValidationVisitor.RunAsync(node, context).AnyContext();
         }
         catch (FormatException ex)
         {

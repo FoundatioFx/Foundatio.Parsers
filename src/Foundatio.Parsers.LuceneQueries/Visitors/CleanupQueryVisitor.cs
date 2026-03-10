@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -13,7 +13,7 @@ public class CleanupQueryVisitor : ChainableQueryVisitor
         if (result == null)
             return null;
 
-        result = await base.VisitAsync(result, context);
+        result = await base.VisitAsync(result, context).AnyContext();
 
         return CleanNode(result);
     }
@@ -128,7 +128,7 @@ public class CleanupQueryVisitor : ChainableQueryVisitor
 
     public static async Task<string> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
     {
-        var result = await new CleanupQueryVisitor().AcceptAsync(node, context);
+        var result = await new CleanupQueryVisitor().AcceptAsync(node, context).AnyContext();
         return result.ToString();
     }
 

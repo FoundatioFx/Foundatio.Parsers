@@ -417,7 +417,7 @@ string request = response.GetRequest();
 Console.WriteLine(request);
 
 // Check for errors
-if (!response.IsValid)
+if (!response.IsValidResponse)
 {
     Console.WriteLine(response.GetErrorMessage());
 }

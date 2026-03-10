@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -41,17 +41,17 @@ public class SqlQueryParser : LuceneQueryParser
         SetupQueryVisitorContextDefaults(context);
         try
         {
-            var result = await base.ParseAsync(query, context).ConfigureAwait(false);
+            var result = await base.ParseAsync(query, context).AnyContext();
             switch (context.QueryType)
             {
                 case QueryTypes.Aggregation:
-                    result = await Configuration.AggregationVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    result = await Configuration.AggregationVisitor.AcceptAsync(result, context).AnyContext();
                     break;
                 case QueryTypes.Query:
-                    result = await Configuration.QueryVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    result = await Configuration.QueryVisitor.AcceptAsync(result, context).AnyContext();
                     break;
                 case QueryTypes.Sort:
-                    result = await Configuration.SortVisitor.AcceptAsync(result, context).ConfigureAwait(false);
+                    result = await Configuration.SortVisitor.AcceptAsync(result, context).AnyContext();
                     break;
             }
 
@@ -70,18 +70,18 @@ public class SqlQueryParser : LuceneQueryParser
     private static readonly ConcurrentDictionary<IEntityType, List<EntityFieldInfo>> _entityFieldCache = new();
     public async Task<QueryValidationResult> ValidateAsync(string query, SqlQueryVisitorContext context)
     {
-        var node = await ParseAsync(query, context);
-        return await ValidationVisitor.RunAsync(node, context);
+        var node = await ParseAsync(query, context).AnyContext();
+        return await ValidationVisitor.RunAsync(node, context).AnyContext();
     }
 
     public async Task<string> ToDynamicLinqAsync(string query, SqlQueryVisitorContext context)
     {
-        var node = await ParseAsync(query, context);
+        var node = await ParseAsync(query, context).AnyContext();
         var result = context.GetValidationResult();
         if (!result.IsValid)
             throw new ValidationException("Invalid query: " + result.Message);
 
-        return await GenerateSqlVisitor.RunAsync(node, context);
+        return await GenerateSqlVisitor.RunAsync(node, context).AnyContext();
     }
 
     public SqlQueryVisitorContext GetContext(IEntityType entityType)
@@ -194,14 +194,14 @@ public class SqlQueryParser : LuceneQueryParser
             string resolvedField = null;
             if (context.Data.TryGetValue("@OriginalContextResolver", out object data) && data is QueryFieldResolver resolver)
             {
-                string contextResolvedField = await resolver(field, context).ConfigureAwait(false);
+                string contextResolvedField = await resolver(field, context).AnyContext();
                 if (contextResolvedField != null)
                     resolvedField = contextResolvedField;
             }
 
             if (Configuration.FieldResolver != null)
             {
-                string configResolvedField = await Configuration.FieldResolver(resolvedField ?? field, context).ConfigureAwait(false);
+                string configResolvedField = await Configuration.FieldResolver(resolvedField ?? field, context).AnyContext();
                 if (configResolvedField != null)
                     resolvedField = configResolvedField;
             }

@@ -308,7 +308,7 @@ public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
 
     node.SetNestedPath(nestedProperty);
     if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
-        node.SetQuery(new NestedQuery { Path = nestedProperty });
+        node.SetQuery(new NestedQuery(nestedProperty, new MatchAllQuery()));
 
     return base.VisitAsync(node, context);
 }
@@ -331,7 +331,7 @@ private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisito
     else if (context.QueryType == QueryTypes.Query)
     {
         var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context));
-        node.SetQuery(new NestedQuery { Path = nestedProperty, Query = innerQuery });
+        node.SetQuery(new NestedQuery(nestedProperty, innerQuery));
     }
 }
 ```
@@ -368,7 +368,7 @@ When sorting by a nested field (e.g., `-nested.field4`), `NestedVisitor` tags th
 ```csharp
 string nestedPath = node.GetNestedPath();
 if (nestedPath is not null)
-    sort.Nested = new NestedSort { Path = nestedPath };
+    sort.Nested = new NestedSortValue { Path = nestedPath };
 ```
 
 This produces the correct Elasticsearch sort clause with the required `nested` context.
