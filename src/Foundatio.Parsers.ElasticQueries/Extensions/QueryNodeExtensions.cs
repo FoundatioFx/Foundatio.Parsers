@@ -101,4 +101,9 @@ public static class QueryNodeExtensions
 
         node.Data[NestedPathKey] = path;
     }
+
+    public static void RemoveNestedPath(this IQueryNode node)
+    {
+        node.Data.Remove(NestedPathKey);
+    }
 }
