@@ -1808,18 +1808,18 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 .Nested("nested_resellers", n => n
                     .Path("resellers")
                     .Aggregations(na => na
-                        .Filter("filtered_terms_resellers.name", f => f
-                            .Filter(fq => fq.Term(t => t.Field("resellers.name").Value("Official")))
-                            .Aggregations(fa => fa
-                                .Terms("terms_resellers.name", ts => ts
-                                    .Field("resellers.name")
-                                    .Meta(m => m.Add("@field_type", "keyword")))))
                         .Filter("filtered_max_resellers.price", f => f
                             .Filter(fq => fq.Term(t => t.Field("resellers.name").Value("Official")))
                             .Aggregations(fa => fa
                                 .Max("max_resellers.price", m => m
                                     .Field("resellers.price")
-                                    .Meta(m2 => m2.Add("@field_type", "double")))))))));
+                                    .Meta(m2 => m2.Add("@field_type", "double")))))
+                        .Filter("filtered_terms_resellers.name", f => f
+                            .Filter(fq => fq.Term(t => t.Field("resellers.name").Value("Official")))
+                            .Aggregations(fa => fa
+                                .Terms("terms_resellers.name", ts => ts
+                                    .Field("resellers.name")
+                                    .Meta(m => m.Add("@field_type", "keyword")))))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
