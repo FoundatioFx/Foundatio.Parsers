@@ -68,6 +68,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         foreach (var (path, pathQueries) in nestedQueries)
         {
             QueryContainer combinedInner = null;
+            QueryContainer nestedFilter = null;
             foreach (var (child, innerQuery) in pathQueries)
             {
                 QueryContainer q = innerQuery;
@@ -75,7 +76,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
                     q = !q;
 
                 combinedInner = Combine(combinedInner, q, op);
+                nestedFilter ??= child.GetNestedFilter();
             }
+
+            if (nestedFilter is not null)
+                combinedInner &= nestedFilter;
 
             QueryBase combinedNested = new NestedQuery { Path = path, Query = combinedInner };
             container = Combine(container, combinedNested, op);
@@ -83,7 +88,18 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         if (nested is not null)
         {
-            nested.Query = container;
+            var nestedFilter = node.GetNestedFilter();
+            if (nestedFilter is not null)
+            {
+                QueryContainer inner = container;
+                inner &= nestedFilter;
+                nested.Query = inner;
+            }
+            else
+            {
+                nested.Query = container;
+            }
+
             node.SetQuery(nested);
         }
         else

@@ -104,4 +104,23 @@ public static class QueryNodeExtensions
     {
         node.Data.Remove(NestedPathKey);
     }
+
+    private const string NestedFilterKey = "@NestedFilter";
+    public static QueryContainer GetNestedFilter(this IQueryNode node)
+    {
+        if (!node.Data.TryGetValue(NestedFilterKey, out object value))
+            return null;
+
+        return value as QueryContainer;
+    }
+
+    public static void SetNestedFilter(this IQueryNode node, QueryContainer filter)
+    {
+        node.Data[NestedFilterKey] = filter;
+    }
+
+    public static void RemoveNestedFilter(this IQueryNode node)
+    {
+        node.Data.Remove(NestedFilterKey);
+    }
 }

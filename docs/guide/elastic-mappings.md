@@ -192,6 +192,44 @@ bool isNested = resolver.IsNestedPropertyType("comments");
 // "comments.author" -> "comments"
 ```
 
+### Filtered Nested Queries
+
+When multiple logical types share a nested array, use `UseNestedFilter()` to inject a discriminator filter:
+
+```csharp
+var parser = new ElasticQueryParser(c => c
+    .UseMappings(client, "my-index")
+    .UseNestedFilter((nestedPath, originalField, resolvedField, context) =>
+    {
+        if (nestedPath == "comments")
+            return new TermQuery { Field = "comments.type", Value = "public" };
+        return null;
+    })
+    .UseNested());
+
+// Query: comments.author:john
+// Produces:
+// {
+//   "nested": {
+//     "path": "comments",
+//     "query": {
+//       "bool": {
+//         "must": [
+//           { "term": { "comments.author": "john" } },
+//           { "term": { "comments.type": "public" } }
+//         ]
+//       }
+//     }
+//   }
+// }
+
+// Aggregation: max:comments.rating
+// Produces: nested > filter(comments.type=public) > max(comments.rating)
+
+// Sort: -comments.rating
+// Produces: sort with nested(path=comments, filter=term(comments.type, public))
+```
+
 ## Mapping Extensions
 
 ### Adding Keyword Sub-Fields

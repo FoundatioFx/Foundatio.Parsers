@@ -62,7 +62,24 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
             foreach (var (child, aggregation) in childAggregations)
             {
-                nestedAgg.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                var nestedFilter = child.GetNestedFilter();
+                if (nestedFilter is not null)
+                {
+                    var filteredAgg = new FilterAggregation("filtered_" + ((IAggregation)aggregation).Name)
+                    {
+                        Filter = nestedFilter,
+                        Aggregations = new AggregationDictionary
+                        {
+                            [((IAggregation)aggregation).Name] = (AggregationContainer)aggregation
+                        }
+                    };
+                    nestedAgg.Aggregations[((IAggregation)filteredAgg).Name] = (AggregationContainer)filteredAgg;
+                }
+                else
+                {
+                    nestedAgg.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                }
+
                 AddTermsOrder(termsAggregation, child, aggregation);
             }
 

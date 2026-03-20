@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
@@ -11,20 +12,41 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
 public class NestedVisitor : ChainableQueryVisitor
 {
-    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    private readonly NestedFilterResolver _filterResolver;
+
+    public NestedVisitor(NestedFilterResolver filterResolver = null)
+    {
+        _filterResolver = filterResolver;
+    }
+
+    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
-            return base.VisitAsync(node, context);
+        {
+            await base.VisitAsync(node, context);
+            return;
+        }
 
         string nestedProperty = GetNestedProperty(node.Field, context);
         if (nestedProperty is null)
-            return base.VisitAsync(node, context);
+        {
+            await base.VisitAsync(node, context);
+            return;
+        }
 
         node.SetNestedPath(nestedProperty);
         if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
             node.SetQuery(new NestedQuery { Path = nestedProperty });
 
-        return base.VisitAsync(node, context);
+        if (_filterResolver is not null)
+        {
+            string originalField = node.GetOriginalField();
+            var filter = await _filterResolver(nestedProperty, originalField, node.Field, context);
+            if (filter is not null)
+                node.SetNestedFilter(filter);
+        }
+
+        await base.VisitAsync(node, context);
     }
 
     public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
@@ -56,6 +78,14 @@ public class NestedVisitor : ChainableQueryVisitor
         string nestedProperty = GetNestedProperty(node.Field, context);
         if (nestedProperty is null)
             return;
+
+        if (_filterResolver is not null)
+        {
+            string originalField = node.GetOriginalField();
+            var filter = await _filterResolver(nestedProperty, originalField, node.Field, context);
+            if (filter is not null)
+                node.SetNestedFilter(filter);
+        }
 
         if (context.QueryType is QueryTypes.Aggregation or QueryTypes.Sort)
         {
