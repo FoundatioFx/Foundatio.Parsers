@@ -55,12 +55,24 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         foreach (var (nestedPath, childAggregations) in nestedAggregations)
         {
-            var nestedAgg = new AggregationMap("nested_" + nestedPath, new NestedAggregation { Path = nestedPath });
+            var nestedAgg = new AggregationMap($"nested_{nestedPath}", new NestedAggregation { Path = nestedPath });
 
             foreach (var (child, aggregation) in childAggregations)
             {
-                nestedAgg.Aggregations.Add(aggregation);
-                AddTermsOrder(termsAggregation, child, aggregation);
+                var nestedFilter = child.GetNestedFilter();
+                if (nestedFilter is not null)
+                {
+                    var filteredAgg = new AggregationMap($"filtered_{aggregation.Name}", new AggregationFilterQuery(nestedFilter));
+                    filteredAgg.Aggregations.Add(aggregation);
+                    nestedAgg.Aggregations.Add(filteredAgg);
+
+                    AddTermsOrder(termsAggregation, child, aggregation, $"nested_{nestedPath}>filtered_{aggregation.Name}>");
+                }
+                else
+                {
+                    nestedAgg.Aggregations.Add(aggregation);
+                    AddTermsOrder(termsAggregation, child, aggregation);
+                }
             }
 
             if (container.Value is null || container.Value.IsBucketAggregation())
@@ -83,13 +95,16 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         AddTermsOrder(termsAggregation, child, aggregation);
     }
 
-    private static void AddTermsOrder(TermsAggregation termsAggregation, IFieldQueryNode child, AggregationMap aggregation)
+    private static void AddTermsOrder(TermsAggregation termsAggregation, IFieldQueryNode child, AggregationMap aggregation, string bucketPathPrefix = null)
     {
-        if (termsAggregation is null || (child.Prefix != "-" && child.Prefix != "+"))
+        if (termsAggregation is null || child.Prefix is not "-" and not "+")
             return;
 
+        string aggName = aggregation.Name;
+        string key = bucketPathPrefix is not null ? $"{bucketPathPrefix}{aggName}" : aggName;
+
         termsAggregation.Order ??= new List<KeyValuePair<Field, SortOrder>>();
-        termsAggregation.Order.Add(new KeyValuePair<Field, SortOrder>(aggregation.Name, child.Prefix == "-" ? SortOrder.Desc : SortOrder.Asc));
+        termsAggregation.Order.Add(new KeyValuePair<Field, SortOrder>(key, child.Prefix is "-" ? SortOrder.Desc : SortOrder.Asc));
     }
 
     /// <summary>

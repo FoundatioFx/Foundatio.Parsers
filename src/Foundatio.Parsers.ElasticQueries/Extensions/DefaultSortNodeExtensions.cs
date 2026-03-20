@@ -31,7 +31,14 @@ public static class DefaultSortNodeExtensions
 
         string nestedPath = node.GetNestedPath();
         if (nestedPath is not null)
-            fieldSort.Nested = new NestedSortValue { Path = nestedPath };
+        {
+            var nestedSort = new NestedSortValue { Path = nestedPath };
+            var nestedFilter = node.GetNestedFilter();
+            if (nestedFilter is not null)
+                nestedSort.Filter = nestedFilter;
+
+            fieldSort.Nested = nestedSort;
+        }
 
         return new SortOptions
         {

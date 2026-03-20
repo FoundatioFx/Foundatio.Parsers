@@ -71,12 +71,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         foreach (var (path, pathQueries) in nestedQueries)
         {
             Query combinedIncluded = null;
+            Query nestedFilter = null;
             foreach (var (child, innerQuery) in pathQueries)
             {
                 if (child.IsExcluded())
                 {
-                    // Negate the NestedQuery wrapper, not the inner query, to avoid
-                    // matching documents that have any nested doc not matching the term.
                     Query negatedNested = !(Query)(new NestedQuery(path, innerQuery));
                     container = Combine(container, negatedNested, op, useScoring);
                 }
@@ -84,10 +83,15 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
                 {
                     combinedIncluded = Combine(combinedIncluded, innerQuery, op, useScoring);
                 }
+
+                nestedFilter ??= child.GetNestedFilter();
             }
 
             if (combinedIncluded is not null)
             {
+                if (nestedFilter is not null)
+                    combinedIncluded = combinedIncluded & nestedFilter;
+
                 Query combinedNested = new NestedQuery(path, combinedIncluded);
                 container = Combine(container, combinedNested, op, useScoring);
             }
@@ -117,7 +121,17 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         if (nested is not null)
         {
-            nested.Query = container;
+            var groupNestedFilter = node.GetNestedFilter();
+            if (groupNestedFilter is not null)
+            {
+                Query inner = container & groupNestedFilter;
+                nested.Query = inner;
+            }
+            else
+            {
+                nested.Query = container;
+            }
+
             node.SetQuery(nested);
         }
         else
@@ -129,7 +143,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
     private static GroupOperator GetEffectiveOperator(GroupNode node, IElasticQueryVisitorContext context)
     {
         var op = node.GetOperator(context);
-        if (op == GroupOperator.Or && node.IsRequired())
+        if (op is GroupOperator.Or && node.IsRequired())
             op = GroupOperator.And;
         return op;
     }
@@ -145,7 +159,6 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         {
             if (!useScoring)
             {
-                // In non-scoring mode, build filter array instead of must
                 var filters = new List<Query>();
                 AddToFilterList(filters, left);
                 AddToFilterList(filters, right);
@@ -155,7 +168,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             return left & right;
         }
 
-        if (op == GroupOperator.Or)
+        if (op is GroupOperator.Or)
             return left | right;
 
         return left;

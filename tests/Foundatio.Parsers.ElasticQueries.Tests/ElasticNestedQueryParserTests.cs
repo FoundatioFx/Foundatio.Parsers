@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
 using Elastic.Clients.Elasticsearch.Mapping;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -1248,5 +1249,477 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
     {
         public string Field1 { get; set; }
         public IList<MyType> Child { get; set; } = new List<MyType>();
+    }
+
+    [Fact]
+    public async Task NestedFilterQuery_WithResellerFilter_AddsFilterToNestedInnerQuery()
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<Product>(d => d.Properties(p => p
+            .Text("name")
+            .Keyword("category")
+            .Nested("resellers", o => o.Properties(p1 => p1
+                .Keyword("name")
+                .DoubleNumber("price")
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new Product
+            {
+                Name = "Widget",
+                Resellers =
+                {
+                    new Reseller { Name = "Official", Price = 10.0 },
+                    new Reseller { Name = "ThirdParty", Price = 8.0 }
+                }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<Product>(Client)
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+                path is "resellers" ? new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+            .UseNested());
+
+        // Act
+        var result = await processor.BuildQueryAsync("resellers.price:10", new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Query(result), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
+            .Query(q => q.Nested(n => n
+                .Path("resellers")
+                .Query(q2 => q2.Bool(b => b.Must(
+                    m => m.Term(t => t.Field("resellers.price").Value(10.0)),
+                    m => m.Term(t => t.Field("resellers.name").Value("Official"))))))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task NestedFilterQuery_WithMultipleFieldsSamePath_AppliesFilterOnceInCoalescedQuery()
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<Product>(d => d.Properties(p => p
+            .Text("name")
+            .Nested("resellers", o => o.Properties(p1 => p1
+                .Keyword("name")
+                .DoubleNumber("price")
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new Product
+            {
+                Name = "Widget",
+                Resellers =
+                {
+                    new Reseller { Name = "Official", Price = 10.0 },
+                    new Reseller { Name = "ThirdParty", Price = 8.0 }
+                }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<Product>(Client)
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+                path is "resellers" ? new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+            .UseNested());
+
+        // Act
+        var result = await processor.BuildQueryAsync("resellers.name:Official AND resellers.price:10", new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Query(result), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
+            .Query(q => q.Nested(n => n
+                .Path("resellers")
+                .Query(q2 => q2.Bool(b => b.Must(
+                    m => m.Term(t => t.Field("resellers.name").Value("Official")),
+                    m => m.Term(t => t.Field("resellers.price").Value(10.0)),
+                    m => m.Term(t => t.Field("resellers.name").Value("Official"))))))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task NestedFilterAggregation_WithResellerFilter_WrapsInFilterAggregation()
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<Product>(d => d.Properties(p => p
+            .Text("name")
+            .Nested("resellers", o => o.Properties(p1 => p1
+                .Keyword("name")
+                .DoubleNumber("price")
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new Product
+            {
+                Name = "Widget",
+                Resellers =
+                {
+                    new Reseller { Name = "Official", Price = 10.0 },
+                    new Reseller { Name = "ThirdParty", Price = 8.0 }
+                }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<Product>(Client)
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+                path is "resellers" ? new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+            .UseNested());
+
+        // Act
+        var result = await processor.BuildAggregationsAsync("max:resellers.price");
+
+        // Assert
+        var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
+            .Aggregations(a => a
+                .Add("nested_resellers", n => n
+                    .Nested(ne => ne.Path("resellers"))
+                    .Aggregations(na => na
+                        .Add("filtered_max_resellers.price", f => f
+                            .Filter(fq => fq.Term(t => t.Field("resellers.name").Value("Official")))
+                            .Aggregations(fa => fa
+                                .Add("max_resellers.price", m => m
+                                    .Max(ma => ma.Field("resellers.price"))
+                                    .Meta(m2 => m2.Add("@field_type", "double")))))))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+    }
+
+    [Fact]
+    public async Task NestedFilterSort_WithResellerFilter_SetsNestedSortFilter()
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<Product>(d => d.Properties(p => p
+            .Text("name")
+            .Nested("resellers", o => o.Properties(p1 => p1
+                .Keyword("name")
+                .DoubleNumber("price")
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new Product
+            {
+                Name = "Widget",
+                Resellers =
+                {
+                    new Reseller { Name = "Official", Price = 10.0 },
+                    new Reseller { Name = "ThirdParty", Price = 8.0 }
+                }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<Product>(Client)
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+                path is "resellers" ? new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+            .UseNested());
+
+        // Act
+        var sort = await processor.BuildSortAsync("-resellers.price");
+
+        // Assert
+        var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Sort(sort), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
+            .Sort(s => s.Field(f => f
+                .Field("resellers.price")
+                .Order(SortOrder.Desc)
+                .UnmappedType(FieldType.Double)
+                .Nested(n => n
+                    .Path("resellers")
+                    .Filter(fq => fq.Term(t => t.Field("resellers.name").Value("Official")))))), TestCancellationToken);
+
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.True(actualResponse.IsValidResponse);
+    }
+
+    [Fact]
+    public async Task NestedFilterQuery_WithGroupedNestedFields_AddsFilterToGroupInnerQuery()
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<Product>(d => d.Properties(p => p
+            .Text("name")
+            .Nested("resellers", o => o.Properties(p1 => p1
+                .Keyword("name")
+                .DoubleNumber("price")
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new Product
+            {
+                Name = "Widget",
+                Resellers =
+                {
+                    new Reseller { Name = "Official", Price = 10.0 },
+                    new Reseller { Name = "ThirdParty", Price = 8.0 }
+                }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<Product>(Client)
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+                path is "resellers" ? new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+            .UseNested());
+
+        // Act
+        var result = await processor.BuildQueryAsync("resellers:(resellers.name:Official resellers.price:10)", new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Query(result), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
+            .Query(q => q.Nested(n => n
+                .Path("resellers")
+                .Query(q2 => q2.Bool(b => b.Must(
+                    m => m.Term(t => t.Field("resellers.name").Value("Official")),
+                    m => m.Term(t => t.Field("resellers.price").Value(10.0)),
+                    m => m.Term(t => t.Field("resellers.name").Value("Official"))))))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task NestedFilterQuery_WithNullResolver_ProducesUnfilteredNestedQuery()
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<Product>(d => d.Properties(p => p
+            .Text("name")
+            .Nested("resellers", o => o.Properties(p1 => p1
+                .Keyword("name")
+                .DoubleNumber("price")
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new Product
+            {
+                Name = "Widget",
+                Resellers = { new Reseller { Name = "Official", Price = 10.0 } }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<Product>(Client)
+            .UseNestedFilter((path, orig, resolved, ctx) => (Query)null)
+            .UseNested());
+
+        // Act
+        var result = await processor.BuildQueryAsync("resellers.price:10", new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Query(result), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
+            .Query(q => q.Nested(n => n
+                .Path("resellers")
+                .Query(q2 => q2.Term(t => t.Field("resellers.price").Value(10.0))))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task NestedFilterQuery_WithMultiplePaths_AppliesDifferentFiltersPerPath()
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<MultiNestedProduct>(d => d.Properties(p => p
+            .Text("name")
+            .Nested("resellers", o => o.Properties(p1 => p1
+                .Keyword("name")
+                .DoubleNumber("price")
+            ))
+            .Nested("tags", o => o.Properties(p1 => p1
+                .Keyword("label")
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MultiNestedProduct
+            {
+                Name = "Widget",
+                Resellers = { new Reseller { Name = "Official", Price = 10.0 } },
+                Tags = { new Tag { Label = "sale" } }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<MultiNestedProduct>(Client)
+            .UseNestedFilter((path, orig, resolved, ctx) => path switch
+            {
+                "resellers" => new TermQuery { Field = "resellers.name", Value = "Official" },
+                "tags" => new TermQuery { Field = "tags.label", Value = "sale" },
+                _ => null
+            })
+            .UseNested());
+
+        // Act
+        var result = await processor.BuildQueryAsync("resellers.price:10 AND tags.label:sale", new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        var actualResponse = await Client.SearchAsync<MultiNestedProduct>(d => d.Indices(index).Query(result), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<MultiNestedProduct>(d => d.Indices(index)
+            .Query(q => q.Bool(b => b.Must(
+                m => m.Nested(n => n
+                    .Path("resellers")
+                    .Query(q2 => q2.Bool(b2 => b2.Must(
+                        m2 => m2.Term(t => t.Field("resellers.price").Value(10.0)),
+                        m2 => m2.Term(t => t.Field("resellers.name").Value("Official")))))),
+                m => m.Nested(n => n
+                    .Path("tags")
+                    .Query(q2 => q2.Bool(b2 => b2.Must(
+                        m2 => m2.Term(t => t.Field("tags.label").Value("sale")),
+                        m2 => m2.Term(t => t.Field("tags.label").Value("sale"))))))))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+    }
+
+    [Fact]
+    public async Task NestedFilterAggregation_WithMultipleFields_EachGetsOwnFilterAggregation()
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<Product>(d => d.Properties(p => p
+            .Text("name")
+            .Nested("resellers", o => o.Properties(p1 => p1
+                .Keyword("name")
+                .DoubleNumber("price")
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new Product
+            {
+                Name = "Widget",
+                Resellers =
+                {
+                    new Reseller { Name = "Official", Price = 10.0 },
+                    new Reseller { Name = "ThirdParty", Price = 8.0 }
+                }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<Product>(Client)
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+                path is "resellers" ? new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+            .UseNested());
+
+        // Act
+        var result = await processor.BuildAggregationsAsync("max:resellers.price terms:resellers.name");
+
+        // Assert
+        var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
+            .Aggregations(a => a
+                .Add("nested_resellers", n => n
+                    .Nested(ne => ne.Path("resellers"))
+                    .Aggregations(na => na
+                        .Add("filtered_max_resellers.price", f => f
+                            .Filter(fq => fq.Term(t => t.Field("resellers.name").Value("Official")))
+                            .Aggregations(fa => fa
+                                .Add("max_resellers.price", m => m
+                                    .Max(ma => ma.Field("resellers.price"))
+                                    .Meta(m2 => m2.Add("@field_type", "double")))))
+                        .Add("filtered_terms_resellers.name", f => f
+                            .Filter(fq => fq.Term(t => t.Field("resellers.name").Value("Official")))
+                            .Aggregations(fa => fa
+                                .Add("terms_resellers.name", ts => ts
+                                    .Terms(te => te.Field("resellers.name"))
+                                    .Meta(m => m.Add("@field_type", "keyword")))))))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+    }
+
+    public class Product
+    {
+        public string Name { get; set; }
+        public string Category { get; set; }
+        public IList<Reseller> Resellers { get; set; } = new List<Reseller>();
+    }
+
+    public class MultiNestedProduct
+    {
+        public string Name { get; set; }
+        public IList<Reseller> Resellers { get; set; } = new List<Reseller>();
+        public IList<Tag> Tags { get; set; } = new List<Tag>();
+    }
+
+    public class Reseller
+    {
+        public string Name { get; set; }
+        public double Price { get; set; }
+    }
+
+    public class Tag
+    {
+        public string Label { get; set; }
     }
 }

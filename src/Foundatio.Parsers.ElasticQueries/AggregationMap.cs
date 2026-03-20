@@ -2,8 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Elastic.Clients.Elasticsearch.Aggregations;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 
 namespace Foundatio.Parsers.ElasticQueries;
+
+/// <summary>
+/// Wraps a <see cref="Query"/> for use as a filter aggregation value inside <see cref="AggregationMap"/>.
+/// The v8 <see cref="Aggregation"/> discriminated union represents filter aggregations via
+/// <c>Aggregation { Filter = query }</c>, so this wrapper carries the query until conversion.
+/// </summary>
+public class AggregationFilterQuery(Query query)
+{
+    public Query Query { get; } = query;
+}
 
 /// <summary>
 /// Intermediate representation for building aggregation trees during query parsing.
@@ -92,6 +103,7 @@ public class AggregationMap
             PercentilesAggregation percentiles => new Aggregation { Percentiles = percentiles },
             GeohashGridAggregation geohashGrid => new Aggregation { GeohashGrid = geohashGrid },
             NestedAggregation nested => new Aggregation { Nested = nested },
+            AggregationFilterQuery filter => new Aggregation { Filter = filter.Query },
             _ => throw new NotSupportedException($"Aggregation type '{map.Value.GetType().Name}' is not supported by AggregationMap. Add a case to CreateAggregation.")
         };
 
