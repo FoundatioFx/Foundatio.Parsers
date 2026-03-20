@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Nest;
@@ -11,6 +12,13 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
 public class NestedVisitor : ChainableQueryVisitor
 {
+    private readonly NestedFilterResolver _filterResolver;
+
+    public NestedVisitor(NestedFilterResolver filterResolver = null)
+    {
+        _filterResolver = filterResolver;
+    }
+
     public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
@@ -24,7 +32,21 @@ public class NestedVisitor : ChainableQueryVisitor
         if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
             node.SetQuery(new NestedQuery { Path = nestedProperty });
 
+        if (_filterResolver is not null)
+            return VisitGroupWithFilterAsync(node, nestedProperty, context);
+
         return base.VisitAsync(node, context);
+    }
+
+    private async Task VisitGroupWithFilterAsync(GroupNode node, string nestedProperty, IQueryVisitorContext context)
+    {
+        string originalField = node.GetOriginalField();
+        ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
+        var filter = await _filterResolver(nestedProperty, originalField, node.Field, context).ConfigureAwait(false);
+        if (filter is not null)
+            node.SetNestedFilter(filter);
+
+        await base.VisitAsync(node, context).ConfigureAwait(false);
     }
 
     public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
@@ -47,28 +69,59 @@ public class NestedVisitor : ChainableQueryVisitor
         return HandleNestedFieldNodeAsync(node, context);
     }
 
-    private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
+    private Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
     {
-        // Skip if inside a group that references a nested path
         if (IsInsideNestedGroup(node))
-            return;
+            return Task.CompletedTask;
 
         string nestedProperty = GetNestedProperty(node.Field, context);
         if (nestedProperty is null)
-            return;
+            return Task.CompletedTask;
+
+        if (_filterResolver is not null)
+            return HandleNestedFieldWithFilterAsync(node, nestedProperty, context);
+
+        if (context.QueryType is QueryTypes.Aggregation or QueryTypes.Sort)
+        {
+            node.SetNestedPath(nestedProperty);
+            return Task.CompletedTask;
+        }
+
+        if (context.QueryType is QueryTypes.Query)
+            return WrapInNestedQueryAsync(node, nestedProperty, context);
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleNestedFieldWithFilterAsync(IFieldQueryNode node, string nestedProperty, IQueryVisitorContext context)
+    {
+        string originalField = node.GetOriginalField();
+        ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
+        var filter = await _filterResolver(nestedProperty, originalField, node.Field, context).ConfigureAwait(false);
+        if (filter is not null)
+            node.SetNestedFilter(filter);
 
         if (context.QueryType is QueryTypes.Aggregation or QueryTypes.Sort)
         {
             node.SetNestedPath(nestedProperty);
         }
-        else if (context.QueryType == QueryTypes.Query)
+        else if (context.QueryType is QueryTypes.Query)
         {
-            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context));
+            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
             if (innerQuery is null)
                 return;
 
             node.SetQuery(new NestedQuery { Path = nestedProperty, Query = innerQuery });
         }
+    }
+
+    private static async Task WrapInNestedQueryAsync(IFieldQueryNode node, string nestedProperty, IQueryVisitorContext context)
+    {
+        var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
+        if (innerQuery is null)
+            return;
+
+        node.SetQuery(new NestedQuery { Path = nestedProperty, Query = innerQuery });
     }
 
     private static bool IsInsideNestedGroup(IQueryNode node)

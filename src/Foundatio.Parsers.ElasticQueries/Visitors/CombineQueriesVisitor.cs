@@ -68,6 +68,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         foreach (var (path, pathQueries) in nestedQueries)
         {
             QueryContainer combinedInner = null;
+            QueryContainer nestedFilter = null;
             foreach (var (child, innerQuery) in pathQueries)
             {
                 QueryContainer q = innerQuery;
@@ -75,7 +76,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
                     q = !q;
 
                 combinedInner = Combine(combinedInner, q, op);
+                nestedFilter ??= child.GetNestedFilter();
             }
+
+            if (nestedFilter is not null)
+                combinedInner &= nestedFilter;
 
             QueryBase combinedNested = new NestedQuery { Path = path, Query = combinedInner };
             container = Combine(container, combinedNested, op);
@@ -83,7 +88,18 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         if (nested is not null)
         {
-            nested.Query = container;
+            var nestedFilter = node.GetNestedFilter();
+            if (nestedFilter is not null)
+            {
+                QueryContainer inner = container;
+                inner &= nestedFilter;
+                nested.Query = inner;
+            }
+            else
+            {
+                nested.Query = container;
+            }
+
             node.SetQuery(nested);
         }
         else
@@ -95,17 +111,17 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
     private static GroupOperator GetEffectiveOperator(GroupNode node, IElasticQueryVisitorContext context)
     {
         var op = node.GetOperator(context);
-        if (op == GroupOperator.Or && node.IsRequired())
+        if (op is GroupOperator.Or && node.IsRequired())
             op = GroupOperator.And;
         return op;
     }
 
     private static QueryBase Combine(QueryBase left, QueryBase right, GroupOperator op)
     {
-        if (op == GroupOperator.And)
+        if (op is GroupOperator.And)
             return left & right;
 
-        if (op == GroupOperator.Or)
+        if (op is GroupOperator.Or)
             return left | right;
 
         return left;
@@ -113,10 +129,10 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
     private static QueryContainer Combine(QueryContainer left, QueryContainer right, GroupOperator op)
     {
-        if (op == GroupOperator.And)
+        if (op is GroupOperator.And)
             return left & right;
 
-        if (op == GroupOperator.Or)
+        if (op is GroupOperator.Or)
             return left | right;
 
         return left;

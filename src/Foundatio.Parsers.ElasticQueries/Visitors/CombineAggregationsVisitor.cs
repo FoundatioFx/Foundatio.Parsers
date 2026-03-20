@@ -54,7 +54,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         foreach (var (nestedPath, childAggregations) in nestedAggregations)
         {
-            var nestedAgg = new NestedAggregation("nested_" + nestedPath)
+            var nestedAgg = new NestedAggregation($"nested_{nestedPath}")
             {
                 Path = nestedPath,
                 Aggregations = new AggregationDictionary()
@@ -62,8 +62,28 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
             foreach (var (child, aggregation) in childAggregations)
             {
-                nestedAgg.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
-                AddTermsOrder(termsAggregation, child, aggregation);
+                var nestedFilter = child.GetNestedFilter();
+                if (nestedFilter is not null)
+                {
+                    var filteredAgg = new FilterAggregation($"filtered_{((IAggregation)aggregation).Name}")
+                    {
+                        Filter = nestedFilter,
+                        Aggregations = new AggregationDictionary
+                        {
+                            [((IAggregation)aggregation).Name] = (AggregationContainer)aggregation
+                        }
+                    };
+                    nestedAgg.Aggregations[((IAggregation)filteredAgg).Name] = (AggregationContainer)filteredAgg;
+                }
+                else
+                {
+                    nestedAgg.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                }
+
+                if (nestedFilter is not null)
+                    AddTermsOrder(termsAggregation, child, aggregation, $"nested_{nestedPath}>filtered_{((IAggregation)aggregation).Name}>");
+                else
+                    AddTermsOrder(termsAggregation, child, aggregation);
             }
 
             if (container is BucketAggregationBase bucketContainer)
@@ -73,7 +93,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             }
         }
 
-        if (node.Parent == null)
+        if (node.Parent is null)
             node.SetAggregation(container);
     }
 
@@ -88,16 +108,19 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         AddTermsOrder(termsAggregation, child, aggregation);
     }
 
-    private static void AddTermsOrder(ITermsAggregation termsAggregation, IFieldQueryNode child, AggregationBase aggregation)
+    private static void AddTermsOrder(ITermsAggregation termsAggregation, IFieldQueryNode child, AggregationBase aggregation, string bucketPathPrefix = null)
     {
-        if (termsAggregation is null || (child.Prefix != "-" && child.Prefix != "+"))
+        if (termsAggregation is null || child.Prefix is not "-" and not "+")
             return;
+
+        string aggName = ((IAggregation)aggregation).Name;
+        string key = bucketPathPrefix is not null ? $"{bucketPathPrefix}{aggName}" : aggName;
 
         termsAggregation.Order ??= new List<TermsOrder>();
         termsAggregation.Order.Add(new TermsOrder
         {
-            Key = ((IAggregation)aggregation).Name,
-            Order = child.Prefix == "-" ? SortOrder.Descending : SortOrder.Ascending
+            Key = key,
+            Order = child.Prefix is "-" ? SortOrder.Descending : SortOrder.Ascending
         });
     }
 

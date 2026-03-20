@@ -79,6 +79,7 @@ var parser = new ElasticQueryParser(c => c
 | `UseIncludes(includes)` | Query include definitions |
 | `UseGeo(resolver)` | Geo location resolver |
 | `UseNested()` | Enable nested document support |
+| `UseNestedFilter(resolver)` | Nested filter resolver for injecting filters into nested queries/aggs/sorts |
 | `SetValidationOptions(options)` | Validation configuration |
 | `UseRuntimeFieldResolver(resolver)` | Runtime field support |
 
@@ -351,6 +352,55 @@ Sorting by nested fields is automatically handled with the correct `nested` cont
 // Sort descending by a nested field
 var sort = await parser.BuildSortAsync("-nested.field4");
 ```
+
+### Nested Filter Resolver
+
+When multiple logical types share a single nested array (e.g., different reseller tiers), you can inject a discriminator filter inside nested queries, aggregations, and sorts using `UseNestedFilter()`:
+
+```csharp
+var parser = new ElasticQueryParser(c => c
+    .UseMappings(client, "my-index")
+    .UseNestedFilter((nestedPath, originalField, resolvedField, context) =>
+    {
+        if (nestedPath is "resellers")
+            return new TermQuery { Field = "resellers.type", Value = "official" };
+
+        return null;
+    })
+    .UseNested());
+```
+
+The resolver is called for each standalone nested field node during visitor traversal. For fields inside an explicit nested group (e.g., `resellers:(...)`), the resolver is called once on the group node rather than on the individual inner field nodes. Return `null` to skip filtering for a given field or group.
+
+**Queries** -- The filter is AND-ed into the nested query's inner query:
+
+```csharp
+// Input: resellers.price:10
+// Output: nested(path=resellers, query=(term(resellers.price, 10) AND term(resellers.type, official)))
+```
+
+**Aggregations** -- Each nested aggregation is wrapped in a `FilterAggregation`:
+
+```csharp
+// Input: max:resellers.price
+// Output: nested(path=resellers) > filter(term(resellers.type, official)) > max(resellers.price)
+```
+
+**Sorts** -- The filter is set on `NestedSort.Filter`:
+
+```csharp
+// Input: -resellers.price
+// Output: sort(resellers.price, desc, nested(path=resellers, filter=term(resellers.type, official)))
+```
+
+A synchronous overload is also available for resolvers that don't need async:
+
+```csharp
+.UseNestedFilter((path, orig, resolved, ctx) =>
+    path is "resellers" ? new TermQuery { Field = "resellers.type", Value = "official" } : null)
+```
+
+**Call order safety**: `UseNestedFilter()` and `UseNested()` can be called in any order. The resolver is always passed to the `NestedVisitor` correctly.
 
 ### Exists and Missing on Nested Fields
 

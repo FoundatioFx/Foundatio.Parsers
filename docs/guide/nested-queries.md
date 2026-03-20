@@ -453,6 +453,56 @@ The following nested query scenarios are fully supported with test coverage:
 | Mixed nested/non-nested default fields | `SetDefaultFields(["field1", "nested.field1"])` | Supported |
 | Mixed field types in defaults | Text + keyword + integer across nested/non-nested | Supported |
 | Field aliases to nested paths | `UseFieldMap({ "alias", "nested" })` | Supported |
+| Filtered nested query | `UseNestedFilter()` + `resellers.price:10` | Supported |
+| Filtered nested aggregation | `UseNestedFilter()` + `max:resellers.price` (FilterAgg wrapper) | Supported |
+| Filtered nested sort | `UseNestedFilter()` + `-resellers.price` (NestedSort.Filter) | Supported |
+| Multiple nested paths with different filters | `UseNestedFilter()` with path-based dispatch | Supported |
+
+## Nested Filter Resolver
+
+When a single nested array contains documents of different logical types (e.g., official vs third-party resellers), a discriminator filter must be injected inside the nested scope. The `UseNestedFilter()` configuration method registers a callback that runs during `NestedVisitor` traversal and stores the filter as `@NestedFilter` metadata on each node.
+
+### How It Works
+
+1. **`NestedVisitor`** calls the resolver whenever a node introduces or participates in a nested scope. For standalone nested field nodes (e.g., `resellers.price:10`), the resolver is called for each field. For explicit nested groups (e.g., `resellers:(resellers.name:x resellers.price:10)`), inner field nodes are skipped and the resolver is called once on the group node. If the resolver returns a non-null `QueryContainer`, it is stored as `@NestedFilter` metadata on that node.
+
+2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and AND-s the filter once per nested path into the inner query. For explicit grouped nested queries, the filter stored on the group node is applied to the group's inner query.
+
+3. **`CombineAggregationsVisitor`** reads the `@NestedFilter` and wraps each inner aggregation in a `FilterAggregation` before adding it to the `NestedAggregation`.
+
+4. **`DefaultSortNodeExtensions`** reads the `@NestedFilter` and sets `NestedSort.Filter`.
+
+### Configuration
+
+```csharp
+var parser = new ElasticQueryParser(c => c
+    .UseMappings(client, "my-index")
+    .UseNestedFilter((nestedPath, originalField, resolvedField, context) =>
+    {
+        if (nestedPath is "resellers")
+            return new TermQuery { Field = "resellers.type", Value = "official" };
+
+        return null;
+    })
+    .UseNested());
+```
+
+### Delegate Signature
+
+```csharp
+public delegate Task<QueryContainer> NestedFilterResolver(
+    string nestedPath,       // e.g., "resellers"
+    string originalField,    // field name before alias resolution
+    string resolvedField,    // field name after alias resolution
+    IQueryVisitorContext context);
+```
+
+A synchronous overload is available that wraps the return in `Task.FromResult`.
+
+### Resolver Behavior Notes
+
+- For explicit nested groups, the resolver is called once on the group node, not on the individual inner field nodes. To use different discriminators for different fields within the same nested path, use separate explicit nested groups or encode the distinction via field aliases or `IQueryVisitorContext.Data`.
+- Default field searches (`SetDefaultFields` with nested fields) bypass the visitor chain and do not invoke the filter resolver.
 
 ## Known Limitations
 

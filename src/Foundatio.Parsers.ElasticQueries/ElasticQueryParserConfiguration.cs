@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -10,9 +10,27 @@ using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
+/// <summary>
+/// Resolves an optional filter to inject inside nested queries, aggregations, and sorts.
+/// Called for each nested field node that is not inside an explicit nested group, and once
+/// for each explicit nested group node during visitor traversal.
+/// Return null to skip filtering for a given field.
+/// </summary>
+/// <param name="nestedPath">The detected nested mapping path (e.g., "resellers").</param>
+/// <param name="originalField">The field name before alias resolution (from GetOriginalField()).</param>
+/// <param name="resolvedField">The field name after alias resolution (the current node.Field).</param>
+/// <param name="context">The visitor context, providing Data dictionary for arbitrary state.</param>
+public delegate Task<QueryContainer> NestedFilterResolver(
+    string nestedPath,
+    string originalField,
+    string resolvedField,
+    IQueryVisitorContext context
+);
+
 public class ElasticQueryParserConfiguration
 {
     private ILogger _logger = NullLogger.Instance;
+    private int? _nestedPriority;
 
     public ElasticQueryParserConfiguration()
     {
@@ -28,6 +46,7 @@ public class ElasticQueryParserConfiguration
     public string[] DefaultFields { get; private set; }
     public QueryFieldResolver FieldResolver { get; private set; }
     public IncludeResolver IncludeResolver { get; private set; }
+    public NestedFilterResolver NestedFilterResolver { get; private set; }
     public RuntimeFieldResolver RuntimeFieldResolver { get; private set; }
     public bool? EnableRuntimeFieldResolver { get; private set; }
     public ElasticMappingResolver MappingResolver { get; private set; }
@@ -116,10 +135,33 @@ public class ElasticQueryParserConfiguration
 
     public ElasticQueryParserConfiguration UseNested(int priority = 300)
     {
-        return AddVisitor(new NestedVisitor(), priority);
+        _nestedPriority = priority;
+        RemoveVisitor<NestedVisitor>();
+
+        return AddVisitor(new NestedVisitor(NestedFilterResolver), priority);
     }
 
-    #region Combined Visitor Management
+    public ElasticQueryParserConfiguration UseNestedFilter(NestedFilterResolver resolver)
+    {
+        NestedFilterResolver = resolver;
+        if (_nestedPriority.HasValue)
+        {
+            RemoveVisitor<NestedVisitor>();
+            AddVisitor(new NestedVisitor(resolver), _nestedPriority.Value);
+        }
+
+        return this;
+    }
+
+    public ElasticQueryParserConfiguration UseNestedFilter(
+        Func<string, string, string, IQueryVisitorContext, QueryContainer> resolver)
+    {
+        if (resolver is null)
+            return UseNestedFilter((NestedFilterResolver)null);
+
+        return UseNestedFilter((path, orig, resolved, ctx) =>
+            Task.FromResult(resolver(path, orig, resolved, ctx)));
+    }
 
     public ElasticQueryParserConfiguration AddVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
@@ -166,10 +208,6 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    #endregion
-
-    #region Query Visitor Management
-
     public ElasticQueryParserConfiguration AddQueryVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
         QueryVisitor.AddVisitor(visitor, priority);
@@ -204,10 +242,6 @@ public class ElasticQueryParserConfiguration
 
         return this;
     }
-
-    #endregion
-
-    #region Sort Visitor Management
 
     public ElasticQueryParserConfiguration AddSortVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
@@ -244,10 +278,6 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    #endregion
-
-    #region Aggregation Visitor Management
-
     public ElasticQueryParserConfiguration AddAggregationVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
         AggregationVisitor.AddVisitor(visitor, priority);
@@ -282,8 +312,6 @@ public class ElasticQueryParserConfiguration
 
         return this;
     }
-
-    #endregion
 
     public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class
     {
