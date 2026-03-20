@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries;
@@ -157,8 +157,6 @@ public class SqlQueryParserConfiguration
         return "DateOnly.Parse(\"" + dateOnlyValue + "\")";
     }
 
-    #region Combined Visitor Management
-
     public SqlQueryParserConfiguration AddVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
         QueryVisitor.AddVisitor(visitor, priority);
@@ -204,10 +202,6 @@ public class SqlQueryParserConfiguration
         return this;
     }
 
-    #endregion
-
-    #region Query Visitor Management
-
     public SqlQueryParserConfiguration AddQueryVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
         QueryVisitor.AddVisitor(visitor, priority);
@@ -242,10 +236,6 @@ public class SqlQueryParserConfiguration
 
         return this;
     }
-
-    #endregion
-
-    #region Sort Visitor Management
 
     public SqlQueryParserConfiguration AddSortVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
@@ -282,10 +272,6 @@ public class SqlQueryParserConfiguration
         return this;
     }
 
-    #endregion
-
-    #region Aggregation Visitor Management
-
     public SqlQueryParserConfiguration AddAggregationVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
         AggregationVisitor.AddVisitor(visitor, priority);
@@ -321,7 +307,6 @@ public class SqlQueryParserConfiguration
         return this;
     }
 
-    #endregion
 }
 
 public delegate bool EntityTypeNavigationFilter(INavigation navigation);

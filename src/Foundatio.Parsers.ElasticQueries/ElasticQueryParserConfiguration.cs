@@ -163,8 +163,6 @@ public class ElasticQueryParserConfiguration
             Task.FromResult(resolver(path, orig, resolved, ctx)));
     }
 
-    #region Combined Visitor Management
-
     public ElasticQueryParserConfiguration AddVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
         QueryVisitor.AddVisitor(visitor, priority);
@@ -210,10 +208,6 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    #endregion
-
-    #region Query Visitor Management
-
     public ElasticQueryParserConfiguration AddQueryVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
         QueryVisitor.AddVisitor(visitor, priority);
@@ -248,10 +242,6 @@ public class ElasticQueryParserConfiguration
 
         return this;
     }
-
-    #endregion
-
-    #region Sort Visitor Management
 
     public ElasticQueryParserConfiguration AddSortVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
@@ -288,10 +278,6 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    #endregion
-
-    #region Aggregation Visitor Management
-
     public ElasticQueryParserConfiguration AddAggregationVisitor(IChainableQueryVisitor visitor, int priority = 0)
     {
         AggregationVisitor.AddVisitor(visitor, priority);
@@ -326,8 +312,6 @@ public class ElasticQueryParserConfiguration
 
         return this;
     }
-
-    #endregion
 
     public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class
     {

@@ -201,8 +201,9 @@ var parser = new ElasticQueryParser(c => c
     .UseMappings(client, "my-index")
     .UseNestedFilter((nestedPath, originalField, resolvedField, context) =>
     {
-        if (nestedPath == "comments")
+        if (nestedPath is "comments")
             return new TermQuery { Field = "comments.type", Value = "public" };
+
         return null;
     })
     .UseNested());

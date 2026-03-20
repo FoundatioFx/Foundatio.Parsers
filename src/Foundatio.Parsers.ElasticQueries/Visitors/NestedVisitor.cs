@@ -41,6 +41,7 @@ public class NestedVisitor : ChainableQueryVisitor
         if (_filterResolver is not null)
         {
             string originalField = node.GetOriginalField();
+            ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
             var filter = await _filterResolver(nestedProperty, originalField, node.Field, context).ConfigureAwait(false);
             if (filter is not null)
                 node.SetNestedFilter(filter);
@@ -71,7 +72,6 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
     {
-        // Skip if inside a group that references a nested path
         if (IsInsideNestedGroup(node))
             return;
 
@@ -82,6 +82,7 @@ public class NestedVisitor : ChainableQueryVisitor
         if (_filterResolver is not null)
         {
             string originalField = node.GetOriginalField();
+            ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
             var filter = await _filterResolver(nestedProperty, originalField, node.Field, context).ConfigureAwait(false);
             if (filter is not null)
                 node.SetNestedFilter(filter);
@@ -91,7 +92,7 @@ public class NestedVisitor : ChainableQueryVisitor
         {
             node.SetNestedPath(nestedProperty);
         }
-        else if (context.QueryType == QueryTypes.Query)
+        else if (context.QueryType is QueryTypes.Query)
         {
             var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
             if (innerQuery is null)

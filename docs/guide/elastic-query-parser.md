@@ -362,8 +362,9 @@ var parser = new ElasticQueryParser(c => c
     .UseMappings(client, "my-index")
     .UseNestedFilter((nestedPath, originalField, resolvedField, context) =>
     {
-        if (nestedPath == "resellers")
+        if (nestedPath is "resellers")
             return new TermQuery { Field = "resellers.type", Value = "official" };
+
         return null;
     })
     .UseNested());
@@ -396,7 +397,7 @@ A synchronous overload is also available for resolvers that don't need async:
 
 ```csharp
 .UseNestedFilter((path, orig, resolved, ctx) =>
-    path == "resellers" ? new TermQuery { Field = "resellers.type", Value = "official" } : null)
+    path is "resellers" ? new TermQuery { Field = "resellers.type", Value = "official" } : null)
 ```
 
 **Call order safety**: `UseNestedFilter()` and `UseNested()` can be called in any order. The resolver is always passed to the `NestedVisitor` correctly.

@@ -479,8 +479,9 @@ var parser = new ElasticQueryParser(c => c
     .UseMappings(client, "my-index")
     .UseNestedFilter((nestedPath, originalField, resolvedField, context) =>
     {
-        if (nestedPath == "resellers")
+        if (nestedPath is "resellers")
             return new TermQuery { Field = "resellers.type", Value = "official" };
+
         return null;
     })
     .UseNested());

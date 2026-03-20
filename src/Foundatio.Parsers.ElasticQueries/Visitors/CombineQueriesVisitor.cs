@@ -111,17 +111,17 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
     private static GroupOperator GetEffectiveOperator(GroupNode node, IElasticQueryVisitorContext context)
     {
         var op = node.GetOperator(context);
-        if (op == GroupOperator.Or && node.IsRequired())
+        if (op is GroupOperator.Or && node.IsRequired())
             op = GroupOperator.And;
         return op;
     }
 
     private static QueryBase Combine(QueryBase left, QueryBase right, GroupOperator op)
     {
-        if (op == GroupOperator.And)
+        if (op is GroupOperator.And)
             return left & right;
 
-        if (op == GroupOperator.Or)
+        if (op is GroupOperator.Or)
             return left | right;
 
         return left;
@@ -129,10 +129,10 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
     private static QueryContainer Combine(QueryContainer left, QueryContainer right, GroupOperator op)
     {
-        if (op == GroupOperator.And)
+        if (op is GroupOperator.And)
             return left & right;
 
-        if (op == GroupOperator.Or)
+        if (op is GroupOperator.Or)
             return left | right;
 
         return left;
