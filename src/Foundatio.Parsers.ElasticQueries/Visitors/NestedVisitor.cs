@@ -23,14 +23,14 @@ public class NestedVisitor : ChainableQueryVisitor
     {
         if (String.IsNullOrEmpty(node.Field))
         {
-            await base.VisitAsync(node, context);
+            await base.VisitAsync(node, context).ConfigureAwait(false);
             return;
         }
 
         string nestedProperty = GetNestedProperty(node.Field, context);
         if (nestedProperty is null)
         {
-            await base.VisitAsync(node, context);
+            await base.VisitAsync(node, context).ConfigureAwait(false);
             return;
         }
 
@@ -41,12 +41,12 @@ public class NestedVisitor : ChainableQueryVisitor
         if (_filterResolver is not null)
         {
             string originalField = node.GetOriginalField();
-            var filter = await _filterResolver(nestedProperty, originalField, node.Field, context);
+            var filter = await _filterResolver(nestedProperty, originalField, node.Field, context).ConfigureAwait(false);
             if (filter is not null)
                 node.SetNestedFilter(filter);
         }
 
-        await base.VisitAsync(node, context);
+        await base.VisitAsync(node, context).ConfigureAwait(false);
     }
 
     public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
@@ -82,7 +82,7 @@ public class NestedVisitor : ChainableQueryVisitor
         if (_filterResolver is not null)
         {
             string originalField = node.GetOriginalField();
-            var filter = await _filterResolver(nestedProperty, originalField, node.Field, context);
+            var filter = await _filterResolver(nestedProperty, originalField, node.Field, context).ConfigureAwait(false);
             if (filter is not null)
                 node.SetNestedFilter(filter);
         }
@@ -93,7 +93,7 @@ public class NestedVisitor : ChainableQueryVisitor
         }
         else if (context.QueryType == QueryTypes.Query)
         {
-            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context));
+            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
             if (innerQuery is null)
                 return;
 
