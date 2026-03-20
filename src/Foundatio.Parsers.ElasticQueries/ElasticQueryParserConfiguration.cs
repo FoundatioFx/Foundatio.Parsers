@@ -12,7 +12,8 @@ namespace Foundatio.Parsers.ElasticQueries;
 
 /// <summary>
 /// Resolves an optional filter to inject inside nested queries, aggregations, and sorts.
-/// Called once per nested field node during visitor traversal.
+/// Called for each nested field node that is not inside an explicit nested group, and once
+/// for each explicit nested group node during visitor traversal.
 /// Return null to skip filtering for a given field.
 /// </summary>
 /// <param name="nestedPath">The detected nested mapping path (e.g., "resellers").</param>

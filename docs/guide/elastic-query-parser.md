@@ -369,7 +369,7 @@ var parser = new ElasticQueryParser(c => c
     .UseNested());
 ```
 
-The resolver is called once per nested field node during visitor traversal. Return `null` to skip filtering for a given field.
+The resolver is called for each standalone nested field node during visitor traversal. For fields inside an explicit nested group (e.g., `resellers:(...)`), the resolver is called once on the group node rather than on the individual inner field nodes. Return `null` to skip filtering for a given field or group.
 
 **Queries** -- The filter is AND-ed into the nested query's inner query:
 

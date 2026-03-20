@@ -464,9 +464,9 @@ When a single nested array contains documents of different logical types (e.g., 
 
 ### How It Works
 
-1. **`NestedVisitor`** calls the resolver for every field that maps to a nested type, passing the nested path, the original field name (before alias resolution), the resolved field name, and the visitor context. If the resolver returns a non-null `QueryContainer`, it is stored as `@NestedFilter` metadata on the node.
+1. **`NestedVisitor`** calls the resolver whenever a node introduces or participates in a nested scope. For standalone nested field nodes (e.g., `resellers.price:10`), the resolver is called for each field. For explicit nested groups (e.g., `resellers:(resellers.name:x resellers.price:10)`), inner field nodes are skipped and the resolver is called once on the group node. If the resolver returns a non-null `QueryContainer`, it is stored as `@NestedFilter` metadata on that node.
 
-2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and AND-s the filter once per nested path into the inner query. For explicit grouped nested queries, the filter is applied to the group's inner query.
+2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and AND-s the filter once per nested path into the inner query. For explicit grouped nested queries, the filter stored on the group node is applied to the group's inner query.
 
 3. **`CombineAggregationsVisitor`** reads the `@NestedFilter` and wraps each inner aggregation in a `FilterAggregation` before adding it to the `NestedAggregation`.
 
@@ -498,11 +498,10 @@ public delegate Task<QueryContainer> NestedFilterResolver(
 
 A synchronous overload is available that wraps the return in `Task.FromResult`.
 
-### Known Limitations of the Filter Resolver
+### Resolver Behavior Notes
 
-- Default field searches (`SetDefaultFields` with nested fields) do not invoke the filter resolver.
-- When coalescing multiple fields from the same nested path in a query, the filter is taken from the first node that has one and applied once. Different discriminators for the same path require separate explicit nested groups.
-- `NestedQuery.InnerHits` and `ScoreMode` are out of scope for this feature.
+- For explicit nested groups, the resolver is called once on the group node, not on the individual inner field nodes. To use different discriminators for different fields within the same nested path, use separate explicit nested groups or encode the distinction via field aliases or `IQueryVisitorContext.Data`.
+- Default field searches (`SetDefaultFields` with nested fields) bypass the visitor chain and do not invoke the filter resolver.
 
 ## Known Limitations
 
