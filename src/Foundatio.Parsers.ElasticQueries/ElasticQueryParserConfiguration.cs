@@ -156,6 +156,9 @@ public class ElasticQueryParserConfiguration
     public ElasticQueryParserConfiguration UseNestedFilter(
         Func<string, string, string, IQueryVisitorContext, QueryContainer> resolver)
     {
+        if (resolver is null)
+            return UseNestedFilter((NestedFilterResolver)null);
+
         return UseNestedFilter((path, orig, resolved, ctx) =>
             Task.FromResult(resolver(path, orig, resolved, ctx)));
     }
