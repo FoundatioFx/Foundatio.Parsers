@@ -63,10 +63,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var sut = new ElasticQueryParser(c => c.AddQueryVisitor(testQueryVisitor));
         var context = new ElasticQueryVisitorContext();
 
-        var result = sut.Parse("NOT (dog parrot)", context) as GroupNode;
+        var result = Assert.IsType<GroupNode>(sut.Parse("NOT (dog parrot)", context));
         Assert.Equal(2, testQueryVisitor.GroupNodeCount);
 
-        Assert.IsType<GroupNode>(result!.Left);
+        Assert.IsType<GroupNode>(result.Left);
         Assert.True((result.Left as GroupNode)!.HasParens);
         Assert.True((result.Left as GroupNode)!.IsNegated);
     }

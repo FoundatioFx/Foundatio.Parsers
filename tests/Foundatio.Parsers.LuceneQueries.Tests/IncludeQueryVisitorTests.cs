@@ -74,7 +74,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         };
 
         var context = new QueryVisitorContext();
-        var resolved = await IncludeVisitor.RunAsync(result!, includes, context);
+        await IncludeVisitor.RunAsync(result!, includes, context);
         var validationResult = context.GetValidationResult();
         Assert.False(validationResult.IsValid);
         Assert.Contains("Recursive", validationResult.Message);
@@ -91,7 +91,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         };
 
         var context = new QueryVisitorContext();
-        var resolved = await IncludeVisitor.RunAsync(result!, includes, context);
+        await IncludeVisitor.RunAsync(result!, includes, context);
         var validationResult = context.GetValidationResult();
         Assert.Contains("include1", validationResult.UnresolvedIncludes);
         Assert.False(validationResult.IsValid);
@@ -106,7 +106,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         var result = await parser.ParseAsync("field1:value1 @include:include1");
 
         var context = new QueryVisitorContext();
-        var resolved = await IncludeVisitor.RunAsync(result!, _ => throw new ApplicationException("Bam"), context);
+        await IncludeVisitor.RunAsync(result!, _ => throw new ApplicationException("Bam"), context);
         var validationResult = context.GetValidationResult();
         Assert.Contains("include1", validationResult.UnresolvedIncludes);
         Assert.False(validationResult.IsValid);
@@ -124,7 +124,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         };
 
         var context = new QueryVisitorContext();
-        var resolved = await IncludeVisitor.RunAsync(result!, includes, context);
+        await IncludeVisitor.RunAsync(result!, includes, context);
         Assert.True(context.IsValid());
     }
 

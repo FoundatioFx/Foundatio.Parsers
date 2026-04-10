@@ -15,7 +15,7 @@ public static class QueryNodeExtensions
             if (getDefaultValue == null)
                 return Task.FromResult<QueryBase?>(null);
 
-            return getDefaultValue?.Invoke()!;
+            return getDefaultValue.Invoke();
         }
 
         return Task.FromResult(value as QueryBase);
@@ -49,7 +49,7 @@ public static class QueryNodeExtensions
             if (getDefaultValue == null)
                 return Task.FromResult<AggregationBase?>(null);
 
-            return getDefaultValue?.Invoke()!;
+            return getDefaultValue.Invoke();
         }
 
         return Task.FromResult(value as AggregationBase);
