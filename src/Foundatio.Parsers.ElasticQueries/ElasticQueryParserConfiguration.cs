@@ -20,7 +20,7 @@ namespace Foundatio.Parsers.ElasticQueries;
 /// <param name="originalField">The field name before alias resolution (from GetOriginalField()).</param>
 /// <param name="resolvedField">The field name after alias resolution (the current node.Field).</param>
 /// <param name="context">The visitor context, providing Data dictionary for arbitrary state.</param>
-public delegate Task<QueryContainer> NestedFilterResolver(
+public delegate Task<QueryContainer?> NestedFilterResolver(
     string nestedPath,
     string originalField,
     string resolvedField,
@@ -154,7 +154,7 @@ public class ElasticQueryParserConfiguration
     }
 
     public ElasticQueryParserConfiguration UseNestedFilter(
-        Func<string, string, string, IQueryVisitorContext, QueryContainer>? resolver)
+        Func<string, string, string, IQueryVisitorContext, QueryContainer?>? resolver)
     {
         if (resolver is null)
             return UseNestedFilter((NestedFilterResolver?)null);

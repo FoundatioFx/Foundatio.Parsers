@@ -275,7 +275,6 @@ public static class DefaultQueryNodeExtensions
         return null;
     }
 
-
     private static QueryBase GetSplitNestedQuery(TermNode node, Dictionary<string, List<string>> fieldsByNestedPath, IElasticQueryVisitorContext context)
     {
         var queryContainers = new List<QueryContainer>();

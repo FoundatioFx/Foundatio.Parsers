@@ -78,15 +78,13 @@ public static class DefaultAggregationNodeExtensions
                 {
                     Field = field,
                     Precision = precision,
-#pragma warning disable CS8625 // Field is null because these aggregations use Script instead
-                    Aggregations = new AverageAggregation("avg_lat", null)
+                    Aggregations = new AverageAggregation("avg_lat", new Field("_script"))
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lat")
-                    } && new AverageAggregation("avg_lon", null)
+                    } && new AverageAggregation("avg_lon", new Field("_script"))
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lon")
                     }
-#pragma warning restore CS8625
                 };
 
             case AggregationType.Terms:
@@ -170,15 +168,13 @@ public static class DefaultAggregationNodeExtensions
                 {
                     Field = aggField,
                     Precision = precision,
-#pragma warning disable CS8625 // Field is null because these aggregations use Script instead
-                    Aggregations = new AverageAggregation("avg_lat", null)
+                    Aggregations = new AverageAggregation("avg_lat", new Field("_script"))
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lat")
-                    } && new AverageAggregation("avg_lon", null)
+                    } && new AverageAggregation("avg_lon", new Field("_script"))
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lon")
                     }
-#pragma warning restore CS8625
                 };
 
             case AggregationType.Terms:
