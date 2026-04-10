@@ -97,7 +97,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             if (s.FieldInfo.FullName != "NationalPhoneNumber")
                 return;
 
-            s.Tokens = [TryGetNationalNumber(s.Term)];
+            s.Tokens = [TryGetNationalNumber(s.Term)!];
             s.Operator = SqlSearchOperator.StartsWith;
         });
 
@@ -344,7 +344,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.CurrentCompany.Name, "\"acme*\"") || EF.Functions.Contains(e.CurrentCompany.Location, "\"acme*\"")).ToQueryString();
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.CurrentCompany!.Name, "\"acme*\"") || EF.Functions.Contains(e.CurrentCompany!.Location!, "\"acme*\"")).ToQueryString();
 
         await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
 
@@ -431,7 +431,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
         context.Fields.Add(new EntityFieldInfo { Name = "age", FullName = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
-        context.ValidationOptions.AllowedFields.Add("age");
+        context.ValidationOptions!.AllowedFields.Add("age");
 
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name == "acme") && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
         string sqlActual = db.Employees.Where("""Companies.Any(Name = "acme") AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();
@@ -455,7 +455,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.Equal("John Doe", employee.FullName);
     }
 
-    public static string TryGetNationalNumber(string phoneNumber, string regionCode = "US")
+    public static string? TryGetNationalNumber(string phoneNumber, string regionCode = "US")
     {
         var phoneNumberUtil = PhoneNumberUtil.GetInstance();
         try
@@ -587,7 +587,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         IQueryNode result;
         try
         {
-            result = await parser.ParseAsync(query);
+            result = (await parser.ParseAsync(query))!;
         }
         catch (FormatException ex)
         {

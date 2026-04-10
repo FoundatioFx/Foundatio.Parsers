@@ -14,7 +14,7 @@ public static class DefaultSortNodeExtensions
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        string field = elasticContext.MappingResolver.GetSortFieldName(node.UnescapedField);
+        string? field = elasticContext.MappingResolver.GetSortFieldName(node.UnescapedField);
         var fieldType = elasticContext.MappingResolver.GetFieldType(field);
 
         var sort = new FieldSort
@@ -24,7 +24,7 @@ public static class DefaultSortNodeExtensions
             Order = node.IsNodeOrGroupNegated() ? SortOrder.Descending : SortOrder.Ascending
         };
 
-        string nestedPath = node.GetNestedPath();
+        string? nestedPath = node.GetNestedPath();
         if (nestedPath is not null)
         {
             var nestedSort = new NestedSort { Path = nestedPath };

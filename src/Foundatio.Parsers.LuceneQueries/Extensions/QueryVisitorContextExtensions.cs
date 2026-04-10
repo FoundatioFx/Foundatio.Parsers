@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -8,7 +9,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions;
 
 public static class QueryVisitorContextExtensions
 {
-    public static QueryFieldResolver GetFieldResolver(this IQueryVisitorContext context)
+    public static QueryFieldResolver? GetFieldResolver(this IQueryVisitorContext context)
     {
         var resolverContext = context as IQueryVisitorContextWithFieldResolver;
         return resolverContext?.FieldResolver;
@@ -19,7 +20,7 @@ public static class QueryVisitorContextExtensions
         if (context is not IQueryVisitorContextWithFieldResolver resolverContext)
             throw new ArgumentException("Context must be of type IQueryVisitorContextWithFieldResolver", nameof(context));
 
-        resolverContext.FieldResolver = (field, _) => Task.FromResult(resolver(field));
+        resolverContext.FieldResolver = (field, _) => Task.FromResult<string?>(resolver(field));
 
         return context;
     }
@@ -34,7 +35,7 @@ public static class QueryVisitorContextExtensions
         return context;
     }
 
-    public static IncludeResolver GetIncludeResolver(this IQueryVisitorContext context)
+    public static IncludeResolver? GetIncludeResolver(this IQueryVisitorContext context)
     {
         if (context is not IQueryVisitorContextWithIncludeResolver includeContext)
             throw new ArgumentException("Context must be of type IQueryVisitorContextWithIncludeResolver", nameof(context));
@@ -173,9 +174,10 @@ public static class QueryVisitorContextExtensions
         return context;
     }
 
+    [return: MaybeNull]
     public static T GetValue<T>(this IQueryVisitorContext context, string key)
     {
-        if (context.Data.TryGetValue(key, out object value) && value is T typedValue)
+        if (context.Data.TryGetValue(key, out object? value) && value is T typedValue)
             return typedValue;
 
         return default;
@@ -183,7 +185,7 @@ public static class QueryVisitorContextExtensions
 
     public static ICollection<T> GetCollection<T>(this IQueryVisitorContext context, string key)
     {
-        if (context.Data.TryGetValue(key, out object value))
+        if (context.Data.TryGetValue(key, out object? value))
         {
             if (value is ICollection<T> typedValue)
                 return typedValue;
@@ -199,15 +201,15 @@ public static class QueryVisitorContextExtensions
 
     public static DateTime? GetDate(this IQueryVisitorContext context, string key)
     {
-        if (context.Data.TryGetValue(key, out object value) && value is DateTime date)
+        if (context.Data.TryGetValue(key, out object? value) && value is DateTime date)
             return date;
 
         return null;
     }
 
-    public static string GetString(this IQueryVisitorContext context, string key)
+    public static string? GetString(this IQueryVisitorContext context, string key)
     {
-        if (context.Data.TryGetValue(key, out object value) && value is string str)
+        if (context.Data.TryGetValue(key, out object? value) && value is string str)
             return str;
 
         return null;
@@ -215,7 +217,7 @@ public static class QueryVisitorContextExtensions
 
     public static bool GetBoolean(this IQueryVisitorContext context, string key, bool defaultValue = false)
     {
-        if (context.Data.TryGetValue(key, out object value) && value is bool b)
+        if (context.Data.TryGetValue(key, out object? value) && value is bool b)
             return b;
 
         return defaultValue;
@@ -229,7 +231,7 @@ public static class QueryVisitorContextExtensions
         return context;
     }
 
-    public static IQueryNode GetAlternateInvertedCriteria(this IQueryVisitorContext context)
+    public static IQueryNode? GetAlternateInvertedCriteria(this IQueryVisitorContext context)
     {
         return context.GetValue<IQueryNode>(AlternateInvertedCriteriaKey);
     }

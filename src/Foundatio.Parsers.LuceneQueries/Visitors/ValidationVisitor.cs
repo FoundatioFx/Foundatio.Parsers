@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -68,11 +68,11 @@ public class ValidationVisitor : ChainableQueryVisitor
             if (node.Field.StartsWith("@"))
                 return;
 
-            validationResult.ReferencedFields.Add(node.GetOriginalField());
+            validationResult.ReferencedFields.Add(node.GetOriginalField() ?? node.Field ?? "");
         }
         else
         {
-            string[] fields = node.GetDefaultFields(context.DefaultFields);
+            string[]? fields = node.GetDefaultFields(context.DefaultFields);
             if (fields == null || fields.Length == 0)
                 validationResult.ReferencedFields.Add("");
             else
@@ -81,12 +81,12 @@ public class ValidationVisitor : ChainableQueryVisitor
         }
     }
 
-    private void AddOperation(QueryValidationResult info, string operation, string field)
+    private void AddOperation(QueryValidationResult info, string? operation, string? field)
     {
         if (String.IsNullOrEmpty(operation))
             return;
 
-        info.AddOperation(operation, field);
+        info.AddOperation(operation, field ?? "");
     }
 
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
@@ -110,8 +110,8 @@ public class ValidationVisitor : ChainableQueryVisitor
             var restrictedFields = new List<string>();
             foreach (string field in options.RestrictedFields)
             {
-                string resolvedField = fieldResolver == null ? field : await fieldResolver(field, context);
-                if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField.Equals(f) || field.Equals(f))))
+                string? resolvedField = fieldResolver == null ? field : await fieldResolver(field, context);
+                if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField?.Equals(f) == true || field.Equals(f))))
                     restrictedFields.Add(field);
             }
             if (restrictedFields.Count > 0)
@@ -160,7 +160,7 @@ public class ValidationVisitor : ChainableQueryVisitor
             throw new QueryValidationException($"Invalid query: {result.Message}", result);
     }
 
-    public static async Task<QueryValidationResult> RunAsync(IQueryNode node, IQueryVisitorContextWithValidation context = null)
+    public static async Task<QueryValidationResult> RunAsync(IQueryNode node, IQueryVisitorContextWithValidation? context = null)
     {
         context ??= new QueryVisitorContext();
 
@@ -175,12 +175,12 @@ public class ValidationVisitor : ChainableQueryVisitor
         return context.GetValidationResult();
     }
 
-    public static QueryValidationResult Run(IQueryNode node, IQueryVisitorContextWithValidation context = null)
+    public static QueryValidationResult Run(IQueryNode node, IQueryVisitorContextWithValidation? context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }
 
-    public static async Task<QueryValidationResult> RunAsync(IQueryNode node, QueryValidationOptions options, IQueryVisitorContextWithValidation context = null)
+    public static async Task<QueryValidationResult> RunAsync(IQueryNode node, QueryValidationOptions options, IQueryVisitorContextWithValidation? context = null)
     {
         context ??= new QueryVisitorContext();
 
@@ -192,7 +192,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         return validationResult;
     }
 
-    public static Task<QueryValidationResult> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null)
+    public static Task<QueryValidationResult> RunAsync(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation? context = null)
     {
         var options = new QueryValidationOptions();
         foreach (string field in allowedFields)
@@ -200,7 +200,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         return RunAsync(node, options, context);
     }
 
-    public static QueryValidationResult Run(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation context = null)
+    public static QueryValidationResult Run(IQueryNode node, IEnumerable<string> allowedFields, IQueryVisitorContextWithValidation? context = null)
     {
         return RunAsync(node, allowedFields, context).GetAwaiter().GetResult();
     }

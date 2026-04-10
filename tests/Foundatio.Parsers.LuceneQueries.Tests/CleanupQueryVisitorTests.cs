@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -48,7 +48,7 @@ public class CleanupQueryVisitorTests : TestWithLoggingBase
         IQueryNode result;
         try
         {
-            result = await parser.ParseAsync(query);
+            result = (await parser.ParseAsync(query))!;
         }
         catch (FormatException ex)
         {

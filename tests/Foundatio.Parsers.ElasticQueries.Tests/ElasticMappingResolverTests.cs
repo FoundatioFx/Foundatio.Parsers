@@ -91,13 +91,13 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
 
         var resolver = ElasticMappingResolver.Create<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType, Client, index, _logger);
 
-        string dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001");
+        string dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001")!;
         Assert.Equal("nested.data.text-0001.keyword", dynamicTextAggregation);
 
-        string dynamicSpacedAggregation = resolver.GetAggregationsFieldName("nested.data.spaced field");
+        string dynamicSpacedAggregation = resolver.GetAggregationsFieldName("nested.data.spaced field")!;
         Assert.Equal("nested.data.spaced field.keyword", dynamicSpacedAggregation);
 
-        string dynamicSpacedSort = resolver.GetSortFieldName("nested.data.spaced field");
+        string dynamicSpacedSort = resolver.GetSortFieldName("nested.data.spaced field")!;
         Assert.Equal("nested.data.spaced field.keyword", dynamicSpacedSort);
 
         string dynamicSpacedField = resolver.GetResolvedField("nested.data.spaced field");
@@ -106,7 +106,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         var field1Property = resolver.GetMappingProperty("Field1");
         Assert.IsType<TextProperty>(field1Property);
 
-        string field5Property = resolver.GetAggregationsFieldName("Field5");
+        string field5Property = resolver.GetAggregationsFieldName("Field5")!;
         Assert.Equal("field5.keyword", field5Property);
 
         var unknownProperty = resolver.GetMappingProperty("UnknowN.test.doesNotExist");
@@ -130,20 +130,20 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         var field4Property = resolver.GetMappingProperty("Field4");
         Assert.IsType<TextProperty>(field4Property);
 
-        var field4ReflectionProperty = resolver.GetMappingProperty(new Field(typeof(ElasticNestedQueryParserTests.MyNestedType).GetProperty("Field4")));
+        var field4ReflectionProperty = resolver.GetMappingProperty(new Field(typeof(ElasticNestedQueryParserTests.MyNestedType).GetProperty("Field4")!));
         Assert.IsType<TextProperty>(field4ReflectionProperty);
 
         var field4ExpressionProperty = resolver.GetMappingProperty(new Field(GetObjectPath(p => p.Field4)));
         Assert.IsType<TextProperty>(field4ExpressionProperty);
 
         var field4AliasMapping = resolver.GetMapping("Field4Alias", true);
-        Assert.IsType<TextProperty>(field4AliasMapping.Property);
+        Assert.IsType<TextProperty>(field4AliasMapping!.Property);
         Assert.Same(field4Property, field4AliasMapping.Property);
 
-        string field4sort = resolver.GetSortFieldName("Field4Alias");
+        string field4sort = resolver.GetSortFieldName("Field4Alias")!;
         Assert.Equal("field4.sort", field4sort);
 
-        string field4aggs = resolver.GetAggregationsFieldName("Field4Alias");
+        string field4aggs = resolver.GetAggregationsFieldName("Field4Alias")!;
         Assert.Equal("field4.keyword", field4aggs);
 
         var nestedIdProperty = resolver.GetMappingProperty("Nested.Id");

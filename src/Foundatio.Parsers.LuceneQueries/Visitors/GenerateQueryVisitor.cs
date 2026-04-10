@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
@@ -41,12 +41,12 @@ public class GenerateQueryVisitor : QueryNodeVisitorWithResultBase<string>
         return _builder.ToString();
     }
 
-    public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        return new GenerateQueryVisitor().AcceptAsync(node, context);
+        return new GenerateQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext { DefaultOperator = GroupOperator.Default });
     }
 
-    public static string Run(IQueryNode node, IQueryVisitorContext context = null)
+    public static string Run(IQueryNode node, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -10,10 +10,7 @@ public class CleanupQueryVisitor : ChainableQueryVisitor
     public override async Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context)
     {
         var result = CleanNode(node);
-        if (result == null)
-            return null;
-
-        result = await base.VisitAsync(result, context);
+        result = await base.VisitAsync(result, context).ConfigureAwait(false);
 
         return CleanNode(result);
     }
@@ -126,13 +123,13 @@ public class CleanupQueryVisitor : ChainableQueryVisitor
         return node;
     }
 
-    public static async Task<string> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    public static async Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        var result = await new CleanupQueryVisitor().AcceptAsync(node, context);
+        var result = await new CleanupQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext()).ConfigureAwait(false);
         return result.ToString();
     }
 
-    public static string Run(IQueryNode node, IQueryVisitorContext context = null)
+    public static string Run(IQueryNode node, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }

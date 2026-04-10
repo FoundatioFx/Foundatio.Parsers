@@ -17,24 +17,24 @@ public class SqlQueryParserConfiguration
     public SqlQueryParserConfiguration()
     {
         AddSortVisitor(new TermToFieldVisitor(), 0);
-        AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver != null ? FieldResolver(field, context) : Task.FromResult<string>(null)), 10);
+        AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver != null ? FieldResolver(field, context) : Task.FromResult<string?>(null)), 10);
         AddVisitor(new ValidationVisitor(), 30);
     }
 
     public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
-    public string[] DefaultFields { get; private set; }
+    public string[]? DefaultFields { get; private set; }
     public SqlSearchOperator DefaultFieldsSearchOperator { get; private set; } = SqlSearchOperator.StartsWith;
-    public string[] FullTextFields { get; private set; }
+    public string[]? FullTextFields { get; private set; }
     public int MaxFieldDepth { get; private set; } = 10;
-    public QueryFieldResolver FieldResolver { get; private set; }
+    public QueryFieldResolver? FieldResolver { get; private set; }
     public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
     public Func<string, string> DateTimeParser { get; set; } = DefaultTimeParser;
     public Func<string, string> DateOnlyParser { get; set; } = DefaultOnlyParser;
     public EntityTypePropertyFilter EntityTypePropertyFilter { get; private set; } = static _ => true;
     public EntityTypeNavigationFilter EntityTypeNavigationFilter { get; private set; } = static _ => true;
     public EntityTypeSkipNavigationFilter EntityTypeSkipNavigationFilter { get; private set; } = static _ => true;
-    public IncludeResolver IncludeResolver { get; private set; }
-    public QueryValidationOptions ValidationOptions { get; private set; }
+    public IncludeResolver? IncludeResolver { get; private set; }
+    public QueryValidationOptions? ValidationOptions { get; private set; }
     public ChainedQueryVisitor SortVisitor { get; } = new();
     public ChainedQueryVisitor QueryVisitor { get; } = new();
     public ChainedQueryVisitor AggregationVisitor { get; } = new();
@@ -102,7 +102,7 @@ public class SqlQueryParserConfiguration
         return this;
     }
 
-    public SqlQueryParserConfiguration UseFieldResolver(QueryFieldResolver resolver, int priority = 10)
+    public SqlQueryParserConfiguration UseFieldResolver(QueryFieldResolver? resolver, int priority = 10)
     {
         FieldResolver = resolver;
         ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(resolver), priority);
@@ -118,19 +118,19 @@ public class SqlQueryParserConfiguration
         return UseFieldResolver(null);
     }
 
-    public SqlQueryParserConfiguration UseIncludes(IncludeResolver includeResolver, ShouldSkipIncludeFunc shouldSkipInclude = null, string includeName = "include", int priority = 0)
+    public SqlQueryParserConfiguration UseIncludes(IncludeResolver includeResolver, ShouldSkipIncludeFunc? shouldSkipInclude = null, string includeName = "include", int priority = 0)
     {
         IncludeResolver = includeResolver;
 
         return AddVisitor(new IncludeVisitor(shouldSkipInclude, includeName), priority);
     }
 
-    public SqlQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, ShouldSkipIncludeFunc shouldSkipInclude = null, string includeName = "include", int priority = 0)
+    public SqlQueryParserConfiguration UseIncludes(Func<string, string?> resolveInclude, ShouldSkipIncludeFunc? shouldSkipInclude = null, string includeName = "include", int priority = 0)
     {
         return UseIncludes(name => Task.FromResult(resolveInclude(name)), shouldSkipInclude, includeName, priority);
     }
 
-    public SqlQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, ShouldSkipIncludeFunc shouldSkipInclude = null, string includeName = "include", int priority = 0)
+    public SqlQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, ShouldSkipIncludeFunc? shouldSkipInclude = null, string includeName = "include", int priority = 0)
     {
         return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, shouldSkipInclude, includeName, priority);
     }

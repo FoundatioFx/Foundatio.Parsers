@@ -4,7 +4,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions;
 
 public static class StringExtensions
 {
-    public static string Unescape(this string input)
+    public static string? Unescape(this string? input)
     {
         if (input == null)
             return null;

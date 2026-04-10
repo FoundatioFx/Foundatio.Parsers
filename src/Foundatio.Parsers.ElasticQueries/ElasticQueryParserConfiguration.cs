@@ -38,19 +38,19 @@ public class ElasticQueryParserConfiguration
         AddSortVisitor(new TermToFieldVisitor(), 0);
         AddAggregationVisitor(new AssignOperationTypeVisitor(), 0);
         AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
-        AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver != null ? FieldResolver(field, context) : Task.FromResult<string>(null)), 10);
+        AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver != null ? FieldResolver(field, context) : Task.FromResult<string?>(null)), 10);
         AddVisitor(new ValidationVisitor(), 30);
     }
 
     public ILoggerFactory LoggerFactory { get; private set; } = NullLoggerFactory.Instance;
-    public string[] DefaultFields { get; private set; }
-    public QueryFieldResolver FieldResolver { get; private set; }
-    public IncludeResolver IncludeResolver { get; private set; }
-    public NestedFilterResolver NestedFilterResolver { get; private set; }
-    public RuntimeFieldResolver RuntimeFieldResolver { get; private set; }
+    public string[]? DefaultFields { get; private set; }
+    public QueryFieldResolver? FieldResolver { get; private set; }
+    public IncludeResolver? IncludeResolver { get; private set; }
+    public NestedFilterResolver? NestedFilterResolver { get; private set; }
+    public RuntimeFieldResolver? RuntimeFieldResolver { get; private set; }
     public bool? EnableRuntimeFieldResolver { get; private set; }
-    public ElasticMappingResolver MappingResolver { get; private set; }
-    public QueryValidationOptions ValidationOptions { get; private set; }
+    public ElasticMappingResolver? MappingResolver { get; private set; }
+    public QueryValidationOptions? ValidationOptions { get; private set; }
     public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
     public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
     public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
@@ -58,7 +58,7 @@ public class ElasticQueryParserConfiguration
     public ElasticQueryParserConfiguration SetLoggerFactory(ILoggerFactory loggerFactory)
     {
         LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
-        _logger = loggerFactory.CreateLogger<ElasticQueryParserConfiguration>();
+        _logger = LoggerFactory.CreateLogger<ElasticQueryParserConfiguration>();
 
         return this;
     }
@@ -69,7 +69,7 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseFieldResolver(QueryFieldResolver resolver, int priority = 10)
+    public ElasticQueryParserConfiguration UseFieldResolver(QueryFieldResolver? resolver, int priority = 10)
     {
         FieldResolver = resolver;
         ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(resolver), priority);
@@ -77,7 +77,7 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string> fields, int priority = 10)
+    public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string>? fields, int priority = 10)
     {
         if (fields != null)
             return UseFieldResolver(fields.ToHierarchicalFieldResolver(), priority);
@@ -90,12 +90,12 @@ public class ElasticQueryParserConfiguration
         return UseGeo(location => Task.FromResult(resolveGeoLocation(location)), priority);
     }
 
-    public ElasticQueryParserConfiguration UseGeo(Func<string, Task<string>> resolveGeoLocation, int priority = 200)
+    public ElasticQueryParserConfiguration UseGeo(Func<string, Task<string>>? resolveGeoLocation, int priority = 200)
     {
         return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
     }
 
-    public ElasticQueryParserConfiguration UseIncludes(IncludeResolver includeResolver, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0)
+    public ElasticQueryParserConfiguration UseIncludes(IncludeResolver includeResolver, ShouldSkipIncludeFunc? shouldSkipInclude = null, int priority = 0)
     {
         IncludeResolver = includeResolver;
 
@@ -117,12 +117,12 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseIncludes(Func<string, string> resolveInclude, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0)
+    public ElasticQueryParserConfiguration UseIncludes(Func<string, string?> resolveInclude, ShouldSkipIncludeFunc? shouldSkipInclude = null, int priority = 0)
     {
         return UseIncludes(name => Task.FromResult(resolveInclude(name)), shouldSkipInclude, priority);
     }
 
-    public ElasticQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, ShouldSkipIncludeFunc shouldSkipInclude = null, int priority = 0)
+    public ElasticQueryParserConfiguration UseIncludes(IDictionary<string, string> includes, ShouldSkipIncludeFunc? shouldSkipInclude = null, int priority = 0)
     {
         return UseIncludes(name => includes.ContainsKey(name) ? includes[name] : null, shouldSkipInclude, priority);
     }
@@ -141,7 +141,7 @@ public class ElasticQueryParserConfiguration
         return AddVisitor(new NestedVisitor(NestedFilterResolver), priority);
     }
 
-    public ElasticQueryParserConfiguration UseNestedFilter(NestedFilterResolver resolver)
+    public ElasticQueryParserConfiguration UseNestedFilter(NestedFilterResolver? resolver)
     {
         NestedFilterResolver = resolver;
         if (_nestedPriority.HasValue)
@@ -154,10 +154,10 @@ public class ElasticQueryParserConfiguration
     }
 
     public ElasticQueryParserConfiguration UseNestedFilter(
-        Func<string, string, string, IQueryVisitorContext, QueryContainer> resolver)
+        Func<string, string, string, IQueryVisitorContext, QueryContainer>? resolver)
     {
         if (resolver is null)
-            return UseNestedFilter((NestedFilterResolver)null);
+            return UseNestedFilter((NestedFilterResolver?)null);
 
         return UseNestedFilter((path, orig, resolved, ctx) =>
             Task.FromResult(resolver(path, orig, resolved, ctx)));
@@ -341,7 +341,7 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping, Inferrer inferrer = null)
+    public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping, Inferrer? inferrer = null)
     {
         MappingResolver = ElasticMappingResolver.Create(getMapping, inferrer, logger: _logger);
 

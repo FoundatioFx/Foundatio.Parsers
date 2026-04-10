@@ -9,13 +9,13 @@ namespace Foundatio.Parsers.SqlQueries.Visitors;
 
 public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorContext
 {
-    public List<EntityFieldInfo> Fields { get; set; }
+    public List<EntityFieldInfo> Fields { get; set; } = [];
     public SqlSearchOperator DefaultSearchOperator { get; set; } = SqlSearchOperator.StartsWith;
     public string[] FullTextFields { get; set; } = [];
     public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
-    public Func<string, string> DateTimeParser { get; set; }
-    public Func<string, string> DateOnlyParser { get; set; }
-    public IEntityType EntityType { get; set; }
+    public Func<string, string> DateTimeParser { get; set; } = static s => s;
+    public Func<string, string> DateOnlyParser { get; set; } = static s => s;
+    public IEntityType? EntityType { get; set; }
 }
 
 [DebuggerDisplay("{FullName} IsNumber: {IsNumber} IsMoney: {IsMoney} IsDate: {IsDate} IsBoolean: {IsBoolean} IsCollection: {IsCollection}")]
@@ -30,12 +30,12 @@ public class EntityFieldInfo
     public bool IsBoolean { get; set; }
     public bool IsCollection { get; set; }
     public bool IsNavigation { get; set; }
-    public EntityFieldInfo Parent { get; set; }
+    public EntityFieldInfo? Parent { get; set; }
     public IDictionary<string, object> Data { get; set; } = new Dictionary<string, object>();
 
     protected bool Equals(EntityFieldInfo other) => Name == other.Name;
 
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         if (obj is null)
         {
@@ -60,7 +60,7 @@ public class EntityFieldInfo
     public (string fieldPrefix, string fieldSuffix) GetFieldPrefixAndSuffix()
     {
         var fieldTree = new List<EntityFieldInfo>();
-        EntityFieldInfo current = Parent;
+        EntityFieldInfo? current = Parent;
         while (current != null)
         {
             fieldTree.Add(current);
@@ -116,9 +116,9 @@ public class EntityFieldInfo
 
 public class SearchTerm
 {
-    public EntityFieldInfo FieldInfo { get; set; }
-    public string Term { get; set; }
-    public List<string> Tokens { get; set; }
+    public required EntityFieldInfo FieldInfo { get; set; }
+    public required string Term { get; set; }
+    public List<string>? Tokens { get; set; }
     public SqlSearchOperator Operator { get; set; } = SqlSearchOperator.Contains;
 }
 

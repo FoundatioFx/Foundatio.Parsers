@@ -28,7 +28,7 @@ public abstract class QueryNodeBase : IQueryNode
 
     public IDictionary<string, object> Data { get; } = new Dictionary<string, object>();
     public abstract IEnumerable<IQueryNode> Children { get; }
-    public IQueryNode Parent { get; set; }
+    public IQueryNode? Parent { get; set; }
     public static readonly IList<IQueryNode> EmptyNodeList = new List<IQueryNode>().AsReadOnly();
 
     public abstract IQueryNode Clone();

@@ -11,5 +11,5 @@ public interface IQueryVisitorContextWithFieldResolver : IQueryVisitorContext
     /// <summary>
     /// Resolves field names to their actual storage names or aliases.
     /// </summary>
-    QueryFieldResolver FieldResolver { get; set; }
+    QueryFieldResolver? FieldResolver { get; set; }
 }

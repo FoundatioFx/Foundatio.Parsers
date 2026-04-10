@@ -28,7 +28,7 @@ public static class TypeExtensions
     public static Type UnwrapNullable(this Type type)
     {
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-            return Nullable.GetUnderlyingType(type);
+            return Nullable.GetUnderlyingType(type)!;
 
         return type;
     }

@@ -24,7 +24,7 @@ public class QueryValidationResult
 {
     private ConcurrentDictionary<string, ICollection<string>> _operations = new(StringComparer.OrdinalIgnoreCase);
 
-    public string QueryType { get; set; }
+    public string? QueryType { get; set; }
     public bool IsValid => ValidationErrors.Count == 0;
     public ICollection<QueryValidationError> ValidationErrors { get; } = new List<QueryValidationError>();
     public string Message
@@ -103,12 +103,12 @@ public class QueryValidationError
 
 public class QueryValidationException : Exception
 {
-    public QueryValidationException(string message, QueryValidationResult result = null,
-        Exception inner = null) : base(message, inner)
+    public QueryValidationException(string message, QueryValidationResult? result = null,
+        Exception? inner = null) : base(message, inner)
     {
         Result = result;
     }
 
-    public QueryValidationResult Result { get; }
-    public ICollection<QueryValidationError> Errors => Result.ValidationErrors;
+    public QueryValidationResult? Result { get; }
+    public ICollection<QueryValidationError>? Errors => Result?.ValidationErrors;
 }

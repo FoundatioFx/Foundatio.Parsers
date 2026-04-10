@@ -180,7 +180,7 @@ public class QueryParserValidationTests : TestWithLoggingBase
         IQueryNode result;
         try
         {
-            result = await parser.ParseAsync(query);
+            result = (await parser.ParseAsync(query))!;
         }
         catch (FormatException ex)
         {
@@ -230,7 +230,7 @@ public class QueryParserValidationTests : TestWithLoggingBase
         try
         {
             _logger.LogInformation("Attempting: {Escaped}", escaped);
-            var result = await parser.ParseAsync(query);
+            var result = (await parser.ParseAsync(query))!;
 
             _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);

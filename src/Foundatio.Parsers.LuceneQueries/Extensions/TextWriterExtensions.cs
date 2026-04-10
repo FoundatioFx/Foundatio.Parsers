@@ -4,7 +4,7 @@ namespace Foundatio.Parsers.LuceneQueries.Extensions;
 
 public static class TextWriterExtensions
 {
-    public static void WriteIf(this TextWriter writer, bool condition, string content, params object[] arguments)
+    public static void WriteIf(this TextWriter writer, bool condition, string content, params object?[] arguments)
     {
         if (!condition)
             return;
@@ -15,7 +15,7 @@ public static class TextWriterExtensions
             writer.Write(content);
     }
 
-    public static void WriteLineIf(this TextWriter writer, bool condition, string content, params object[] arguments)
+    public static void WriteLineIf(this TextWriter writer, bool condition, string content, params object?[] arguments)
     {
         if (!condition)
             return;

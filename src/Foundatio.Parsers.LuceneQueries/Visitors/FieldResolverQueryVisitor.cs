@@ -8,9 +8,9 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
 public class FieldResolverQueryVisitor : ChainableQueryVisitor
 {
-    private readonly QueryFieldResolver _globalResolver;
+    private readonly QueryFieldResolver? _globalResolver;
 
-    public FieldResolverQueryVisitor(QueryFieldResolver globalResolver = null)
+    public FieldResolverQueryVisitor(QueryFieldResolver? globalResolver = null)
     {
         _globalResolver = globalResolver;
     }
@@ -52,7 +52,7 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
 
         try
         {
-            string resolvedField = null;
+            string? resolvedField = null;
             if (contextResolver != null)
                 resolvedField = await contextResolver(node.Field, context).ConfigureAwait(false);
             if (resolvedField == null && _globalResolver != null)
@@ -86,82 +86,82 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
         return node;
     }
 
-    public static Task<IQueryNode> RunAsync(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver context = null)
+    public static Task<IQueryNode> RunAsync(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         context ??= new QueryVisitorContext();
         context.SetFieldResolver(resolver);
         return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
-    public static Task<IQueryNode> RunAsync(IQueryNode node, Func<string, string> resolver, IQueryVisitorContextWithFieldResolver context = null)
+    public static Task<IQueryNode> RunAsync(IQueryNode node, Func<string, string> resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         context ??= new QueryVisitorContext();
-        context.SetFieldResolver((field, _) => Task.FromResult(resolver(field)));
+        context.SetFieldResolver((field, _) => Task.FromResult<string?>(resolver(field)));
         return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
-    public static IQueryNode Run(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver context = null)
+    public static IQueryNode Run(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         return RunAsync(node, resolver, context).GetAwaiter().GetResult();
     }
 
-    public static IQueryNode Run(IQueryNode node, Func<string, string> resolver, IQueryVisitorContextWithFieldResolver context = null)
+    public static IQueryNode Run(IQueryNode node, Func<string, string> resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         return RunAsync(node, resolver, context).GetAwaiter().GetResult();
     }
 
-    public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver context = null)
+    public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver? context = null)
     {
         context ??= new QueryVisitorContext();
         context.SetFieldResolver(map.ToHierarchicalFieldResolver());
         return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
-    public static IQueryNode Run(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver context = null)
+    public static IQueryNode Run(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver? context = null)
     {
         return RunAsync(node, map, context).GetAwaiter().GetResult();
     }
 }
 
-public delegate Task<string> QueryFieldResolver(string field, IQueryVisitorContext context);
+public delegate Task<string?> QueryFieldResolver(string field, IQueryVisitorContext context);
 
 public class FieldMap : Dictionary<string, string> { }
 
 public static class FieldMapExtensions
 {
-    public static string GetValueOrNull(this IDictionary<string, string> map, string field)
+    public static string? GetValueOrNull(this IDictionary<string, string> map, string? field)
     {
         if (map == null || field == null)
             return null;
 
-        if (map.TryGetValue(field, out string value))
+        if (map.TryGetValue(field, out string? value))
             return value;
 
         return null;
     }
 
-    public static QueryFieldResolver ToHierarchicalFieldResolver(this IDictionary<string, string> map, string resultPrefix = null)
+    public static QueryFieldResolver ToHierarchicalFieldResolver(this IDictionary<string, string> map, string? resultPrefix = null)
     {
         return (field, _) =>
         {
             if (field == null)
-                return null;
+                return Task.FromResult<string?>(null);
 
-            if (map.TryGetValue(field, out string result))
-                return Task.FromResult($"{resultPrefix}{result}");
+            if (map.TryGetValue(field, out string? result))
+                return Task.FromResult<string?>($"{resultPrefix}{result}");
 
             // start at the longest path and go backwards until we find a match in the map
             int currentPart = field.LastIndexOf('.');
             while (currentPart > 0)
             {
                 string currentName = field.Substring(0, currentPart);
-                if (map.TryGetValue(currentName, out string currentResult))
-                    return Task.FromResult($"{resultPrefix}{currentResult}{field.Substring(currentPart)}");
+                if (map.TryGetValue(currentName, out string? currentResult))
+                    return Task.FromResult<string?>($"{resultPrefix}{currentResult}{field.Substring(currentPart)}");
 
                 currentPart = field.LastIndexOf('.', currentPart - 1);
             }
 
-            return Task.FromResult(field);
+            return Task.FromResult<string?>(field);
         };
     }
 }

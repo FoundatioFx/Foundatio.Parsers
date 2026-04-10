@@ -7,8 +7,8 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes;
 
 public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode
 {
-    private IQueryNode _left;
-    public IQueryNode Left
+    private IQueryNode? _left;
+    public IQueryNode? Left
     {
         get => _left;
         set
@@ -19,8 +19,8 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode
         }
     }
 
-    private IQueryNode _right;
-    public IQueryNode Right
+    private IQueryNode? _right;
+    public IQueryNode? Right
     {
         get => _right;
         set
@@ -33,14 +33,14 @@ public class GroupNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode
 
     public GroupOperator Operator { get; set; } = GroupOperator.Default;
     public bool HasParens { get; set; }
-    public string Field { get; set; }
-    public string UnescapedField => Field?.Unescape();
+    public string? Field { get; set; }
+    public string? UnescapedField => Field?.Unescape();
     public bool? IsNegated { get; set; }
-    public string Prefix { get; set; }
-    public string Boost { get; set; }
-    public string UnescapedBoost => Boost?.Unescape();
-    public string Proximity { get; set; }
-    public string UnescapedProximity => Proximity?.Unescape();
+    public string? Prefix { get; set; }
+    public string? Boost { get; set; }
+    public string? UnescapedBoost => Boost?.Unescape();
+    public string? Proximity { get; set; }
+    public string? UnescapedProximity => Proximity?.Unescape();
 
     public GroupNode CopyTo(GroupNode target)
     {

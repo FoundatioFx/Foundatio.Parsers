@@ -135,12 +135,12 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string>
         return _builder.ToString();
     }
 
-    public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        return new DebugQueryVisitor().AcceptAsync(node, context);
+        return new DebugQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext());
     }
 
-    public static string Run(IQueryNode node, IQueryVisitorContext context = null)
+    public static string Run(IQueryNode node, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }

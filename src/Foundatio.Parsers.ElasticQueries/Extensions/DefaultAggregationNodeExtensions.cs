@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Exceptionless.DateTimeExtensions;
@@ -16,9 +16,9 @@ public static class DefaultAggregationNodeExtensions
     // NOTE: We may want to read this dynamically from server settings.
     public const int MAX_BUCKET_SIZE = 10000;
 
-    public static async Task<AggregationBase> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static async Task<AggregationBase?> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
     {
-        AggregationBase aggregation = null;
+        AggregationBase? aggregation = null;
         if (node is GroupNode groupNode)
             aggregation = await groupNode.GetDefaultAggregationAsync(context);
 
@@ -46,7 +46,7 @@ public static class DefaultAggregationNodeExtensions
         return aggregation;
     }
 
-    public static async Task<AggregationBase> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context)
+    public static async Task<AggregationBase?> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -54,9 +54,12 @@ public static class DefaultAggregationNodeExtensions
         if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left != null)
             return null;
 
-        string field = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        string? field = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        if (field is null)
+            return null;
+
         var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
-        string originalField = node.GetOriginalField().Unescape();
+        string originalField = node.GetOriginalField()?.Unescape() ?? String.Empty;
 
         switch (node.GetOperationType())
         {
@@ -75,6 +78,7 @@ public static class DefaultAggregationNodeExtensions
                 {
                     Field = field,
                     Precision = precision,
+#pragma warning disable CS8625 // Field is null because these aggregations use Script instead
                     Aggregations = new AverageAggregation("avg_lat", null)
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lat")
@@ -82,6 +86,7 @@ public static class DefaultAggregationNodeExtensions
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lon")
                     }
+#pragma warning restore CS8625
                 };
 
             case AggregationType.Terms:
@@ -90,11 +95,11 @@ public static class DefaultAggregationNodeExtensions
                     Field = field,
                     Size = node.GetProximityAsInt32(),
                     MinimumDocumentCount = node.GetBoostAsInt32(),
-                    Meta = new Dictionary<string, object> { { "@field_type", property?.Type } }
+                    Meta = property?.Type is not null ? new Dictionary<string, object> { { "@field_type", property.Type } } : null
                 };
 
                 if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
-                    agg.ShardSize = Math.Max((int)agg.Size, MAX_BUCKET_SIZE);
+                    agg.ShardSize = Math.Max(agg.Size.Value, MAX_BUCKET_SIZE);
 
                 return agg;
 
@@ -105,35 +110,38 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    public static async Task<AggregationBase> GetDefaultAggregationAsync(this TermNode node, IQueryVisitorContext context)
+    public static async Task<AggregationBase?> GetDefaultAggregationAsync(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        string aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        string? aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        if (aggField is null)
+            return null;
+
         var property = elasticContext.MappingResolver.GetMappingProperty(node.UnescapedField, true);
-        string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync());
-        string originalField = node.GetOriginalField().Unescape();
+        string? timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync());
+        string originalField = node.GetOriginalField()?.Unescape() ?? String.Empty;
 
         switch (node.GetOperationType())
         {
             case AggregationType.Min:
-                return new MinAggregation("min_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
+                return new MinAggregation("min_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = BuildFieldTypeMeta(property?.Type, timezone) };
 
             case AggregationType.Max:
-                return new MaxAggregation("max_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type }, { "@timezone", timezone } } };
+                return new MaxAggregation("max_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = BuildFieldTypeMeta(property?.Type, timezone) };
 
             case AggregationType.Avg:
-                return new AverageAggregation("avg_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                return new AverageAggregation("avg_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = BuildFieldTypeMeta(property?.Type) };
 
             case AggregationType.Sum:
-                return new SumAggregation("sum_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                return new SumAggregation("sum_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = BuildFieldTypeMeta(property?.Type) };
 
             case AggregationType.Stats:
-                return new StatsAggregation("stats_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                return new StatsAggregation("stats_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = BuildFieldTypeMeta(property?.Type) };
 
             case AggregationType.ExtendedStats:
-                return new ExtendedStatsAggregation("exstats_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = new Dictionary<string, object> { { "@field_type", property?.Type } } };
+                return new ExtendedStatsAggregation("exstats_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), Meta = BuildFieldTypeMeta(property?.Type) };
 
             case AggregationType.Cardinality:
                 return new CardinalityAggregation("cardinality_" + originalField, aggField) { Missing = node.GetProximityAsDouble(), PrecisionThreshold = node.GetBoostAsInt32() };
@@ -162,6 +170,7 @@ public static class DefaultAggregationNodeExtensions
                 {
                     Field = aggField,
                     Precision = precision,
+#pragma warning disable CS8625 // Field is null because these aggregations use Script instead
                     Aggregations = new AverageAggregation("avg_lat", null)
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lat")
@@ -169,6 +178,7 @@ public static class DefaultAggregationNodeExtensions
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lon")
                     }
+#pragma warning restore CS8625
                 };
 
             case AggregationType.Terms:
@@ -177,11 +187,11 @@ public static class DefaultAggregationNodeExtensions
                     Field = aggField,
                     Size = node.GetProximityAsInt32(),
                     MinimumDocumentCount = node.GetBoostAsInt32(),
-                    Meta = new Dictionary<string, object> { { "@field_type", property?.Type } }
+                    Meta = property?.Type is not null ? new Dictionary<string, object> { { "@field_type", property.Type } } : null
                 };
 
                 if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
-                    agg.ShardSize = Math.Max((int)agg.Size, MAX_BUCKET_SIZE);
+                    agg.ShardSize = Math.Max(agg.Size.Value, MAX_BUCKET_SIZE);
 
                 return agg;
         }
@@ -189,9 +199,23 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    private static AggregationBase GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static Dictionary<string, object>? BuildFieldTypeMeta(string? fieldType, string? timezone = null)
     {
-        List<double> percents = null;
+        if (fieldType is null && timezone is null)
+            return null;
+
+        var meta = new Dictionary<string, object>();
+        if (fieldType is not null)
+            meta["@field_type"] = fieldType;
+        if (timezone is not null)
+            meta["@timezone"] = timezone;
+
+        return meta;
+    }
+
+    private static AggregationBase GetPercentilesAggregation(string originalField, string field, string? proximity, string? boost, IQueryVisitorContext context)
+    {
+        List<double>? percents = null;
         if (!String.IsNullOrWhiteSpace(proximity))
         {
             string[] percentStrings = proximity.Split(',');
@@ -209,7 +233,7 @@ public static class DefaultAggregationNodeExtensions
         };
     }
 
-    private static AggregationBase GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static AggregationBase GetHistogramAggregation(string originalField, string field, string? proximity, string? boost, IQueryVisitorContext context)
     {
         double interval = 50;
         if (Double.TryParse(proximity, out double prox))
@@ -223,16 +247,16 @@ public static class DefaultAggregationNodeExtensions
         };
     }
 
-    private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static AggregationBase GetDateHistogramAggregation(string originalField, string field, string? proximity, string? boost, IQueryVisitorContext context)
     {
         // NOTE: StartDate and EndDate are set in the Repositories QueryBuilderContext.
         var start = context.GetDate("StartDate");
         var end = context.GetDate("EndDate");
         bool isValidRange = start.HasValue && start.Value > DateTime.MinValue && end.HasValue && end.Value < DateTime.MaxValue && start.Value <= end.Value;
-        var bounds = isValidRange ? new ExtendedBounds<DateMath> { Minimum = start.Value, Maximum = end.Value } : null;
+        var bounds = isValidRange ? new ExtendedBounds<DateMath> { Minimum = start!.Value, Maximum = end!.Value } : null;
 
         var interval = GetInterval(proximity, start, end);
-        string timezone = TryConvertTimeUnitToUtcOffset(boost);
+        string? timezone = TryConvertTimeUnitToUtcOffset(boost);
         var agg = new DateHistogramAggregation(originalField)
         {
             Field = field,
@@ -247,7 +271,7 @@ public static class DefaultAggregationNodeExtensions
         return agg;
     }
 
-    private static string TryConvertTimeUnitToUtcOffset(string boost)
+    private static string? TryConvertTimeUnitToUtcOffset(string? boost)
     {
         if (String.IsNullOrEmpty(boost))
             return null;
@@ -267,7 +291,7 @@ public static class DefaultAggregationNodeExtensions
         return "+" + timezoneOffset.Value.ToString("hh\\:mm");
     }
 
-    private static Union<DateInterval, Time> GetInterval(string proximity, DateTime? start, DateTime? end)
+    private static Union<DateInterval, Time> GetInterval(string? proximity, DateTime? start, DateTime? end)
     {
         if (String.IsNullOrEmpty(proximity))
             return GetInterval(start, end);
@@ -370,7 +394,7 @@ public static class DefaultAggregationNodeExtensions
                     }
                     else
                     {
-                        termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm);
+                        termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm!);
                     }
                     break;
                 case "@include":
@@ -380,7 +404,7 @@ public static class DefaultAggregationNodeExtensions
                     }
                     else
                     {
-                        termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm);
+                        termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm!);
                     }
                     break;
                 case "@missing":

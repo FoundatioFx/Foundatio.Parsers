@@ -9,7 +9,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
 public class InvertQueryVisitor : ChainableMutatingQueryVisitor
 {
-    public InvertQueryVisitor(IEnumerable<string> nonInvertedFields = null)
+    public InvertQueryVisitor(IEnumerable<string>? nonInvertedFields = null)
     {
         if (nonInvertedFields != null)
             NonInvertedFields.AddRange(nonInvertedFields);
@@ -30,7 +30,7 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
         if (onlyInvertedFields)
         {
             // invert, don't visit children
-            node = node.InvertNegation() as GroupNode;
+            node = (node.InvertNegation() as GroupNode)!;
 
             var alternateInvertedCriteria = context.GetAlternateInvertedCriteria();
             if (alternateInvertedCriteria != null)
@@ -80,13 +80,13 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
         return node.AcceptAsync(this, context);
     }
 
-    public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null)
+    public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
     {
-        var result = await new InvertQueryVisitor(nonInvertedFields).AcceptAsync(node, context);
+        var result = await new InvertQueryVisitor(nonInvertedFields).AcceptAsync(node, context ?? new QueryVisitorContext());
         return result.ToString();
     }
 
-    public static string Run(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null)
+    public static string Run(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, nonInvertedFields, context).GetAwaiter().GetResult();
     }

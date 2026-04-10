@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -99,12 +99,12 @@ public class InvertQueryVisitorTests : TestWithLoggingBase
     [InlineData("noninvertedfield1:value field1:value field2:value field3:value", "noninvertedfield1:value (is_deleted:true OR (NOT (field1:value field2:value field3:value)))", "is_deleted:true")]
     [InlineData("noninvertedfield1:123 (status:open OR status:regressed) noninvertedfield1:234", "noninvertedfield1:123 (NOT (status:open OR status:regressed)) noninvertedfield1:234")]
     [InlineData("first_occurrence:[1609459200000 TO 1609730450521] (noninvertedfield1:537650f3b77efe23a47914f4 (status:open OR status:regressed))", "(NOT first_occurrence:[1609459200000 TO 1609730450521]) (noninvertedfield1:537650f3b77efe23a47914f4 (NOT (status:open OR status:regressed)))")]
-    public Task CanInvertQuery(string query, string expected, string alternateInvertedCriteria = null)
+    public Task CanInvertQuery(string query, string expected, string? alternateInvertedCriteria = null)
     {
         return InvertAndValidateQuery(query, expected, alternateInvertedCriteria, true);
     }
 
-    private async Task InvertAndValidateQuery(string query, string expected, string alternateInvertedCriteria, bool isValid)
+    private async Task InvertAndValidateQuery(string query, string expected, string? alternateInvertedCriteria, bool isValid)
     {
 #if ENABLE_TRACING
             var tracer = new LoggingTracer(_logger, reportPerformance: true);
@@ -116,7 +116,7 @@ public class InvertQueryVisitorTests : TestWithLoggingBase
             Tracer = tracer
         };
 
-        IQueryNode result;
+        IQueryNode? result;
         try
         {
             result = await parser.ParseAsync(query);
@@ -133,10 +133,10 @@ public class InvertQueryVisitorTests : TestWithLoggingBase
         if (!String.IsNullOrWhiteSpace(alternateInvertedCriteria))
         {
             var invertedAlternate = await parser.ParseAsync(alternateInvertedCriteria);
-            context.SetAlternateInvertedCriteria(invertedAlternate);
+            context.SetAlternateInvertedCriteria(invertedAlternate!);
         }
 
-        result = await invertQueryVisitor.AcceptAsync(result, context);
+        result = await invertQueryVisitor.AcceptAsync(result!, context);
         string invertedQuery = result.ToString();
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation("{Result}", nodes);
