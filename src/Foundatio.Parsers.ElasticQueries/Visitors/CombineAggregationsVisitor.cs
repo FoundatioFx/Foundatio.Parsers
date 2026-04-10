@@ -194,7 +194,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         if (container is null)
         {
-            container = new GlobalAggregation("root");
+            container = new ChildrenAggregation(null, null);
             currentNode!.SetAggregation(container);
         }
 
