@@ -62,7 +62,7 @@ public static class DefaultQueryNodeExtensions
         }
 
         // Fallback for no fields
-        return GetMultiFieldQuery(node, defaultFields!, elasticContext);
+        return GetMultiFieldQuery(node, defaultFields, elasticContext);
     }
 
     private static QueryBase GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
@@ -131,7 +131,7 @@ public static class DefaultQueryNodeExtensions
         };
     }
 
-    private static QueryBase GetMultiFieldQuery(TermNode node, string[] fields, IElasticQueryVisitorContext context)
+    private static QueryBase GetMultiFieldQuery(TermNode node, string[]? fields, IElasticQueryVisitorContext context)
     {
         // Handle null or empty fields - use default multi_match behavior
         if (fields is null or { Length: 0 })
