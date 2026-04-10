@@ -22,7 +22,7 @@ public class QueryValidationOptions
 [DebuggerDisplay("IsValid: {IsValid} Message: {Message} Type: {QueryType}")]
 public class QueryValidationResult
 {
-    private ConcurrentDictionary<string, ICollection<string>> _operations = new(StringComparer.OrdinalIgnoreCase);
+    private ConcurrentDictionary<string, ICollection<string?>> _operations = new(StringComparer.OrdinalIgnoreCase);
 
     public string? QueryType { get; set; }
     public bool IsValid => ValidationErrors.Count == 0;
@@ -45,7 +45,7 @@ public class QueryValidationResult
     public ICollection<string> UnresolvedFields { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public ICollection<string> UnresolvedIncludes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public int MaxNodeDepth { get; set; } = 1;
-    public IDictionary<string, ICollection<string>> Operations => _operations;
+    public IDictionary<string, ICollection<string?>> Operations => _operations;
 
     public static implicit operator bool(QueryValidationResult info) => info.IsValid;
 
@@ -61,10 +61,10 @@ public class QueryValidationResult
         }
     }
 
-    internal void AddOperation(string operation, string field)
+    internal void AddOperation(string operation, string? field)
     {
         _operations.AddOrUpdate(operation,
-            _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { field },
+            _ => new HashSet<string?>(StringComparer.OrdinalIgnoreCase) { field },
             (_, collection) =>
             {
                 collection.Add(field);

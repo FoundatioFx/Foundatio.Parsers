@@ -497,40 +497,40 @@ public class AggregationParserTests : ElasticsearchTestBase
 
     public static IEnumerable<object[]> AggregationTestCases =>
     [
-        [null!, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>()],
-        [String.Empty, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>()],
+        [null!, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string?>>()],
+        [String.Empty, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string?>>()],
         ["avg",
             false,
             1,
             new HashSet<string> { "" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { null! } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { null } } }
         ],
-        ["avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>()],
+        ["avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string?>>()],
         [
             "avg:value",
             true,
             1,
             new HashSet<string> { "value" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { "value" } } }
         ],
         [
             "    avg    :    value",
             true,
             1,
             new HashSet<string> { "value" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { "value" } } }
         ],
         [
             "avg:value cardinality:value sum:value min:value max:value",
             true,
             1,
             new HashSet<string> { "value" },
-            new Dictionary<string, ICollection<string>> {
-                    { "avg", new HashSet<string> { "value" } },
-                    { "cardinality", new HashSet<string> { "value" } },
-                    { "sum", new HashSet<string> { "value" } },
-                    { "min", new HashSet<string> { "value" } },
-                    { "max", new HashSet<string> { "value" } }
+            new Dictionary<string, ICollection<string?>> {
+                    { "avg", new HashSet<string?> { "value" } },
+                    { "cardinality", new HashSet<string?> { "value" } },
+                    { "sum", new HashSet<string?> { "value" } },
+                    { "min", new HashSet<string?> { "value" } },
+                    { "max", new HashSet<string?> { "value" } }
                 }
         ],
         [
@@ -538,26 +538,26 @@ public class AggregationParserTests : ElasticsearchTestBase
             true,
             1,
             new HashSet<string> { "value", "value2" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value", "value2" } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { "value", "value2" } } }
         ],
         [
             "avg:value avg:value",
             true,
             1,
             new HashSet<string> { "value" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { "value" } } }
         ]
     ];
 
     [Theory]
     [MemberData(nameof(AggregationTestCases))]
-    public Task GetElasticAggregationQueryInfoAsync(string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations)
+    public Task GetElasticAggregationQueryInfoAsync(string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string?>> operations)
     {
         var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         return GetAggregationQueryInfoAsync(parser, query, isValid, maxNodeDepth, fields, operations);
     }
 
-    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth = -1, HashSet<string>? fields = null, Dictionary<string, ICollection<string>>? operations = null)
+    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth = -1, HashSet<string>? fields = null, Dictionary<string, ICollection<string?>>? operations = null)
     {
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var queryNode = await parser.ParseAsync(query, context);

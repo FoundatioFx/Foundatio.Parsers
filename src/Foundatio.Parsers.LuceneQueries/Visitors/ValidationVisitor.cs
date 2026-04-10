@@ -86,7 +86,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         if (String.IsNullOrEmpty(operation))
             return;
 
-        info.AddOperation(operation, field ?? "");
+        info.AddOperation(operation, field);
     }
 
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
