@@ -78,10 +78,10 @@ public static class DefaultAggregationNodeExtensions
                 {
                     Field = field,
                     Precision = precision,
-                    Aggregations = new AverageAggregation("avg_lat", new Field("_script"))
+                    Aggregations = new AverageAggregation("avg_lat", null!)
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lat")
-                    } && new AverageAggregation("avg_lon", new Field("_script"))
+                    } && new AverageAggregation("avg_lon", null!)
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lon")
                     }
@@ -168,10 +168,10 @@ public static class DefaultAggregationNodeExtensions
                 {
                     Field = aggField,
                     Precision = precision,
-                    Aggregations = new AverageAggregation("avg_lat", new Field("_script"))
+                    Aggregations = new AverageAggregation("avg_lat", null!)
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lat")
-                    } && new AverageAggregation("avg_lon", new Field("_script"))
+                    } && new AverageAggregation("avg_lon", null!)
                     {
                         Script = new InlineScript($"doc['{node.Field}'].lon")
                     }
