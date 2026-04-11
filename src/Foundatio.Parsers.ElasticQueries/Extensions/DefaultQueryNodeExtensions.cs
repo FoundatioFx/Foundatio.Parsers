@@ -316,7 +316,7 @@ public static class DefaultQueryNodeExtensions
         string? field = node.UnescapedField;
         if (elasticContext.MappingResolver.IsDatePropertyType(field))
         {
-            var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()) };
+            var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().ConfigureAwait(false)) };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
