@@ -59,7 +59,7 @@ public static class DefaultAggregationNodeExtensions
             return null;
 
         var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
-        string originalField = node.GetOriginalField()?.Unescape() ?? String.Empty;
+        string originalField = node.GetOriginalField()?.Unescape() ?? node.UnescapedField ?? String.Empty;
 
         switch (node.GetOperationType())
         {
@@ -93,7 +93,7 @@ public static class DefaultAggregationNodeExtensions
                     Field = field,
                     Size = node.GetProximityAsInt32(),
                     MinimumDocumentCount = node.GetBoostAsInt32(),
-                    Meta = property?.Type is not null ? new Dictionary<string, object> { { "@field_type", property.Type } } : null
+                    Meta = new Dictionary<string, object> { { "@field_type", property?.Type! } }
                 };
 
                 if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
@@ -119,7 +119,7 @@ public static class DefaultAggregationNodeExtensions
 
         var property = elasticContext.MappingResolver.GetMappingProperty(node.UnescapedField, true);
         string? timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync());
-        string originalField = node.GetOriginalField()?.Unescape() ?? String.Empty;
+        string originalField = node.GetOriginalField()?.Unescape() ?? node.UnescapedField ?? String.Empty;
 
         switch (node.GetOperationType())
         {
@@ -183,7 +183,7 @@ public static class DefaultAggregationNodeExtensions
                     Field = aggField,
                     Size = node.GetProximityAsInt32(),
                     MinimumDocumentCount = node.GetBoostAsInt32(),
-                    Meta = property?.Type is not null ? new Dictionary<string, object> { { "@field_type", property.Type } } : null
+                    Meta = new Dictionary<string, object> { { "@field_type", property?.Type! } }
                 };
 
                 if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
