@@ -130,6 +130,7 @@ public class CleanupQueryVisitor : ChainableQueryVisitor
 
     public static async Task<string?> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
+        context ??= new QueryVisitorContext();
         var result = await new CleanupQueryVisitor().AcceptAsync(node, context).ConfigureAwait(false);
         return result?.ToString();
     }

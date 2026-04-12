@@ -130,14 +130,15 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string>
         _writer.Indent--;
     }
 
-    public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
+    public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        await node.AcceptAsync(this, context ?? new QueryVisitorContext { DefaultOperator = GroupOperator.Default });
+        await node.AcceptAsync(this, context);
         return _builder.ToString();
     }
 
     public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
+        context ??= new QueryVisitorContext { DefaultOperator = GroupOperator.Default };
         return new DebugQueryVisitor().AcceptAsync(node, context);
     }
 

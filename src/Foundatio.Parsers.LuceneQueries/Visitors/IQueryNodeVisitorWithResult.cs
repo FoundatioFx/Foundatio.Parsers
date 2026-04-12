@@ -15,5 +15,5 @@ public interface IQueryNodeVisitorWithResult<T> : IQueryNodeVisitor
     /// <param name="node">The root node to start traversal from.</param>
     /// <param name="context">The visitor context containing traversal state.</param>
     /// <returns>The result of visiting the AST.</returns>
-    Task<T> AcceptAsync(IQueryNode node, IQueryVisitorContext? context);
+    Task<T> AcceptAsync(IQueryNode node, IQueryVisitorContext context);
 }

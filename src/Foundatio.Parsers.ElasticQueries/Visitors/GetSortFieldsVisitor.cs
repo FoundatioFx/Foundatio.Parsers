@@ -24,14 +24,15 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<I
         _fields.Add(sort);
     }
 
-    public override async Task<IEnumerable<IFieldSort>> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
+    public override async Task<IEnumerable<IFieldSort>> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        await node.AcceptAsync(this, context ?? new QueryVisitorContext()).ConfigureAwait(false);
+        await node.AcceptAsync(this, context).ConfigureAwait(false);
         return _fields;
     }
 
     public static Task<IEnumerable<IFieldSort>> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
+        context ??= new QueryVisitorContext();
         return new GetSortFieldsVisitor().AcceptAsync(node, context);
     }
 
