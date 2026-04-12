@@ -77,7 +77,7 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
 
     public override Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        return node.AcceptAsync(this, context!);
+        return node.AcceptAsync(this, context ?? new QueryVisitorContext());
     }
 
     public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)

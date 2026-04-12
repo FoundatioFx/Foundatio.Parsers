@@ -78,7 +78,10 @@ public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode?>, 
     public override async Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
         if (_isDirty)
+        {
             _frozenVisitors = _visitors.OrderBy(v => v.Priority).ToArray();
+            _isDirty = false;
+        }
 
         IQueryNode? current = node;
         foreach (var visitor in _frozenVisitors!)

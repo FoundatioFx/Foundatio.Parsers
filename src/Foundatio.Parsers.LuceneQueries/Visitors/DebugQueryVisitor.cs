@@ -132,7 +132,7 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        await node.AcceptAsync(this, context!);
+        await node.AcceptAsync(this, context ?? new QueryVisitorContext { DefaultOperator = GroupOperator.Default });
         return _builder.ToString();
     }
 
