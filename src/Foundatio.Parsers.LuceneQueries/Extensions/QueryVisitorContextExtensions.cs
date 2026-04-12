@@ -15,7 +15,7 @@ public static class QueryVisitorContextExtensions
         return resolverContext?.FieldResolver;
     }
 
-    public static T SetFieldResolver<T>(this T context, Func<string, string> resolver) where T : IQueryVisitorContext
+    public static T SetFieldResolver<T>(this T context, Func<string, string?> resolver) where T : IQueryVisitorContext
     {
         if (context is not IQueryVisitorContextWithFieldResolver resolverContext)
             throw new ArgumentException("Context must be of type IQueryVisitorContextWithFieldResolver", nameof(context));

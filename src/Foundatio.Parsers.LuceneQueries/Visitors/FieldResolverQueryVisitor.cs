@@ -94,7 +94,7 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
         return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
-    public static Task<IQueryNode> RunAsync(IQueryNode node, Func<string, string> resolver, IQueryVisitorContextWithFieldResolver? context = null)
+    public static Task<IQueryNode> RunAsync(IQueryNode node, Func<string, string?> resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         context ??= new QueryVisitorContext();
         context.SetFieldResolver((field, _) => Task.FromResult<string?>(resolver(field)));
@@ -106,7 +106,7 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
         return RunAsync(node, resolver, context).GetAwaiter().GetResult();
     }
 
-    public static IQueryNode Run(IQueryNode node, Func<string, string> resolver, IQueryVisitorContextWithFieldResolver? context = null)
+    public static IQueryNode Run(IQueryNode node, Func<string, string?> resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         return RunAsync(node, resolver, context).GetAwaiter().GetResult();
     }

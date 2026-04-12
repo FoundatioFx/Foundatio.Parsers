@@ -90,7 +90,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
         return RunAsync(node, includeResolver, context, shouldSkipInclude).GetAwaiter().GetResult();
     }
 
-    public static IQueryNode Run(IQueryNode node, Func<string, string> includeResolver, IQueryVisitorContextWithIncludeResolver? context = null, ShouldSkipIncludeFunc? shouldSkipInclude = null)
+    public static IQueryNode Run(IQueryNode node, Func<string, string?> includeResolver, IQueryVisitorContextWithIncludeResolver? context = null, ShouldSkipIncludeFunc? shouldSkipInclude = null)
     {
         return RunAsync(node, name => Task.FromResult<string?>(includeResolver(name)), context, shouldSkipInclude).GetAwaiter().GetResult();
     }
