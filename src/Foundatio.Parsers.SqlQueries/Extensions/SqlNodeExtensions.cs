@@ -194,7 +194,7 @@ public static class SqlNodeExtensions
 
                         builder.Append(scopePrefix);
 
-                        if (context.FullTextFields.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase))
+                        if (context.FullTextFields?.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase) is true)
                         {
                             builder.Append("FTS.Contains(");
                             builder.Append(argumentPrefix);
@@ -224,7 +224,7 @@ public static class SqlNodeExtensions
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(scopePrefix);
 
-                        if (context.FullTextFields.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase))
+                        if (context.FullTextFields?.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase) is true)
                         {
                             builder.Append("FTS.Contains(");
                             builder.Append(argumentPrefix);
@@ -280,7 +280,7 @@ public static class SqlNodeExtensions
         {
             builder.Append(scopePrefix);
 
-            if (context.FullTextFields.Contains(field.FullName, StringComparer.OrdinalIgnoreCase))
+            if (context.FullTextFields?.Contains(field.FullName, StringComparer.OrdinalIgnoreCase) is true)
             {
                 builder.Append("FTS.Contains(");
                 builder.Append(argumentPrefix);
@@ -304,7 +304,7 @@ public static class SqlNodeExtensions
         {
             builder.Append(scopePrefix);
 
-            if (context.FullTextFields.Contains(field.FullName, StringComparer.OrdinalIgnoreCase))
+            if (context.FullTextFields?.Contains(field.FullName, StringComparer.OrdinalIgnoreCase) is true)
             {
                 builder.Append("FTS.Contains(");
                 builder.Append(argumentPrefix);
