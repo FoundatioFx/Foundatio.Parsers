@@ -274,7 +274,7 @@ public static class QueryNodeExtensions
                 if (defaultFields == null || defaultFields.Length == 0)
                     fields.Add("");
                 else
-                    foreach (string defaultField in fields)
+                    foreach (string defaultField in defaultFields)
                         fields.Add(defaultField);
             }
         }

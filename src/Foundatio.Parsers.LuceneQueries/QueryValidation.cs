@@ -64,13 +64,28 @@ public class QueryValidationResult
     internal void AddOperation(string operation, string? field)
     {
         _operations.AddOrUpdate(operation,
-            _ => new HashSet<string?>(StringComparer.OrdinalIgnoreCase) { field },
+            _ => new HashSet<string?>(NullSafeOrdinalIgnoreCaseComparer.Instance) { field },
             (_, collection) =>
             {
                 collection.Add(field);
                 return collection;
             }
         );
+    }
+
+    private sealed class NullSafeOrdinalIgnoreCaseComparer : IEqualityComparer<string?>
+    {
+        public static readonly NullSafeOrdinalIgnoreCaseComparer Instance = new();
+
+        public bool Equals(string? x, string? y)
+        {
+            if (x is null && y is null) return true;
+            if (x is null || y is null) return false;
+            return StringComparer.OrdinalIgnoreCase.Equals(x, y);
+        }
+
+        public int GetHashCode(string? obj) =>
+            obj is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(obj);
     }
 }
 
