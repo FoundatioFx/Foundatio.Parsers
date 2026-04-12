@@ -59,7 +59,7 @@ public static class DefaultAggregationNodeExtensions
             return null;
 
         var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
-        string originalField = node.GetOriginalField()?.Unescape() ?? node.UnescapedField ?? String.Empty;
+        string? originalField = node.GetOriginalField()?.Unescape();
 
         switch (node.GetOperationType())
         {
@@ -93,7 +93,7 @@ public static class DefaultAggregationNodeExtensions
                     Field = field,
                     Size = node.GetProximityAsInt32(),
                     MinimumDocumentCount = node.GetBoostAsInt32(),
-                    Meta = new Dictionary<string, object> { { "@field_type", property?.Type! } }
+                    Meta = BuildFieldTypeMeta(property?.Type)
                 };
 
                 if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
@@ -119,7 +119,7 @@ public static class DefaultAggregationNodeExtensions
 
         var property = elasticContext.MappingResolver.GetMappingProperty(node.UnescapedField, true);
         string? timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync());
-        string originalField = node.GetOriginalField()?.Unescape() ?? node.UnescapedField ?? String.Empty;
+        string? originalField = node.GetOriginalField()?.Unescape();
 
         switch (node.GetOperationType())
         {
@@ -183,7 +183,7 @@ public static class DefaultAggregationNodeExtensions
                     Field = aggField,
                     Size = node.GetProximityAsInt32(),
                     MinimumDocumentCount = node.GetBoostAsInt32(),
-                    Meta = new Dictionary<string, object> { { "@field_type", property?.Type! } }
+                    Meta = BuildFieldTypeMeta(property?.Type)
                 };
 
                 if (agg.Size.HasValue && (agg.Size * 1.5 + 10) > MAX_BUCKET_SIZE)
@@ -195,11 +195,8 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    private static Dictionary<string, object>? BuildFieldTypeMeta(string? fieldType, string? timezone = null)
+    private static Dictionary<string, object> BuildFieldTypeMeta(string? fieldType, string? timezone = null)
     {
-        if (fieldType is null && timezone is null)
-            return null;
-
         var meta = new Dictionary<string, object>();
         if (fieldType is not null)
             meta["@field_type"] = fieldType;
@@ -384,23 +381,27 @@ public static class DefaultAggregationNodeExtensions
             switch (termNode?.Field)
             {
                 case "@exclude":
+                    if (termNode.UnescapedTerm is null)
+                        break;
                     if (termNode.IsRegexTerm)
                     {
                         termsAggregation.Exclude = new TermsExclude(termNode.UnescapedTerm);
                     }
                     else
                     {
-                        termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm!);
+                        termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm);
                     }
                     break;
                 case "@include":
+                    if (termNode.UnescapedTerm is null)
+                        break;
                     if (termNode.IsRegexTerm)
                     {
                         termsAggregation.Include = new TermsInclude(termNode.UnescapedTerm);
                     }
                     else
                     {
-                        termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm!);
+                        termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm);
                     }
                     break;
                 case "@missing":

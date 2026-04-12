@@ -96,7 +96,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
 
     public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> includes, IQueryVisitorContextWithIncludeResolver? context = null, ShouldSkipIncludeFunc? shouldSkipInclude = null)
     {
-        return RunAsync(node, name => Task.FromResult<string?>(includes.ContainsKey(name) ? includes[name] : null), context, shouldSkipInclude);
+        return RunAsync(node, name => Task.FromResult<string?>(includes.TryGetValue(name, out var include) ? include : null), context, shouldSkipInclude);
     }
 
     public static IQueryNode Run(IQueryNode node, IDictionary<string, string> includes, IQueryVisitorContextWithIncludeResolver? context = null, ShouldSkipIncludeFunc? shouldSkipInclude = null)

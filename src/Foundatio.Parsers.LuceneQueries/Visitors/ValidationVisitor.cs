@@ -68,7 +68,9 @@ public class ValidationVisitor : ChainableQueryVisitor
             if (node.Field.StartsWith("@"))
                 return;
 
-            validationResult.ReferencedFields.Add(node.GetOriginalField() ?? node.Field ?? "");
+            var originalField = node.GetOriginalField();
+            if (originalField is not null)
+                validationResult.ReferencedFields.Add(originalField);
         }
         else
         {
@@ -89,8 +91,9 @@ public class ValidationVisitor : ChainableQueryVisitor
         info.AddOperation(operation, field);
     }
 
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
+        context ??= new QueryVisitorContext();
         await node.AcceptAsync(this, context).ConfigureAwait(false);
         var validationResult = context.GetValidationResult();
         validationResult.QueryType = context.QueryType;
@@ -110,7 +113,7 @@ public class ValidationVisitor : ChainableQueryVisitor
             var restrictedFields = new List<string>();
             foreach (string field in options.RestrictedFields)
             {
-                string? resolvedField = fieldResolver == null ? field : await fieldResolver(field, context);
+                string? resolvedField = fieldResolver is null ? field : await fieldResolver(field, context);
                 if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField?.Equals(f) == true || field.Equals(f))))
                     restrictedFields.Add(field);
             }

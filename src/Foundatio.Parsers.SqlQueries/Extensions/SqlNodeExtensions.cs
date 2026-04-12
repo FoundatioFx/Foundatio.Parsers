@@ -14,7 +14,7 @@ public static class SqlNodeExtensions
     public static string ToDynamicLinqString(this GroupNode node, ISqlQueryVisitorContext context)
     {
         // support overriding the generated query
-        if (node.TryGetQuery(out var query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         if (node.Left == null && node.Right == null)
@@ -68,7 +68,7 @@ public static class SqlNodeExtensions
             context.AddValidationError("Field is required for exists node queries.");
 
         // support overriding the generated query
-        if (node.TryGetQuery(out var query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
@@ -96,7 +96,7 @@ public static class SqlNodeExtensions
             context.AddValidationError("Prefix is not supported for term range queries.");
 
         // support overriding the generated query
-        if (node.TryGetQuery(out var query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
@@ -119,8 +119,11 @@ public static class SqlNodeExtensions
         if (!String.IsNullOrEmpty(node.Prefix))
             context.AddValidationError("Prefix is not supported for term range queries.");
 
+        if (String.IsNullOrEmpty(node.Term))
+            return String.Empty;
+
         // support overriding the generated query
-        if (node.TryGetQuery(out var query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         var builder = new StringBuilder();
@@ -142,7 +145,7 @@ public static class SqlNodeExtensions
                     searchTerm = new SearchTerm
                     {
                         FieldInfo = fieldInfo,
-                        Term = node.Term!,
+                        Term = node.Term,
                         Operator = context.DefaultSearchOperator
                     };
                     fieldTerms[fieldInfo] = searchTerm;
@@ -150,7 +153,7 @@ public static class SqlNodeExtensions
 
                 context.SearchTokenizer.Invoke(searchTerm);
                 if (searchTerm.Tokens == null)
-                    searchTerm.Tokens = [searchTerm.Term!];
+                    searchTerm.Tokens = [searchTerm.Term];
                 else
                     searchTerm.Tokens = searchTerm.Tokens.Select(t => !String.IsNullOrWhiteSpace(t) ? t : "@__NOMATCH__").ToList();
             }
@@ -256,7 +259,7 @@ public static class SqlNodeExtensions
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
         var (scopePrefix, argumentPrefix) = SplitFieldPrefix(field, fieldPrefix);
         var searchOperator = SqlSearchOperator.Equals;
-        if (node.Term!.StartsWith("*") && node.Term.EndsWith("*"))
+        if (node.Term.StartsWith("*") && node.Term.EndsWith("*"))
             searchOperator = SqlSearchOperator.Contains;
         else if (node.Term.EndsWith("*"))
             searchOperator = SqlSearchOperator.StartsWith;
@@ -335,7 +338,7 @@ public static class SqlNodeExtensions
             context.AddValidationError("Proximity is not supported for term range queries.");
 
         // support overriding the generated query
-        if (node.TryGetQuery(out var query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
@@ -397,13 +400,11 @@ public static class SqlNodeExtensions
 
     public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo>? fields, string? field)
     {
-        field ??= String.Empty;
-
         if (fields is null)
-            return new EntityFieldInfo { Name = field, FullName = field };
+            return new EntityFieldInfo { Name = field ?? String.Empty, FullName = field ?? String.Empty };
 
         return fields.FirstOrDefault(f => f.FullName.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
-               new EntityFieldInfo { Name = field, FullName = field };
+               new EntityFieldInfo { Name = field ?? String.Empty, FullName = field ?? String.Empty };
     }
 
     private static (string scopePrefix, string argumentPrefix) SplitFieldPrefix(EntityFieldInfo field, string fieldPrefix)
@@ -526,8 +527,14 @@ public static class SqlNodeExtensions
 
     public static bool TryGetQuery(this IQueryNode node, [NotNullWhen(true)] out string? query)
     {
+        if (node.Data.TryGetValue(QueryKey, out object? value) && value is string s)
+        {
+            query = s;
+            return true;
+        }
+
         query = null;
-        return node.Data.TryGetValue(QueryKey, out object? value) && (query = value as string) != null;
+        return false;
     }
 
     public static void RemoveQuery(this IQueryNode node)

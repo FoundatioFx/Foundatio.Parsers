@@ -215,14 +215,12 @@ public class ElasticQueryParser : LuceneQueryParser
         return await BuildAggregationsAsync(result, context).ConfigureAwait(false);
     }
 
-#pragma warning disable IDE0060 // Remove unused parameter
     public async Task<AggregationContainer?> BuildAggregationsAsync(IQueryNode? aggregations, IElasticQueryVisitorContext? context = null)
     {
         if (aggregations == null)
             return null;
 
-#pragma warning restore IDE0060 // Remove unused parameter
-        return await aggregations.GetAggregationAsync().ConfigureAwait(false) ?? new AggregationContainer();
+        return await aggregations.GetAggregationAsync().ConfigureAwait(false);
     }
 
     public async Task<QueryValidationResult> ValidateSortAsync(string query, QueryValidationOptions? options = null, IElasticQueryVisitorContext? context = null)

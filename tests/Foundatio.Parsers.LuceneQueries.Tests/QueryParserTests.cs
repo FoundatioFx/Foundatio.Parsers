@@ -38,9 +38,10 @@ public class QueryParserTests : TestWithLoggingBase
         try
         {
             var result = await parser.ParseAsync(query);
+            Assert.NotNull(result);
 
-            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result!));
-            string generatedQuery = await GenerateQueryVisitor.RunAsync(result!);
+            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
+            string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
         }
         catch (FormatException ex)
@@ -73,9 +74,10 @@ public class QueryParserTests : TestWithLoggingBase
         try
         {
             var result = await parser.ParseAsync(query);
+            Assert.NotNull(result);
 
-            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result!));
-            string generatedQuery = await GenerateQueryVisitor.RunAsync(result!);
+            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
+            string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
 
             var groupNode = result as GroupNode;
@@ -114,9 +116,10 @@ public class QueryParserTests : TestWithLoggingBase
         try
         {
             var result = await parser.ParseAsync(query);
+            Assert.NotNull(result);
 
-            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result!));
-            string generatedQuery = await GenerateQueryVisitor.RunAsync(result!);
+            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
+            string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
 
             var groupNode = result as GroupNode;
@@ -159,9 +162,10 @@ public class QueryParserTests : TestWithLoggingBase
         };
         string query = "mydate:[now/d TO now/d+30d/d]";
         var result = sut.Parse(query);
+        Assert.NotNull(result);
         _logger.LogInformation(DebugQueryVisitor.Run(result));
 
-        string generatedQuery = await GenerateQueryVisitor.RunAsync(result!);
+        string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
         Assert.Equal(query, generatedQuery);
 
         var groupNode = result as GroupNode;
@@ -216,9 +220,10 @@ public class QueryParserTests : TestWithLoggingBase
         try
         {
             var result = await parser.ParseAsync(query);
+            Assert.NotNull(result);
 
-            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result!));
-            string generatedQuery = await GenerateQueryVisitor.RunAsync(result!);
+            _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
+            string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
             Assert.Equal(query, generatedQuery);
 
             var groupNode = result as GroupNode;
@@ -508,13 +513,14 @@ public class QueryParserTests : TestWithLoggingBase
         var parser = new LuceneQueryParser();
 
         var result = await parser.ParseAsync(query);
+        Assert.NotNull(result);
 
-        _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result!));
-        string generatedQuery = await GenerateQueryVisitor.RunAsync(result!);
+        _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
+        string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
         Assert.Equal(expected, generatedQuery);
 
-        await new AssignOperationTypeVisitor().AcceptAsync(result!, null!);
-        _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result!));
+        await new AssignOperationTypeVisitor().AcceptAsync(result, null!);
+        _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
     }
 
     [Theory]

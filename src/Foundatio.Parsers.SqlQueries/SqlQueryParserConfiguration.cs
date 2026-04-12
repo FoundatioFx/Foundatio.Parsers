@@ -17,7 +17,7 @@ public class SqlQueryParserConfiguration
     public SqlQueryParserConfiguration()
     {
         AddSortVisitor(new TermToFieldVisitor(), 0);
-        AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver != null ? FieldResolver(field, context) : Task.FromResult<string?>(null)), 10);
+        AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver is not null ? FieldResolver(field, context) : Task.FromResult<string?>(null)), 10);
         AddVisitor(new ValidationVisitor(), 30);
     }
 
@@ -42,7 +42,7 @@ public class SqlQueryParserConfiguration
     public SqlQueryParserConfiguration SetLoggerFactory(ILoggerFactory loggerFactory)
     {
         LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
-        _logger = loggerFactory!.CreateLogger<SqlQueryParserConfiguration>();
+        _logger = LoggerFactory.CreateLogger<SqlQueryParserConfiguration>();
 
         return this;
     }

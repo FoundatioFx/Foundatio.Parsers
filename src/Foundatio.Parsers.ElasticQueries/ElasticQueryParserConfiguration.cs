@@ -38,7 +38,7 @@ public class ElasticQueryParserConfiguration
         AddSortVisitor(new TermToFieldVisitor(), 0);
         AddAggregationVisitor(new AssignOperationTypeVisitor(), 0);
         AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
-        AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver != null ? FieldResolver(field, context) : Task.FromResult<string?>(null)), 10);
+        AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver is not null ? FieldResolver(field, context) : Task.FromResult<string?>(null)), 10);
         AddVisitor(new ValidationVisitor(), 30);
     }
 

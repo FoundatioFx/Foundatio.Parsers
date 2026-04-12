@@ -18,21 +18,21 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<I
             return;
 
         var sort = node.GetSort(() => node.GetDefaultSort(context));
-        if (sort?.SortKey == null)
+        if (sort?.SortKey is null)
             return;
 
         _fields.Add(sort);
     }
 
-    public override async Task<IEnumerable<IFieldSort>> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<IEnumerable<IFieldSort>> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        await node.AcceptAsync(this, context).ConfigureAwait(false);
+        await node.AcceptAsync(this, context ?? new QueryVisitorContext()).ConfigureAwait(false);
         return _fields;
     }
 
     public static Task<IEnumerable<IFieldSort>> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        return new GetSortFieldsVisitor().AcceptAsync(node, context ?? new QueryVisitorContext());
+        return new GetSortFieldsVisitor().AcceptAsync(node, context);
     }
 
     public static IEnumerable<IFieldSort> Run(IQueryNode node, IQueryVisitorContext? context = null)

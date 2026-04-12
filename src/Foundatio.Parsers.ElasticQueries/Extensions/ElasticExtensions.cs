@@ -72,7 +72,7 @@ public static class ElasticExtensions
         }
 
         var apiCall = response?.ApiCall;
-        if (includeResponse && apiCall?.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
+        if (includeResponse && apiCall?.ResponseBodyInBytes is not null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
         {
             string body = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes);
             if (normalize)

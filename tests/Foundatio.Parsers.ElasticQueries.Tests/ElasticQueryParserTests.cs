@@ -51,9 +51,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var result = sut.Parse("NOT (dog parrot)");
 
-        Assert.IsType<GroupNode>(result.Left);
-        Assert.True((result.Left as GroupNode)!.HasParens);
-        Assert.True((result.Left as GroupNode)!.IsNegated);
+        var leftGroup = Assert.IsType<GroupNode>(result.Left);
+        Assert.True(leftGroup.HasParens);
+        Assert.True(leftGroup.IsNegated);
     }
 
     [Fact]
@@ -66,9 +66,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var result = Assert.IsType<GroupNode>(sut.Parse("NOT (dog parrot)", context));
         Assert.Equal(2, testQueryVisitor.GroupNodeCount);
 
-        Assert.IsType<GroupNode>(result.Left);
-        Assert.True((result.Left as GroupNode)!.HasParens);
-        Assert.True((result.Left as GroupNode)!.IsNegated);
+        var leftGroup2 = Assert.IsType<GroupNode>(result.Left);
+        Assert.True(leftGroup2.HasParens);
+        Assert.True(leftGroup2.IsNegated);
     }
 
     [Fact]
@@ -454,7 +454,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildAggregationsAsync("min:field2 max:field2 date:(field5~1d^\"America/Chicago\" min:field2 max:field2 min:field1 @offset:-6h)");
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(result!));
+        Assert.NotNull(result);
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -522,7 +523,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
 
         var result = await processor.BuildAggregationsAsync($"date:(field5~{interval})");
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(result!));
+        Assert.NotNull(result);
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -578,7 +580,8 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildAggregationsAsync("date:field5");
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(result!));
+        Assert.NotNull(result);
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 

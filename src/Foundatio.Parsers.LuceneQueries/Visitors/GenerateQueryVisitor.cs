@@ -35,15 +35,15 @@ public class GenerateQueryVisitor : QueryNodeVisitorWithResultBase<string>
         _builder.Append(node);
     }
 
-    public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        await node.AcceptAsync(this, context).ConfigureAwait(false);
+        await node.AcceptAsync(this, context ?? new QueryVisitorContext { DefaultOperator = GroupOperator.Default }).ConfigureAwait(false);
         return _builder.ToString();
     }
 
     public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        return new GenerateQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext { DefaultOperator = GroupOperator.Default });
+        return new GenerateQueryVisitor().AcceptAsync(node, context);
     }
 
     public static string Run(IQueryNode node, IQueryVisitorContext? context = null)

@@ -39,21 +39,21 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
         return base.VisitAsync(node, context);
     }
 
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        await node.AcceptAsync(this, context).ConfigureAwait(false);
+        await node.AcceptAsync(this, context ?? new QueryVisitorContext()).ConfigureAwait(false);
         return node;
     }
 
     public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string> fieldsToRemove, IQueryVisitorContext? context = null)
     {
-        var result = await new RemoveFieldsQueryVisitor(fieldsToRemove).AcceptAsync(node, context ?? new QueryVisitorContext()).ConfigureAwait(false);
+        var result = await new RemoveFieldsQueryVisitor(fieldsToRemove).AcceptAsync(node, context).ConfigureAwait(false);
         return result.ToString();
     }
 
     public static async Task<string> RunAsync(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext? context = null)
     {
-        var result = await new RemoveFieldsQueryVisitor(shouldRemoveFieldFunc).AcceptAsync(node, context ?? new QueryVisitorContext()).ConfigureAwait(false);
+        var result = await new RemoveFieldsQueryVisitor(shouldRemoveFieldFunc).AcceptAsync(node, context).ConfigureAwait(false);
         return result.ToString();
     }
 

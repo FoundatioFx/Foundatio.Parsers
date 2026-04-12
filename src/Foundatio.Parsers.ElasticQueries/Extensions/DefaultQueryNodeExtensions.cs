@@ -106,8 +106,16 @@ public static class DefaultQueryNodeExtensions
             };
         }
 
-        // For non-analyzed fields, try to convert value to appropriate type
-        object termValue = GetTypedValue(node.UnescapedTerm!, field, context);
+        if (node.UnescapedTerm is null)
+        {
+            return new TermQuery
+            {
+                Field = field,
+                Value = node.UnescapedTerm
+            };
+        }
+
+        object termValue = GetTypedValue(node.UnescapedTerm, field, context);
 
         return new TermQuery
         {
@@ -190,7 +198,7 @@ public static class DefaultQueryNodeExtensions
 
     private static QueryBase GetAnalyzedFieldsQuery(TermNode node, string[] fields)
     {
-        if (!node.IsQuotedTerm && node.UnescapedTerm!.EndsWith("*"))
+        if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") == true)
         {
             return new QueryStringQuery
             {

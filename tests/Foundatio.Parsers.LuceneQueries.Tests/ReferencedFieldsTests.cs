@@ -16,7 +16,8 @@ public class ReferencedFieldsTests : TestWithLoggingBase
     public async Task CanGetReferencedFields()
     {
         var parser = new LuceneQueryParser();
-        var result = (await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value"))!;
+        var result = await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value");
+        Assert.NotNull(result);
         var fields = result.GetReferencedFields();
 
         Assert.Equal(6, fields.Count);
@@ -43,7 +44,8 @@ public class ReferencedFieldsTests : TestWithLoggingBase
     public async Task CanGetTopLevelReferencedFields()
     {
         var parser = new LuceneQueryParser();
-        var result = (await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value"))!;
+        var result = await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value");
+        Assert.NotNull(result);
         var fields = result.GetReferencedFields(currentGroupOnly: true);
 
         Assert.Equal(3, fields.Count);

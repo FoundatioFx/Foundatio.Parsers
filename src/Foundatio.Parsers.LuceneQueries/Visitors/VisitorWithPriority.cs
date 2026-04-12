@@ -11,7 +11,7 @@ public class QueryVisitorWithPriority : IChainableQueryVisitor
     public int Priority { get; set; }
     public required IQueryNodeVisitorWithResult<IQueryNode> Visitor { get; set; }
 
-    public Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
         return Visitor.AcceptAsync(node, context);
     }

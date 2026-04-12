@@ -105,10 +105,12 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture>
         if (!String.IsNullOrWhiteSpace(alternateInvertedCriteria))
         {
             var invertedAlternate = await parser.ParseAsync(alternateInvertedCriteria);
-            context.SetAlternateInvertedCriteria(invertedAlternate!);
+            Assert.NotNull(invertedAlternate);
+            context.SetAlternateInvertedCriteria(invertedAlternate);
         }
 
-        result = await invertQueryVisitor.AcceptAsync(result!, context);
+        Assert.NotNull(result);
+        result = await invertQueryVisitor.AcceptAsync(result, context);
         string invertedQuery = result.ToString();
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation("{Result}", nodes);
