@@ -383,6 +383,7 @@ public static class DefaultAggregationNodeExtensions
                 case "@exclude":
                     if (termNode.UnescapedTerm is null)
                         break;
+
                     if (termNode.IsRegexTerm)
                     {
                         termsAggregation.Exclude = new TermsExclude(termNode.UnescapedTerm);

@@ -40,7 +40,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var sortResult = await sut.BuildSortAsync("");
         Assert.NotNull(sortResult);
 
-        sortResult = await sut.BuildSortAsync((string)null!);
+        sortResult = await sut.BuildSortAsync((string?)null);
         Assert.NotNull(sortResult);
     }
 

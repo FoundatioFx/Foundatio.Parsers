@@ -29,9 +29,10 @@ public class QueryValidatorTests : TestWithLoggingBase
     {
         var ex = await Assert.ThrowsAsync<QueryValidationException>(() => QueryValidator.ValidateQueryAndThrowAsync(@":"));
         Assert.Contains("Unexpected", ex.Message);
-        Assert.False(ex.Result!.IsValid);
+        Assert.NotNull(ex.Result);
+        Assert.False(ex.Result.IsValid);
         Assert.NotNull(ex.Result.Message);
-        Assert.Contains("Unexpected", ex.Result.Message!);
+        Assert.Contains("Unexpected", ex.Result.Message);
     }
 
     [Fact]
@@ -172,7 +173,9 @@ public class QueryValidatorTests : TestWithLoggingBase
         context.SetFieldResolver(f => f == "field1" ? f : null!);
         var ex = await Assert.ThrowsAsync<QueryValidationException>(() => QueryValidator.ValidateQueryAndThrowAsync(@"field1:blah field2:blah", options, context));
         Assert.Contains("resolved", ex.Message);
-        Assert.Contains("field2", ex.Result!.UnresolvedFields!);
+        Assert.NotNull(ex.Result);
+        Assert.NotNull(ex.Result.UnresolvedFields);
+        Assert.Contains("field2", ex.Result.UnresolvedFields);
         Assert.False(ex.Result.IsValid);
         Assert.NotNull(ex.Result.Message);
         Assert.Contains("resolved", ex.Result.Message!);

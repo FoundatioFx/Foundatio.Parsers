@@ -61,7 +61,7 @@ public class QueryValidator
             if (includeResolver is not null)
                 node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
 
-            return await ValidationVisitor.RunAsync(node!, context);
+            return await ValidationVisitor.RunAsync(node, context);
         }
         catch (FormatException ex)
         {
@@ -129,7 +129,7 @@ public class QueryValidator
             if (includeResolver != null)
                 node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
 
-            return await ValidationVisitor.RunAsync(node!, context);
+            return await ValidationVisitor.RunAsync(node, context);
         }
         catch (FormatException ex)
         {

@@ -17,7 +17,7 @@ public class TermToFieldVisitor : ChainableQueryVisitor
 
     public static Task RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        return new TermToFieldVisitor().AcceptAsync(node, context ?? new QueryVisitorContext());
+        return new TermToFieldVisitor().AcceptAsync(node, context);
     }
 
     public static void Run(IQueryNode node, IQueryVisitorContext? context = null)

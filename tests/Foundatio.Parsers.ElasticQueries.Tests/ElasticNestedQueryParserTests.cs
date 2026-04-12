@@ -1683,7 +1683,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
-            .UseNestedFilter((path, orig, resolved, ctx) => (QueryContainer)null!)
+            .UseNestedFilter((path, orig, resolved, ctx) => (QueryContainer?)null)
             .UseNested());
 
         // Act

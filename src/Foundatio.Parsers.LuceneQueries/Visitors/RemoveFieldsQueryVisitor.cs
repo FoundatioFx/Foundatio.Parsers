@@ -9,11 +9,11 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
 public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
 {
-    public RemoveFieldsQueryVisitor(IEnumerable<string> nonInvertedFields)
+    public RemoveFieldsQueryVisitor(IEnumerable<string> fieldsToRemove)
     {
-        ArgumentNullException.ThrowIfNull(nonInvertedFields);
+        ArgumentNullException.ThrowIfNull(fieldsToRemove);
 
-        string[] fieldsToRemoveList = nonInvertedFields.ToArray();
+        string[] fieldsToRemoveList = fieldsToRemove.ToArray();
         ShouldRemoveField = f => fieldsToRemoveList.Contains(f, StringComparer.OrdinalIgnoreCase);
     }
 
@@ -39,20 +39,19 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
 
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        ArgumentNullException.ThrowIfNull(context);
-        await node.AcceptAsync(this, context).ConfigureAwait(false);
+        await node.AcceptAsync(this, context!).ConfigureAwait(false);
         return node;
     }
 
     public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
     {
-        var result = await new RemoveFieldsQueryVisitor(nonInvertedFields ?? []).AcceptAsync(node, context ?? new QueryVisitorContext()).ConfigureAwait(false);
+        var result = await new RemoveFieldsQueryVisitor(nonInvertedFields ?? []).AcceptAsync(node, context).ConfigureAwait(false);
         return result.ToString();
     }
 
     public static async Task<string> RunAsync(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext? context = null)
     {
-        var result = await new RemoveFieldsQueryVisitor(shouldRemoveFieldFunc).AcceptAsync(node, context ?? new QueryVisitorContext()).ConfigureAwait(false);
+        var result = await new RemoveFieldsQueryVisitor(shouldRemoveFieldFunc).AcceptAsync(node, context).ConfigureAwait(false);
         return result.ToString();
     }
 

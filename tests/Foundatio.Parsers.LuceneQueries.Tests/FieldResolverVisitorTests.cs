@@ -34,7 +34,7 @@ public class FieldResolverVisitorTests
             };
 
         var resolver = map.ToHierarchicalFieldResolver();
-        string? resolvedField = await resolver(field, null!);
+        string? resolvedField = await resolver(field, null);
         Assert.Equal(expected, resolvedField);
     }
 

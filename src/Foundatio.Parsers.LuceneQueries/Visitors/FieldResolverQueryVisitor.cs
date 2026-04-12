@@ -82,8 +82,7 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
 
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        context ??= new QueryVisitorContext();
-        await node.AcceptAsync(this, context).ConfigureAwait(false);
+        await node.AcceptAsync(this, context!).ConfigureAwait(false);
         return node;
     }
 
@@ -124,7 +123,7 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
     }
 }
 
-public delegate Task<string?> QueryFieldResolver(string field, IQueryVisitorContext context);
+public delegate Task<string?> QueryFieldResolver(string field, IQueryVisitorContext? context);
 
 public class FieldMap : Dictionary<string, string> { }
 

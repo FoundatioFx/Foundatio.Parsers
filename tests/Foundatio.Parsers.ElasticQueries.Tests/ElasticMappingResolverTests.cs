@@ -94,10 +94,12 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         string dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001")!;
         Assert.Equal("nested.data.text-0001.keyword", dynamicTextAggregation);
 
-        string dynamicSpacedAggregation = resolver.GetAggregationsFieldName("nested.data.spaced field")!;
+        string? dynamicSpacedAggregation = resolver.GetAggregationsFieldName("nested.data.spaced field");
+        Assert.NotNull(dynamicSpacedAggregation);
         Assert.Equal("nested.data.spaced field.keyword", dynamicSpacedAggregation);
 
-        string dynamicSpacedSort = resolver.GetSortFieldName("nested.data.spaced field")!;
+        string? dynamicSpacedSort = resolver.GetSortFieldName("nested.data.spaced field");
+        Assert.NotNull(dynamicSpacedSort);
         Assert.Equal("nested.data.spaced field.keyword", dynamicSpacedSort);
 
         string? dynamicSpacedField = resolver.GetResolvedField("nested.data.spaced field");
@@ -106,7 +108,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         var field1Property = resolver.GetMappingProperty("Field1");
         Assert.IsType<TextProperty>(field1Property);
 
-        string field5Property = resolver.GetAggregationsFieldName("Field5")!;
+        string? field5Property = resolver.GetAggregationsFieldName("Field5");
+        Assert.NotNull(field5Property);
         Assert.Equal("field5.keyword", field5Property);
 
         var unknownProperty = resolver.GetMappingProperty("UnknowN.test.doesNotExist");

@@ -199,7 +199,7 @@ public class SqlQueryParser : LuceneQueryParser
         context.SetFieldResolver(async (field, context) =>
         {
             string? resolvedField = null;
-            if (context.Data.TryGetValue("@OriginalContextResolver", out object? data) && data is QueryFieldResolver resolver)
+            if (context?.Data.TryGetValue("@OriginalContextResolver", out object? data) is true && data is QueryFieldResolver resolver)
             {
                 string? contextResolvedField = await resolver(field, context).ConfigureAwait(false);
                 if (contextResolvedField != null)

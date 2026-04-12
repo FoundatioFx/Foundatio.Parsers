@@ -132,14 +132,13 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        ArgumentNullException.ThrowIfNull(context);
-        await node.AcceptAsync(this, context);
+        await node.AcceptAsync(this, context!);
         return _builder.ToString();
     }
 
     public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        return new DebugQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext());
+        return new DebugQueryVisitor().AcceptAsync(node, context);
     }
 
     public static string Run(IQueryNode node, IQueryVisitorContext? context = null)

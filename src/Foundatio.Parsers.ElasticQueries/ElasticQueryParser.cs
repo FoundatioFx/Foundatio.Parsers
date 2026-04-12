@@ -77,7 +77,7 @@ public class ElasticQueryParser : LuceneQueryParser
         context.SetFieldResolver(async (field, context) =>
         {
             string? resolvedField = null;
-            if (context.Data.TryGetValue("@OriginalContextResolver", out object? data) && data is QueryFieldResolver resolver)
+            if (context?.Data.TryGetValue("@OriginalContextResolver", out object? data) is true && data is QueryFieldResolver resolver)
             {
                 string? contextResolvedField = await resolver(field, context).ConfigureAwait(false);
                 if (contextResolvedField != null)
@@ -110,7 +110,7 @@ public class ElasticQueryParser : LuceneQueryParser
         }
     }
 
-    private async Task<string?> MappingFieldResolver(string? field, IQueryVisitorContext context)
+    private async Task<string?> MappingFieldResolver(string? field, IQueryVisitorContext? context)
     {
         if (field == null)
             return null;
@@ -235,8 +235,9 @@ public class ElasticQueryParser : LuceneQueryParser
         return context.GetValidationResult();
     }
 
-    public async Task<IEnumerable<IFieldSort>> BuildSortAsync(string sort, IElasticQueryVisitorContext? context = null)
+    public async Task<IEnumerable<IFieldSort>> BuildSortAsync(string? sort, IElasticQueryVisitorContext? context = null)
     {
+        sort ??= String.Empty;
         context ??= new ElasticQueryVisitorContext();
         context.QueryType = QueryTypes.Sort;
 
