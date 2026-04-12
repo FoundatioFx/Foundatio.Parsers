@@ -32,6 +32,8 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
             // invert, don't visit children
             if (node.InvertNegation() is GroupNode inverted)
                 node = inverted;
+            else
+                throw new InvalidOperationException($"InvertNegation on a GroupNode returned an unexpected type: {node.GetType().Name}");
 
             var alternateInvertedCriteria = context.GetAlternateInvertedCriteria();
             if (alternateInvertedCriteria != null)

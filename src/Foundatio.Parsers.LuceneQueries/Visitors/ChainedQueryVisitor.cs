@@ -8,7 +8,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors;
 public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode?>, IChainableQueryVisitor
 {
     private readonly List<QueryVisitorWithPriority> _visitors = new();
-    private QueryVisitorWithPriority[]? _frozenVisitors;
+    private QueryVisitorWithPriority[] _frozenVisitors = [];
     private bool _isDirty = true;
 
     public void AddVisitor(IQueryNodeVisitorWithResult<IQueryNode?> visitor, int priority = 0)
@@ -84,7 +84,7 @@ public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode?>, 
         }
 
         IQueryNode? current = node;
-        foreach (var visitor in _frozenVisitors!)
+        foreach (var visitor in _frozenVisitors)
         {
             if (current is null)
                 break;

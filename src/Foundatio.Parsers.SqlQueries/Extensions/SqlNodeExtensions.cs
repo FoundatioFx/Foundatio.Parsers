@@ -114,13 +114,13 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
-    public static string ToDynamicLinqString(this TermNode node, ISqlQueryVisitorContext context)
+    public static string? ToDynamicLinqString(this TermNode node, ISqlQueryVisitorContext context)
     {
         if (!String.IsNullOrEmpty(node.Prefix))
             context.AddValidationError("Prefix is not supported for term range queries.");
 
         if (node.Term is null)
-            return String.Empty;
+            return null;
 
         // support overriding the generated query
         if (node.TryGetQuery(out string? query))
@@ -385,7 +385,7 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
-    public static string ToDynamicLinqString(this IQueryNode node, ISqlQueryVisitorContext context)
+    public static string? ToDynamicLinqString(this IQueryNode node, ISqlQueryVisitorContext context)
     {
         return node switch
         {

@@ -118,11 +118,13 @@ public class QueryValidator
 
             // Visitors never nullify a non-null root in practice; this guard satisfies NRT
             // and produces a clear validation error if a visitor unexpectedly returns null.
-            IQueryNode EnsureNode(IQueryNode? n)
+            IQueryNode EnsureNode(IQueryNode? node)
             {
-                if (n is not null) return n;
-                var result = context.GetValidationResult();
-                throw new QueryValidationException(result.Message, result);
+                if (node is not null)
+                    return node;
+
+                var validationResult = context.GetValidationResult();
+                throw new QueryValidationException(validationResult.Message, validationResult);
             }
 
             node = EnsureNode(node);
