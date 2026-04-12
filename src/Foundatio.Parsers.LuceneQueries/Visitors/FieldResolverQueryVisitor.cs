@@ -80,44 +80,44 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
         }
     }
 
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
+    public override async Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
         await node.AcceptAsync(this, context!).ConfigureAwait(false);
         return node;
     }
 
-    public static Task<IQueryNode> RunAsync(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver? context = null)
+    public static Task<IQueryNode?> RunAsync(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         context ??= new QueryVisitorContext();
         context.SetFieldResolver(resolver);
         return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
-    public static Task<IQueryNode> RunAsync(IQueryNode node, Func<string, string?> resolver, IQueryVisitorContextWithFieldResolver? context = null)
+    public static Task<IQueryNode?> RunAsync(IQueryNode node, Func<string, string?> resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         context ??= new QueryVisitorContext();
         context.SetFieldResolver((field, _) => Task.FromResult<string?>(resolver(field)));
         return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
-    public static IQueryNode Run(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver? context = null)
+    public static IQueryNode? Run(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         return RunAsync(node, resolver, context).GetAwaiter().GetResult();
     }
 
-    public static IQueryNode Run(IQueryNode node, Func<string, string?> resolver, IQueryVisitorContextWithFieldResolver? context = null)
+    public static IQueryNode? Run(IQueryNode node, Func<string, string?> resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         return RunAsync(node, resolver, context).GetAwaiter().GetResult();
     }
 
-    public static Task<IQueryNode> RunAsync(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver? context = null)
+    public static Task<IQueryNode?> RunAsync(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver? context = null)
     {
         context ??= new QueryVisitorContext();
         context.SetFieldResolver(map.ToHierarchicalFieldResolver());
         return new FieldResolverQueryVisitor().AcceptAsync(node, context);
     }
 
-    public static IQueryNode Run(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver? context = null)
+    public static IQueryNode? Run(IQueryNode node, IDictionary<string, string> map, IQueryVisitorContextWithFieldResolver? context = null)
     {
         return RunAsync(node, map, context).GetAwaiter().GetResult();
     }

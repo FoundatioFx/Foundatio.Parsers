@@ -91,7 +91,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
 
         var resolver = ElasticMappingResolver.Create<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType, Client, index, _logger);
 
-        string dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001")!;
+        string? dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001");
+        Assert.NotNull(dynamicTextAggregation);
         Assert.Equal("nested.data.text-0001.keyword", dynamicTextAggregation);
 
         string? dynamicSpacedAggregation = resolver.GetAggregationsFieldName("nested.data.spaced field");
@@ -144,10 +145,12 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<TextProperty>(field4AliasMapping.Property);
         Assert.Same(field4Property, field4AliasMapping.Property);
 
-        string field4sort = resolver.GetSortFieldName("Field4Alias")!;
+        string? field4sort = resolver.GetSortFieldName("Field4Alias");
+        Assert.NotNull(field4sort);
         Assert.Equal("field4.sort", field4sort);
 
-        string field4aggs = resolver.GetAggregationsFieldName("Field4Alias")!;
+        string? field4aggs = resolver.GetAggregationsFieldName("Field4Alias");
+        Assert.NotNull(field4aggs);
         Assert.Equal("field4.keyword", field4aggs);
 
         var nestedIdProperty = resolver.GetMappingProperty("Nested.Id");

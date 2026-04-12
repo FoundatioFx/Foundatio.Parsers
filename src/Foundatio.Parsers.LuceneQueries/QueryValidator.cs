@@ -57,9 +57,15 @@ public class QueryValidator
             if (fieldResolver is not null)
                 node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver);
 
+            if (node is null)
+                return context.GetValidationResult();
+
             var includeResolver = context.GetIncludeResolver();
             if (includeResolver is not null)
                 node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
+
+            if (node is null)
+                return context.GetValidationResult();
 
             return await ValidationVisitor.RunAsync(node, context);
         }
@@ -111,23 +117,35 @@ public class QueryValidator
             if (context is null)
                 context = new QueryVisitorContext();
 
+            options ??= new QueryValidationOptions();
+            options.ShouldThrow = true;
+            context.SetValidationOptions(options);
+
             if (node is null)
             {
                 var earlyResult = context.GetValidationResult();
                 throw new QueryValidationException(earlyResult.Message, earlyResult);
             }
 
-            options ??= new QueryValidationOptions();
-            options.ShouldThrow = true;
-            context.SetValidationOptions(options);
-
             var fieldResolver = context.GetFieldResolver();
             if (fieldResolver != null)
                 node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver);
 
+            if (node is null)
+            {
+                var earlyResult2 = context.GetValidationResult();
+                throw new QueryValidationException(earlyResult2.Message, earlyResult2);
+            }
+
             var includeResolver = context.GetIncludeResolver();
             if (includeResolver != null)
                 node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
+
+            if (node is null)
+            {
+                var earlyResult3 = context.GetValidationResult();
+                throw new QueryValidationException(earlyResult3.Message, earlyResult3);
+            }
 
             return await ValidationVisitor.RunAsync(node, context);
         }

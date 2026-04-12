@@ -26,7 +26,7 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<IEnumerable<I
 
     public override async Task<IEnumerable<IFieldSort>> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        await node.AcceptAsync(this, context!).ConfigureAwait(false);
+        await node.AcceptAsync(this, context ?? new QueryVisitorContext()).ConfigureAwait(false);
         return _fields;
     }
 

@@ -7,13 +7,15 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
 public class CleanupQueryVisitor : ChainableQueryVisitor
 {
-    public override async Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<IQueryNode?> VisitAsync(IQueryNode node, IQueryVisitorContext context)
     {
         var result = CleanNode(node);
         if (result is null)
-            return null!;
+            return null;
 
         result = await base.VisitAsync(result, context).ConfigureAwait(false);
+        if (result is null)
+            return null;
 
         return CleanNode(result);
     }
@@ -129,7 +131,7 @@ public class CleanupQueryVisitor : ChainableQueryVisitor
     public static async Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
         var result = await new CleanupQueryVisitor().AcceptAsync(node, context).ConfigureAwait(false);
-        return result.ToString();
+        return result?.ToString() ?? string.Empty;
     }
 
     public static string Run(IQueryNode node, IQueryVisitorContext? context = null)

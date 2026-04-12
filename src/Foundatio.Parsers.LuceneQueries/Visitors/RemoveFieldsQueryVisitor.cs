@@ -26,18 +26,18 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
 
     public Func<string, bool> ShouldRemoveField { get; }
 
-    public override Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context)
+    public override Task<IQueryNode?> VisitAsync(IQueryNode node, IQueryVisitorContext context)
     {
         if (node is IFieldQueryNode fieldNode && fieldNode.Field is not null && ShouldRemoveField(fieldNode.Field))
         {
             node.RemoveSelf();
-            return Task.FromResult<IQueryNode>(null!);
+            return Task.FromResult<IQueryNode?>(null);
         }
 
         return base.VisitAsync(node, context);
     }
 
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
+    public override async Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
         await node.AcceptAsync(this, context!).ConfigureAwait(false);
         return node;
@@ -46,13 +46,13 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
     public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
     {
         var result = await new RemoveFieldsQueryVisitor(nonInvertedFields ?? []).AcceptAsync(node, context).ConfigureAwait(false);
-        return result.ToString();
+        return result?.ToString() ?? string.Empty;
     }
 
     public static async Task<string> RunAsync(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext? context = null)
     {
         var result = await new RemoveFieldsQueryVisitor(shouldRemoveFieldFunc).AcceptAsync(node, context).ConfigureAwait(false);
-        return result.ToString();
+        return result?.ToString() ?? string.Empty;
     }
 
     public static string Run(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)

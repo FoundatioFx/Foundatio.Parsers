@@ -143,7 +143,7 @@ public class QueryValidatorTests : TestWithLoggingBase
             AllowUnresolvedFields = false
         };
         var context = new QueryVisitorContext();
-        context.SetFieldResolver(f => f == "field1" ? f : null!);
+        context.SetFieldResolver(f => f == "field1" ? f : null);
         var info = await QueryValidator.ValidateQueryAsync(@"field1:blah", options, context);
         Assert.True(info.IsValid);
     }
@@ -156,7 +156,7 @@ public class QueryValidatorTests : TestWithLoggingBase
             AllowUnresolvedFields = false
         };
         var context = new QueryVisitorContext();
-        context.SetFieldResolver(f => f == "field1" ? f : null!);
+        context.SetFieldResolver(f => f == "field1" ? f : null);
         var info = await QueryValidator.ValidateQueryAsync(@"field1:blah field2:blah", options, context);
         Assert.False(info.IsValid);
         Assert.Contains("field2", info.UnresolvedFields!);
@@ -170,7 +170,7 @@ public class QueryValidatorTests : TestWithLoggingBase
             AllowUnresolvedFields = false
         };
         var context = new QueryVisitorContext();
-        context.SetFieldResolver(f => f == "field1" ? f : null!);
+        context.SetFieldResolver(f => f == "field1" ? f : null);
         var ex = await Assert.ThrowsAsync<QueryValidationException>(() => QueryValidator.ValidateQueryAndThrowAsync(@"field1:blah field2:blah", options, context));
         Assert.Contains("resolved", ex.Message);
         Assert.NotNull(ex.Result);

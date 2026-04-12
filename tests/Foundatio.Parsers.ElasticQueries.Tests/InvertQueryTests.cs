@@ -111,6 +111,7 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture>
 
         Assert.NotNull(result);
         result = await invertQueryVisitor.AcceptAsync(result, context);
+        Assert.NotNull(result);
         string invertedQuery = result.ToString();
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation("{Result}", nodes);

@@ -24,6 +24,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         var includes = new Dictionary<string, string> { { "other", "field:value" } };
         Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes);
+        Assert.NotNull(resolved);
         Assert.Equal("(field:value)", resolved.ToString());
     }
 
@@ -38,17 +39,21 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
             };
         Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: (_, _) => true);
+        Assert.NotNull(resolved);
         Assert.Equal("outter @include:other @skipped:(other stuff @include:other)", resolved.ToString());
 
         resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: ShouldSkipInclude);
+        Assert.NotNull(resolved);
         Assert.Equal("outter (field:value) @skipped:(other stuff @include:other)", resolved.ToString());
 
         resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: (n, ctx) => !ShouldSkipInclude(n, ctx));
+        Assert.NotNull(resolved);
         Assert.Equal("outter (field:value) @skipped:(other stuff (field:value))", resolved.ToString());
 
         var nestedResult = await parser.ParseAsync("outter @skipped:(other stuff @include:nested)");
         Assert.NotNull(nestedResult);
         resolved = await IncludeVisitor.RunAsync(nestedResult, includes, shouldSkipInclude: ShouldSkipInclude);
+        Assert.NotNull(resolved);
         Assert.Equal("outter @skipped:(other stuff @include:nested)", resolved.ToString());
     }
 
@@ -143,6 +148,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         var includes = new Dictionary<string, string> { { "other", "field:value" } };
         Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes);
+        Assert.NotNull(resolved);
         Assert.Equal("field1:value1 (field:value)", resolved.ToString());
     }
 
@@ -154,6 +160,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         var includes = new Dictionary<string, string> { { "other", "field:value" } };
         Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes);
+        Assert.NotNull(resolved);
         Assert.Equal("field1:value1 OR ((field:value) field2:value2)", resolved.ToString());
     }
 
@@ -168,6 +175,7 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
             };
         Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes);
+        Assert.NotNull(resolved);
         Assert.Equal("((field2:value2))", resolved.ToString());
     }
 }

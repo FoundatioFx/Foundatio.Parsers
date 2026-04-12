@@ -59,7 +59,7 @@ public static class DefaultAggregationNodeExtensions
             return null;
 
         var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
-        string? originalField = node.GetOriginalField()?.Unescape();
+        string? originalField = node.GetOriginalField().Unescape();
 
         switch (node.GetOperationType())
         {
@@ -119,7 +119,7 @@ public static class DefaultAggregationNodeExtensions
 
         var property = elasticContext.MappingResolver.GetMappingProperty(node.UnescapedField, true);
         string? timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync());
-        string? originalField = node.GetOriginalField()?.Unescape();
+        string? originalField = node.GetOriginalField().Unescape();
 
         switch (node.GetOperationType())
         {

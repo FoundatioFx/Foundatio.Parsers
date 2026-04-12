@@ -91,7 +91,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         info.AddOperation(operation, field);
     }
 
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
+    public override async Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
         ArgumentNullException.ThrowIfNull(context);
 

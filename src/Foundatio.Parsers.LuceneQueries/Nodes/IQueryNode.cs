@@ -31,7 +31,7 @@ public interface IQueryNode
     /// <summary>
     /// Accepts a visitor for tree traversal using the visitor pattern.
     /// </summary>
-    Task<IQueryNode> AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context);
+    Task<IQueryNode?> AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context);
 
     /// <summary>
     /// Returns the query string representation of this node.
