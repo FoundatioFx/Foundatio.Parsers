@@ -30,7 +30,8 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
         if (onlyInvertedFields)
         {
             // invert, don't visit children
-            node = (GroupNode)node.InvertNegation();
+            if (node.InvertNegation() is GroupNode inverted)
+                node = inverted;
 
             var alternateInvertedCriteria = context.GetAlternateInvertedCriteria();
             if (alternateInvertedCriteria != null)

@@ -104,7 +104,7 @@ public class SqlQueryParser : LuceneQueryParser
         fields = fields.ToList();
 
         var validationOptions = new QueryValidationOptions();
-        foreach (string field in fields.Where(f => !f.IsNavigation).Select(f => f.FullName))
+        foreach (string field in fields.Where(f => !f.IsNavigation && f.FullName is not null).Select(f => f.FullName!))
             validationOptions.AllowedFields.Add(field);
 
         Configuration.SetValidationOptions(validationOptions);

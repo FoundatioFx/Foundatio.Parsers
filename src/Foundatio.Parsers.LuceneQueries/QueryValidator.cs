@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Pegasus.Common;
 
@@ -55,17 +56,11 @@ public class QueryValidator
 
             var fieldResolver = context.GetFieldResolver();
             if (fieldResolver is not null)
-                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver);
-
-            if (node is null)
-                return context.GetValidationResult();
+                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver) ?? node;
 
             var includeResolver = context.GetIncludeResolver();
             if (includeResolver is not null)
-                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
-
-            if (node is null)
-                return context.GetValidationResult();
+                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver) ?? node;
 
             return await ValidationVisitor.RunAsync(node, context);
         }
@@ -121,31 +116,24 @@ public class QueryValidator
             options.ShouldThrow = true;
             context.SetValidationOptions(options);
 
-            if (node is null)
+            // Visitors never nullify a non-null root in practice; this guard satisfies NRT
+            // and produces a clear validation error if a visitor unexpectedly returns null.
+            IQueryNode EnsureNode(IQueryNode? n)
             {
-                var earlyResult = context.GetValidationResult();
-                throw new QueryValidationException(earlyResult.Message, earlyResult);
+                if (n is not null) return n;
+                var result = context.GetValidationResult();
+                throw new QueryValidationException(result.Message, result);
             }
+
+            node = EnsureNode(node);
 
             var fieldResolver = context.GetFieldResolver();
             if (fieldResolver != null)
-                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver);
-
-            if (node is null)
-            {
-                var earlyResult2 = context.GetValidationResult();
-                throw new QueryValidationException(earlyResult2.Message, earlyResult2);
-            }
+                node = EnsureNode(await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver));
 
             var includeResolver = context.GetIncludeResolver();
             if (includeResolver != null)
-                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
-
-            if (node is null)
-            {
-                var earlyResult3 = context.GetValidationResult();
-                throw new QueryValidationException(earlyResult3.Message, earlyResult3);
-            }
+                node = EnsureNode(await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver));
 
             return await ValidationVisitor.RunAsync(node, context);
         }

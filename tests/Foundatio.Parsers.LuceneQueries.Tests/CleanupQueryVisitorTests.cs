@@ -45,10 +45,10 @@ public class CleanupQueryVisitorTests : TestWithLoggingBase
             Tracer = tracer
         };
 
-        IQueryNode result;
+        IQueryNode? result;
         try
         {
-            result = (await parser.ParseAsync(query))!;
+            result = await parser.ParseAsync(query);
         }
         catch (FormatException ex)
         {
@@ -56,6 +56,7 @@ public class CleanupQueryVisitorTests : TestWithLoggingBase
             return;
         }
 
+        Assert.NotNull(result);
         string? cleanedQuery = await CleanupQueryVisitor.RunAsync(result);
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation("{Result}", nodes);

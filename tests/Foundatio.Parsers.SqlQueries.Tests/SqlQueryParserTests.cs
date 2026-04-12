@@ -586,10 +586,10 @@ public class SqlQueryParserTests : TestWithLoggingBase
             Tracer = tracer
         };
 
-        IQueryNode result;
+        IQueryNode? result;
         try
         {
-            result = (await parser.ParseAsync(query))!;
+            result = await parser.ParseAsync(query);
         }
         catch (FormatException ex)
         {
@@ -597,6 +597,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             return;
         }
 
+        Assert.NotNull(result);
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation("{Nodes}", nodes);
         var context = new SqlQueryVisitorContext
