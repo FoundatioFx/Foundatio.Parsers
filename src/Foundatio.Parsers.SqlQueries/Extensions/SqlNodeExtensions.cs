@@ -119,7 +119,7 @@ public static class SqlNodeExtensions
         if (!String.IsNullOrEmpty(node.Prefix))
             context.AddValidationError("Prefix is not supported for term range queries.");
 
-        if (String.IsNullOrEmpty(node.Term))
+        if (node.Term is null)
             return String.Empty;
 
         // support overriding the generated query
