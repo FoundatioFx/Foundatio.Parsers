@@ -128,13 +128,13 @@ public class CleanupQueryVisitor : ChainableQueryVisitor
         return node;
     }
 
-    public static async Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
+    public static async Task<string?> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
         var result = await new CleanupQueryVisitor().AcceptAsync(node, context).ConfigureAwait(false);
-        return result?.ToString() ?? string.Empty;
+        return result?.ToString();
     }
 
-    public static string Run(IQueryNode node, IQueryVisitorContext? context = null)
+    public static string? Run(IQueryNode node, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }

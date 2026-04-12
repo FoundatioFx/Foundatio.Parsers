@@ -37,29 +37,24 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
         return base.VisitAsync(node, context);
     }
 
-    public override Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
-    {
-        return node.AcceptAsync(this, context ?? new QueryVisitorContext());
-    }
-
-    public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
+    public static async Task<string?> RunAsync(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
     {
         var result = await new RemoveFieldsQueryVisitor(nonInvertedFields ?? []).AcceptAsync(node, context).ConfigureAwait(false);
-        return result?.ToString() ?? string.Empty;
+        return result?.ToString();
     }
 
-    public static async Task<string> RunAsync(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext? context = null)
+    public static async Task<string?> RunAsync(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext? context = null)
     {
         var result = await new RemoveFieldsQueryVisitor(shouldRemoveFieldFunc).AcceptAsync(node, context).ConfigureAwait(false);
-        return result?.ToString() ?? string.Empty;
+        return result?.ToString();
     }
 
-    public static string Run(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
+    public static string? Run(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, nonInvertedFields ?? [], context).GetAwaiter().GetResult();
     }
 
-    public static string Run(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext? context = null)
+    public static string? Run(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, shouldRemoveFieldFunc, context).GetAwaiter().GetResult();
     }

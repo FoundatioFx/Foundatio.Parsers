@@ -80,11 +80,6 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
         }
     }
 
-    public override Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
-    {
-        return node.AcceptAsync(this, context ?? new QueryVisitorContext());
-    }
-
     public static Task<IQueryNode?> RunAsync(IQueryNode node, QueryFieldResolver resolver, IQueryVisitorContextWithFieldResolver? context = null)
     {
         context ??= new QueryVisitorContext();

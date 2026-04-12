@@ -57,10 +57,9 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
 
             includeStack.Push(node.Term);
 
-            var parsed = await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
-            if (parsed is not GroupNode result)
-                return node;
-
+            var parsed = await _parser.ParseAsync(includedQuery).ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"Parser returned null for included query: {includedQuery}");
+            var result = (GroupNode)parsed;
             result.HasParens = true;
             await VisitAsync(result, context).ConfigureAwait(false);
 
