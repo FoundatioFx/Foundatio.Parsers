@@ -151,7 +151,7 @@ public static class SqlNodeExtensions
                     fieldTerms[fieldInfo] = searchTerm;
                 }
 
-                context.SearchTokenizer.Invoke(searchTerm);
+                context.SearchTokenizer?.Invoke(searchTerm);
                 if (searchTerm.Tokens == null)
                     searchTerm.Tokens = [searchTerm.Term];
                 else
@@ -361,7 +361,7 @@ public static class SqlNodeExtensions
             builder.Append(scopePrefix);
             builder.Append(argumentPrefix);
             builder.Append(field.Name);
-            builder.Append(node.MinInclusive == true ? " >= " : " > ");
+            builder.Append(node.MinInclusive is true ? " >= " : " > ");
             AppendField(builder, field, node.Min, context);
             builder.Append(fieldSuffix);
         }
@@ -374,7 +374,7 @@ public static class SqlNodeExtensions
             builder.Append(scopePrefix);
             builder.Append(argumentPrefix);
             builder.Append(field.Name);
-            builder.Append(node.MaxInclusive == true ? " <= " : " < ");
+            builder.Append(node.MaxInclusive is true ? " <= " : " < ");
             AppendField(builder, field, node.Max, context);
             builder.Append(fieldSuffix);
         }
@@ -401,10 +401,10 @@ public static class SqlNodeExtensions
     public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo>? fields, string? field)
     {
         if (fields is null)
-            return new EntityFieldInfo { Name = field ?? String.Empty, FullName = field ?? String.Empty };
+            return new EntityFieldInfo { Name = field, FullName = field };
 
-        return fields.FirstOrDefault(f => f.FullName.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
-               new EntityFieldInfo { Name = field ?? String.Empty, FullName = field ?? String.Empty };
+        return fields.FirstOrDefault(f => String.Equals(f.FullName, field, StringComparison.OrdinalIgnoreCase)) ??
+               new EntityFieldInfo { Name = field, FullName = field };
     }
 
     private static (string scopePrefix, string argumentPrefix) SplitFieldPrefix(EntityFieldInfo field, string fieldPrefix)

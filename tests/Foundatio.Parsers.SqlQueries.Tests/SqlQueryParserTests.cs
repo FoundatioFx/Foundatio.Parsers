@@ -430,8 +430,10 @@ public class SqlQueryParserTests : TestWithLoggingBase
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
         var context = parser.GetContext(db.Employees.EntityType);
+        context.Fields ??= [];
         context.Fields.Add(new EntityFieldInfo { Name = "age", FullName = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
-        context.ValidationOptions!.AllowedFields.Add("age");
+        Assert.NotNull(context.ValidationOptions);
+        context.ValidationOptions.AllowedFields.Add("age");
 
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name == "acme") && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
         string sqlActual = db.Employees.Where("""Companies.Any(Name = "acme") AND DataValues.Any(DataDefinitionId = 1 AND NumberValue = 30) """).ToQueryString();

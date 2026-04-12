@@ -25,9 +25,15 @@ public class QueryVisitorWithPriority : IChainableQueryVisitor
     {
         public int Compare(QueryVisitorWithPriority? x, QueryVisitorWithPriority? y)
         {
-            if (ReferenceEquals(x, y)) return 0;
-            if (x is null) return -1;
-            if (y is null) return 1;
+            if (ReferenceEquals(x, y))
+                return 0;
+
+            if (x is null)
+                return -1;
+
+            if (y is null)
+                return 1;
+
             return x.Priority.CompareTo(y.Priority);
         }
 

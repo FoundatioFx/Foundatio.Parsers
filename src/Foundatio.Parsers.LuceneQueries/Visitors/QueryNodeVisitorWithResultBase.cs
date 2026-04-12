@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
@@ -17,7 +18,7 @@ public abstract class ChainableQueryVisitor : QueryNodeVisitorWithResultBase<IQu
 {
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        context ??= new QueryVisitorContext();
+        ArgumentNullException.ThrowIfNull(context);
         var result = await node.AcceptAsync(this, context).ConfigureAwait(false);
         return result;
     }
@@ -27,7 +28,7 @@ public abstract class ChainableMutatingQueryVisitor : MutatingQueryNodeVisitorWi
 {
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        context ??= new QueryVisitorContext();
+        ArgumentNullException.ThrowIfNull(context);
         var result = await node.AcceptAsync(this, context).ConfigureAwait(false);
         return result;
     }

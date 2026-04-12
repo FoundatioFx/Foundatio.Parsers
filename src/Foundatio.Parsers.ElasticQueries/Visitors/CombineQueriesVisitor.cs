@@ -104,8 +104,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         }
         else
         {
-            if (container is not null)
-                node.SetQuery(container);
+            node.SetQuery(container);
         }
     }
 

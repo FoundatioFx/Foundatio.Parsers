@@ -100,7 +100,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         string dynamicSpacedSort = resolver.GetSortFieldName("nested.data.spaced field")!;
         Assert.Equal("nested.data.spaced field.keyword", dynamicSpacedSort);
 
-        string dynamicSpacedField = resolver.GetResolvedField("nested.data.spaced field");
+        string? dynamicSpacedField = resolver.GetResolvedField("nested.data.spaced field");
         Assert.Equal("nested.data.spaced field", dynamicSpacedField);
 
         var field1Property = resolver.GetMappingProperty("Field1");
@@ -112,19 +112,19 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         var unknownProperty = resolver.GetMappingProperty("UnknowN.test.doesNotExist");
         Assert.Null(unknownProperty);
 
-        string field1 = resolver.GetResolvedField("FielD1");
+        string? field1 = resolver.GetResolvedField("FielD1");
         Assert.Equal("field1", field1);
 
-        string emptyField = resolver.GetResolvedField(" ");
+        string? emptyField = resolver.GetResolvedField(" ");
         Assert.Equal(" ", emptyField);
 
-        string unknownField = resolver.GetResolvedField("UnknowN.test.doesNotExist");
+        string? unknownField = resolver.GetResolvedField("UnknowN.test.doesNotExist");
         Assert.Equal("UnknowN.test.doesNotExist", unknownField);
 
-        string unknownField2 = resolver.GetResolvedField("unknown.test.doesnotexist");
+        string? unknownField2 = resolver.GetResolvedField("unknown.test.doesnotexist");
         Assert.Equal("unknown.test.doesnotexist", unknownField2);
 
-        string unknownField3 = resolver.GetResolvedField("unknown");
+        string? unknownField3 = resolver.GetResolvedField("unknown");
         Assert.Equal("unknown", unknownField3);
 
         var field4Property = resolver.GetMappingProperty("Field4");
@@ -137,7 +137,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<TextProperty>(field4ExpressionProperty);
 
         var field4AliasMapping = resolver.GetMapping("Field4Alias", true);
-        Assert.IsType<TextProperty>(field4AliasMapping!.Property);
+        Assert.NotNull(field4AliasMapping);
+        Assert.IsType<TextProperty>(field4AliasMapping.Property);
         Assert.Same(field4Property, field4AliasMapping.Property);
 
         string field4sort = resolver.GetSortFieldName("Field4Alias")!;
@@ -149,7 +150,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         var nestedIdProperty = resolver.GetMappingProperty("Nested.Id");
         Assert.IsType<TextProperty>(nestedIdProperty);
 
-        string nestedId = resolver.GetResolvedField("Nested.Id");
+        string? nestedId = resolver.GetResolvedField("Nested.Id");
         Assert.Equal("nested.id", nestedId);
 
         nestedIdProperty = resolver.GetMappingProperty("nested.id");

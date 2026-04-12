@@ -10,7 +10,7 @@ public class QueryValidator
 {
     public static Task<QueryValidationResult> ValidateQueryAsync(string query, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Query;
@@ -20,7 +20,7 @@ public class QueryValidator
 
     public static Task<QueryValidationResult> ValidateAggregationsAsync(string aggregations, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Aggregation;
@@ -30,7 +30,7 @@ public class QueryValidator
 
     public static Task<QueryValidationResult> ValidateSortAsync(string sort, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Sort;
@@ -44,21 +44,21 @@ public class QueryValidator
         try
         {
             var node = await parser.ParseAsync(query);
-            if (context == null)
+            if (context is null)
                 context = new QueryVisitorContext();
 
             if (node is null)
                 return context.GetValidationResult();
 
-            if (options != null)
+            if (options is not null)
                 context.SetValidationOptions(options);
 
             var fieldResolver = context.GetFieldResolver();
-            if (fieldResolver != null)
+            if (fieldResolver is not null)
                 node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver);
 
             var includeResolver = context.GetIncludeResolver();
-            if (includeResolver != null)
+            if (includeResolver is not null)
                 node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver);
 
             return await ValidationVisitor.RunAsync(node!, context);
@@ -74,7 +74,7 @@ public class QueryValidator
 
     public static Task<QueryValidationResult> ValidateQueryAndThrowAsync(string query, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Query;
@@ -84,7 +84,7 @@ public class QueryValidator
 
     public static Task<QueryValidationResult> ValidateAggregationsAndThrowAsync(string aggregations, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Aggregation;
@@ -94,7 +94,7 @@ public class QueryValidator
 
     public static Task<QueryValidationResult> ValidateSortAndThrowAsync(string sort, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Sort;
@@ -108,7 +108,7 @@ public class QueryValidator
         try
         {
             var node = await parser.ParseAsync(query);
-            if (context == null)
+            if (context is null)
                 context = new QueryVisitorContext();
 
             if (node is null)

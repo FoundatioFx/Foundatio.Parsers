@@ -1,4 +1,5 @@
-﻿using System.CodeDom.Compiler;
+﻿using System;
+using System.CodeDom.Compiler;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -131,13 +132,14 @@ public class DebugQueryVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        await node.AcceptAsync(this, context ?? new QueryVisitorContext());
+        ArgumentNullException.ThrowIfNull(context);
+        await node.AcceptAsync(this, context);
         return _builder.ToString();
     }
 
     public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        return new DebugQueryVisitor().AcceptAsync(node, context);
+        return new DebugQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext());
     }
 
     public static string Run(IQueryNode node, IQueryVisitorContext? context = null)

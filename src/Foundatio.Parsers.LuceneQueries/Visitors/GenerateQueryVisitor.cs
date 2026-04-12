@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -10,7 +11,7 @@ public class GenerateQueryVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        _builder.Append(node.ToString(context != null ? context.DefaultOperator : GroupOperator.Default));
+        _builder.Append(node.ToString(context?.DefaultOperator ?? GroupOperator.Default));
 
         return Task.CompletedTask;
     }
@@ -37,13 +38,14 @@ public class GenerateQueryVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        await node.AcceptAsync(this, context ?? new QueryVisitorContext { DefaultOperator = GroupOperator.Default }).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(context);
+        await node.AcceptAsync(this, context).ConfigureAwait(false);
         return _builder.ToString();
     }
 
     public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        return new GenerateQueryVisitor().AcceptAsync(node, context);
+        return new GenerateQueryVisitor().AcceptAsync(node, context ?? new QueryVisitorContext());
     }
 
     public static string Run(IQueryNode node, IQueryVisitorContext? context = null)

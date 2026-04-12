@@ -289,10 +289,26 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var parser = new ElasticQueryParser(c => c.SetDefaultFields(["field1"]).UseMappings<MyType>(GetCodeMappings, Client, index));
 
-        var dynamicServerMappingProperty = parser.Configuration.MappingResolver!.GetMapping("field5")!.Property!;
-        var serverMappingProperty = parser.Configuration.MappingResolver.GetMapping("field2")!.Property!;
-        var codeMappingProperty = parser.Configuration.MappingResolver.GetMapping("field1")!.Property!;
-        var codeAndServerMappingProperty = parser.Configuration.MappingResolver.GetMapping("field3")!.Property!;
+        Assert.NotNull(parser.Configuration.MappingResolver);
+        var field5Mapping = parser.Configuration.MappingResolver.GetMapping("field5");
+        Assert.NotNull(field5Mapping);
+        Assert.NotNull(field5Mapping.Property);
+        var dynamicServerMappingProperty = field5Mapping.Property;
+
+        var field2Mapping = parser.Configuration.MappingResolver.GetMapping("field2");
+        Assert.NotNull(field2Mapping);
+        Assert.NotNull(field2Mapping.Property);
+        var serverMappingProperty = field2Mapping.Property;
+
+        var field1Mapping = parser.Configuration.MappingResolver.GetMapping("field1");
+        Assert.NotNull(field1Mapping);
+        Assert.NotNull(field1Mapping.Property);
+        var codeMappingProperty = field1Mapping.Property;
+
+        var field3Mapping = parser.Configuration.MappingResolver.GetMapping("field3");
+        Assert.NotNull(field3Mapping);
+        Assert.NotNull(field3Mapping.Property);
+        var codeAndServerMappingProperty = field3Mapping.Property;
 
         Assert.Equal("date", dynamicServerMappingProperty.Type);
         Assert.Equal("keyword", serverMappingProperty.Type);

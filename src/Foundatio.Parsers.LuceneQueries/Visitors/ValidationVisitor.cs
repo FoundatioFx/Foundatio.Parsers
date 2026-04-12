@@ -93,7 +93,8 @@ public class ValidationVisitor : ChainableQueryVisitor
 
     public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext? context)
     {
-        context ??= new QueryVisitorContext();
+        ArgumentNullException.ThrowIfNull(context);
+
         await node.AcceptAsync(this, context).ConfigureAwait(false);
         var validationResult = context.GetValidationResult();
         validationResult.QueryType = context.QueryType;
@@ -114,7 +115,7 @@ public class ValidationVisitor : ChainableQueryVisitor
             foreach (string field in options.RestrictedFields)
             {
                 string? resolvedField = fieldResolver is null ? field : await fieldResolver(field, context);
-                if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField?.Equals(f) == true || field.Equals(f))))
+                if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField?.Equals(f) is true || field.Equals(f))))
                     restrictedFields.Add(field);
             }
             if (restrictedFields.Count > 0)

@@ -36,7 +36,7 @@ public static class QueryNodeExtensions
             return false;
 
         if (node is IFieldQueryNode fieldNode)
-            return (fieldNode.IsNegated.HasValue && fieldNode.IsNegated.Value == true) || (!String.IsNullOrEmpty(fieldNode.Prefix) && (fieldNode.Prefix == "-" || fieldNode.Prefix == "!"));
+            return fieldNode.IsNegated is true || (!String.IsNullOrEmpty(fieldNode.Prefix) && fieldNode.Prefix is "-" or "!");
 
         return false;
     }
@@ -123,7 +123,7 @@ public static class QueryNodeExtensions
         if (node.IsRequired())
             return false;
 
-        return node.IsExcluded() || node.GetGroupNode()?.IsExcluded() == true;
+        return node.IsExcluded() || node.GetGroupNode()?.IsExcluded() is true;
     }
 
     public static GroupNode? GetRootNode(this IQueryNode node)

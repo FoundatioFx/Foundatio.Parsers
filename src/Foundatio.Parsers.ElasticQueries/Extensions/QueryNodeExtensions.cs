@@ -21,9 +21,12 @@ public static class QueryNodeExtensions
         return Task.FromResult(value as QueryBase);
     }
 
-    public static void SetQuery(this IQueryNode node, QueryBase container)
+    public static void SetQuery(this IQueryNode node, QueryBase? container)
     {
-        node.Data[QueryKey] = container;
+        if (container is null)
+            node.Data.Remove(QueryKey);
+        else
+            node.Data[QueryKey] = container;
     }
 
     public static void RemoveQuery(this IQueryNode node)

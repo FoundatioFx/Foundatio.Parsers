@@ -25,10 +25,10 @@ public static class TypeExtensions
         typeof (ulong?)
     };
 
-    public static Type UnwrapNullable(this Type type)
+    public static Type? UnwrapNullable(this Type type)
     {
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-            return Nullable.GetUnderlyingType(type)!;
+            return Nullable.GetUnderlyingType(type);
 
         return type;
     }

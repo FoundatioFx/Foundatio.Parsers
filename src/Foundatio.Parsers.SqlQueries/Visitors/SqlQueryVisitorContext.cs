@@ -9,20 +9,20 @@ namespace Foundatio.Parsers.SqlQueries.Visitors;
 
 public class SqlQueryVisitorContext : QueryVisitorContext, ISqlQueryVisitorContext
 {
-    public List<EntityFieldInfo> Fields { get; set; } = [];
+    public List<EntityFieldInfo>? Fields { get; set; }
     public SqlSearchOperator DefaultSearchOperator { get; set; } = SqlSearchOperator.StartsWith;
-    public string[] FullTextFields { get; set; } = [];
-    public Action<SearchTerm> SearchTokenizer { get; set; } = static _ => { };
-    public Func<string, string> DateTimeParser { get; set; } = static s => s;
-    public Func<string, string> DateOnlyParser { get; set; } = static s => s;
+    public string[]? FullTextFields { get; set; }
+    public Action<SearchTerm>? SearchTokenizer { get; set; }
+    public Func<string, string>? DateTimeParser { get; set; }
+    public Func<string, string>? DateOnlyParser { get; set; }
     public IEntityType? EntityType { get; set; }
 }
 
 [DebuggerDisplay("{FullName} IsNumber: {IsNumber} IsMoney: {IsMoney} IsDate: {IsDate} IsBoolean: {IsBoolean} IsCollection: {IsCollection}")]
 public class EntityFieldInfo
 {
-    public required string Name { get; init; }
-    public required string FullName { get; init; }
+    public string? Name { get; init; }
+    public string? FullName { get; init; }
     public bool IsNumber { get; set; }
     public bool IsMoney { get; set; }
     public bool IsDate { get; set; }

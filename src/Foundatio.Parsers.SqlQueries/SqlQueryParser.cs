@@ -104,7 +104,7 @@ public class SqlQueryParser : LuceneQueryParser
         fields = fields.ToList();
 
         var validationOptions = new QueryValidationOptions();
-        foreach (string field in fields.Where(f => !f.IsNavigation).Select(f => f.FullName))
+        foreach (string field in fields.Where(f => !f.IsNavigation && f.FullName is not null).Select(f => f.FullName!))
             validationOptions.AllowedFields.Add(field);
 
         Configuration.SetValidationOptions(validationOptions);
@@ -139,10 +139,10 @@ public class SqlQueryParser : LuceneQueryParser
             {
                 Name = property.Name,
                 FullName = propertyPath,
-                IsNumber = property.ClrType.UnwrapNullable().IsNumeric(),
-                IsDate = property.ClrType.UnwrapNullable().IsDateTime(),
-                IsDateOnly = property.ClrType.UnwrapNullable().IsDateOnly(),
-                IsBoolean = property.ClrType.UnwrapNullable().IsBoolean(),
+                IsNumber = property.ClrType.UnwrapNullable()?.IsNumeric() ?? false,
+                IsDate = property.ClrType.UnwrapNullable()?.IsDateTime() ?? false,
+                IsDateOnly = property.ClrType.UnwrapNullable()?.IsDateOnly() ?? false,
+                IsBoolean = property.ClrType.UnwrapNullable()?.IsBoolean() ?? false,
                 Parent = parent
             });
         }

@@ -395,6 +395,7 @@ public static class DefaultAggregationNodeExtensions
                 case "@include":
                     if (termNode.UnescapedTerm is null)
                         break;
+
                     if (termNode.IsRegexTerm)
                     {
                         termsAggregation.Include = new TermsInclude(termNode.UnescapedTerm);

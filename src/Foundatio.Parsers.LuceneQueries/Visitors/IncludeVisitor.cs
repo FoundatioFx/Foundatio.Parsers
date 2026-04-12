@@ -60,6 +60,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
             var parsed = await _parser.ParseAsync(includedQuery).ConfigureAwait(false);
             if (parsed is not GroupNode result)
                 return node;
+
             result.HasParens = true;
             await VisitAsync(result, context).ConfigureAwait(false);
 

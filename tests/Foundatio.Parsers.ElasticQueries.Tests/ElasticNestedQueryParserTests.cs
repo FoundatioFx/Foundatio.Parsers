@@ -432,7 +432,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         // Parse and examine the result after visitors have run
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var parsedNode = await processor.ParseAsync("terms:nested.field1 terms:nested.field4 max:nested.field4", context);
-        _logger.LogInformation("Parsed node (after visitors): {Node}", await DebugQueryVisitor.RunAsync(parsedNode!));
+        Assert.NotNull(parsedNode);
+        _logger.LogInformation("Parsed node (after visitors): {Node}", await DebugQueryVisitor.RunAsync(parsedNode));
 
         // Check nested paths on term nodes
         void LogNestedPaths(IQueryNode node, string indent = "")
@@ -449,7 +450,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                     LogNestedPaths(child, indent + "  ");
             }
         }
-        LogNestedPaths(parsedNode!);
+        LogNestedPaths(parsedNode);
 
         // Act
         var result = await processor.BuildAggregationsAsync("terms:nested.field1 terms:nested.field4 max:nested.field4");
@@ -787,9 +788,10 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         // Act
         var queryResult = await processor.BuildQueryAsync("nested.field4:>=5", new ElasticQueryVisitorContext { UseScoring = true });
         var aggResult = await processor.BuildAggregationsAsync("terms:nested.field1 max:nested.field4");
+        Assert.NotNull(aggResult);
 
         // Assert
-        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Query(_ => queryResult).Aggregations(aggResult!));
+        var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Query(_ => queryResult).Aggregations(aggResult));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 

@@ -174,9 +174,9 @@ public class ElasticMappingResolver : IDisposable
                 fieldMapping.Name = new PropertyName(clrOrigin.ClrOrigin);
 
             if (depth == 0)
-                resolvedFieldName += _inferrer?.PropertyName(fieldMapping.Name) ?? fieldMapping.Name?.Name ?? fieldPart;
+                resolvedFieldName += _inferrer!.PropertyName(fieldMapping.Name);
             else
-                resolvedFieldName += "." + (_inferrer?.PropertyName(fieldMapping.Name) ?? fieldMapping.Name?.Name ?? fieldPart);
+                resolvedFieldName += "." + _inferrer!.PropertyName(fieldMapping.Name);
 
             if (depth == fieldParts.Length - 1)
             {
@@ -232,10 +232,10 @@ public class ElasticMappingResolver : IDisposable
         return GetMapping(field, followAlias)?.Property;
     }
 
-    public string GetResolvedField(string? field)
+    public string? GetResolvedField(string? field)
     {
         var result = GetMapping(field, true);
-        return result?.FullPath ?? field ?? String.Empty;
+        return result?.FullPath ?? field;
     }
 
     public string GetResolvedField(Field field)
@@ -243,7 +243,7 @@ public class ElasticMappingResolver : IDisposable
         if (_inferrer == null)
             throw new InvalidOperationException("Unable to resolve Field without inferrer");
 
-        return GetResolvedField(_inferrer.Field(field));
+        return GetResolvedField(_inferrer.Field(field))!;
     }
 
     public string? GetSortFieldName(string? field)
