@@ -401,10 +401,10 @@ public static class SqlNodeExtensions
     public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo>? fields, string? field)
     {
         if (fields is null)
-            return new EntityFieldInfo { Name = field, FullName = field };
+            return new EntityFieldInfo { Name = field ?? string.Empty, FullName = field ?? string.Empty };
 
         return fields.FirstOrDefault(f => String.Equals(f.FullName, field, StringComparison.OrdinalIgnoreCase)) ??
-               new EntityFieldInfo { Name = field, FullName = field };
+               new EntityFieldInfo { Name = field ?? string.Empty, FullName = field ?? string.Empty };
     }
 
     private static (string scopePrefix, string argumentPrefix) SplitFieldPrefix(EntityFieldInfo field, string fieldPrefix)
