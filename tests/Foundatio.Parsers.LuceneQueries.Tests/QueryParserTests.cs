@@ -519,7 +519,7 @@ public class QueryParserTests : TestWithLoggingBase
         string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
         Assert.Equal(expected, generatedQuery);
 
-        await new AssignOperationTypeVisitor().AcceptAsync(result, null!);
+        await new AssignOperationTypeVisitor().AcceptAsync(result, new QueryVisitorContext());
         _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
     }
 
