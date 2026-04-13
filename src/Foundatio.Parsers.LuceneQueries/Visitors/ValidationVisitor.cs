@@ -112,7 +112,7 @@ public class ValidationVisitor : ChainableQueryVisitor
             var restrictedFields = new List<string>();
             foreach (string field in options.RestrictedFields)
             {
-                string? resolvedField = fieldResolver is null ? field : await fieldResolver(field, context);
+                string? resolvedField = fieldResolver is null ? field : await fieldResolver(field, context).AnyContext();
                 if (result.ReferencedFields.Any(f => !String.IsNullOrEmpty(f) && (resolvedField?.Equals(f) is true || field.Equals(f))))
                     restrictedFields.Add(field);
             }

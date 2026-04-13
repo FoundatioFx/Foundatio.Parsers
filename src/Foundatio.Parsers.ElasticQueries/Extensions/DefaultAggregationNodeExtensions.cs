@@ -437,7 +437,7 @@ public static class DefaultAggregationNodeExtensions
                     }
                     else
                     {
-                        termsAggregation.Exclude = termsAggregation.Exclude!.AddValue(termNode.UnescapedTerm);
+                        termsAggregation.Exclude = (termsAggregation.Exclude ?? new TermsExclude([])).AddValue(termNode.UnescapedTerm);
                     }
                     break;
                 case "@include":
@@ -450,7 +450,7 @@ public static class DefaultAggregationNodeExtensions
                     }
                     else
                     {
-                        termsAggregation.Include = termsAggregation.Include!.AddValue(termNode.UnescapedTerm);
+                        termsAggregation.Include = (termsAggregation.Include ?? new TermsInclude([])).AddValue(termNode.UnescapedTerm);
                     }
                     break;
                 case "@missing":
