@@ -71,10 +71,13 @@ public static class DefaultQueryNodeExtensions
     {
         if (context.MappingResolver.IsPropertyAnalyzed(field))
         {
+            if (node.UnescapedTerm is not { } term)
+                return null;
+
             // MatchQuery treats '*' as literal; use QueryStringQuery for wildcard support on analyzed fields
-            if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") is true)
+            if (!node.IsQuotedTerm && term.EndsWith("*"))
             {
-                return new QueryStringQuery(node.UnescapedTerm)
+                return new QueryStringQuery(term)
                 {
                     Fields = new[] { field },
                     AllowLeadingWildcard = false,
@@ -83,9 +86,9 @@ public static class DefaultQueryNodeExtensions
             }
 
             if (node.IsQuotedTerm)
-                return new MatchPhraseQuery(field, node.UnescapedTerm!);
+                return new MatchPhraseQuery(field, term);
 
-            return new MatchQuery(field, node.UnescapedTerm!);
+            return new MatchQuery(field, term);
         }
 
         if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") is true)
@@ -149,7 +152,9 @@ public static class DefaultQueryNodeExtensions
         // multi_match doesn't work well across analyzed + non-analyzed field types,
         // so split into separate queries and combine with bool should.
         var queries = new List<Query>();
-        queries.Add(GetAnalyzedFieldsQuery(node, analyzedFields.ToArray()));
+        var analyzedQuery = GetAnalyzedFieldsQuery(node, analyzedFields.ToArray());
+        if (analyzedQuery is not null)
+            queries.Add(analyzedQuery);
 
         foreach (string field in nonAnalyzedFields)
         {
@@ -161,11 +166,14 @@ public static class DefaultQueryNodeExtensions
         return new BoolQuery { Should = queries };
     }
 
-    private static Query GetAnalyzedFieldsQuery(TermNode node, string[] fields)
+    private static Query? GetAnalyzedFieldsQuery(TermNode node, string[] fields)
     {
-        if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") is true)
+        if (node.UnescapedTerm is not { } term)
+            return null;
+
+        if (!node.IsQuotedTerm && term.EndsWith("*"))
         {
-            return new QueryStringQuery(node.UnescapedTerm)
+            return new QueryStringQuery(term)
             {
                 Fields = fields,
                 AllowLeadingWildcard = false,
@@ -176,12 +184,12 @@ public static class DefaultQueryNodeExtensions
         if (fields.Length == 1)
         {
             if (node.IsQuotedTerm)
-                return new MatchPhraseQuery(fields[0], node.UnescapedTerm!);
+                return new MatchPhraseQuery(fields[0], term);
 
-            return new MatchQuery(fields[0], node.UnescapedTerm!);
+            return new MatchQuery(fields[0], term);
         }
 
-        var query = new MultiMatchQuery(node.UnescapedTerm!);
+        var query = new MultiMatchQuery(term);
         query.Fields = fields;
         if (node.IsQuotedTerm)
             query.Type = TextQueryType.Phrase;
@@ -271,15 +279,18 @@ public static class DefaultQueryNodeExtensions
         return new BoolQuery { Should = queryList };
     }
 
-    public static async Task<Query> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)
+    public static async Task<Query?> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
         string? field = node.UnescapedField;
+        if (String.IsNullOrEmpty(field))
+            return null;
+
         if (elasticContext.MappingResolver.IsDatePropertyType(field))
         {
-            var range = new DateRangeQuery(field!) { TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext()) };
+            var range = new DateRangeQuery(field) { TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext()) };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
@@ -300,7 +311,7 @@ public static class DefaultQueryNodeExtensions
         }
         else
         {
-            var range = new TermRangeQuery(field!);
+            var range = new TermRangeQuery(field);
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)

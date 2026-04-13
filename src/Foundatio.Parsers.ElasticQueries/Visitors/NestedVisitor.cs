@@ -42,9 +42,14 @@ public class NestedVisitor : ChainableQueryVisitor
     {
         ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
 
-        string field = node.Field!;
+        if (node.Field is not { } field || _filterResolver is null)
+        {
+            await base.VisitAsync(node, context).AnyContext();
+            return;
+        }
+
         string? originalField = node.GetOriginalField();
-        var filter = await _filterResolver!(nestedProperty, originalField ?? field, field, context).AnyContext();
+        var filter = await _filterResolver(nestedProperty, originalField ?? field, field, context).AnyContext();
         if (filter is not null)
             node.SetNestedFilter(filter);
 

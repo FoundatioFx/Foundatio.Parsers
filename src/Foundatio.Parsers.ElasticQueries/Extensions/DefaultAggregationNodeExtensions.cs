@@ -287,7 +287,7 @@ public static class DefaultAggregationNodeExtensions
         var start = context.GetDate("StartDate");
         var end = context.GetDate("EndDate");
         bool isValidRange = start.HasValue && start.Value > DateTime.MinValue && end.HasValue && end.Value < DateTime.MaxValue && start.Value <= end.Value;
-        var bounds = isValidRange ? new ExtendedBounds<FieldDateMath> { Min = start!.Value, Max = end!.Value } : null;
+        var bounds = isValidRange ? new ExtendedBounds<FieldDateMath> { Min = start.GetValueOrDefault(), Max = end.GetValueOrDefault() } : null;
 
         var interval = GetInterval(proximity, start, end);
         string? timezone = TryConvertTimeUnitToUtcOffset(boost);
@@ -336,7 +336,8 @@ public static class DefaultAggregationNodeExtensions
         if (String.IsNullOrEmpty(proximity))
             return GetInterval(start, end);
 
-        return proximity.Trim() switch
+        string trimmed = proximity.Trim();
+        return trimmed switch
         {
             "s" or "1s" or "second" => CalendarInterval.Second,
             "m" or "1m" or "minute" => CalendarInterval.Minute,
@@ -346,7 +347,7 @@ public static class DefaultAggregationNodeExtensions
             "M" or "1M" or "month" => CalendarInterval.Month,
             "q" or "1q" or "quarter" => CalendarInterval.Quarter,
             "y" or "1y" or "year" => CalendarInterval.Year,
-            _ => new Union<CalendarInterval, Duration>(proximity!),
+            _ => new Union<CalendarInterval, Duration>(trimmed),
         };
     }
 
@@ -481,14 +482,16 @@ public static class DefaultAggregationNodeExtensions
             {
                 if (topHitsAggregation.Source is null)
                 {
-                    topHitsAggregation.Source = node.GetSourceFilter(() => new SourceFilter())!;
+                    var sourceFilter = node.GetSourceFilter(() => new SourceFilter());
+                    if (sourceFilter is not null)
+                        topHitsAggregation.Source = sourceFilter;
                 }
 
-                topHitsAggregation.Source.Match(
+                topHitsAggregation.Source?.Match(
                     b => { },
                     filter =>
                     {
-                        if (filter is null)
+                        if (filter is null || termNode.UnescapedTerm is not { } term)
                             return;
 
                         switch (termNode.Field)
@@ -496,17 +499,17 @@ public static class DefaultAggregationNodeExtensions
                             case "@exclude":
                                 {
                                     if (filter.Excludes is null)
-                                        filter.Excludes = termNode.UnescapedTerm!;
+                                        filter.Excludes = term;
                                     else
-                                        filter.Excludes!.And(termNode.UnescapedTerm!);
+                                        filter.Excludes.And(term);
                                     break;
                                 }
                             case "@include":
                                 {
                                     if (filter.Includes is null)
-                                        filter.Includes = termNode.UnescapedTerm!;
+                                        filter.Includes = term;
                                     else
-                                        filter.Includes!.And(termNode.UnescapedTerm!);
+                                        filter.Includes.And(term);
                                     break;
                                 }
                         }
@@ -540,7 +543,8 @@ public static class DefaultAggregationNodeExtensions
                         break;
                     }
                 case "@offset":
-                    dateHistogramAggregation.Offset = termNode.IsExcluded() ? "-" + termNode.Term : termNode.Term!;
+                    if (termNode.Term is { } offset)
+                        dateHistogramAggregation.Offset = termNode.IsExcluded() ? "-" + offset : offset;
                     break;
             }
 

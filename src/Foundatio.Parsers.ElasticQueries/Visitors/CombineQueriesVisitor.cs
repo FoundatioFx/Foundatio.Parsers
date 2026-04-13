@@ -183,9 +183,9 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (query is null)
             return;
 
-        if (query.IsFilterOnlyBoolQuery())
+        if (query.IsFilterOnlyBoolQuery() && query.Bool is { Filter: { } existingFilters })
         {
-            filters.AddRange(query.Bool!.Filter!);
+            filters.AddRange(existingFilters);
         }
         else
         {
