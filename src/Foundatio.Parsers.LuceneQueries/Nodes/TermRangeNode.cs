@@ -8,22 +8,22 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes;
 public class TermRangeNode : QueryNodeBase, IFieldQueryNode
 {
     public bool? IsNegated { get; set; }
-    public string Field { get; set; }
-    public string UnescapedField => Field?.Unescape();
-    public string Prefix { get; set; }
-    public string Min { get; set; }
-    public string UnescapedMin => Min?.Unescape();
+    public string? Field { get; set; }
+    public string? UnescapedField => Field?.Unescape();
+    public string? Prefix { get; set; }
+    public string? Min { get; set; }
+    public string? UnescapedMin => Min?.Unescape();
     public bool IsMinQuotedTerm { get; set; }
-    public string Max { get; set; }
-    public string UnescapedMax => Max?.Unescape();
+    public string? Max { get; set; }
+    public string? UnescapedMax => Max?.Unescape();
     public bool IsMaxQuotedTerm { get; set; }
-    public string Operator { get; set; }
-    public string Delimiter { get; set; }
+    public string? Operator { get; set; }
+    public string? Delimiter { get; set; }
     public bool? MinInclusive { get; set; }
     public bool? MaxInclusive { get; set; }
-    public string Boost { get; set; }
-    public string UnescapedBoost => Boost?.Unescape();
-    public string Proximity { get; set; }
+    public string? Boost { get; set; }
+    public string? UnescapedBoost => Boost?.Unescape();
+    public string? Proximity { get; set; }
 
     public TermRangeNode CopyTo(TermRangeNode target)
     {

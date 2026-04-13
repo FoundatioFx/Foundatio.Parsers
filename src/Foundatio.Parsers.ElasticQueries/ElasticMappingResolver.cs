@@ -12,9 +12,9 @@ namespace Foundatio.Parsers.ElasticQueries;
 
 public class ElasticMappingResolver : IDisposable
 {
-    private ITypeMapping _serverMapping;
-    private readonly ITypeMapping _codeMapping;
-    private readonly Inferrer _inferrer;
+    private ITypeMapping? _serverMapping;
+    private readonly ITypeMapping? _codeMapping;
+    private readonly Inferrer? _inferrer;
     private readonly ConcurrentDictionary<string, FieldMapping> _mappingCache = new();
     private readonly object _mappingLock = new();
     private readonly SemaphoreSlim _fetchSemaphore = new(1, 1);
@@ -24,7 +24,7 @@ public class ElasticMappingResolver : IDisposable
 
     public static ElasticMappingResolver NullInstance = new(() => null);
 
-    public ElasticMappingResolver(Func<ITypeMapping> getMapping, Inferrer inferrer = null, TimeProvider timeProvider = null, ILogger logger = null)
+    public ElasticMappingResolver(Func<ITypeMapping?> getMapping, Inferrer? inferrer = null, TimeProvider? timeProvider = null, ILogger? logger = null)
     {
         GetServerMappingFunc = getMapping;
         _inferrer = inferrer;
@@ -32,7 +32,7 @@ public class ElasticMappingResolver : IDisposable
         _logger = logger ?? NullLogger.Instance;
     }
 
-    public ElasticMappingResolver(ITypeMapping codeMapping, Inferrer inferrer, Func<ITypeMapping> getMapping, TimeProvider timeProvider = null, ILogger logger = null)
+    public ElasticMappingResolver(ITypeMapping codeMapping, Inferrer inferrer, Func<ITypeMapping?> getMapping, TimeProvider? timeProvider = null, ILogger? logger = null)
         : this(getMapping, inferrer, timeProvider, logger)
     {
         _codeMapping = codeMapping;
@@ -59,7 +59,7 @@ public class ElasticMappingResolver : IDisposable
         _logger.LogInformation("Mapping refresh triggered.");
     }
 
-    public FieldMapping GetMapping(string field, bool followAlias = false)
+    public FieldMapping? GetMapping(string? field, bool followAlias = false)
     {
         if (String.IsNullOrWhiteSpace(field))
             return null;
@@ -99,7 +99,7 @@ public class ElasticMappingResolver : IDisposable
 
         // Snapshot server mapping under lock so readers see a consistent pair of
         // _serverMapping + _lastMappingUpdateTicks (both are set together in GetServerMapping).
-        ITypeMapping serverMapping;
+        ITypeMapping? serverMapping;
         DateTime? mappingServerTime;
         lock (_mappingLock)
         {
@@ -124,14 +124,14 @@ public class ElasticMappingResolver : IDisposable
         for (int depth = 0; depth < fieldParts.Length; depth++)
         {
             string fieldPart = fieldParts[depth];
-            IProperty fieldMapping = null;
+            IProperty? fieldMapping = null;
             if (currentProperties == null || !currentProperties.TryGetValue(fieldPart, out fieldMapping))
             {
                 // check to see if there is an name match
                 if (currentProperties != null)
                     fieldMapping = currentProperties.Values.FirstOrDefault(m =>
                     {
-                        string propertyName = _inferrer.PropertyName(m?.Name);
+                        string? propertyName = _inferrer?.PropertyName(m?.Name);
                         return propertyName != null && propertyName.Equals(fieldPart, StringComparison.OrdinalIgnoreCase);
                     });
 
@@ -174,9 +174,9 @@ public class ElasticMappingResolver : IDisposable
                 fieldMapping.Name = new PropertyName(clrOrigin.ClrOrigin);
 
             if (depth == 0)
-                resolvedFieldName += _inferrer.PropertyName(fieldMapping.Name);
+                resolvedFieldName += _inferrer!.PropertyName(fieldMapping.Name);
             else
-                resolvedFieldName += "." + _inferrer.PropertyName(fieldMapping.Name);
+                resolvedFieldName += "." + _inferrer!.PropertyName(fieldMapping.Name);
 
             if (depth == fieldParts.Length - 1)
             {
@@ -214,7 +214,7 @@ public class ElasticMappingResolver : IDisposable
         return notFoundMapping;
     }
 
-    public FieldMapping GetMapping(Field field, bool followAlias = false)
+    public FieldMapping? GetMapping(Field field, bool followAlias = false)
     {
         if (_inferrer == null)
             throw new InvalidOperationException("Unable to resolve Field without inferrer");
@@ -222,17 +222,17 @@ public class ElasticMappingResolver : IDisposable
         return GetMapping(_inferrer.Field(field), followAlias);
     }
 
-    public IProperty GetMappingProperty(string field, bool followAlias = false)
+    public IProperty? GetMappingProperty(string? field, bool followAlias = false)
     {
         return GetMapping(field, followAlias)?.Property;
     }
 
-    public IProperty GetMappingProperty(Field field, bool followAlias = false)
+    public IProperty? GetMappingProperty(Field field, bool followAlias = false)
     {
         return GetMapping(field, followAlias)?.Property;
     }
 
-    public string GetResolvedField(string field)
+    public string? GetResolvedField(string? field)
     {
         var result = GetMapping(field, true);
         return result?.FullPath ?? field;
@@ -243,35 +243,35 @@ public class ElasticMappingResolver : IDisposable
         if (_inferrer == null)
             throw new InvalidOperationException("Unable to resolve Field without inferrer");
 
-        return GetResolvedField(_inferrer.Field(field));
+        return GetResolvedField(_inferrer.Field(field))!;
     }
 
-    public string GetSortFieldName(string field)
+    public string? GetSortFieldName(string? field)
     {
         return GetNonAnalyzedFieldName(field, ElasticMapping.SortFieldName);
     }
 
     public string GetSortFieldName(Field field)
     {
-        return GetNonAnalyzedFieldName(GetResolvedField(field), ElasticMapping.SortFieldName);
+        return GetNonAnalyzedFieldName(GetResolvedField(field), ElasticMapping.SortFieldName)!;
     }
 
-    public string GetAggregationsFieldName(string field)
+    public string? GetAggregationsFieldName(string? field)
     {
         return GetNonAnalyzedFieldName(field, ElasticMapping.KeywordFieldName);
     }
 
     public string GetAggregationsFieldName(Field field)
     {
-        return GetNonAnalyzedFieldName(field, ElasticMapping.KeywordFieldName);
+        return GetNonAnalyzedFieldName(field, ElasticMapping.KeywordFieldName)!;
     }
 
-    public string GetNonAnalyzedFieldName(Field field, string preferredSubField = null)
+    public string GetNonAnalyzedFieldName(Field field, string? preferredSubField = null)
     {
-        return GetNonAnalyzedFieldName(GetResolvedField(field), preferredSubField);
+        return GetNonAnalyzedFieldName(GetResolvedField(field), preferredSubField)!;
     }
 
-    public string GetNonAnalyzedFieldName(string field, string preferredSubField = null)
+    public string? GetNonAnalyzedFieldName(string? field, string? preferredSubField = null)
     {
         if (String.IsNullOrEmpty(field))
             return field;
@@ -302,17 +302,17 @@ public class ElasticMappingResolver : IDisposable
         return mapping.FullPath;
     }
 
-    public bool IsPropertyAnalyzed(string field)
+    public bool IsPropertyAnalyzed(string? field)
     {
         // assume default is analyzed
         if (String.IsNullOrEmpty(field))
             return true;
 
         var property = GetMapping(field, true);
-        if (!property.Found)
+        if (property is null || !property.Found)
             return false;
 
-        return IsPropertyAnalyzed(property.Property);
+        return IsPropertyAnalyzed(property.Property!);
     }
 
     public bool IsPropertyAnalyzed(IProperty property)
@@ -323,7 +323,7 @@ public class ElasticMappingResolver : IDisposable
         return false;
     }
 
-    public bool IsNestedPropertyType(string field)
+    public bool IsNestedPropertyType(string? field)
     {
         if (String.IsNullOrEmpty(field))
             return false;
@@ -331,7 +331,7 @@ public class ElasticMappingResolver : IDisposable
         return GetMappingProperty(field, true) is INestedProperty;
     }
 
-    public bool IsGeoPropertyType(string field)
+    public bool IsGeoPropertyType(string? field)
     {
         if (String.IsNullOrEmpty(field))
             return false;
@@ -339,7 +339,7 @@ public class ElasticMappingResolver : IDisposable
         return GetMappingProperty(field, true) is IGeoPointProperty;
     }
 
-    public bool IsNumericPropertyType(string field)
+    public bool IsNumericPropertyType(string? field)
     {
         if (String.IsNullOrEmpty(field))
             return false;
@@ -347,7 +347,7 @@ public class ElasticMappingResolver : IDisposable
         return GetMappingProperty(field, true) is INumberProperty;
     }
 
-    public bool IsBooleanPropertyType(string field)
+    public bool IsBooleanPropertyType(string? field)
     {
         if (String.IsNullOrEmpty(field))
             return false;
@@ -355,7 +355,7 @@ public class ElasticMappingResolver : IDisposable
         return GetMappingProperty(field, true) is IBooleanProperty;
     }
 
-    public bool IsDatePropertyType(string field)
+    public bool IsDatePropertyType(string? field)
     {
         if (String.IsNullOrEmpty(field))
             return false;
@@ -363,7 +363,7 @@ public class ElasticMappingResolver : IDisposable
         return GetMappingProperty(field, true) is IDateProperty;
     }
 
-    public FieldType GetFieldType(string field)
+    public FieldType GetFieldType(string? field)
     {
         if (String.IsNullOrWhiteSpace(field))
             return FieldType.None;
@@ -407,12 +407,12 @@ public class ElasticMappingResolver : IDisposable
         };
     }
 
-    private IProperties MergeProperties(IProperties codeProperties, IProperties serverProperties)
+    private IProperties? MergeProperties(IProperties? codeProperties, IProperties? serverProperties)
     {
         if (codeProperties == null && serverProperties == null)
             return null;
 
-        IProperties mergedCodeProperties = null;
+        IProperties? mergedCodeProperties = null;
         // resolve code mapping property expressions using inferrer
         if (codeProperties != null)
         {
@@ -482,7 +482,7 @@ public class ElasticMappingResolver : IDisposable
         return properties;
     }
 
-    private Func<ITypeMapping> GetServerMappingFunc { get; set; }
+    private Func<ITypeMapping?>? GetServerMappingFunc { get; set; }
     private long _lastMappingUpdateTicks;
 
     private bool IsSnapshotCurrent(long snapshotEpoch, DateTime? snapshotServerTime)
@@ -524,7 +524,7 @@ public class ElasticMappingResolver : IDisposable
                     return false;
             }
 
-            ITypeMapping newMapping;
+            ITypeMapping? newMapping;
             try
             {
                 newMapping = GetServerMappingFunc();
@@ -554,7 +554,7 @@ public class ElasticMappingResolver : IDisposable
         }
     }
 
-    public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, ILogger logger = null) where T : class
+    public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, ILogger? logger = null) where T : class
     {
         logger ??= NullLogger.Instance;
 
@@ -569,7 +569,7 @@ public class ElasticMappingResolver : IDisposable
         }, logger);
     }
 
-    public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, string index, ILogger logger = null) where T : class
+    public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, IElasticClient client, string index, ILogger? logger = null) where T : class
     {
         logger ??= NullLogger.Instance;
 
@@ -584,14 +584,14 @@ public class ElasticMappingResolver : IDisposable
         }, logger);
     }
 
-    public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, Inferrer inferrer, Func<ITypeMapping> getMapping, ILogger logger = null) where T : class
+    public static ElasticMappingResolver Create<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> mappingBuilder, Inferrer inferrer, Func<ITypeMapping?> getMapping, ILogger? logger = null) where T : class
     {
         var codeMapping = new TypeMappingDescriptor<T>();
         codeMapping = mappingBuilder(codeMapping) as TypeMappingDescriptor<T>;
-        return new ElasticMappingResolver(codeMapping, inferrer, getMapping, logger: logger);
+        return new ElasticMappingResolver(codeMapping!, inferrer, getMapping, logger: logger);
     }
 
-    public static ElasticMappingResolver Create<T>(IElasticClient client, ILogger logger = null)
+    public static ElasticMappingResolver Create<T>(IElasticClient client, ILogger? logger = null)
     {
         logger ??= NullLogger.Instance;
 
@@ -606,7 +606,7 @@ public class ElasticMappingResolver : IDisposable
         }, client.Infer, logger);
     }
 
-    public static ElasticMappingResolver Create(IElasticClient client, string index, ILogger logger = null)
+    public static ElasticMappingResolver Create(IElasticClient client, string index, ILogger? logger = null)
     {
         logger ??= NullLogger.Instance;
 
@@ -621,7 +621,7 @@ public class ElasticMappingResolver : IDisposable
         }, client.Infer, logger);
     }
 
-    public static ElasticMappingResolver Create(Func<ITypeMapping> getMapping, Inferrer inferrer, ILogger logger = null)
+    public static ElasticMappingResolver Create(Func<ITypeMapping?> getMapping, Inferrer? inferrer, ILogger? logger = null)
     {
         return new ElasticMappingResolver(getMapping, inferrer, logger: logger);
     }
@@ -634,7 +634,7 @@ public class ElasticMappingResolver : IDisposable
 
 public class FieldMapping
 {
-    public FieldMapping(string path, IProperty property, DateTime? serverMapTime, long epoch = 0)
+    public FieldMapping(string path, IProperty? property, DateTime? serverMapTime, long epoch = 0)
     {
         FullPath = path;
         Property = property;
@@ -644,7 +644,7 @@ public class FieldMapping
 
     public bool Found => Property != null;
     public string FullPath { get; private set; }
-    public IProperty Property { get; private set; }
+    public IProperty? Property { get; private set; }
     public DateTime Date { get; private set; } = DateTime.UtcNow;
     internal DateTime? ServerMapTime { get; private set; }
     internal long Epoch { get; private set; }

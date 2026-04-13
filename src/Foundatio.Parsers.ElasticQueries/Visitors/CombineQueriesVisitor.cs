@@ -19,8 +19,8 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        QueryBase query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
-        QueryBase container = query;
+        QueryBase? query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
+        QueryBase? container = query;
         var nested = query as NestedQuery;
 
         // Reset container for non-root nested groups so children combine into a fresh
@@ -67,8 +67,8 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         foreach (var (path, pathQueries) in nestedQueries)
         {
-            QueryContainer combinedInner = null;
-            QueryContainer nestedFilter = null;
+            QueryContainer? combinedInner = null;
+            QueryContainer? nestedFilter = null;
             foreach (var (child, innerQuery) in pathQueries)
             {
                 QueryContainer q = innerQuery;
@@ -116,8 +116,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         return op;
     }
 
-    private static QueryBase Combine(QueryBase left, QueryBase right, GroupOperator op)
+    private static QueryBase? Combine(QueryBase? left, QueryBase right, GroupOperator op)
     {
+        if (left is null)
+            return right;
+
         if (op is GroupOperator.And)
             return left & right;
 
@@ -127,8 +130,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         return left;
     }
 
-    private static QueryContainer Combine(QueryContainer left, QueryContainer right, GroupOperator op)
+    private static QueryContainer? Combine(QueryContainer? left, QueryContainer right, GroupOperator op)
     {
+        if (left is null)
+            return right;
+
         if (op is GroupOperator.And)
             return left & right;
 

@@ -10,9 +10,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
 public class GeoVisitor : ChainableQueryVisitor
 {
-    private readonly Func<string, Task<string>> _resolveGeoLocation;
+    private readonly Func<string, Task<string>>? _resolveGeoLocation;
 
-    public GeoVisitor(Func<string, Task<string>> resolveGeoLocation = null)
+    public GeoVisitor(Func<string, Task<string>>? resolveGeoLocation = null)
     {
         _resolveGeoLocation = resolveGeoLocation;
     }
@@ -22,7 +22,10 @@ public class GeoVisitor : ChainableQueryVisitor
         if (context.QueryType != QueryTypes.Query || context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
             return;
 
-        string location = _resolveGeoLocation != null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;
+        if (String.IsNullOrEmpty(node.Term))
+            return;
+
+        string? location = _resolveGeoLocation is not null ? await _resolveGeoLocation(node.Term).ConfigureAwait(false) ?? node.Term : node.Term;
         var query = new GeoDistanceQuery { Field = node.Field, Location = location, Distance = node.Proximity ?? Distance.Miles(10) };
         node.SetQuery(query);
     }

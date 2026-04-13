@@ -110,10 +110,10 @@ public class CustomVisitorTests : ElasticsearchTestBase
         return false;
     }
 
-    private static Task<string> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch)
+    private static Task<string?> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch)
     {
         if (String.Equals(expected, actual))
-            return Task.FromResult(resolvedFilterIfMatch);
+            return Task.FromResult<string?>(resolvedFilterIfMatch);
 
         throw new ArgumentException(nameof(actual), $"Unable to resolve filter with id: {actual}");
     }
@@ -175,9 +175,9 @@ public sealed class CustomFilterVisitor : ChainableQueryVisitor
             string term = ToTerm(node);
             var ids = await GetIdsAsync(term);
             if (ids != null && ids.Count > 0)
-                node.Parent.SetQuery(new TermsQuery { Field = "id", Terms = ids });
+                node.Parent!.SetQuery(new TermsQuery { Field = "id", Terms = ids });
             else
-                node.Parent.SetQuery(new TermQuery { Field = "id", Value = "none" });
+                node.Parent!.SetQuery(new TermQuery { Field = "id", Value = "none" });
 
             node.Left = null;
             node.Right = null;

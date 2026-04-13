@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -9,22 +9,31 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors;
 public class QueryVisitorWithPriority : IChainableQueryVisitor
 {
     public int Priority { get; set; }
-    public IQueryNodeVisitorWithResult<IQueryNode> Visitor { get; set; }
+    public required IQueryNodeVisitorWithResult<IQueryNode?> Visitor { get; set; }
 
-    public Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
         return Visitor.AcceptAsync(node, context);
     }
 
-    public Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context)
+    public Task<IQueryNode?> VisitAsync(IQueryNode node, IQueryVisitorContext context)
     {
         return Visitor.VisitAsync(node, context);
     }
 
     public class PriorityComparer : IComparer<QueryVisitorWithPriority>
     {
-        public int Compare(QueryVisitorWithPriority x, QueryVisitorWithPriority y)
+        public int Compare(QueryVisitorWithPriority? x, QueryVisitorWithPriority? y)
         {
+            if (ReferenceEquals(x, y))
+                return 0;
+
+            if (x is null)
+                return -1;
+
+            if (y is null)
+                return 1;
+
             return x.Priority.CompareTo(y.Priority);
         }
 

@@ -16,7 +16,7 @@ public interface IQueryVisitorContext
     /// <summary>
     /// The default fields to search when no field is specified in a term.
     /// </summary>
-    string[] DefaultFields { get; set; }
+    string[]? DefaultFields { get; set; }
 
     /// <summary>
     /// The type of query being processed (query, aggregation, sort).

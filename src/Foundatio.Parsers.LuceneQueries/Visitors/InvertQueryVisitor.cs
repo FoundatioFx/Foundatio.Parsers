@@ -9,7 +9,7 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
 public class InvertQueryVisitor : ChainableMutatingQueryVisitor
 {
-    public InvertQueryVisitor(IEnumerable<string> nonInvertedFields = null)
+    public InvertQueryVisitor(IEnumerable<string>? nonInvertedFields = null)
     {
         if (nonInvertedFields != null)
             NonInvertedFields.AddRange(nonInvertedFields);
@@ -17,7 +17,7 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
 
     public List<string> NonInvertedFields { get; } = new List<string>();
 
-    public override Task<IQueryNode> VisitAsync(GroupNode node, IQueryVisitorContext context)
+    public override Task<IQueryNode?> VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         bool onlyNonInvertedFields = node.GetReferencedFields().All(f => NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase));
         bool hasNonInvertedFields = node.GetReferencedFields().Any(f => NonInvertedFields.Contains(f, StringComparer.OrdinalIgnoreCase));
@@ -25,12 +25,15 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
 
         // don't invert groups that only contain non-inverted fields
         if (onlyNonInvertedFields)
-            return Task.FromResult<IQueryNode>(node);
+            return Task.FromResult<IQueryNode?>(node);
 
         if (onlyInvertedFields)
         {
             // invert, don't visit children
-            node = node.InvertNegation() as GroupNode;
+            if (node.InvertNegation() is GroupNode inverted)
+                node = inverted;
+            else
+                throw new InvalidOperationException($"InvertNegation on a GroupNode returned an unexpected type: {node.GetType().Name}");
 
             var alternateInvertedCriteria = context.GetAlternateInvertedCriteria();
             if (alternateInvertedCriteria != null)
@@ -42,14 +45,14 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
                     HasParens = true
                 });
 
-            return Task.FromResult<IQueryNode>(node);
+            return Task.FromResult<IQueryNode?>(node);
         }
 
         // otherwise, continue visiting children and invert them
         return base.VisitAsync(node, context);
     }
 
-    public override Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context)
+    public override Task<IQueryNode?> VisitAsync(IQueryNode node, IQueryVisitorContext context)
     {
         if (context.DefaultOperator == GroupOperator.Or)
             throw new ArgumentException("Queries using OR as the default operator can not be inverted.");
@@ -58,7 +61,7 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
             return VisitAsync(groupNode, context);
 
         if (node is IFieldQueryNode fieldNode && NonInvertedFields.Contains(fieldNode.Field, StringComparer.OrdinalIgnoreCase))
-            return Task.FromResult(node);
+            return Task.FromResult<IQueryNode?>(node);
 
         node = node.InvertNegation();
 
@@ -72,21 +75,17 @@ public class InvertQueryVisitor : ChainableMutatingQueryVisitor
                 HasParens = true
             });
 
-        return Task.FromResult(node);
+        return Task.FromResult<IQueryNode?>(node);
     }
 
-    public override Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public static async Task<string?> RunAsync(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
     {
-        return node.AcceptAsync(this, context);
-    }
-
-    public static async Task<string> RunAsync(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null)
-    {
+        context ??= new QueryVisitorContext();
         var result = await new InvertQueryVisitor(nonInvertedFields).AcceptAsync(node, context);
-        return result.ToString();
+        return result?.ToString();
     }
 
-    public static string Run(IQueryNode node, IEnumerable<string> nonInvertedFields = null, IQueryVisitorContext context = null)
+    public static string? Run(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, nonInvertedFields, context).GetAwaiter().GetResult();
     }

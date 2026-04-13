@@ -36,7 +36,7 @@ public static class QueryNodeExtensions
             return false;
 
         if (node is IFieldQueryNode fieldNode)
-            return (fieldNode.IsNegated.HasValue && fieldNode.IsNegated.Value == true) || (!String.IsNullOrEmpty(fieldNode.Prefix) && (fieldNode.Prefix == "-" || fieldNode.Prefix == "!"));
+            return fieldNode.IsNegated is true || (!String.IsNullOrEmpty(fieldNode.Prefix) && fieldNode.Prefix is "-" or "!");
 
         return false;
     }
@@ -123,10 +123,10 @@ public static class QueryNodeExtensions
         if (node.IsRequired())
             return false;
 
-        return node.IsExcluded() || node.GetGroupNode().IsExcluded();
+        return node.IsExcluded() || node.GetGroupNode()?.IsExcluded() is true;
     }
 
-    public static GroupNode GetRootNode(this IQueryNode node)
+    public static GroupNode? GetRootNode(this IQueryNode node)
     {
         if (node == null)
             return null;
@@ -143,7 +143,7 @@ public static class QueryNodeExtensions
         return null;
     }
 
-    public static GroupNode GetGroupNode(this IQueryNode node, bool onlyParensOrRoot = true)
+    public static GroupNode? GetGroupNode(this IQueryNode node, bool onlyParensOrRoot = true)
     {
         if (node == null)
             return null;
@@ -161,9 +161,9 @@ public static class QueryNodeExtensions
     }
 
     private const string TimeZoneKey = "@TimeZone";
-    public static string GetTimeZone(this IFieldQueryNode node, string defaultTimeZone = null)
+    public static string? GetTimeZone(this IFieldQueryNode node, string? defaultTimeZone = null)
     {
-        if (!node.Data.TryGetValue(TimeZoneKey, out object value))
+        if (!node.Data.TryGetValue(TimeZoneKey, out object? value))
             return defaultTimeZone;
 
         return value as string;
@@ -175,9 +175,9 @@ public static class QueryNodeExtensions
     }
 
     private const string OriginalFieldKey = "@OriginalField";
-    public static string GetOriginalField(this IFieldQueryNode node)
+    public static string? GetOriginalField(this IFieldQueryNode node)
     {
-        if (!node.Data.TryGetValue(OriginalFieldKey, out object value))
+        if (!node.Data.TryGetValue(OriginalFieldKey, out object? value))
             return node.Field;
 
         return value as string;
@@ -194,33 +194,35 @@ public static class QueryNodeExtensions
         return node.Data.ContainsKey(OperationTypeKey);
     }
 
-    public static string GetOperationType(this IQueryNode node)
+    public static string? GetOperationType(this IQueryNode node)
     {
-        if (!node.Data.TryGetValue(OperationTypeKey, out object value))
+        if (!node.Data.TryGetValue(OperationTypeKey, out object? value))
             return null;
 
-        return (string)value;
+        return (string?)value;
     }
 
-    public static void SetOperationType(this IQueryNode node, string operationType)
+    public static void SetOperationType(this IQueryNode node, string? operationType)
     {
-        node.Data[OperationTypeKey] = operationType;
+        if (operationType is null)
+            node.Data.Remove(OperationTypeKey);
+        else
+            node.Data[OperationTypeKey] = operationType;
     }
 
-    public static string[] GetDefaultFields(this IQueryNode node, string[] rootDefaultFields)
+    public static string[]? GetDefaultFields(this IQueryNode node, string[]? rootDefaultFields)
     {
         var scopedNode = GetGroupNode(node);
-        return !String.IsNullOrEmpty(scopedNode?.Field) ? [scopedNode.Field] : rootDefaultFields;
+        return !String.IsNullOrEmpty(scopedNode?.Field) ? [scopedNode!.Field!] : rootDefaultFields;
     }
 
-    public static GroupOperator GetOperator(this IQueryNode node, IQueryVisitorContext context)
+    public static GroupOperator GetOperator(this IQueryNode node, IQueryVisitorContext? context)
     {
         var defaultOperator = GroupOperator.And;
         if (context != null && context.DefaultOperator != GroupOperator.Default)
             defaultOperator = context.DefaultOperator;
 
-        if (node is not GroupNode groupNode)
-            groupNode = node.Parent as GroupNode;
+        var groupNode = node as GroupNode ?? node.Parent as GroupNode;
 
         if (groupNode == null)
             return defaultOperator;
@@ -235,12 +237,12 @@ public static class QueryNodeExtensions
 
     private const string ReferencedFieldsKey = "@ReferencedFields";
     private const string CurrentGroupReferencedFieldsKey = "@CurrentGroupReferencedFields";
-    public static ISet<string> GetReferencedFields<T>(this T node, IQueryVisitorContext context = null, bool currentGroupOnly = false) where T : IQueryNode
+    public static ISet<string> GetReferencedFields<T>(this T node, IQueryVisitorContext? context = null, bool currentGroupOnly = false) where T : IQueryNode
     {
-        if (!currentGroupOnly && node.Data.TryGetValue(ReferencedFieldsKey, out object allFieldsObject) && allFieldsObject is ISet<string> allFields)
+        if (!currentGroupOnly && node.Data.TryGetValue(ReferencedFieldsKey, out object? allFieldsObject) && allFieldsObject is ISet<string> allFields)
             return allFields;
 
-        if (currentGroupOnly && node.Data.TryGetValue(CurrentGroupReferencedFieldsKey, out object immediateFieldsObject) && immediateFieldsObject is ISet<string> immediateFields)
+        if (currentGroupOnly && node.Data.TryGetValue(CurrentGroupReferencedFieldsKey, out object? immediateFieldsObject) && immediateFieldsObject is ISet<string> immediateFields)
             return immediateFields;
 
         var fields = new HashSet<string>();
@@ -255,7 +257,7 @@ public static class QueryNodeExtensions
         return fields;
     }
 
-    private static void GatherReferencedFields(IQueryVisitorContext context, IQueryNode node, HashSet<string> fields, int currentGroupDepth, int maxGroupDepth)
+    private static void GatherReferencedFields(IQueryVisitorContext? context, IQueryNode node, HashSet<string> fields, int currentGroupDepth, int maxGroupDepth)
     {
         if (maxGroupDepth >= 0 && currentGroupDepth >= 0 && currentGroupDepth > maxGroupDepth)
             return;
@@ -268,11 +270,11 @@ public static class QueryNodeExtensions
             }
             else if (fieldNode is not GroupNode)
             {
-                string[] defaultFields = node.GetDefaultFields(context?.DefaultFields);
+                string[]? defaultFields = node.GetDefaultFields(context?.DefaultFields);
                 if (defaultFields == null || defaultFields.Length == 0)
                     fields.Add("");
                 else
-                    foreach (string defaultField in fields)
+                    foreach (string defaultField in defaultFields)
                         fields.Add(defaultField);
             }
         }

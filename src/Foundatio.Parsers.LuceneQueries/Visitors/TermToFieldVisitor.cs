@@ -15,12 +15,13 @@ public class TermToFieldVisitor : ChainableQueryVisitor
         node.Term = null;
     }
 
-    public static Task RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    public static Task RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
+        context ??= new QueryVisitorContext();
         return new TermToFieldVisitor().AcceptAsync(node, context);
     }
 
-    public static void Run(IQueryNode node, IQueryVisitorContext context = null)
+    public static void Run(IQueryNode node, IQueryVisitorContext? context = null)
     {
         RunAsync(node, context).GetAwaiter().GetResult();
     }

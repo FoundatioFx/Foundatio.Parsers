@@ -37,7 +37,7 @@ public static class ElasticExtensions
     }
 
     // TODO: Handle IFailureReason/BulkIndexByScrollFailure and other bulk response types.
-    public static string GetErrorMessage(this IElasticsearchResponse elasticResponse, string message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
+    public static string GetErrorMessage(this IElasticsearchResponse elasticResponse, string? message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
     {
         if (elasticResponse == null)
             return String.Empty;
@@ -55,7 +55,7 @@ public static class ElasticExtensions
             sb.AppendLine($"Original: [{response.OriginalException.GetType().Name}] {response.OriginalException.Message}");
 
         if (response?.ServerError?.Error != null)
-            sb.AppendLine($"Server Error (Index={response.ServerError.Error?.Index}): {response.ServerError.Error.Reason}");
+            sb.AppendLine($"Server Error (Index={response.ServerError.Error.Index}): {response.ServerError.Error.Reason}");
 
         if (elasticResponse is BulkResponse bulkResponse)
             sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
@@ -65,16 +65,16 @@ public static class ElasticExtensions
 
         if (elasticResponse.ApiCall?.RequestBodyInBytes != null)
         {
-            string body = Encoding.UTF8.GetString(elasticResponse.ApiCall?.RequestBodyInBytes);
+            string body = Encoding.UTF8.GetString(elasticResponse.ApiCall.RequestBodyInBytes);
             if (normalize)
                 body = JsonUtility.Normalize(body);
             sb.AppendLine(body);
         }
 
-        var apiCall = response.ApiCall;
-        if (includeResponse && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
+        var apiCall = response?.ApiCall;
+        if (includeResponse && apiCall?.ResponseBodyInBytes is not null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
         {
-            string body = Encoding.UTF8.GetString(apiCall?.ResponseBodyInBytes);
+            string body = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes);
             if (normalize)
                 body = JsonUtility.Normalize(body);
 
@@ -93,7 +93,7 @@ public static class ElasticExtensions
         return GetErrorMessage(elasticResponse, null, normalize, includeResponse, includeDebugInformation);
     }
 
-    public static async Task<bool> WaitForReadyAsync(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null)
+    public static async Task<bool> WaitForReadyAsync(this IElasticClient client, CancellationToken cancellationToken, ILogger? logger = null)
     {
         var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;
@@ -116,7 +116,7 @@ public static class ElasticExtensions
         return false;
     }
 
-    public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger logger = null)
+    public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger? logger = null)
     {
         var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;

@@ -58,15 +58,15 @@ public class SampleContext : DbContext
 public class Employee
 {
     public int Id { get; set; }
-    public string FullName { get; set; }
-    public string PhoneNumber { get; set; }
-    public string NationalPhoneNumber { get; set; }
-    public string Title { get; set; }
+    public string FullName { get; set; } = null!;
+    public string PhoneNumber { get; set; } = null!;
+    public string NationalPhoneNumber { get; set; } = null!;
+    public string Title { get; set; } = null!;
     public int Salary { get; set; }
     public int? CurrentCompanyId { get; set; }
-    public Company CurrentCompany { get; set; }
-    public List<Company> Companies { get; set; }
-    public List<DataValue> DataValues { get; set; }
+    public Company? CurrentCompany { get; set; }
+    public List<Company> Companies { get; set; } = null!;
+    public List<DataValue> DataValues { get; set; } = null!;
     public TimeOnly HappyHour { get; set; }
     public DateOnly Birthday { get; set; }
 
@@ -76,11 +76,11 @@ public class Employee
 public class Company
 {
     public int Id { get; set; }
-    public string Name { get; set; }
-    public string Description { get; set; }
-    public string Location { get; set; }
-    public List<Employee> Employees { get; set; }
-    public List<DataDefinition> DataDefinitions { get; set; }
+    public string Name { get; set; } = null!;
+    public string? Description { get; set; }
+    public string? Location { get; set; }
+    public List<Employee> Employees { get; set; } = null!;
+    public List<DataDefinition> DataDefinitions { get; set; } = null!;
 }
 
 public class DataValue
@@ -91,16 +91,16 @@ public class DataValue
     public int EmployeeId { get; set; }
 
     // store the values separately as sparse columns for querying purposes
-    public string StringValue { get; set; }
+    public string? StringValue { get; set; }
     public DateTime? DateValue { get; set; }
     public DateOnly? DateOnlyValue { get; set; }
     public decimal? MoneyValue { get; set; }
     public bool? BooleanValue { get; set; }
     public decimal? NumberValue { get; set; }
 
-    public DataDefinition Definition { get; set; } = null;
+    public DataDefinition? Definition { get; set; } = null;
 
-    public object GetValue(DataType? dataType = null)
+    public object? GetValue(DataType? dataType = null)
     {
         if (!dataType.HasValue && Definition != null)
             dataType = Definition.DataType;
@@ -136,6 +136,7 @@ public class DataValue
     {
         StringValue = null;
         DateValue = null;
+        DateOnlyValue = null;
         NumberValue = null;
         BooleanValue = null;
         MoneyValue = null;
@@ -175,7 +176,7 @@ public class DataValue
 
     // relationships
     [DeleteBehavior(DeleteBehavior.NoAction)]
-    public Employee Employee { get; set; } = null;
+    public Employee? Employee { get; set; } = null;
 }
 
 public class DataDefinition
@@ -188,7 +189,7 @@ public class DataDefinition
 
     // relationships
     [DeleteBehavior(DeleteBehavior.Cascade)]
-    public Company Company { get; set; } = null;
+    public Company? Company { get; set; } = null;
 }
 
 public enum DataType

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -13,7 +14,7 @@ public static class SqlNodeExtensions
     public static string ToDynamicLinqString(this GroupNode node, ISqlQueryVisitorContext context)
     {
         // support overriding the generated query
-        if (node.TryGetQuery(out string query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         if (node.Left == null && node.Right == null)
@@ -67,7 +68,7 @@ public static class SqlNodeExtensions
             context.AddValidationError("Field is required for exists node queries.");
 
         // support overriding the generated query
-        if (node.TryGetQuery(out string query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
@@ -95,7 +96,7 @@ public static class SqlNodeExtensions
             context.AddValidationError("Prefix is not supported for term range queries.");
 
         // support overriding the generated query
-        if (node.TryGetQuery(out string query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
@@ -113,13 +114,16 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
-    public static string ToDynamicLinqString(this TermNode node, ISqlQueryVisitorContext context)
+    public static string? ToDynamicLinqString(this TermNode node, ISqlQueryVisitorContext context)
     {
         if (!String.IsNullOrEmpty(node.Prefix))
             context.AddValidationError("Prefix is not supported for term range queries.");
 
+        if (node.Term is null)
+            return null;
+
         // support overriding the generated query
-        if (node.TryGetQuery(out string query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         var builder = new StringBuilder();
@@ -147,7 +151,7 @@ public static class SqlNodeExtensions
                     fieldTerms[fieldInfo] = searchTerm;
                 }
 
-                context.SearchTokenizer.Invoke(searchTerm);
+                context.SearchTokenizer?.Invoke(searchTerm);
                 if (searchTerm.Tokens == null)
                     searchTerm.Tokens = [searchTerm.Term];
                 else
@@ -190,7 +194,7 @@ public static class SqlNodeExtensions
 
                         builder.Append(scopePrefix);
 
-                        if (context.FullTextFields.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase))
+                        if (context.FullTextFields?.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase) is true)
                         {
                             builder.Append("FTS.Contains(");
                             builder.Append(argumentPrefix);
@@ -220,7 +224,7 @@ public static class SqlNodeExtensions
                         builder.Append(i.IsFirst ? "(" : " OR ");
                         builder.Append(scopePrefix);
 
-                        if (context.FullTextFields.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase))
+                        if (context.FullTextFields?.Contains(kvp.Key.FullName, StringComparer.OrdinalIgnoreCase) is true)
                         {
                             builder.Append("FTS.Contains(");
                             builder.Append(argumentPrefix);
@@ -276,7 +280,7 @@ public static class SqlNodeExtensions
         {
             builder.Append(scopePrefix);
 
-            if (context.FullTextFields.Contains(field.FullName, StringComparer.OrdinalIgnoreCase))
+            if (context.FullTextFields?.Contains(field.FullName, StringComparer.OrdinalIgnoreCase) is true)
             {
                 builder.Append("FTS.Contains(");
                 builder.Append(argumentPrefix);
@@ -300,7 +304,7 @@ public static class SqlNodeExtensions
         {
             builder.Append(scopePrefix);
 
-            if (context.FullTextFields.Contains(field.FullName, StringComparer.OrdinalIgnoreCase))
+            if (context.FullTextFields?.Contains(field.FullName, StringComparer.OrdinalIgnoreCase) is true)
             {
                 builder.Append("FTS.Contains(");
                 builder.Append(argumentPrefix);
@@ -334,7 +338,7 @@ public static class SqlNodeExtensions
             context.AddValidationError("Proximity is not supported for term range queries.");
 
         // support overriding the generated query
-        if (node.TryGetQuery(out string query))
+        if (node.TryGetQuery(out string? query))
             return query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
@@ -357,7 +361,7 @@ public static class SqlNodeExtensions
             builder.Append(scopePrefix);
             builder.Append(argumentPrefix);
             builder.Append(field.Name);
-            builder.Append(node.MinInclusive == true ? " >= " : " > ");
+            builder.Append(node.MinInclusive is true ? " >= " : " > ");
             AppendField(builder, field, node.Min, context);
             builder.Append(fieldSuffix);
         }
@@ -370,7 +374,7 @@ public static class SqlNodeExtensions
             builder.Append(scopePrefix);
             builder.Append(argumentPrefix);
             builder.Append(field.Name);
-            builder.Append(node.MaxInclusive == true ? " <= " : " < ");
+            builder.Append(node.MaxInclusive is true ? " <= " : " < ");
             AppendField(builder, field, node.Max, context);
             builder.Append(fieldSuffix);
         }
@@ -381,7 +385,7 @@ public static class SqlNodeExtensions
         return builder.ToString();
     }
 
-    public static string ToDynamicLinqString(this IQueryNode node, ISqlQueryVisitorContext context)
+    public static string? ToDynamicLinqString(this IQueryNode node, ISqlQueryVisitorContext context)
     {
         return node switch
         {
@@ -394,12 +398,12 @@ public static class SqlNodeExtensions
         };
     }
 
-    public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo> fields, string field)
+    public static EntityFieldInfo GetFieldInfo(List<EntityFieldInfo>? fields, string? field)
     {
-        if (fields == null)
+        if (fields is null)
             return new EntityFieldInfo { Name = field, FullName = field };
 
-        return fields.FirstOrDefault(f => f.FullName.Equals(field, StringComparison.OrdinalIgnoreCase)) ??
+        return fields.FirstOrDefault(f => String.Equals(f.FullName, field, StringComparison.OrdinalIgnoreCase)) ??
                new EntityFieldInfo { Name = field, FullName = field };
     }
 
@@ -516,15 +520,21 @@ public static class SqlNodeExtensions
         node.Data[QueryKey] = query;
     }
 
-    public static string GetQuery(this IQueryNode node)
+    public static string? GetQuery(this IQueryNode node)
     {
-        return node.Data.TryGetValue(QueryKey, out object query) ? query as string : null;
+        return node.Data.TryGetValue(QueryKey, out object? query) ? query as string : null;
     }
 
-    public static bool TryGetQuery(this IQueryNode node, out string query)
+    public static bool TryGetQuery(this IQueryNode node, [NotNullWhen(true)] out string? query)
     {
+        if (node.Data.TryGetValue(QueryKey, out object? value) && value is string s)
+        {
+            query = s;
+            return true;
+        }
+
         query = null;
-        return node.Data.TryGetValue(QueryKey, out object value) && (query = value as string) != null;
+        return false;
     }
 
     public static void RemoveQuery(this IQueryNode node)

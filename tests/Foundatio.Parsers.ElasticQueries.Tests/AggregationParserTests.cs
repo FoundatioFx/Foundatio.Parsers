@@ -33,7 +33,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -65,7 +65,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:heynow");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -101,7 +101,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(fieldMap));
         var aggregations = await processor.BuildAggregationsAsync("terms:heynow");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -132,7 +132,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990"));
         var aggregations = await processor.BuildAggregationsAsync("min:field4 max:field4 avg:field4 sum:field4 percentiles:field4~50,100 cardinality:field4 missing:field2 date:field5 histogram:field4 geogrid:field3 terms:field1");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -175,7 +175,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("terms:(alias1 cardinality:user)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -205,7 +205,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("missing:alias2");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -239,7 +239,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index).UseGeo(_ => "51.5032520,-0.1278990").UseFieldMap(aliasMap));
         var aggregations = await processor.BuildAggregationsAsync("min:alias4 max:alias4 avg:alias4 sum:alias4 percentiles:alias4 cardinality:user missing:alias2 date:alias5 histogram:alias4 geogrid:alias3 terms:alias1");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -275,7 +275,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -304,7 +304,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 @exclude:/A.*/ @include:/B.*/)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -331,7 +331,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("histogram:(field1~0.1)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -358,7 +358,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1~1000^2 tophits:(_~1000 @include:myinclude))");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -386,7 +386,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("terms:(field1 -cardinality:field4)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -416,7 +416,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("date:(field5^1h @missing:\"0001-01-01T00:00:00\" min:field5^1h max:field5^1h)");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -450,7 +450,7 @@ public class AggregationParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var aggregations = await processor.BuildAggregationsAsync("min:field4~0 max:field4~0 avg:field4~0 sum:field4~0 cardinality:field4~0");
 
-        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations));
+        var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(aggregations!));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
@@ -497,40 +497,40 @@ public class AggregationParserTests : ElasticsearchTestBase
 
     public static IEnumerable<object[]> AggregationTestCases =>
     [
-        [null, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>()],
-        [String.Empty, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>()],
+        [null!, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string?>>()],
+        [String.Empty, true, 1, new HashSet<string>(), new Dictionary<string, ICollection<string?>>()],
         ["avg",
             false,
             1,
             new HashSet<string> { "" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { null } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { null } } }
         ],
-        ["avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string>>()],
+        ["avg:", false, 1, new HashSet<string>(), new Dictionary<string, ICollection<string?>>()],
         [
             "avg:value",
             true,
             1,
             new HashSet<string> { "value" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { "value" } } }
         ],
         [
             "    avg    :    value",
             true,
             1,
             new HashSet<string> { "value" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { "value" } } }
         ],
         [
             "avg:value cardinality:value sum:value min:value max:value",
             true,
             1,
             new HashSet<string> { "value" },
-            new Dictionary<string, ICollection<string>> {
-                    { "avg", new HashSet<string> { "value" } },
-                    { "cardinality", new HashSet<string> { "value" } },
-                    { "sum", new HashSet<string> { "value" } },
-                    { "min", new HashSet<string> { "value" } },
-                    { "max", new HashSet<string> { "value" } }
+            new Dictionary<string, ICollection<string?>> {
+                    { "avg", new HashSet<string?> { "value" } },
+                    { "cardinality", new HashSet<string?> { "value" } },
+                    { "sum", new HashSet<string?> { "value" } },
+                    { "min", new HashSet<string?> { "value" } },
+                    { "max", new HashSet<string?> { "value" } }
                 }
         ],
         [
@@ -538,26 +538,26 @@ public class AggregationParserTests : ElasticsearchTestBase
             true,
             1,
             new HashSet<string> { "value", "value2" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value", "value2" } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { "value", "value2" } } }
         ],
         [
             "avg:value avg:value",
             true,
             1,
             new HashSet<string> { "value" },
-            new Dictionary<string, ICollection<string>> { { "avg", new HashSet<string> { "value" } } }
+            new Dictionary<string, ICollection<string?>> { { "avg", new HashSet<string?> { "value" } } }
         ]
     ];
 
     [Theory]
     [MemberData(nameof(AggregationTestCases))]
-    public Task GetElasticAggregationQueryInfoAsync(string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string>> operations)
+    public Task GetElasticAggregationQueryInfoAsync(string query, bool isValid, int maxNodeDepth, HashSet<string> fields, Dictionary<string, ICollection<string?>> operations)
     {
         var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         return GetAggregationQueryInfoAsync(parser, query, isValid, maxNodeDepth, fields, operations);
     }
 
-    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth = -1, HashSet<string> fields = null, Dictionary<string, ICollection<string>> operations = null)
+    private async Task GetAggregationQueryInfoAsync(IQueryParser parser, string query, bool isValid, int maxNodeDepth = -1, HashSet<string>? fields = null, Dictionary<string, ICollection<string?>>? operations = null)
     {
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var queryNode = await parser.ParseAsync(query, context);

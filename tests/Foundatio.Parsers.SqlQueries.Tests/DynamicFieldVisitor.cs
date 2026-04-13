@@ -15,7 +15,7 @@ public class DynamicFieldVisitor : ChainableMutatingQueryVisitor
 
         var field = SqlNodeExtensions.GetFieldInfo(sqlContext.Fields, node.Field);
 
-        if (field == null || !field.Data.TryGetValue("DataDefinitionId", out object value) ||
+        if (field is null || !field.Data.TryGetValue("DataDefinitionId", out object? value) ||
             value is not int dataDefinitionId)
         {
             return node;

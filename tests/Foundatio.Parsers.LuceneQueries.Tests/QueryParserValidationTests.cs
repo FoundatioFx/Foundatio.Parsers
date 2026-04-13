@@ -177,7 +177,7 @@ public class QueryParserValidationTests : TestWithLoggingBase
             Tracer = tracer
         };
 
-        IQueryNode result;
+        IQueryNode? result;
         try
         {
             result = await parser.ParseAsync(query);
@@ -188,6 +188,7 @@ public class QueryParserValidationTests : TestWithLoggingBase
             return;
         }
 
+        Assert.NotNull(result);
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation("{Result}", nodes);
         string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
@@ -231,6 +232,7 @@ public class QueryParserValidationTests : TestWithLoggingBase
         {
             _logger.LogInformation("Attempting: {Escaped}", escaped);
             var result = await parser.ParseAsync(query);
+            Assert.NotNull(result);
 
             _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);

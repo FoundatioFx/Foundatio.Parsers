@@ -28,19 +28,19 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var queryResult = await sut.BuildQueryAsync("");
         Assert.NotNull(queryResult);
 
-        queryResult = await sut.BuildQueryAsync((string)null);
+        queryResult = await sut.BuildQueryAsync((string)null!);
         Assert.NotNull(queryResult);
 
         var aggResult = await sut.BuildAggregationsAsync("");
         Assert.NotNull(aggResult);
 
-        aggResult = await sut.BuildAggregationsAsync((string)null);
+        aggResult = await sut.BuildAggregationsAsync((string)null!);
         Assert.NotNull(aggResult);
 
         var sortResult = await sut.BuildSortAsync("");
         Assert.NotNull(sortResult);
 
-        sortResult = await sut.BuildSortAsync((string)null);
+        sortResult = await sut.BuildSortAsync((string?)null);
         Assert.NotNull(sortResult);
     }
 
@@ -51,9 +51,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var result = sut.Parse("NOT (dog parrot)");
 
-        Assert.IsType<GroupNode>(result.Left);
-        Assert.True((result.Left as GroupNode).HasParens);
-        Assert.True((result.Left as GroupNode).IsNegated);
+        var leftGroup = Assert.IsType<GroupNode>(result.Left);
+        Assert.True(leftGroup.HasParens);
+        Assert.True(leftGroup.IsNegated);
     }
 
     [Fact]
@@ -63,12 +63,12 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var sut = new ElasticQueryParser(c => c.AddQueryVisitor(testQueryVisitor));
         var context = new ElasticQueryVisitorContext();
 
-        var result = sut.Parse("NOT (dog parrot)", context) as GroupNode;
+        var result = Assert.IsType<GroupNode>(sut.Parse("NOT (dog parrot)", context));
         Assert.Equal(2, testQueryVisitor.GroupNodeCount);
 
-        Assert.IsType<GroupNode>(result.Left);
-        Assert.True((result.Left as GroupNode).HasParens);
-        Assert.True((result.Left as GroupNode).IsNegated);
+        var leftGroup2 = Assert.IsType<GroupNode>(result.Left);
+        Assert.True(leftGroup2.HasParens);
+        Assert.True(leftGroup2.IsNegated);
     }
 
     [Fact]
@@ -289,10 +289,26 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var parser = new ElasticQueryParser(c => c.SetDefaultFields(["field1"]).UseMappings<MyType>(GetCodeMappings, Client, index));
 
-        var dynamicServerMappingProperty = parser.Configuration.MappingResolver.GetMapping("field5").Property;
-        var serverMappingProperty = parser.Configuration.MappingResolver.GetMapping("field2").Property;
-        var codeMappingProperty = parser.Configuration.MappingResolver.GetMapping("field1").Property;
-        var codeAndServerMappingProperty = parser.Configuration.MappingResolver.GetMapping("field3").Property;
+        Assert.NotNull(parser.Configuration.MappingResolver);
+        var field5Mapping = parser.Configuration.MappingResolver.GetMapping("field5");
+        Assert.NotNull(field5Mapping);
+        Assert.NotNull(field5Mapping.Property);
+        var dynamicServerMappingProperty = field5Mapping.Property;
+
+        var field2Mapping = parser.Configuration.MappingResolver.GetMapping("field2");
+        Assert.NotNull(field2Mapping);
+        Assert.NotNull(field2Mapping.Property);
+        var serverMappingProperty = field2Mapping.Property;
+
+        var field1Mapping = parser.Configuration.MappingResolver.GetMapping("field1");
+        Assert.NotNull(field1Mapping);
+        Assert.NotNull(field1Mapping.Property);
+        var codeMappingProperty = field1Mapping.Property;
+
+        var field3Mapping = parser.Configuration.MappingResolver.GetMapping("field3");
+        Assert.NotNull(field3Mapping);
+        Assert.NotNull(field3Mapping.Property);
+        var codeAndServerMappingProperty = field3Mapping.Property;
 
         Assert.Equal("date", dynamicServerMappingProperty.Type);
         Assert.Equal("keyword", serverMappingProperty.Type);
@@ -454,6 +470,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildAggregationsAsync("min:field2 max:field2 date:(field5~1d^\"America/Chicago\" min:field2 max:field2 min:field1 @offset:-6h)");
+        Assert.NotNull(result);
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -513,7 +530,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [InlineData("1y", DateInterval.Year)]
     [InlineData("year", DateInterval.Year)]
     [Theory]
-    public async Task CanUseDateHistogramAggregationInterval(string interval, object expectedInterval = null)
+    public async Task CanUseDateHistogramAggregationInterval(string interval, object? expectedInterval = null)
     {
         string index = CreateRandomIndex<MyType>();
         await Client.IndexManyAsync([new MyType { Field5 = DateTime.Now }], index, TestCancellationToken);
@@ -522,6 +539,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
 
         var result = await processor.BuildAggregationsAsync($"date:(field5~{interval})");
+        Assert.NotNull(result);
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -578,6 +596,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildAggregationsAsync("date:field5");
+        Assert.NotNull(result);
         var actualResponse = Client.Search<MyType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -1196,7 +1215,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         parser = new ElasticQueryParser(c => c.UseMappings(Client, index).SetValidationOptions(new QueryValidationOptions { AllowUnresolvedFields = false }));
         var ex = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync("field2:value", context));
         Assert.Contains("resolved", ex.Message);
-        Assert.Contains("field2", ex.Result.ReferencedFields);
+        Assert.Contains("field2", ex.Result!.ReferencedFields);
         Assert.Contains("field2", ex.Result.UnresolvedFields);
         Assert.False(ex.Result.IsValid);
         Assert.NotNull(ex.Result.Message);
@@ -1426,7 +1445,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
-    private async Task<string> GetIncludeAsync(string name)
+    private async Task<string?> GetIncludeAsync(string name)
     {
         await Task.Delay(150);
         return "included:value";
@@ -1443,7 +1462,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var parser = new ElasticQueryParser(c => c.UseMappings(Client, index).SetLoggerFactory(Log));
         var node = await parser.ParseAsync(aggregation, context);
 
-        var result = await ValidationVisitor.RunAsync(node, context);
+        var result = await ValidationVisitor.RunAsync(node!, context);
         Assert.True(result.IsValid, result.Message);
         Assert.Single(result.ReferencedFields, "field1");
         Assert.Empty(result.UnresolvedFields);
@@ -1452,13 +1471,13 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
 public class MyType
 {
-    public string Id { get; set; }
-    public string Field1 { get; set; }
-    public string Field2 { get; set; }
-    public string Field3 { get; set; }
+    public string Id { get; set; } = null!;
+    public string Field1 { get; set; } = null!;
+    public string Field2 { get; set; } = null!;
+    public string Field3 { get; set; } = null!;
     public int Field4 { get; set; }
     public DateTime Field5 { get; set; }
-    public string MultiWord { get; set; }
+    public string MultiWord { get; set; } = null!;
     public Dictionary<string, object> Data { get; set; } = new Dictionary<string, object>();
 }
 

@@ -33,7 +33,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             CreateTextWithKeywordMapping("title"), _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetNonAnalyzedFieldName("title", "keyword");
+        string result = resolver.GetNonAnalyzedFieldName("title", "keyword")!;
 
         // Assert
         Assert.Equal("title.keyword", result);
@@ -47,7 +47,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             CreateTextWithKeywordMapping("title"), _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetAggregationsFieldName("title");
+        string result = resolver.GetAggregationsFieldName("title")!;
 
         // Assert
         Assert.Equal("title.keyword", result);
@@ -61,7 +61,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             CreateTextWithKeywordAndSortMapping("title"), _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetSortFieldName("title");
+        string result = resolver.GetSortFieldName("title")!;
 
         // Assert
         Assert.Equal("title.sort", result);
@@ -81,7 +81,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var resolver = new ElasticMappingResolver(codeMapping, _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetNonAnalyzedFieldName("status", "keyword");
+        string result = resolver.GetNonAnalyzedFieldName("status", "keyword")!;
 
         // Assert
         Assert.Equal("status", result);
@@ -95,7 +95,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             CreateTextOnlyMapping("body"), _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetNonAnalyzedFieldName("body", "keyword");
+        string result = resolver.GetNonAnalyzedFieldName("body", "keyword")!;
 
         // Assert
         Assert.Equal("body", result);
@@ -115,9 +115,9 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         }, _inferrer, logger: _logger);
 
         // Act
-        string beforeRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword");
+        string beforeRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
         resolver.RefreshMapping();
-        string afterRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword");
+        string afterRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
 
         // Assert
         Assert.Equal("name", beforeRefresh);
@@ -139,9 +139,9 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         }, _inferrer, logger: _logger);
 
         // Act
-        string first = resolver.GetNonAnalyzedFieldName("name", "keyword");
+        string first = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
         resolver.RefreshMapping();
-        string second = resolver.GetNonAnalyzedFieldName("name", "keyword");
+        string second = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
 
         // Assert
         Assert.Equal("name", first);
@@ -158,7 +158,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         resolver.RefreshMapping();
 
         // Act
-        string result = resolver.GetNonAnalyzedFieldName("name", "keyword");
+        string result = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
 
         // Assert
         Assert.Equal("name.keyword", result);
@@ -177,9 +177,9 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             }, logger: _logger);
 
         // Act
-        string initial = resolver.GetNonAnalyzedFieldName("name", "keyword");
+        string initial = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
         resolver.RefreshMapping();
-        string updated = resolver.GetNonAnalyzedFieldName("name", "keyword");
+        string updated = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
 
         // Assert
         Assert.Equal("name", initial);
@@ -205,7 +205,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             barrier.SignalAndWait(TestCancellationToken);
             for (int i = 0; i < iterations; i++)
             {
-                string result = resolver.GetNonAnalyzedFieldName("name", "keyword");
+                string result = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
                 Assert.Equal("name.keyword", result);
             }
         }, TestCancellationToken);
@@ -215,7 +215,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             barrier.SignalAndWait(TestCancellationToken);
             for (int i = 0; i < iterations; i++)
             {
-                string result = resolver.GetAggregationsFieldName("name");
+                string result = resolver.GetAggregationsFieldName("name")!;
                 Assert.Equal("name.keyword", result);
             }
         }, TestCancellationToken);

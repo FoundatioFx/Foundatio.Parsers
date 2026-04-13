@@ -388,6 +388,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var result = await processor.BuildAggregationsAsync("terms:nested.field4");
 
         // Assert
+        Assert.NotNull(result);
         var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -431,6 +432,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         // Parse and examine the result after visitors have run
         var context = new ElasticQueryVisitorContext { QueryType = QueryTypes.Aggregation };
         var parsedNode = await processor.ParseAsync("terms:nested.field1 terms:nested.field4 max:nested.field4", context);
+        Assert.NotNull(parsedNode);
         _logger.LogInformation("Parsed node (after visitors): {Node}", await DebugQueryVisitor.RunAsync(parsedNode));
 
         // Check nested paths on term nodes
@@ -454,6 +456,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var result = await processor.BuildAggregationsAsync("terms:nested.field1 terms:nested.field4 max:nested.field4");
 
         // Assert
+        Assert.NotNull(result);
         var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -509,6 +512,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var result = await processor.BuildAggregationsAsync("terms:(nested.field1 @include:apple @include:banana @include:cherry)");
 
         // Assert
+        Assert.NotNull(result);
         var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -554,6 +558,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var result = await processor.BuildAggregationsAsync("terms:(nested.field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)");
 
         // Assert
+        Assert.NotNull(result);
         var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -783,6 +788,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         // Act
         var queryResult = await processor.BuildQueryAsync("nested.field4:>=5", new ElasticQueryVisitorContext { UseScoring = true });
         var aggResult = await processor.BuildAggregationsAsync("terms:nested.field1 max:nested.field4");
+        Assert.NotNull(aggResult);
 
         // Assert
         var actualResponse = Client.Search<MyNestedType>(d => d.Index(index).Query(_ => queryResult).Aggregations(aggResult));
@@ -1355,24 +1361,24 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
 
     public class MyDeeplyNestedType
     {
-        public string Field1 { get; set; }
+        public string Field1 { get; set; } = null!;
         public IList<MyMiddleNestedType> Parent { get; set; } = new List<MyMiddleNestedType>();
     }
 
     public class MyMiddleNestedType
     {
-        public string Field1 { get; set; }
+        public string Field1 { get; set; } = null!;
         public IList<MyType> Child { get; set; } = new List<MyType>();
     }
 
     public class MyNestedType
     {
-        public string Field1 { get; set; }
-        public string Field2 { get; set; }
-        public string Field3 { get; set; }
+        public string Field1 { get; set; } = null!;
+        public string Field2 { get; set; } = null!;
+        public string Field3 { get; set; } = null!;
         public int Field4 { get; set; }
-        public string Field5 { get; set; }
-        public string Payload { get; set; }
+        public string Field5 { get; set; } = null!;
+        public string Payload { get; set; } = null!;
         public IList<MyType> Nested { get; set; } = new List<MyType>();
     }
 
@@ -1520,6 +1526,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var result = await processor.BuildAggregationsAsync("max:resellers.price");
 
         // Assert
+        Assert.NotNull(result);
         var actualResponse = Client.Search<Product>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -1676,7 +1683,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
-            .UseNestedFilter((path, orig, resolved, ctx) => (QueryContainer)null)
+            .UseNestedFilter((path, orig, resolved, ctx) => (QueryContainer?)null)
             .UseNested());
 
         // Act
@@ -1797,6 +1804,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var result = await processor.BuildAggregationsAsync("max:resellers.price terms:resellers.name");
 
         // Assert
+        Assert.NotNull(result);
         var actualResponse = Client.Search<Product>(d => d.Index(index).Aggregations(result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -1827,26 +1835,26 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
 
     public class Product
     {
-        public string Name { get; set; }
-        public string Category { get; set; }
+        public string Name { get; set; } = null!;
+        public string Category { get; set; } = null!;
         public IList<Reseller> Resellers { get; set; } = new List<Reseller>();
     }
 
     public class MultiNestedProduct
     {
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
         public IList<Reseller> Resellers { get; set; } = new List<Reseller>();
         public IList<Tag> Tags { get; set; } = new List<Tag>();
     }
 
     public class Reseller
     {
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
         public double Price { get; set; }
     }
 
     public class Tag
     {
-        public string Label { get; set; }
+        public string Label { get; set; } = null!;
     }
 }

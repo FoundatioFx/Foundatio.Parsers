@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries;
@@ -84,11 +84,11 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture>
         return InvertAndValidateQuery("(field1:value organizationId:value) field2:value", "((NOT field1:value) organizationId:value) (NOT field2:value)", null, true);
     }
 
-    private async Task InvertAndValidateQuery(string query, string expected, string alternateInvertedCriteria, bool isValid)
+    private async Task InvertAndValidateQuery(string query, string expected, string? alternateInvertedCriteria, bool isValid)
     {
         var parser = new LuceneQueryParser();
 
-        IQueryNode result;
+        IQueryNode? result;
         try
         {
             result = await parser.ParseAsync(query);
@@ -105,10 +105,13 @@ public class InvertQueryTests : ElasticsearchTestBase<SampleDataFixture>
         if (!String.IsNullOrWhiteSpace(alternateInvertedCriteria))
         {
             var invertedAlternate = await parser.ParseAsync(alternateInvertedCriteria);
+            Assert.NotNull(invertedAlternate);
             context.SetAlternateInvertedCriteria(invertedAlternate);
         }
 
+        Assert.NotNull(result);
         result = await invertQueryVisitor.AcceptAsync(result, context);
+        Assert.NotNull(result);
         string invertedQuery = result.ToString();
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation("{Result}", nodes);
@@ -127,9 +130,9 @@ public class InvertTest
     public const string OrgId = "1";
     public const string AltOrgId = "2";
 
-    public string Id { get; set; }
-    public string OrganizationId { get; set; }
-    public string Description { get; set; }
+    public string Id { get; set; } = null!;
+    public string OrganizationId { get; set; } = null!;
+    public string Description { get; set; } = null!;
     public string Status { get; set; } = "open";
     public bool IsDeleted { get; set; }
 }

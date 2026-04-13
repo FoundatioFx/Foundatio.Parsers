@@ -13,13 +13,13 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class DefaultQueryNodeExtensions
 {
-    public static async Task<QueryBase> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static async Task<QueryBase?> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
     {
         if (node is TermNode termNode)
             return termNode.GetDefaultQuery(context);
 
         if (node is TermRangeNode termRangeNode)
-            return await termRangeNode.GetDefaultQueryAsync(context);
+            return await termRangeNode.GetDefaultQueryAsync(context).ConfigureAwait(false);
 
         if (node is ExistsNode existsNode)
             return existsNode.GetDefaultQuery(context);
@@ -30,13 +30,13 @@ public static class DefaultQueryNodeExtensions
         return null;
     }
 
-    public static QueryBase GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
+    public static QueryBase? GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        string field = node.UnescapedField;
-        string[] defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
+        string? field = node.UnescapedField;
+        string[]? defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
 
         // If a specific field is set, use single-field query
         if (!String.IsNullOrEmpty(field))
@@ -65,12 +65,12 @@ public static class DefaultQueryNodeExtensions
         return GetMultiFieldQuery(node, defaultFields, elasticContext);
     }
 
-    private static QueryBase GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
+    private static QueryBase? GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
     {
         if (context.MappingResolver.IsPropertyAnalyzed(field))
         {
             // MatchQuery treats '*' as literal; PrefixQuery only works on non-analyzed fields.
-            if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
+            if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") is true)
             {
                 return new QueryStringQuery
                 {
@@ -97,7 +97,7 @@ public static class DefaultQueryNodeExtensions
             };
         }
 
-        if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
+        if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") is true)
         {
             return new PrefixQuery
             {
@@ -105,6 +105,9 @@ public static class DefaultQueryNodeExtensions
                 Value = node.UnescapedTerm.TrimEnd('*')
             };
         }
+
+        if (node.UnescapedTerm is null)
+            return null;
 
         // For non-analyzed fields, try to convert value to appropriate type
         object termValue = GetTypedValue(node.UnescapedTerm, field, context);
@@ -131,7 +134,7 @@ public static class DefaultQueryNodeExtensions
         };
     }
 
-    private static QueryBase GetMultiFieldQuery(TermNode node, string[] fields, IElasticQueryVisitorContext context)
+    private static QueryBase? GetMultiFieldQuery(TermNode node, string[]? fields, IElasticQueryVisitorContext context)
     {
         // Handle null or empty fields - use default multi_match behavior
         if (fields is null or { Length: 0 })
@@ -179,7 +182,9 @@ public static class DefaultQueryNodeExtensions
         // Add individual queries for non-analyzed fields
         foreach (string field in nonAnalyzedFields)
         {
-            queries.Add(GetSingleFieldQuery(node, field, context));
+            var query = GetSingleFieldQuery(node, field, context);
+            if (query is not null)
+                queries.Add(query);
         }
 
         return new BoolQuery
@@ -190,7 +195,7 @@ public static class DefaultQueryNodeExtensions
 
     private static QueryBase GetAnalyzedFieldsQuery(TermNode node, string[] fields)
     {
-        if (!node.IsQuotedTerm && node.UnescapedTerm.EndsWith("*"))
+        if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") is true)
         {
             return new QueryStringQuery
             {
@@ -220,14 +225,14 @@ public static class DefaultQueryNodeExtensions
         return query;
     }
 
-    private static QueryBase GetNonAnalyzedFieldsQuery(TermNode node, List<string> fields, IElasticQueryVisitorContext context)
+    private static QueryBase? GetNonAnalyzedFieldsQuery(TermNode node, List<string> fields, IElasticQueryVisitorContext context)
     {
         // For a single non-analyzed field, use single query
         if (fields.Count == 1)
             return GetSingleFieldQuery(node, fields[0], context);
 
         // Multiple non-analyzed fields - combine with bool should
-        var queries = fields.Select(f => GetSingleFieldQuery(node, f, context)).ToList();
+        var queries = fields.Select(f => GetSingleFieldQuery(node, f, context)).Where(q => q is not null).ToList();
         return new BoolQuery
         {
             Should = queries.Select(q => (QueryContainer)q).ToList()
@@ -252,9 +257,9 @@ public static class DefaultQueryNodeExtensions
         return result;
     }
 
-    private static string GetNestedPath(string fullName, IElasticQueryVisitorContext context)
+    private static string? GetNestedPath(string fullName, IElasticQueryVisitorContext context)
     {
-        string[] nameParts = fullName?.Split('.');
+        string[]? nameParts = fullName?.Split('.');
 
         if (nameParts is null or { Length: 0 })
             return null;
@@ -281,9 +286,12 @@ public static class DefaultQueryNodeExtensions
 
         foreach (var (nestedPath, fields) in fieldsByNestedPath)
         {
-            QueryBase query = fields.Count == 1
+            QueryBase? query = fields.Count == 1
                 ? GetSingleFieldQuery(node, fields[0], context)
                 : GetMultiFieldQuery(node, fields.ToArray(), context);
+
+            if (query is null)
+                continue;
 
             if (!String.IsNullOrEmpty(nestedPath))
             {
@@ -313,10 +321,10 @@ public static class DefaultQueryNodeExtensions
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        string field = node.UnescapedField;
+        string? field = node.UnescapedField;
         if (elasticContext.MappingResolver.IsDatePropertyType(field))
         {
-            var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync()) };
+            var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().ConfigureAwait(false)) };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)

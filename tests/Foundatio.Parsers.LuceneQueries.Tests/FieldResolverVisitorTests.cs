@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -14,8 +14,10 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap { { "field1", "field2" } };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("field2:value", aliased.ToString());
     }
 
@@ -33,7 +35,7 @@ public class FieldResolverVisitorTests
             };
 
         var resolver = map.ToHierarchicalFieldResolver();
-        string resolvedField = await resolver(field, null);
+        string? resolvedField = await resolver(field, null);
         Assert.Equal(expected, resolvedField);
     }
 
@@ -42,10 +44,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "nested", "field2" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("field1.nested:value", aliased.ToString());
     }
 
@@ -54,10 +58,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "field1.nested", "field2.other" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("field2.other:value", aliased.ToString());
     }
 
@@ -66,10 +72,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "field1.nested", "field2.other" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("field2.other:value", aliased.ToString());
     }
 
@@ -78,10 +86,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested.childproperty:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "field1.nested.childproperty", "field2.other.childproperty" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("field2.other.childproperty:value", aliased.ToString());
     }
 
@@ -90,10 +100,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested.childproperty:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "field1.nested.childproperty", "field2.other.childproperty" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("field2.other.childproperty:value", aliased.ToString());
     }
 
@@ -102,10 +114,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested.hey:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "field1.nested.hey", "field2.other.blah" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("field2.other.blah:value", aliased.ToString());
     }
 
@@ -114,10 +128,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("(field1.nested:value field1.another:blah)");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "field1.nested", "field2.other" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("(field2.other:value field1.another:blah)", aliased.ToString());
     }
 
@@ -126,10 +142,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("level1.level2.level3.level4:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "level1.level2.level3.level4", "alias1.alias2.level3.level4" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("alias1.alias2.level3.level4:value", aliased.ToString());
     }
 
@@ -138,10 +156,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "field1.nested", "field2.nested" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("field2.nested:value", aliased.ToString());
     }
 
@@ -150,10 +170,12 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested.morenested:value");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "field1.nested.morenested", "field2.nested.morenested" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("field2.nested.morenested:value", aliased.ToString());
     }
 
@@ -162,11 +184,13 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("(field1.nested:value OR field1.thing:yep) another:works");
+        Assert.NotNull(result);
         var aliasMap = new FieldMap {
                 { "field1.nested", "field2.other" },
                 { "field1.thing", "field2.nice" }
             };
         var aliased = await FieldResolverQueryVisitor.RunAsync(result, aliasMap);
+        Assert.NotNull(aliased);
         Assert.Equal("(field2.other:value OR field2.nice:yep) another:works", aliased.ToString());
     }
 
@@ -175,7 +199,9 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested:value");
-        var aliased = await FieldResolverQueryVisitor.RunAsync(result, f => f == "field1.nested" ? "field2.nested" : null);
+        Assert.NotNull(result);
+        var aliased = await FieldResolverQueryVisitor.RunAsync(result, f => f == "field1.nested" ? "field2.nested" : null!);
+        Assert.NotNull(aliased);
         Assert.Equal("field2.nested:value", aliased.ToString());
     }
 
@@ -184,9 +210,10 @@ public class FieldResolverVisitorTests
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1.nested:value");
+        Assert.NotNull(result);
 
         var context = new QueryVisitorContext();
-        var aliased = await FieldResolverQueryVisitor.RunAsync(result, _ => throw new ApplicationException("Bam"), context);
+        await FieldResolverQueryVisitor.RunAsync(result, _ => throw new ApplicationException("Bam"), context);
         var validationResult = context.GetValidationResult();
 
         Assert.False(validationResult.IsValid);

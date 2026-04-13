@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -22,7 +22,9 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("@include:other");
         var includes = new Dictionary<string, string> { { "other", "field:value" } };
+        Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes);
+        Assert.NotNull(resolved);
         Assert.Equal("(field:value)", resolved.ToString());
     }
 
@@ -35,17 +37,23 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
                 { "other", "field:value" },
                 { "nested", "field:value @include:other" }
             };
+        Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: (_, _) => true);
+        Assert.NotNull(resolved);
         Assert.Equal("outter @include:other @skipped:(other stuff @include:other)", resolved.ToString());
 
         resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: ShouldSkipInclude);
+        Assert.NotNull(resolved);
         Assert.Equal("outter (field:value) @skipped:(other stuff @include:other)", resolved.ToString());
 
         resolved = await IncludeVisitor.RunAsync(result, includes, shouldSkipInclude: (n, ctx) => !ShouldSkipInclude(n, ctx));
+        Assert.NotNull(resolved);
         Assert.Equal("outter (field:value) @skipped:(other stuff (field:value))", resolved.ToString());
 
         var nestedResult = await parser.ParseAsync("outter @skipped:(other stuff @include:nested)");
+        Assert.NotNull(nestedResult);
         resolved = await IncludeVisitor.RunAsync(nestedResult, includes, shouldSkipInclude: ShouldSkipInclude);
+        Assert.NotNull(resolved);
         Assert.Equal("outter @skipped:(other stuff @include:nested)", resolved.ToString());
     }
 
@@ -74,7 +82,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         };
 
         var context = new QueryVisitorContext();
-        var resolved = await IncludeVisitor.RunAsync(result, includes, context);
+        Assert.NotNull(result);
+        await IncludeVisitor.RunAsync(result, includes, context);
         var validationResult = context.GetValidationResult();
         Assert.False(validationResult.IsValid);
         Assert.Contains("Recursive", validationResult.Message);
@@ -91,7 +100,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         };
 
         var context = new QueryVisitorContext();
-        var resolved = await IncludeVisitor.RunAsync(result, includes, context);
+        Assert.NotNull(result);
+        await IncludeVisitor.RunAsync(result, includes, context);
         var validationResult = context.GetValidationResult();
         Assert.Contains("include1", validationResult.UnresolvedIncludes);
         Assert.False(validationResult.IsValid);
@@ -106,7 +116,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         var result = await parser.ParseAsync("field1:value1 @include:include1");
 
         var context = new QueryVisitorContext();
-        var resolved = await IncludeVisitor.RunAsync(result, _ => throw new ApplicationException("Bam"), context);
+        Assert.NotNull(result);
+        await IncludeVisitor.RunAsync(result, _ => throw new ApplicationException("Bam"), context);
         var validationResult = context.GetValidationResult();
         Assert.Contains("include1", validationResult.UnresolvedIncludes);
         Assert.False(validationResult.IsValid);
@@ -124,7 +135,8 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         };
 
         var context = new QueryVisitorContext();
-        var resolved = await IncludeVisitor.RunAsync(result, includes, context);
+        Assert.NotNull(result);
+        await IncludeVisitor.RunAsync(result, includes, context);
         Assert.True(context.IsValid());
     }
 
@@ -134,7 +146,9 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value1 @include:other");
         var includes = new Dictionary<string, string> { { "other", "field:value" } };
+        Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes);
+        Assert.NotNull(resolved);
         Assert.Equal("field1:value1 (field:value)", resolved.ToString());
     }
 
@@ -144,7 +158,9 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value1 OR (@include:other field2:value2)");
         var includes = new Dictionary<string, string> { { "other", "field:value" } };
+        Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes);
+        Assert.NotNull(resolved);
         Assert.Equal("field1:value1 OR ((field:value) field2:value2)", resolved.ToString());
     }
 
@@ -157,7 +173,9 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
                 { "other", "@include:other2" },
                 { "other2", "field2:value2" }
             };
+        Assert.NotNull(result);
         var resolved = await IncludeVisitor.RunAsync(result, includes);
+        Assert.NotNull(resolved);
         Assert.Equal("((field2:value2))", resolved.ToString());
     }
 }

@@ -27,17 +27,17 @@ public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLife
 
     protected IElasticClient Client => _fixture.Client;
 
-    protected void CreateNamedIndex<TModel>(string index, Func<TypeMappingDescriptor<TModel>, ITypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where TModel : class
+    protected void CreateNamedIndex<TModel>(string index, Func<TypeMappingDescriptor<TModel>, ITypeMapping>? configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>>? configureIndex = null) where TModel : class
     {
         _fixture.CreateNamedIndex(index, configureMappings, configureIndex);
     }
 
-    protected string CreateRandomIndex<TModel>(Func<TypeMappingDescriptor<TModel>, ITypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where TModel : class
+    protected string CreateRandomIndex<TModel>(Func<TypeMappingDescriptor<TModel>, ITypeMapping>? configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>>? configureIndex = null) where TModel : class
     {
         return _fixture.CreateRandomIndex(configureMappings, configureIndex);
     }
 
-    protected CreateIndexResponse CreateIndex(IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> configureIndex = null)
+    protected CreateIndexResponse CreateIndex(IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest>? configureIndex = null)
     {
         return _fixture.CreateIndex(index, configureIndex);
     }
@@ -63,7 +63,7 @@ public class ElasticsearchFixture : IAsyncLifetime
 {
     private readonly List<IndexName> _createdIndexes = new();
     private static bool _elaticsearchReady;
-    protected readonly ILogger _logger;
+    protected readonly ILogger _logger = null!;
     private readonly Lazy<IElasticClient> _client;
 
     public ElasticsearchFixture()
@@ -71,10 +71,10 @@ public class ElasticsearchFixture : IAsyncLifetime
         _client = new Lazy<IElasticClient>(() => GetClient(ConfigureConnectionSettings));
     }
 
-    public TestLogger Log { get; set; }
+    public TestLogger Log { get; set; } = null!;
     public IElasticClient Client => _client.Value;
 
-    protected IElasticClient GetClient(Action<ConnectionSettings> configure = null)
+    protected IElasticClient GetClient(Action<ConnectionSettings>? configure = null)
     {
         string elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
         var settings = new ConnectionSettings(new Uri(elasticsearchUrl));
@@ -95,7 +95,7 @@ public class ElasticsearchFixture : IAsyncLifetime
 
     protected virtual void ConfigureConnectionSettings(ConnectionSettings settings) { }
 
-    public void CreateNamedIndex<T>(string index, Func<TypeMappingDescriptor<T>, ITypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where T : class
+    public void CreateNamedIndex<T>(string index, Func<TypeMappingDescriptor<T>, ITypeMapping>? configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>>? configureIndex = null) where T : class
     {
         if (configureMappings == null)
             configureMappings = m => m.AutoMap<T>().Dynamic();
@@ -106,7 +106,7 @@ public class ElasticsearchFixture : IAsyncLifetime
         Client.ConnectionSettings.DefaultIndices[typeof(T)] = index;
     }
 
-    public string CreateRandomIndex<T>(Func<TypeMappingDescriptor<T>, ITypeMapping> configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>> configureIndex = null) where T : class
+    public string CreateRandomIndex<T>(Func<TypeMappingDescriptor<T>, ITypeMapping>? configureMappings = null, Func<IndexSettingsDescriptor, IPromise<IIndexSettings>>? configureIndex = null) where T : class
     {
         string index = "test_" + Guid.NewGuid().ToString("N");
         if (configureMappings == null)
@@ -120,7 +120,7 @@ public class ElasticsearchFixture : IAsyncLifetime
         return index;
     }
 
-    public CreateIndexResponse CreateIndex(IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest> configureIndex = null)
+    public CreateIndexResponse CreateIndex(IndexName index, Func<CreateIndexDescriptor, ICreateIndexRequest>? configureIndex = null)
     {
         _createdIndexes.Add(index);
 

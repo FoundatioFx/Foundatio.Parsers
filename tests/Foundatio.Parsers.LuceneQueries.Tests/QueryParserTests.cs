@@ -38,6 +38,7 @@ public class QueryParserTests : TestWithLoggingBase
         try
         {
             var result = await parser.ParseAsync(query);
+            Assert.NotNull(result);
 
             _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
@@ -73,6 +74,7 @@ public class QueryParserTests : TestWithLoggingBase
         try
         {
             var result = await parser.ParseAsync(query);
+            Assert.NotNull(result);
 
             _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
@@ -114,6 +116,7 @@ public class QueryParserTests : TestWithLoggingBase
         try
         {
             var result = await parser.ParseAsync(query);
+            Assert.NotNull(result);
 
             _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
@@ -159,6 +162,7 @@ public class QueryParserTests : TestWithLoggingBase
         };
         string query = "mydate:[now/d TO now/d+30d/d]";
         var result = sut.Parse(query);
+        Assert.NotNull(result);
         _logger.LogInformation(DebugQueryVisitor.Run(result));
 
         string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
@@ -216,6 +220,7 @@ public class QueryParserTests : TestWithLoggingBase
         try
         {
             var result = await parser.ParseAsync(query);
+            Assert.NotNull(result);
 
             _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
             string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
@@ -260,8 +265,8 @@ public class QueryParserTests : TestWithLoggingBase
         string ast = DebugQueryVisitor.Run(result);
 
         Assert.IsType<GroupNode>(result.Left);
-        Assert.True((result.Left as GroupNode).HasParens);
-        Assert.True((result.Left as GroupNode).IsNegated);
+        Assert.True((result.Left as GroupNode)!.HasParens);
+        Assert.True((result.Left as GroupNode)!.IsNegated);
     }
 
     [Fact]
@@ -438,7 +443,7 @@ public class QueryParserTests : TestWithLoggingBase
 
         Assert.IsType<TermNode>(result.Left);
         Assert.True(((TermNode)result.Left).IsQuotedTerm);
-        Assert.Empty(((TermNode)result.Left).Term);
+        Assert.Empty(((TermNode)result.Left).Term!);
     }
 
     [Fact]
@@ -508,12 +513,13 @@ public class QueryParserTests : TestWithLoggingBase
         var parser = new LuceneQueryParser();
 
         var result = await parser.ParseAsync(query);
+        Assert.NotNull(result);
 
         _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
         string generatedQuery = await GenerateQueryVisitor.RunAsync(result);
         Assert.Equal(expected, generatedQuery);
 
-        await new AssignOperationTypeVisitor().AcceptAsync(result, null);
+        await new AssignOperationTypeVisitor().AcceptAsync(result, new QueryVisitorContext());
         _logger.LogInformation("{Result}", await DebugQueryVisitor.RunAsync(result));
     }
 
@@ -524,7 +530,7 @@ public class QueryParserTests : TestWithLoggingBase
     [InlineData("\"phrase query\"~2", null, true, "2")]
     [InlineData("field:term~", "field", false, "")]
     [InlineData("field:\"phrase\"~3", "field", true, "3")]
-    public void Parse_WithProximityModifier_SetsProximityOnTermNode(string query, string expectedField, bool expectedQuoted, string expectedProximity)
+    public void Parse_WithProximityModifier_SetsProximityOnTermNode(string query, string? expectedField, bool expectedQuoted, string expectedProximity)
     {
         var parser = new LuceneQueryParser();
         var result = parser.Parse(query);
