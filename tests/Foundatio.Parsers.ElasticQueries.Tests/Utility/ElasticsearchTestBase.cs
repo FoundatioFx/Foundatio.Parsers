@@ -79,7 +79,7 @@ public class ElasticsearchFixture : IAsyncLifetime
     protected ElasticsearchClient GetClient(Action<ElasticsearchClientSettings>? configure = null)
     {
         string elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
-        using var settings = new ElasticsearchClientSettings(new Uri(elasticsearchUrl));
+        var settings = new ElasticsearchClientSettings(new Uri(elasticsearchUrl));
         configure?.Invoke(settings);
 
         var client = new ElasticsearchClient(settings.DisableDirectStreaming().PrettyJson());
