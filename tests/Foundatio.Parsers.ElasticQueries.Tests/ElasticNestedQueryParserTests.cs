@@ -367,6 +367,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
         var result = await processor.BuildAggregationsAsync("terms:nested.field4");
+        Assert.NotNull(result);
 
         var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
@@ -408,6 +409,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
         var result = await processor.BuildAggregationsAsync("terms:nested.field1 terms:nested.field4 max:nested.field4");
+        Assert.NotNull(result);
 
         var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
@@ -457,6 +459,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
         var result = await processor.BuildAggregationsAsync("terms:(nested.field1 @include:apple @include:banana @include:cherry)");
+        Assert.NotNull(result);
 
         var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
@@ -500,6 +503,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
         var result = await processor.BuildAggregationsAsync("terms:(nested.field1 @exclude:myexclude @include:myinclude @include:otherinclude @missing:mymissing @exclude:otherexclude @min:1)");
+        Assert.NotNull(result);
 
         var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
@@ -1095,6 +1099,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
 
         var queryResult = await processor.BuildQueryAsync("nested.field4:>=5", new ElasticQueryVisitorContext { UseScoring = true });
         var aggResult = await processor.BuildAggregationsAsync("terms:nested.field1 max:nested.field4");
+        Assert.NotNull(aggResult);
 
         var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Query(queryResult).Aggregations(aggResult), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
@@ -1406,6 +1411,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var result = await processor.BuildAggregationsAsync("max:resellers.price");
 
         // Assert
+        Assert.NotNull(result);
         var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -1682,6 +1688,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var result = await processor.BuildAggregationsAsync("max:resellers.price terms:resellers.name");
 
         // Assert
+        Assert.NotNull(result);
         var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);

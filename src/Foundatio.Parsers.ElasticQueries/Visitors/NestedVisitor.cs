@@ -95,9 +95,13 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private async Task HandleNestedFieldWithFilterAsync(IFieldQueryNode node, string nestedProperty, IQueryVisitorContext context)
     {
-        string? originalField = node.GetOriginalField();
         ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
-        var filter = await _filterResolver!(nestedProperty, originalField!, node.Field!, context).AnyContext();
+
+        if (node.Field is null || _filterResolver is null)
+            return;
+
+        string? originalField = node.GetOriginalField();
+        var filter = await _filterResolver(nestedProperty, originalField ?? node.Field, node.Field, context).AnyContext();
         if (filter is not null)
             node.SetNestedFilter(filter);
 

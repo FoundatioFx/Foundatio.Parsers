@@ -23,17 +23,22 @@ public class GeoVisitor : ChainableQueryVisitor
         if (context.QueryType != QueryTypes.Query || context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
             return;
 
+        if (node.Field is null)
+            return;
+
         string? location = null;
 
-        if (elasticContext.GeoLocationResolver is not null)
-            location = await elasticContext.GeoLocationResolver(node.Term!).AnyContext();
+        if (node.Term is not null && elasticContext.GeoLocationResolver is not null)
+            location = await elasticContext.GeoLocationResolver(node.Term).AnyContext();
 
-        if (location is null && _resolveGeoLocation is not null)
-            location = await _resolveGeoLocation(node.Term!).AnyContext();
+        if (location is null && node.Term is not null && _resolveGeoLocation is not null)
+            location = await _resolveGeoLocation(node.Term).AnyContext();
 
         location ??= node.Term;
+        if (location is null)
+            return;
 
-        var query = new GeoDistanceQuery(node.Proximity ?? "10mi", node.Field!, location!);
+        var query = new GeoDistanceQuery(node.Proximity ?? "10mi", node.Field, location);
         node.SetQuery(query);
     }
 
@@ -42,9 +47,12 @@ public class GeoVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
             return;
 
+        if (node.Field is null || node.Min is null || node.Max is null)
+            return;
+
         // GeoBoundingBoxQuery ergonomic feedback: https://github.com/elastic/elasticsearch-net/issues/8496
-        var box = GeoBounds.TopLeftBottomRight(new TopLeftBottomRightGeoBounds { TopLeft = GeoLocation.Text(node.Min!), BottomRight = GeoLocation.Text(node.Max!) });
-        var query = new GeoBoundingBoxQuery(box, node.Field!);
+        var box = GeoBounds.TopLeftBottomRight(new TopLeftBottomRightGeoBounds { TopLeft = GeoLocation.Text(node.Min), BottomRight = GeoLocation.Text(node.Max) });
+        var query = new GeoBoundingBoxQuery(box, node.Field);
         node.SetQuery(query);
     }
 }

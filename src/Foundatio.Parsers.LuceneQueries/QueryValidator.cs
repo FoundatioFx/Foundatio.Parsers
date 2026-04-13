@@ -44,7 +44,7 @@ public class QueryValidator
         var parser = new LuceneQueryParser();
         try
         {
-            var node = await parser.ParseAsync(query);
+            var node = await parser.ParseAsync(query).AnyContext();
             if (context is null)
                 context = new QueryVisitorContext();
 
@@ -108,7 +108,7 @@ public class QueryValidator
         var parser = new LuceneQueryParser();
         try
         {
-            var node = await parser.ParseAsync(query);
+            var node = await parser.ParseAsync(query).AnyContext();
             if (context is null)
                 context = new QueryVisitorContext();
 

@@ -119,7 +119,10 @@ public static class DefaultQueryNodeExtensions
         // Handle null or empty fields - use default multi_match behavior
         if (fields is null or { Length: 0 })
         {
-            var defaultQuery = new MultiMatchQuery(node.UnescapedTerm!);
+            if (node.UnescapedTerm is null)
+                return null;
+
+            var defaultQuery = new MultiMatchQuery(node.UnescapedTerm);
             if (node.IsQuotedTerm)
                 defaultQuery.Type = TextQueryType.Phrase;
             return defaultQuery;

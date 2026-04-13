@@ -37,10 +37,10 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
         return base.VisitAsync(node, context);
     }
 
-    public static async Task<string?> RunAsync(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
+    public static async Task<string?> RunAsync(IQueryNode node, IEnumerable<string>? fieldsToRemove = null, IQueryVisitorContext? context = null)
     {
         context ??= new QueryVisitorContext();
-        var result = await new RemoveFieldsQueryVisitor(nonInvertedFields ?? []).AcceptAsync(node, context).ConfigureAwait(false);
+        var result = await new RemoveFieldsQueryVisitor(fieldsToRemove ?? []).AcceptAsync(node, context).ConfigureAwait(false);
         return result?.ToString();
     }
 
@@ -51,9 +51,9 @@ public class RemoveFieldsQueryVisitor : ChainableQueryVisitor
         return result?.ToString();
     }
 
-    public static string? Run(IQueryNode node, IEnumerable<string>? nonInvertedFields = null, IQueryVisitorContext? context = null)
+    public static string? Run(IQueryNode node, IEnumerable<string>? fieldsToRemove = null, IQueryVisitorContext? context = null)
     {
-        return RunAsync(node, nonInvertedFields ?? [], context).GetAwaiter().GetResult();
+        return RunAsync(node, fieldsToRemove ?? [], context).GetAwaiter().GetResult();
     }
 
     public static string? Run(IQueryNode node, Func<string, bool> shouldRemoveFieldFunc, IQueryVisitorContext? context = null)

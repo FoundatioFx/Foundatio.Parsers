@@ -107,7 +107,7 @@ public static class DefaultAggregationNodeExtensions
 
                 return new AggregationMap($"terms_{originalField}", termsAggregation)
                 {
-                    Meta = { { "@field_type", property?.Type! } }
+                    Meta = { { "@field_type", property?.Type } }
                 };
 
             case AggregationType.TopHits:
@@ -146,37 +146,37 @@ public static class DefaultAggregationNodeExtensions
             case AggregationType.Min:
                 return new AggregationMap($"min_{originalField}", new MinAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
                 {
-                    Meta = { { "@field_type", property?.Type! }, { "@timezone", timezone! } }
+                    Meta = { { "@field_type", property?.Type }, { "@timezone", timezone } }
                 };
 
             case AggregationType.Max:
                 return new AggregationMap($"max_{originalField}", new MaxAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
                 {
-                    Meta = { { "@field_type", property?.Type! }, { "@timezone", timezone! } }
+                    Meta = { { "@field_type", property?.Type }, { "@timezone", timezone } }
                 };
 
             case AggregationType.Avg:
                 return new AggregationMap($"avg_{originalField}", new AverageAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
                 {
-                    Meta = { { "@field_type", property?.Type! } }
+                    Meta = { { "@field_type", property?.Type } }
                 };
 
             case AggregationType.Sum:
                 return new AggregationMap($"sum_{originalField}", new SumAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
                 {
-                    Meta = { { "@field_type", property?.Type! } }
+                    Meta = { { "@field_type", property?.Type } }
                 };
 
             case AggregationType.Stats:
                 return new AggregationMap($"stats_{originalField}", new StatsAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
                 {
-                    Meta = { { "@field_type", property?.Type! } }
+                    Meta = { { "@field_type", property?.Type } }
                 };
 
             case AggregationType.ExtendedStats:
                 return new AggregationMap($"exstats_{originalField}", new ExtendedStatsAggregation { Field = aggField, Missing = node.GetProximityAsDouble() })
                 {
-                    Meta = { { "@field_type", property?.Type! } }
+                    Meta = { { "@field_type", property?.Type } }
                 };
 
             case AggregationType.Cardinality:
@@ -239,7 +239,7 @@ public static class DefaultAggregationNodeExtensions
 
                 return new AggregationMap($"terms_{originalField}", termsAggregation)
                 {
-                    Meta = { { "@field_type", property?.Type! } }
+                    Meta = { { "@field_type", property?.Type } }
                 };
         }
 

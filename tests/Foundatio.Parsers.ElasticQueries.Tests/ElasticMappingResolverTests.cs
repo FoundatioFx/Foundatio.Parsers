@@ -139,7 +139,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         var field4Property = resolver.GetMappingProperty("Field4");
         Assert.IsType<TextProperty>(field4Property);
 
-        var field4ReflectionProperty = resolver.GetMappingProperty(new Field(typeof(MyNestedType).GetProperty("Field4")!));
+        var field4ReflectionProperty = resolver.GetMappingProperty(new Field(typeof(MyNestedType).GetProperty("Field4")
+            ?? throw new InvalidOperationException("Field4 property not found on MyNestedType")));
         Assert.IsType<TextProperty>(field4ReflectionProperty);
 
         var field4ExpressionProperty = resolver.GetMappingProperty(new Field(GetObjectPath(p => p.Field4)));

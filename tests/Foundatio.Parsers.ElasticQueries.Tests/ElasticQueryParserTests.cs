@@ -479,6 +479,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
         var result = await processor.BuildAggregationsAsync("min:field4 max:field4 date:(field5~1d^\"America/Chicago\" min:field4 max:field4 min:field5 @offset:-6h)");
+        Assert.NotNull(result);
         var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -547,6 +548,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
 
         var result = await processor.BuildAggregationsAsync($"date:(field5~{interval})");
+        Assert.NotNull(result);
         var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -601,6 +603,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var result = await processor.BuildAggregationsAsync("date:field5");
+        Assert.NotNull(result);
         var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);

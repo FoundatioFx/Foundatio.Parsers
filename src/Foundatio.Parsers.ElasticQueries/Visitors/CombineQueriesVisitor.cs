@@ -121,15 +121,21 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         if (nested is not null)
         {
+            if (container is null)
+            {
+                node.SetQuery(null);
+                return;
+            }
+
             var groupNestedFilter = node.GetNestedFilter();
             if (groupNestedFilter is not null)
             {
-                Query inner = container! & groupNestedFilter;
+                Query inner = container & groupNestedFilter;
                 nested.Query = inner;
             }
             else
             {
-                nested.Query = container!;
+                nested.Query = container;
             }
 
             node.SetQuery(nested);
