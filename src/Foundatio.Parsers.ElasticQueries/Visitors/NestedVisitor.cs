@@ -40,9 +40,11 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private async Task VisitGroupWithFilterAsync(GroupNode node, string nestedProperty, IQueryVisitorContext context)
     {
-        string? originalField = node.GetOriginalField();
         ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
-        var filter = await _filterResolver!(nestedProperty, originalField!, node.Field!, context).AnyContext();
+
+        string field = node.Field!; // Caller verified non-empty at VisitAsync entry
+        string? originalField = node.GetOriginalField();
+        var filter = await _filterResolver!(nestedProperty, originalField ?? field, field, context).AnyContext();
         if (filter is not null)
             node.SetNestedFilter(filter);
 
@@ -97,11 +99,11 @@ public class NestedVisitor : ChainableQueryVisitor
     {
         ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
 
-        if (node.Field is null || _filterResolver is null)
+        if (node.Field is not { } field || _filterResolver is null)
             return;
 
         string? originalField = node.GetOriginalField();
-        var filter = await _filterResolver(nestedProperty, originalField ?? node.Field, node.Field, context).AnyContext();
+        var filter = await _filterResolver(nestedProperty, originalField ?? field, field, context).AnyContext();
         if (filter is not null)
             node.SetNestedFilter(filter);
 
