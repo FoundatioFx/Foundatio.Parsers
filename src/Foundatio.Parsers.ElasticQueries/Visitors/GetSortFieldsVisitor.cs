@@ -34,12 +34,13 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<ICollection<S
         return _fields;
     }
 
-    public static Task<ICollection<SortOptions>> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    public static Task<ICollection<SortOptions>> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
+        context ??= new QueryVisitorContext();
         return new GetSortFieldsVisitor().AcceptAsync(node, context);
     }
 
-    public static ICollection<SortOptions> Run(IQueryNode node, IQueryVisitorContext context = null)
+    public static ICollection<SortOptions> Run(IQueryNode node, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }

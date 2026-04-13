@@ -19,8 +19,8 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        Query query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
-        Query container = query;
+        Query? query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
+        Query? container = query;
         var nested = query?.Nested;
 
         // Reset container for non-root nested groups so children combine into a fresh
@@ -70,8 +70,8 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         foreach (var (path, pathQueries) in nestedQueries)
         {
-            Query combinedIncluded = null;
-            Query nestedFilter = null;
+            Query? combinedIncluded = null;
+            Query? nestedFilter = null;
             foreach (var (child, innerQuery) in pathQueries)
             {
                 if (child.IsExcluded())
@@ -124,12 +124,12 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             var groupNestedFilter = node.GetNestedFilter();
             if (groupNestedFilter is not null)
             {
-                Query inner = container & groupNestedFilter;
+                Query inner = container! & groupNestedFilter;
                 nested.Query = inner;
             }
             else
             {
-                nested.Query = container;
+                nested.Query = container!;
             }
 
             node.SetQuery(nested);
@@ -148,7 +148,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         return op;
     }
 
-    private static Query Combine(Query left, Query right, GroupOperator op, bool useScoring = true)
+    private static Query? Combine(Query? left, Query right, GroupOperator op, bool useScoring = true)
     {
         if (left is null)
             return right;
@@ -174,14 +174,14 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         return left;
     }
 
-    private static void AddToFilterList(List<Query> filters, Query query)
+    private static void AddToFilterList(List<Query> filters, Query? query)
     {
         if (query is null)
             return;
 
         if (query.IsFilterOnlyBoolQuery())
         {
-            filters.AddRange(query.Bool.Filter);
+            filters.AddRange(query.Bool!.Filter!);
         }
         else
         {

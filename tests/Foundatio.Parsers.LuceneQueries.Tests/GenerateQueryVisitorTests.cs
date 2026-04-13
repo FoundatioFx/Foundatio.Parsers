@@ -41,7 +41,8 @@ public class GenerateQueryVisitorTests : TestWithLoggingBase
             Tracer = tracer
         };
 
-        IQueryNode parsedQuery = await parser.ParseAsync(query);
+        var parsedQuery = await parser.ParseAsync(query);
+        Assert.NotNull(parsedQuery);
 
         var context = new QueryVisitorContext { DefaultOperator = defaultOperator };
         string result = await GenerateQueryVisitor.RunAsync(parsedQuery, context);

@@ -35,7 +35,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             if (aggregation is null)
                 continue;
 
-            string nestedPath = child.GetNestedPath();
+            string? nestedPath = child.GetNestedPath();
             if (nestedPath is not null)
             {
                 if (!nestedAggregations.ContainsKey(nestedPath))
@@ -85,7 +85,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
             node.SetAggregation(container);
     }
 
-    private static void AddAggregation(AggregationMap container, TermsAggregation termsAggregation, IFieldQueryNode child, AggregationMap aggregation)
+    private static void AddAggregation(AggregationMap container, TermsAggregation? termsAggregation, IFieldQueryNode child, AggregationMap aggregation)
     {
         if (container.Value is null || container.Value.IsBucketAggregation())
         {
@@ -95,7 +95,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         AddTermsOrder(termsAggregation, child, aggregation);
     }
 
-    private static void AddTermsOrder(TermsAggregation termsAggregation, IFieldQueryNode child, AggregationMap aggregation, string bucketPathPrefix = null)
+    private static void AddTermsOrder(TermsAggregation? termsAggregation, IFieldQueryNode child, AggregationMap aggregation, string? bucketPathPrefix = null)
     {
         if (termsAggregation is null || child.Prefix is not "-" and not "+")
             return;
@@ -155,7 +155,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
     private async Task<AggregationMap> GetParentContainerAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        AggregationMap container = null;
+        AggregationMap? container = null;
         var currentNode = node;
         while (container is null && currentNode is not null)
         {
@@ -177,8 +177,8 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         if (container is null)
         {
-            container = new AggregationMap(null, null);
-            currentNode.SetAggregation(container);
+            container = new AggregationMap(null!, null!);
+            currentNode!.SetAggregation(container);
         }
 
         return container;

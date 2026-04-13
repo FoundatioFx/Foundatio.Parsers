@@ -97,7 +97,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             if (s.FieldInfo.FullName != "NationalPhoneNumber")
                 return;
 
-            s.Tokens = [TryGetNationalNumber(s.Term)];
+            s.Tokens = [TryGetNationalNumber(s.Term)!];
             s.Operator = SqlSearchOperator.StartsWith;
         });
 
@@ -344,7 +344,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
 
         var context = parser.GetContext(db.Employees.EntityType);
 
-        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.CurrentCompany.Name, "\"acme*\"") || EF.Functions.Contains(e.CurrentCompany.Location, "\"acme*\"")).ToQueryString();
+        string sqlExpected = db.Employees.Where(e => EF.Functions.Contains(e.CurrentCompany!.Name, "\"acme*\"") || EF.Functions.Contains(e.CurrentCompany!.Location!, "\"acme*\"")).ToQueryString();
 
         await SqlWaiter.WaitForFullTextIndexAsync(db, "ftCatalog");
 
@@ -430,7 +430,9 @@ public class SqlQueryParserTests : TestWithLoggingBase
         var parser = sp.GetRequiredService<SqlQueryParser>();
 
         var context = parser.GetContext(db.Employees.EntityType);
+        context.Fields ??= [];
         context.Fields.Add(new EntityFieldInfo { Name = "age", FullName = "age", IsNumber = true, Data = { { "DataDefinitionId", 1 } } });
+        Assert.NotNull(context.ValidationOptions);
         context.ValidationOptions.AllowedFields.Add("age");
 
         string sqlExpected = db.Employees.Where(e => e.Companies.Any(c => c.Name == "acme") && e.DataValues.Any(dv => dv.DataDefinitionId == 1 && dv.NumberValue == 30)).ToQueryString();
@@ -455,7 +457,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.Equal("John Doe", employee.FullName);
     }
 
-    public static string TryGetNationalNumber(string phoneNumber, string regionCode = "US")
+    public static string? TryGetNationalNumber(string phoneNumber, string regionCode = "US")
     {
         var phoneNumberUtil = PhoneNumberUtil.GetInstance();
         try
@@ -584,7 +586,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             Tracer = tracer
         };
 
-        IQueryNode result;
+        IQueryNode? result;
         try
         {
             result = await parser.ParseAsync(query);
@@ -595,6 +597,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             return;
         }
 
+        Assert.NotNull(result);
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation("{Nodes}", nodes);
         var context = new SqlQueryVisitorContext

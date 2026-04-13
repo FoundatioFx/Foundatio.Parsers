@@ -44,7 +44,7 @@ public abstract class QueryNodeVisitorBase : IQueryNodeVisitor
         return Task.CompletedTask;
     }
 
-    public virtual async Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context)
+    public virtual async Task<IQueryNode?> VisitAsync(IQueryNode node, IQueryVisitorContext context)
     {
         if (node is GroupNode groupNode)
         {
@@ -82,7 +82,7 @@ public abstract class QueryNodeVisitorBase : IQueryNodeVisitor
 
 public abstract class MutatingQueryNodeVisitorBase : IQueryNodeVisitor
 {
-    public virtual async Task<IQueryNode> VisitAsync(GroupNode node, IQueryVisitorContext context)
+    public virtual async Task<IQueryNode?> VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         foreach (var child in node.Children)
             await VisitAsync(child, context).AnyContext();
@@ -92,33 +92,33 @@ public abstract class MutatingQueryNodeVisitorBase : IQueryNodeVisitor
 
     public virtual IQueryNode Visit(TermNode node, IQueryVisitorContext context) => node;
 
-    public virtual Task<IQueryNode> VisitAsync(TermNode node, IQueryVisitorContext context)
+    public virtual Task<IQueryNode?> VisitAsync(TermNode node, IQueryVisitorContext context)
     {
-        return Task.FromResult(Visit(node, context));
+        return Task.FromResult<IQueryNode?>(Visit(node, context));
     }
 
     public virtual IQueryNode Visit(TermRangeNode node, IQueryVisitorContext context) => node;
 
-    public virtual Task<IQueryNode> VisitAsync(TermRangeNode node, IQueryVisitorContext context)
+    public virtual Task<IQueryNode?> VisitAsync(TermRangeNode node, IQueryVisitorContext context)
     {
-        return Task.FromResult(Visit(node, context));
+        return Task.FromResult<IQueryNode?>(Visit(node, context));
     }
 
     public virtual IQueryNode Visit(ExistsNode node, IQueryVisitorContext context) => node;
 
-    public virtual Task<IQueryNode> VisitAsync(ExistsNode node, IQueryVisitorContext context)
+    public virtual Task<IQueryNode?> VisitAsync(ExistsNode node, IQueryVisitorContext context)
     {
-        return Task.FromResult(Visit(node, context));
+        return Task.FromResult<IQueryNode?>(Visit(node, context));
     }
 
     public virtual IQueryNode Visit(MissingNode node, IQueryVisitorContext context) => node;
 
-    public virtual Task<IQueryNode> VisitAsync(MissingNode node, IQueryVisitorContext context)
+    public virtual Task<IQueryNode?> VisitAsync(MissingNode node, IQueryVisitorContext context)
     {
-        return Task.FromResult(Visit(node, context));
+        return Task.FromResult<IQueryNode?>(Visit(node, context));
     }
 
-    public virtual Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context)
+    public virtual Task<IQueryNode?> VisitAsync(IQueryNode node, IQueryVisitorContext context)
     {
         if (node is GroupNode groupNode)
             return VisitAsync(groupNode, context);
@@ -135,6 +135,6 @@ public abstract class MutatingQueryNodeVisitorBase : IQueryNodeVisitor
         if (node is ExistsNode existsNode)
             return VisitAsync(existsNode, context);
 
-        return Task.FromResult(node);
+        return Task.FromResult<IQueryNode?>(node);
     }
 }

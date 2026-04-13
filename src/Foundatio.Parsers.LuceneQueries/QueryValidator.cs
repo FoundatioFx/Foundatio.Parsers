@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Pegasus.Common;
 
@@ -8,9 +9,9 @@ namespace Foundatio.Parsers.LuceneQueries;
 
 public class QueryValidator
 {
-    public static Task<QueryValidationResult> ValidateQueryAsync(string query, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    public static Task<QueryValidationResult> ValidateQueryAsync(string query, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Query;
@@ -18,9 +19,9 @@ public class QueryValidator
         return InternalValidateAsync(query, context, options);
     }
 
-    public static Task<QueryValidationResult> ValidateAggregationsAsync(string aggregations, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    public static Task<QueryValidationResult> ValidateAggregationsAsync(string aggregations, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Aggregation;
@@ -28,9 +29,9 @@ public class QueryValidator
         return InternalValidateAsync(aggregations, context, options);
     }
 
-    public static Task<QueryValidationResult> ValidateSortAsync(string sort, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    public static Task<QueryValidationResult> ValidateSortAsync(string sort, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Sort;
@@ -38,40 +39,43 @@ public class QueryValidator
         return InternalValidateAsync(sort, context, options);
     }
 
-    private static async Task<QueryValidationResult> InternalValidateAsync(string query, IQueryVisitorContextWithValidation context, QueryValidationOptions options = null)
+    private static async Task<QueryValidationResult> InternalValidateAsync(string query, IQueryVisitorContextWithValidation context, QueryValidationOptions? options = null)
     {
         var parser = new LuceneQueryParser();
         try
         {
-            var node = await parser.ParseAsync(query).AnyContext();
-            if (context == null)
+            var node = await parser.ParseAsync(query);
+            if (context is null)
                 context = new QueryVisitorContext();
 
-            if (options != null)
+            if (node is null)
+                return context.GetValidationResult();
+
+            if (options is not null)
                 context.SetValidationOptions(options);
 
             var fieldResolver = context.GetFieldResolver();
-            if (fieldResolver != null)
-                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver).AnyContext();
+            if (fieldResolver is not null)
+                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver) ?? node;
 
             var includeResolver = context.GetIncludeResolver();
-            if (includeResolver != null)
-                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver).AnyContext();
+            if (includeResolver is not null)
+                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver) ?? node;
 
-            return await ValidationVisitor.RunAsync(node, context).AnyContext();
+            return await ValidationVisitor.RunAsync(node, context);
         }
         catch (FormatException ex)
         {
             var cursor = ex.Data["cursor"] as Cursor;
-            context.AddValidationError(ex.Message, cursor.Column);
+            context.AddValidationError(ex.Message, cursor?.Column ?? 0);
 
             return context.GetValidationResult();
         }
     }
 
-    public static Task<QueryValidationResult> ValidateQueryAndThrowAsync(string query, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    public static Task<QueryValidationResult> ValidateQueryAndThrowAsync(string query, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Query;
@@ -79,9 +83,9 @@ public class QueryValidator
         return InternalValidateAndThrowAsync(query, context, options);
     }
 
-    public static Task<QueryValidationResult> ValidateAggregationsAndThrowAsync(string aggregations, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    public static Task<QueryValidationResult> ValidateAggregationsAndThrowAsync(string aggregations, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Aggregation;
@@ -89,9 +93,9 @@ public class QueryValidator
         return InternalValidateAndThrowAsync(aggregations, context, options);
     }
 
-    public static Task<QueryValidationResult> ValidateSortAndThrowAsync(string sort, QueryValidationOptions options = null, IQueryVisitorContextWithValidation context = null)
+    public static Task<QueryValidationResult> ValidateSortAndThrowAsync(string sort, QueryValidationOptions? options = null, IQueryVisitorContextWithValidation? context = null)
     {
-        if (context == null)
+        if (context is null)
             context = new QueryVisitorContext();
 
         context.QueryType = QueryTypes.Sort;
@@ -99,33 +103,46 @@ public class QueryValidator
         return InternalValidateAndThrowAsync(sort, context, options);
     }
 
-    private static async Task<QueryValidationResult> InternalValidateAndThrowAsync(string query, IQueryVisitorContextWithValidation context, QueryValidationOptions options = null)
+    private static async Task<QueryValidationResult> InternalValidateAndThrowAsync(string query, IQueryVisitorContextWithValidation context, QueryValidationOptions? options = null)
     {
         var parser = new LuceneQueryParser();
         try
         {
-            var node = await parser.ParseAsync(query).AnyContext();
-            if (context == null)
+            var node = await parser.ParseAsync(query);
+            if (context is null)
                 context = new QueryVisitorContext();
 
             options ??= new QueryValidationOptions();
             options.ShouldThrow = true;
             context.SetValidationOptions(options);
 
+            // Visitors never nullify a non-null root in practice; this guard satisfies NRT
+            // and produces a clear validation error if a visitor unexpectedly returns null.
+            IQueryNode EnsureNode(IQueryNode? node)
+            {
+                if (node is not null)
+                    return node;
+
+                var validationResult = context.GetValidationResult();
+                throw new QueryValidationException(validationResult.Message, validationResult);
+            }
+
+            node = EnsureNode(node);
+
             var fieldResolver = context.GetFieldResolver();
             if (fieldResolver != null)
-                node = await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver).AnyContext();
+                node = EnsureNode(await FieldResolverQueryVisitor.RunAsync(node, fieldResolver, context as IQueryVisitorContextWithFieldResolver));
 
             var includeResolver = context.GetIncludeResolver();
             if (includeResolver != null)
-                node = await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver).AnyContext();
+                node = EnsureNode(await IncludeVisitor.RunAsync(node, includeResolver, context as IQueryVisitorContextWithIncludeResolver));
 
-            return await ValidationVisitor.RunAsync(node, context).AnyContext();
+            return await ValidationVisitor.RunAsync(node, context);
         }
         catch (FormatException ex)
         {
             var cursor = ex.Data["cursor"] as Cursor;
-            context.AddValidationError(ex.Message, cursor.Column);
+            context.AddValidationError(ex.Message, cursor?.Column ?? 0);
 
             throw new QueryValidationException(ex.Message, context.GetValidationResult(), ex);
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -45,7 +45,7 @@ public class CleanupQueryVisitorTests : TestWithLoggingBase
             Tracer = tracer
         };
 
-        IQueryNode result;
+        IQueryNode? result;
         try
         {
             result = await parser.ParseAsync(query);
@@ -56,7 +56,8 @@ public class CleanupQueryVisitorTests : TestWithLoggingBase
             return;
         }
 
-        string cleanedQuery = await CleanupQueryVisitor.RunAsync(result);
+        Assert.NotNull(result);
+        string? cleanedQuery = await CleanupQueryVisitor.RunAsync(result);
         string nodes = await DebugQueryVisitor.RunAsync(result);
         _logger.LogInformation("{Result}", nodes);
         Assert.Equal(expected, cleanedQuery);

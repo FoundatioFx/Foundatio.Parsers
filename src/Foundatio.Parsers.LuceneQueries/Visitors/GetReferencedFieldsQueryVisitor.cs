@@ -14,12 +14,13 @@ public class GetReferencedFieldsQueryVisitor : QueryNodeVisitorWithResultBase<IS
         return Task.FromResult(node.GetReferencedFields(context));
     }
 
-    public static Task<ISet<string>> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    public static Task<ISet<string>> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
+        context ??= new QueryVisitorContext();
         return new GetReferencedFieldsQueryVisitor().AcceptAsync(node, context);
     }
 
-    public static ISet<string> Run(IQueryNode node, IQueryVisitorContext context = null)
+    public static ISet<string> Run(IQueryNode node, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }

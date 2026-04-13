@@ -12,9 +12,9 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
 public class NestedVisitor : ChainableQueryVisitor
 {
-    private readonly NestedFilterResolver _filterResolver;
+    private readonly NestedFilterResolver? _filterResolver;
 
-    public NestedVisitor(NestedFilterResolver filterResolver = null)
+    public NestedVisitor(NestedFilterResolver? filterResolver = null)
     {
         _filterResolver = filterResolver;
     }
@@ -24,7 +24,7 @@ public class NestedVisitor : ChainableQueryVisitor
         if (String.IsNullOrEmpty(node.Field))
             return base.VisitAsync(node, context);
 
-        string nestedProperty = GetNestedProperty(node.Field, context);
+        string? nestedProperty = GetNestedProperty(node.Field, context);
         if (nestedProperty is null)
             return base.VisitAsync(node, context);
 
@@ -40,9 +40,9 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private async Task VisitGroupWithFilterAsync(GroupNode node, string nestedProperty, IQueryVisitorContext context)
     {
-        string originalField = node.GetOriginalField();
+        string? originalField = node.GetOriginalField();
         ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
-        var filter = await _filterResolver(nestedProperty, originalField, node.Field, context).AnyContext();
+        var filter = await _filterResolver!(nestedProperty, originalField!, node.Field!, context).AnyContext();
         if (filter is not null)
             node.SetNestedFilter(filter);
 
@@ -74,7 +74,7 @@ public class NestedVisitor : ChainableQueryVisitor
         if (IsInsideNestedGroup(node))
             return Task.CompletedTask;
 
-        string nestedProperty = GetNestedProperty(node.Field, context);
+        string? nestedProperty = GetNestedProperty(node.Field, context);
         if (nestedProperty is null)
             return Task.CompletedTask;
 
@@ -95,9 +95,9 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private async Task HandleNestedFieldWithFilterAsync(IFieldQueryNode node, string nestedProperty, IQueryVisitorContext context)
     {
-        string originalField = node.GetOriginalField();
+        string? originalField = node.GetOriginalField();
         ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
-        var filter = await _filterResolver(nestedProperty, originalField, node.Field, context).AnyContext();
+        var filter = await _filterResolver!(nestedProperty, originalField!, node.Field!, context).AnyContext();
         if (filter is not null)
             node.SetNestedFilter(filter);
 
@@ -138,9 +138,9 @@ public class NestedVisitor : ChainableQueryVisitor
         return false;
     }
 
-    private static string GetNestedProperty(string fullName, IQueryVisitorContext context)
+    private static string? GetNestedProperty(string? fullName, IQueryVisitorContext context)
     {
-        string[] nameParts = fullName?.Split('.');
+        string[]? nameParts = fullName?.Split('.');
 
         if (nameParts is null || context is not IElasticQueryVisitorContext elasticContext || nameParts is { Length: 0 })
             return null;

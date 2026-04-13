@@ -81,7 +81,7 @@ public class AggregationMap
             result[map.Name] = aggregation;
     }
 
-    private static Aggregation CreateAggregation(AggregationMap map)
+    private static Aggregation? CreateAggregation(AggregationMap map)
     {
         if (map?.Value is null)
             return null;
