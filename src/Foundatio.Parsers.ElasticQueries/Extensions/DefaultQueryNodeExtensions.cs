@@ -332,18 +332,24 @@ public static class DefaultQueryNodeExtensions
         }
     }
 
-    public static Query GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context)
+    public static Query? GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context)
     {
-        return new ExistsQuery(node.UnescapedField!);
+        if (node.UnescapedField is not { } field)
+            return null;
+
+        return new ExistsQuery(field);
     }
 
-    public static Query GetDefaultQuery(this MissingNode node, IQueryVisitorContext context)
+    public static Query? GetDefaultQuery(this MissingNode node, IQueryVisitorContext context)
     {
+        if (node.UnescapedField is not { } field)
+            return null;
+
         return new BoolQuery
         {
             MustNot =
             [
-                new ExistsQuery(node.UnescapedField!)
+                new ExistsQuery(field)
             ]
         };
     }
