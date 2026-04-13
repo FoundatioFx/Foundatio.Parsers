@@ -16,7 +16,7 @@ public interface IQueryNode
     /// <summary>
     /// The parent node in the AST, or null for the root node.
     /// </summary>
-    IQueryNode Parent { get; set; }
+    IQueryNode? Parent { get; set; }
 
     /// <summary>
     /// The child nodes of this node.
@@ -31,7 +31,7 @@ public interface IQueryNode
     /// <summary>
     /// Accepts a visitor for tree traversal using the visitor pattern.
     /// </summary>
-    Task<IQueryNode> AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context);
+    Task<IQueryNode?> AcceptAsync(IQueryNodeVisitor visitor, IQueryVisitorContext context);
 
     /// <summary>
     /// Returns the query string representation of this node.
@@ -57,17 +57,17 @@ public interface IFieldQueryNode : IQueryNode
     /// <summary>
     /// The prefix modifier (+, -, etc.) applied to this node.
     /// </summary>
-    string Prefix { get; set; }
+    string? Prefix { get; set; }
 
     /// <summary>
     /// The field name this query targets, or null for default field queries.
     /// </summary>
-    string Field { get; set; }
+    string? Field { get; set; }
 
     /// <summary>
     /// The field name with escape sequences resolved.
     /// </summary>
-    string UnescapedField { get; }
+    string? UnescapedField { get; }
 }
 
 /// <summary>
@@ -78,12 +78,12 @@ public interface IFieldQueryWithProximityAndBoostNode : IFieldQueryNode
     /// <summary>
     /// The boost factor (^) to increase or decrease relevance scoring.
     /// </summary>
-    string Boost { get; set; }
+    string? Boost { get; set; }
 
     /// <summary>
     /// The boost value with escape sequences resolved.
     /// </summary>
-    string UnescapedBoost { get; }
+    string? UnescapedBoost { get; }
 
     /// <summary>
     /// The proximity/slop factor (~) for fuzzy or phrase proximity searches.
@@ -94,10 +94,10 @@ public interface IFieldQueryWithProximityAndBoostNode : IFieldQueryNode
     /// For quoted terms (e.g., <c>"jakarta apache"~10</c>), this indicates a phrase proximity search with word slop.
     /// An empty string means the bare tilde was used with no explicit value (e.g., <c>term~</c>).
     /// </remarks>
-    string Proximity { get; set; }
+    string? Proximity { get; set; }
 
     /// <summary>
     /// The proximity value with escape sequences resolved.
     /// </summary>
-    string UnescapedProximity { get; }
+    string? UnescapedProximity { get; }
 }

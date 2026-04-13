@@ -10,22 +10,25 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions;
 public static class QueryNodeExtensions
 {
     private const string QueryKey = "@Query";
-    public static Task<Query> GetQueryAsync(this IQueryNode node, Func<Task<Query>> getDefaultValue = null)
+    public static Task<Query?> GetQueryAsync(this IQueryNode node, Func<Task<Query?>>? getDefaultValue = null)
     {
-        if (!node.Data.TryGetValue(QueryKey, out object value))
+        if (!node.Data.TryGetValue(QueryKey, out object? value))
         {
-            if (getDefaultValue == null)
-                return Task.FromResult<Query>(null);
+            if (getDefaultValue is null)
+                return Task.FromResult<Query?>(null);
 
-            return getDefaultValue?.Invoke();
+            return getDefaultValue.Invoke();
         }
 
         return Task.FromResult(value as Query);
     }
 
-    public static void SetQuery(this IQueryNode node, Query container)
+    public static void SetQuery(this IQueryNode node, Query? container)
     {
-        node.Data[QueryKey] = container;
+        if (container is null)
+            node.Data.Remove(QueryKey);
+        else
+            node.Data[QueryKey] = container;
     }
 
     public static void RemoveQuery(this IQueryNode node)
@@ -35,23 +38,23 @@ public static class QueryNodeExtensions
     }
 
     private const string SourceFilterKey = "@SourceFilter";
-    public static SourceFilter GetSourceFilter(this IQueryNode node, Func<SourceFilter> getDefaultValue = null)
+    public static SourceFilter? GetSourceFilter(this IQueryNode node, Func<SourceFilter>? getDefaultValue = null)
     {
-        if (!node.Data.TryGetValue(SourceFilterKey, out object value))
+        if (!node.Data.TryGetValue(SourceFilterKey, out object? value))
             return getDefaultValue?.Invoke();
 
         return value as SourceFilter;
     }
 
     private const string AggregationKey = "@Aggregation";
-    public static Task<AggregationMap> GetAggregationAsync(this IQueryNode node, Func<Task<AggregationMap>> getDefaultValue = null)
+    public static Task<AggregationMap?> GetAggregationAsync(this IQueryNode node, Func<Task<AggregationMap?>>? getDefaultValue = null)
     {
-        if (!node.Data.TryGetValue(AggregationKey, out object value))
+        if (!node.Data.TryGetValue(AggregationKey, out object? value))
         {
-            if (getDefaultValue == null)
-                return Task.FromResult<AggregationMap>(null);
+            if (getDefaultValue is null)
+                return Task.FromResult<AggregationMap?>(null);
 
-            return getDefaultValue?.Invoke();
+            return getDefaultValue.Invoke();
         }
 
         return Task.FromResult(value as AggregationMap);
@@ -68,9 +71,9 @@ public static class QueryNodeExtensions
     }
 
     private const string SortKey = "@Sort";
-    public static SortOptions GetSort(this IQueryNode node, Func<SortOptions> getDefaultValue = null)
+    public static SortOptions? GetSort(this IQueryNode node, Func<SortOptions?>? getDefaultValue = null)
     {
-        if (!node.Data.TryGetValue(SortKey, out object value))
+        if (!node.Data.TryGetValue(SortKey, out object? value))
             return getDefaultValue?.Invoke();
 
         return value as SortOptions;
@@ -87,9 +90,9 @@ public static class QueryNodeExtensions
     }
 
     private const string NestedPathKey = "@NestedPath";
-    public static string GetNestedPath(this IQueryNode node)
+    public static string? GetNestedPath(this IQueryNode node)
     {
-        if (!node.Data.TryGetValue(NestedPathKey, out object value))
+        if (!node.Data.TryGetValue(NestedPathKey, out object? value))
             return null;
 
         return value as string;
@@ -108,9 +111,9 @@ public static class QueryNodeExtensions
     }
 
     private const string NestedFilterKey = "@NestedFilter";
-    public static Query GetNestedFilter(this IQueryNode node)
+    public static Query? GetNestedFilter(this IQueryNode node)
     {
-        if (!node.Data.TryGetValue(NestedFilterKey, out object value))
+        if (!node.Data.TryGetValue(NestedFilterKey, out object? value))
             return null;
 
         return value as Query;

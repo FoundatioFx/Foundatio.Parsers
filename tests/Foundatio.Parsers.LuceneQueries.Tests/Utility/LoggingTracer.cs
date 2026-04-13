@@ -197,18 +197,18 @@ public class LoggingTracer : ITracer
         /// <summary>
         /// Gets the name of the rule.
         /// </summary>
-        public string Name { get; internal set; }
+        public string Name { get; internal set; } = null!;
     }
 
     private class RuleStackEntry
     {
         public bool? CacheHit { get; set; }
 
-        public Cursor Cursor { get; set; }
+        public Cursor Cursor { get; set; } = null!;
 
-        public string RuleName { get; set; }
+        public string RuleName { get; set; } = null!;
 
-        public Stopwatch Stopwatch { get; set; }
+        public Stopwatch Stopwatch { get; set; } = null!;
     }
 
     private class RuleStats

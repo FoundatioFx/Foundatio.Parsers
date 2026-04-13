@@ -16,6 +16,6 @@ public interface IQueryNodeVisitor
     /// </summary>
     /// <param name="node">The node to visit.</param>
     /// <param name="context">The visitor context containing traversal state.</param>
-    /// <returns>The visited node, potentially transformed.</returns>
-    Task<IQueryNode> VisitAsync(IQueryNode node, IQueryVisitorContext context);
+    /// <returns>The visited node, potentially transformed. Returns null to signal node removal.</returns>
+    Task<IQueryNode?> VisitAsync(IQueryNode node, IQueryVisitorContext context);
 }

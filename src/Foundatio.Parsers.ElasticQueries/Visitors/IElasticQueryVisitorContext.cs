@@ -13,7 +13,7 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors
         /// <summary>
         /// Provides the default timezone for date queries when not explicitly specified.
         /// </summary>
-        Func<Task<string>> DefaultTimeZone { get; set; }
+        Func<Task<string>>? DefaultTimeZone { get; set; }
 
         /// <summary>
         /// Whether to use scoring queries (query context) instead of filters (filter context).
@@ -38,13 +38,14 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors
         /// <summary>
         /// Resolves field names to runtime field definitions for dynamic field support.
         /// </summary>
-        RuntimeFieldResolver RuntimeFieldResolver { get; set; }
+        RuntimeFieldResolver? RuntimeFieldResolver { get; set; }
+
         /// <summary>
         /// Resolves user-entered geo text (e.g., zip codes, place names) to a "lat,lon" coordinate
         /// string. Used by <see cref="GeoVisitor"/> for geo-distance queries.
         /// When null, the raw term value is used directly as the location.
         /// </summary>
-        Func<string, Task<string>> GeoLocationResolver { get; set; }
+        Func<string, Task<string>>? GeoLocationResolver { get; set; }
     }
 }
 
@@ -55,7 +56,7 @@ namespace Foundatio.Parsers
     /// </summary>
     /// <param name="field">The field name to resolve.</param>
     /// <returns>The runtime field definition, or null if the field should not be a runtime field.</returns>
-    public delegate Task<ElasticRuntimeField> RuntimeFieldResolver(string field);
+    public delegate Task<ElasticRuntimeField?> RuntimeFieldResolver(string field);
 
     /// <summary>
     /// Defines an Elasticsearch runtime field for dynamic field computation.
@@ -65,7 +66,7 @@ namespace Foundatio.Parsers
         /// <summary>
         /// The name of the runtime field.
         /// </summary>
-        public string Name { get; set; }
+        public required string Name { get; set; }
 
         /// <summary>
         /// The data type of the runtime field.
@@ -75,7 +76,7 @@ namespace Foundatio.Parsers
         /// <summary>
         /// The Painless script that computes the field value.
         /// </summary>
-        public string Script { get; set; }
+        public required string Script { get; set; }
     }
 
     /// <summary>

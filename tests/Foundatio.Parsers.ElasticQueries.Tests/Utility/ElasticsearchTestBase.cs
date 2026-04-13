@@ -29,17 +29,17 @@ public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLife
 
     protected ElasticsearchClient Client => _fixture.Client;
 
-    protected Task CreateNamedIndexAsync<TModel>(string index, Action<TypeMappingDescriptor<TModel>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
+    protected Task CreateNamedIndexAsync<TModel>(string index, Action<TypeMappingDescriptor<TModel>>? configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor>? configureIndex = null) where TModel : class
     {
         return _fixture.CreateNamedIndexAsync(index, configureMappings, configureIndex);
     }
 
-    protected Task<string> CreateRandomIndexAsync<TModel>(Action<TypeMappingDescriptor<TModel>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where TModel : class
+    protected Task<string> CreateRandomIndexAsync<TModel>(Action<TypeMappingDescriptor<TModel>>? configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor>? configureIndex = null) where TModel : class
     {
         return _fixture.CreateRandomIndexAsync(configureMappings, configureIndex);
     }
 
-    protected Task<CreateIndexResponse> CreateIndexAsync(IndexName index, Action<CreateIndexRequestDescriptor> configureIndex = null)
+    protected Task<CreateIndexResponse> CreateIndexAsync(IndexName index, Action<CreateIndexRequestDescriptor>? configureIndex = null)
     {
         return _fixture.CreateIndexAsync(index, configureIndex);
     }
@@ -65,7 +65,7 @@ public class ElasticsearchFixture : IAsyncLifetime
 {
     private readonly List<IndexName> _createdIndexes = new();
     private bool _elasticsearchReady;
-    protected readonly ILogger _logger;
+    protected readonly ILogger _logger = null!;
     private readonly Lazy<ElasticsearchClient> _client;
 
     public ElasticsearchFixture()
@@ -73,10 +73,10 @@ public class ElasticsearchFixture : IAsyncLifetime
         _client = new Lazy<ElasticsearchClient>(() => GetClient(ConfigureConnectionSettings));
     }
 
-    public TestLogger Log { get; set; }
+    public TestLogger Log { get; set; } = null!;
     public ElasticsearchClient Client => _client.Value;
 
-    protected ElasticsearchClient GetClient(Action<ElasticsearchClientSettings> configure = null)
+    protected ElasticsearchClient GetClient(Action<ElasticsearchClientSettings>? configure = null)
     {
         string elasticsearchUrl = Environment.GetEnvironmentVariable("ELASTICSEARCH_URL") ?? "http://localhost:9200";
         using var settings = new ElasticsearchClientSettings(new Uri(elasticsearchUrl));
@@ -99,7 +99,7 @@ public class ElasticsearchFixture : IAsyncLifetime
     {
     }
 
-    public async Task CreateNamedIndexAsync<T>(string index, Action<TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
+    public async Task CreateNamedIndexAsync<T>(string index, Action<TypeMappingDescriptor<T>>? configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor>? configureIndex = null) where T : class
     {
         configureMappings ??= m => m.Dynamic(DynamicMapping.True);
         configureIndex ??= i => i.NumberOfReplicas(0).Analysis(a => a.AddSortNormalizer());
@@ -108,7 +108,7 @@ public class ElasticsearchFixture : IAsyncLifetime
         Client.ElasticsearchClientSettings.DefaultIndices[typeof(T)] = index;
     }
 
-    public async Task<string> CreateRandomIndexAsync<T>(Action<TypeMappingDescriptor<T>> configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor> configureIndex = null) where T : class
+    public async Task<string> CreateRandomIndexAsync<T>(Action<TypeMappingDescriptor<T>>? configureMappings = null, Func<IndexSettingsDescriptor, IndexSettingsDescriptor>? configureIndex = null) where T : class
     {
         string index = $"test_{Guid.NewGuid():N}";
         configureMappings ??= m => m.Dynamic(DynamicMapping.True);
@@ -120,7 +120,7 @@ public class ElasticsearchFixture : IAsyncLifetime
         return index;
     }
 
-    public async Task<CreateIndexResponse> CreateIndexAsync(IndexName index, Action<CreateIndexRequestDescriptor> configureIndex = null)
+    public async Task<CreateIndexResponse> CreateIndexAsync(IndexName index, Action<CreateIndexRequestDescriptor>? configureIndex = null)
     {
         _createdIndexes.Add(index);
 

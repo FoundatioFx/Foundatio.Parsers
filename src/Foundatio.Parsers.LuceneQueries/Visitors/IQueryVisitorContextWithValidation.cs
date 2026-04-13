@@ -8,10 +8,10 @@ public interface IQueryVisitorContextWithValidation : IQueryVisitorContext
     /// <summary>
     /// Configuration options controlling validation behavior.
     /// </summary>
-    QueryValidationOptions ValidationOptions { get; set; }
+    QueryValidationOptions? ValidationOptions { get; set; }
 
     /// <summary>
     /// The validation results populated after validation completes.
     /// </summary>
-    QueryValidationResult ValidationResult { get; set; }
+    QueryValidationResult? ValidationResult { get; set; }
 }

@@ -17,9 +17,9 @@ public static class DefaultAggregationNodeExtensions
     // NOTE: We may want to read this dynamically from server settings.
     public const int MAX_BUCKET_SIZE = 10000;
 
-    public static async Task<AggregationMap> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static async Task<AggregationMap?> GetDefaultAggregationAsync(this IQueryNode node, IQueryVisitorContext context)
     {
-        AggregationMap aggregation = null;
+        AggregationMap? aggregation = null;
         if (node is GroupNode groupNode)
             aggregation = await groupNode.GetDefaultAggregationAsync(context).AnyContext();
 
@@ -47,17 +47,20 @@ public static class DefaultAggregationNodeExtensions
         return aggregation;
     }
 
-    public static async Task<AggregationMap> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context)
+    public static async Task<AggregationMap?> GetDefaultAggregationAsync(this GroupNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left != null)
+        if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left is not null)
             return null;
 
-        string field = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        string? field = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        if (field is null)
+            return null;
+
         var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
-        string originalField = node.GetOriginalField().Unescape();
+        string? originalField = node.GetOriginalField().Unescape();
 
         switch (node.GetOperationType())
         {
@@ -114,15 +117,18 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    public static async Task<AggregationMap> GetDefaultAggregationAsync(this TermNode node, IQueryVisitorContext context)
+    public static async Task<AggregationMap?> GetDefaultAggregationAsync(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        string aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        string? aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        if (aggField is null)
+            return null;
+
         var property = elasticContext.MappingResolver.GetMappingProperty(node.UnescapedField, true);
-        string timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext());
-        string originalField = node.GetOriginalField().Unescape();
+        string? timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext());
+        string? originalField = node.GetOriginalField().Unescape();
 
         // Validate that field name is not empty for aggregations that require it
         if (String.IsNullOrEmpty(aggField))
@@ -240,9 +246,9 @@ public static class DefaultAggregationNodeExtensions
         return null;
     }
 
-    private static AggregationMap GetPercentilesAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static AggregationMap GetPercentilesAggregation(string originalField, string field, string? proximity, string? boost, IQueryVisitorContext context)
     {
-        List<double> percents = null;
+        List<double>? percents = null;
         if (!String.IsNullOrWhiteSpace(proximity))
         {
             string[] percentStrings = proximity.Split(',');
@@ -261,7 +267,7 @@ public static class DefaultAggregationNodeExtensions
         });
     }
 
-    private static AggregationMap GetHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static AggregationMap GetHistogramAggregation(string originalField, string field, string? proximity, string? boost, IQueryVisitorContext context)
     {
         double interval = 50;
         if (Double.TryParse(proximity, out double prox))
@@ -275,16 +281,16 @@ public static class DefaultAggregationNodeExtensions
         });
     }
 
-    private static AggregationMap GetDateHistogramAggregation(string originalField, string field, string proximity, string boost, IQueryVisitorContext context)
+    private static AggregationMap GetDateHistogramAggregation(string originalField, string field, string? proximity, string? boost, IQueryVisitorContext context)
     {
         // NOTE: StartDate and EndDate are set in the Repositories QueryBuilderContext.
         var start = context.GetDate("StartDate");
         var end = context.GetDate("EndDate");
         bool isValidRange = start.HasValue && start.Value > DateTime.MinValue && end.HasValue && end.Value < DateTime.MaxValue && start.Value <= end.Value;
-        var bounds = isValidRange ? new ExtendedBounds<FieldDateMath> { Min = start.Value, Max = end.Value } : null;
+        var bounds = isValidRange ? new ExtendedBounds<FieldDateMath> { Min = start.GetValueOrDefault(), Max = end.GetValueOrDefault() } : null;
 
         var interval = GetInterval(proximity, start, end);
-        string timezone = TryConvertTimeUnitToUtcOffset(boost);
+        string? timezone = TryConvertTimeUnitToUtcOffset(boost);
         var agg = new DateHistogramAggregation
         {
             Field = field,
@@ -305,7 +311,7 @@ public static class DefaultAggregationNodeExtensions
         return aggregationMap;
     }
 
-    private static string TryConvertTimeUnitToUtcOffset(string boost)
+    private static string? TryConvertTimeUnitToUtcOffset(string? boost)
     {
         if (String.IsNullOrEmpty(boost))
             return null;
@@ -325,12 +331,13 @@ public static class DefaultAggregationNodeExtensions
         return $"+{timezoneOffset.Value:hh\\:mm}";
     }
 
-    private static Union<CalendarInterval, Duration> GetInterval(string proximity, DateTime? start, DateTime? end)
+    private static Union<CalendarInterval, Duration> GetInterval(string? proximity, DateTime? start, DateTime? end)
     {
         if (String.IsNullOrEmpty(proximity))
             return GetInterval(start, end);
 
-        return proximity.Trim() switch
+        string trimmed = proximity.Trim();
+        return trimmed switch
         {
             "s" or "1s" or "second" => CalendarInterval.Second,
             "m" or "1m" or "minute" => CalendarInterval.Minute,
@@ -340,7 +347,7 @@ public static class DefaultAggregationNodeExtensions
             "M" or "1M" or "month" => CalendarInterval.Month,
             "q" or "1q" or "quarter" => CalendarInterval.Quarter,
             "y" or "1y" or "year" => CalendarInterval.Year,
-            _ => new Union<CalendarInterval, Duration>(proximity),
+            _ => new Union<CalendarInterval, Duration>(trimmed),
         };
     }
 
@@ -415,30 +422,36 @@ public static class DefaultAggregationNodeExtensions
 
         foreach (var child in node.Children)
         {
-            if (child is GroupNode groupNode && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field) && groupNode.Left == null)
+            if (child is GroupNode groupNode && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field) && groupNode.Left is null)
                 continue;
 
             var termNode = child as TermNode;
             switch (termNode?.Field)
             {
                 case "@exclude":
+                    if (termNode.UnescapedTerm is null)
+                        break;
+
                     if (termNode.IsRegexTerm)
                     {
                         termsAggregation.Exclude = new TermsExclude(termNode.UnescapedTerm);
                     }
                     else
                     {
-                        termsAggregation.Exclude = termsAggregation.Exclude.AddValue(termNode.UnescapedTerm);
+                        termsAggregation.Exclude = (termsAggregation.Exclude ?? new TermsExclude([])).AddValue(termNode.UnescapedTerm);
                     }
                     break;
                 case "@include":
+                    if (termNode.UnescapedTerm is null)
+                        break;
+
                     if (termNode.IsRegexTerm)
                     {
                         termsAggregation.Include = new TermsInclude(termNode.UnescapedTerm);
                     }
                     else
                     {
-                        termsAggregation.Include = termsAggregation.Include.AddValue(termNode.UnescapedTerm);
+                        termsAggregation.Include = (termsAggregation.Include ?? new TermsInclude([])).AddValue(termNode.UnescapedTerm);
                     }
                     break;
                 case "@missing":
@@ -462,36 +475,41 @@ public static class DefaultAggregationNodeExtensions
 
         foreach (var child in node.Children)
         {
-            if (child is GroupNode groupNode && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field) && groupNode.Left == null)
+            if (child is GroupNode groupNode && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field) && groupNode.Left is null)
                 continue;
 
             if (child is TermNode termNode)
             {
                 if (topHitsAggregation.Source is null)
                 {
-                    topHitsAggregation.Source = node.GetSourceFilter(() => new SourceFilter());
+                    var sourceFilter = node.GetSourceFilter(() => new SourceFilter());
+                    if (sourceFilter is not null)
+                        topHitsAggregation.Source = sourceFilter;
                 }
 
-                topHitsAggregation.Source.Match(
+                topHitsAggregation.Source?.Match(
                     b => { },
                     filter =>
                     {
+                        if (filter is null || termNode.UnescapedTerm is not { } term)
+                            return;
+
                         switch (termNode.Field)
                         {
                             case "@exclude":
                                 {
-                                    if (filter.Excludes == null)
-                                        filter.Excludes = termNode.UnescapedTerm;
+                                    if (filter.Excludes is null)
+                                        filter.Excludes = term;
                                     else
-                                        filter.Excludes.And(termNode.UnescapedTerm);
+                                        filter.Excludes.And(term);
                                     break;
                                 }
                             case "@include":
                                 {
-                                    if (filter.Includes == null)
-                                        filter.Includes = termNode.UnescapedTerm;
+                                    if (filter.Includes is null)
+                                        filter.Includes = term;
                                     else
-                                        filter.Includes.And(termNode.UnescapedTerm);
+                                        filter.Includes.And(term);
                                     break;
                                 }
                         }
@@ -509,7 +527,7 @@ public static class DefaultAggregationNodeExtensions
 
         foreach (var child in node.Children)
         {
-            if (child is GroupNode groupNode && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field) && groupNode.Left == null)
+            if (child is GroupNode groupNode && groupNode.HasParens && !String.IsNullOrEmpty(groupNode.Field) && groupNode.Left is null)
                 continue;
 
             var termNode = child as TermNode;
@@ -525,7 +543,8 @@ public static class DefaultAggregationNodeExtensions
                         break;
                     }
                 case "@offset":
-                    dateHistogramAggregation.Offset = termNode.IsExcluded() ? "-" + termNode.Term : termNode.Term;
+                    if (termNode.Term is { } offset)
+                        dateHistogramAggregation.Offset = termNode.IsExcluded() ? "-" + offset : offset;
                     break;
             }
 

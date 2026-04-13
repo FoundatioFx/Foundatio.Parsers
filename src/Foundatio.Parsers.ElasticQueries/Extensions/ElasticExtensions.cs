@@ -39,7 +39,7 @@ public static class ElasticExtensions
     public static async Task<SearchRequestDescriptor<TDocument>> QueryLuceneSyntaxAsync<TDocument>(
         this SearchRequestDescriptor<TDocument> descriptor,
         string query,
-        Action<ElasticQueryParserConfiguration> configure = null)
+        Action<ElasticQueryParserConfiguration>? configure = null)
     {
         var parser = new ElasticQueryParser(configure);
         var elasticQuery = await parser.BuildQueryAsync(query).AnyContext();
@@ -53,7 +53,7 @@ public static class ElasticExtensions
         return descriptor.Query(q => q.QueryString(qs => qs.Query(query)));
     }
 
-    public static SearchRequestDescriptor<TDocument> Aggregations<TDocument>(this SearchRequestDescriptor<TDocument> descriptor, AggregationMap aggregations)
+    public static SearchRequestDescriptor<TDocument> Aggregations<TDocument>(this SearchRequestDescriptor<TDocument> descriptor, AggregationMap? aggregations)
     {
         if (aggregations is null)
             return descriptor;
@@ -81,7 +81,7 @@ public static class ElasticExtensions
     /// When upgrading the client, verify that newly added property types are
     /// included here.
     /// </summary>
-    public static Properties GetFields(this IProperty property)
+    public static Properties? GetFields(this IProperty property)
     {
         return property switch
         {
@@ -146,7 +146,7 @@ public static class ElasticExtensions
 
     public static TermsInclude AddValue(this TermsInclude include, string value)
     {
-        if (include?.Values == null)
+        if (include?.Values is null)
             return new TermsInclude([value]);
 
         var values = include.Values.ToList();
@@ -157,7 +157,7 @@ public static class ElasticExtensions
 
     public static TermsExclude AddValue(this TermsExclude exclude, string value)
     {
-        if (exclude?.Values == null)
+        if (exclude?.Values is null)
             return new TermsExclude([value]);
 
         var values = exclude.Values.ToList();
@@ -166,9 +166,9 @@ public static class ElasticExtensions
         return new TermsExclude(values);
     }
 
-    public static string GetErrorMessage(this ElasticsearchResponse elasticResponse, string message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
+    public static string GetErrorMessage(this ElasticsearchResponse elasticResponse, string? message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
     {
-        if (elasticResponse == null)
+        if (elasticResponse is null)
             return String.Empty;
 
         var sb = new StringBuilder();
@@ -200,7 +200,7 @@ public static class ElasticExtensions
             sb.AppendLine(body);
         }
 
-        if (includeResponse && apiCall is not null && apiCall.ResponseBodyInBytes != null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
+        if (includeResponse && apiCall is not null && apiCall.ResponseBodyInBytes is not null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
         {
             string body = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes);
             if (normalize)
@@ -221,7 +221,7 @@ public static class ElasticExtensions
         return GetErrorMessage(elasticResponse, null, normalize, includeResponse, includeDebugInformation);
     }
 
-    public static async Task<bool> WaitForReadyAsync(this ElasticsearchClient client, CancellationToken cancellationToken, ILogger logger = null)
+    public static async Task<bool> WaitForReadyAsync(this ElasticsearchClient client, CancellationToken cancellationToken, ILogger? logger = null)
     {
         var nodes = client.ElasticsearchClientSettings.NodePool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;
@@ -242,7 +242,7 @@ public static class ElasticExtensions
         return false;
     }
 
-    public static bool WaitForReady(this ElasticsearchClient client, CancellationToken cancellationToken, ILogger logger = null)
+    public static bool WaitForReady(this ElasticsearchClient client, CancellationToken cancellationToken, ILogger? logger = null)
     {
         var nodes = client.ElasticsearchClientSettings.NodePool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;

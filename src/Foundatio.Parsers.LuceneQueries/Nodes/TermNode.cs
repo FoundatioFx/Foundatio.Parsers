@@ -8,17 +8,17 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes;
 public class TermNode : QueryNodeBase, IFieldQueryWithProximityAndBoostNode
 {
     public bool? IsNegated { get; set; }
-    public string Prefix { get; set; }
-    public string Field { get; set; }
-    public string UnescapedField => Field?.Unescape();
-    public string Term { get; set; }
-    public string UnescapedTerm => Term?.Unescape();
+    public string? Prefix { get; set; }
+    public string? Field { get; set; }
+    public string? UnescapedField => Field?.Unescape();
+    public string? Term { get; set; }
+    public string? UnescapedTerm => Term?.Unescape();
     public bool IsQuotedTerm { get; set; }
     public bool IsRegexTerm { get; set; }
-    public string Boost { get; set; }
-    public string UnescapedBoost => Boost?.Unescape();
-    public string Proximity { get; set; }
-    public string UnescapedProximity => Proximity?.Unescape();
+    public string? Boost { get; set; }
+    public string? UnescapedBoost => Boost?.Unescape();
+    public string? Proximity { get; set; }
+    public string? UnescapedProximity => Proximity?.Unescape();
 
     public TermNode CopyTo(TermNode target)
     {

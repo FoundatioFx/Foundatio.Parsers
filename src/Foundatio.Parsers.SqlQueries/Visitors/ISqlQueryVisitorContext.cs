@@ -12,7 +12,7 @@ public interface ISqlQueryVisitorContext : IQueryVisitorContext
     /// <summary>
     /// Metadata about available entity fields for query generation.
     /// </summary>
-    List<EntityFieldInfo> Fields { get; set; }
+    List<EntityFieldInfo>? Fields { get; set; }
 
     /// <summary>
     /// The default operator for text searches (Equals, Contains, StartsWith).
@@ -22,20 +22,20 @@ public interface ISqlQueryVisitorContext : IQueryVisitorContext
     /// <summary>
     /// Fields that support full-text search operations.
     /// </summary>
-    string[] FullTextFields { get; set; }
+    string[]? FullTextFields { get; set; }
 
     /// <summary>
     /// Tokenizes search terms for full-text search processing.
     /// </summary>
-    Action<SearchTerm> SearchTokenizer { get; set; }
+    Action<SearchTerm>? SearchTokenizer { get; set; }
 
     /// <summary>
     /// Converts date/time strings to SQL-compatible format.
     /// </summary>
-    Func<string, string> DateTimeParser { get; set; }
+    Func<string, string>? DateTimeParser { get; set; }
 
     /// <summary>
     /// Converts date-only strings to SQL-compatible format.
     /// </summary>
-    Func<string, string> DateOnlyParser { get; set; }
+    Func<string, string>? DateOnlyParser { get; set; }
 }

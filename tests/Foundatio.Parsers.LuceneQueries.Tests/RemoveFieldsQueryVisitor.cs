@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Xunit;
 using Xunit;
@@ -17,7 +17,8 @@ public class RemoveFieldsQueryVisitorTests : TestWithLoggingBase
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value");
-        string queryResult = await RemoveFieldsQueryVisitor.RunAsync(result, ["field1"]);
+        Assert.NotNull(result);
+        string? queryResult = await RemoveFieldsQueryVisitor.RunAsync(result, ["field1"]);
 
         Assert.Equal("field2:value (field3:value OR field4:value (field5:value)) field6:value", queryResult);
     }
@@ -27,7 +28,8 @@ public class RemoveFieldsQueryVisitorTests : TestWithLoggingBase
     {
         var parser = new LuceneQueryParser();
         var result = await parser.ParseAsync("field1:value field2:value (field3:value OR field4:value (field5:value)) field6:value");
-        string queryResult = await RemoveFieldsQueryVisitor.RunAsync(result, f => f == "field3");
+        Assert.NotNull(result);
+        string? queryResult = await RemoveFieldsQueryVisitor.RunAsync(result, f => f == "field3");
 
         Assert.Equal("field1:value field2:value (field4:value (field5:value)) field6:value", queryResult);
     }

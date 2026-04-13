@@ -13,18 +13,18 @@ public abstract class MutatingQueryNodeVisitorWithResultBase<T> : MutatingQueryN
     public abstract Task<T> AcceptAsync(IQueryNode node, IQueryVisitorContext context);
 }
 
-public abstract class ChainableQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode>, IChainableQueryVisitor
+public abstract class ChainableQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode?>, IChainableQueryVisitor
 {
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
         var result = await node.AcceptAsync(this, context).AnyContext();
         return result;
     }
 }
 
-public abstract class ChainableMutatingQueryVisitor : MutatingQueryNodeVisitorWithResultBase<IQueryNode>, IChainableQueryVisitor
+public abstract class ChainableMutatingQueryVisitor : MutatingQueryNodeVisitorWithResultBase<IQueryNode?>, IChainableQueryVisitor
 {
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
         var result = await node.AcceptAsync(this, context).AnyContext();
         return result;

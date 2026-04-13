@@ -16,7 +16,7 @@ public static class ElasticMapping
     /// <summary>
     /// Not chainable with AddSortField. Use AddKeywordAndSortFields to add both.
     /// </summary>
-    public static TextPropertyDescriptor<T> AddKeywordField<T>(this TextPropertyDescriptor<T> descriptor, string normalizer) where T : class
+    public static TextPropertyDescriptor<T> AddKeywordField<T>(this TextPropertyDescriptor<T> descriptor, string? normalizer) where T : class
     {
         return descriptor.Fields(f => f.Keyword(KeywordFieldName, s => s.Normalizer(normalizer).IgnoreAbove(256)));
     }
@@ -37,7 +37,7 @@ public static class ElasticMapping
         return descriptor.Fields(f => f.Keyword(SortFieldName, s => s.Normalizer(normalizer).IgnoreAbove(256)));
     }
 
-    public static TextPropertyDescriptor<T> AddKeywordAndSortFields<T>(this TextPropertyDescriptor<T> descriptor, string sortNormalizer = "sort", string keywordNormalizer = null) where T : class
+    public static TextPropertyDescriptor<T> AddKeywordAndSortFields<T>(this TextPropertyDescriptor<T> descriptor, string sortNormalizer = "sort", string? keywordNormalizer = null) where T : class
     {
         return descriptor.Fields(f => f
             .Keyword(KeywordFieldName, s => s.Normalizer(keywordNormalizer).IgnoreAbove(256))

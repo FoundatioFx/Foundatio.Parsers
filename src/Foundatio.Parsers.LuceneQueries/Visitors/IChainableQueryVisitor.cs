@@ -8,4 +8,4 @@ namespace Foundatio.Parsers.LuceneQueries.Visitors;
 /// <remarks>
 /// Use <see cref="ChainedQueryVisitor"/> to combine multiple chainable visitors.
 /// </remarks>
-public interface IChainableQueryVisitor : IQueryNodeVisitorWithResult<IQueryNode> { }
+public interface IChainableQueryVisitor : IQueryNodeVisitorWithResult<IQueryNode?> { }

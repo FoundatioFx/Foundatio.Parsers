@@ -59,12 +59,13 @@ public class GenerateSqlVisitor : QueryNodeVisitorWithResultBase<string>
         return _builder.ToString();
     }
 
-    public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext context = null)
+    public static Task<string> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
+        context ??= new SqlQueryVisitorContext();
         return new GenerateSqlVisitor().AcceptAsync(node, context);
     }
 
-    public static string Run(IQueryNode node, IQueryVisitorContext context = null)
+    public static string Run(IQueryNode node, IQueryVisitorContext? context = null)
     {
         return RunAsync(node, context).GetAwaiter().GetResult();
     }

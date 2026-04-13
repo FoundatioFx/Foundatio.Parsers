@@ -11,5 +11,5 @@ public interface IQueryVisitorContextWithIncludeResolver : IQueryVisitorContext
     /// <summary>
     /// Resolves include names to their query string definitions.
     /// </summary>
-    IncludeResolver IncludeResolver { get; set; }
+    IncludeResolver? IncludeResolver { get; set; }
 }

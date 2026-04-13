@@ -7,9 +7,9 @@ namespace Foundatio.Parsers.LuceneQueries.Nodes;
 public class ExistsNode : QueryNodeBase, IFieldQueryNode
 {
     public bool? IsNegated { get; set; }
-    public string Prefix { get; set; }
-    public string Field { get; set; }
-    public string UnescapedField => Field?.Unescape();
+    public string? Prefix { get; set; }
+    public string? Field { get; set; }
+    public string? UnescapedField => Field?.Unescape();
 
     public ExistsNode CopyTo(ExistsNode target)
     {

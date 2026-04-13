@@ -112,10 +112,10 @@ public class CustomVisitorTests : ElasticsearchTestBase
         return false;
     }
 
-    private static Task<string> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch)
+    private static Task<string?> ResolveIncludeAsync(string expected, string actual, string resolvedFilterIfMatch)
     {
         if (String.Equals(expected, actual))
-            return Task.FromResult(resolvedFilterIfMatch);
+            return Task.FromResult<string?>(resolvedFilterIfMatch);
 
         throw new ArgumentException(nameof(actual), $"Unable to resolve filter with id: {actual}");
     }

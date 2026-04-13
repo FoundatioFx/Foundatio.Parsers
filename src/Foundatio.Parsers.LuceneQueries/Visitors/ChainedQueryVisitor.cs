@@ -1,17 +1,17 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.LuceneQueries.Visitors;
 
-public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode>, IChainableQueryVisitor
+public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode?>, IChainableQueryVisitor
 {
     private readonly List<QueryVisitorWithPriority> _visitors = new();
-    private QueryVisitorWithPriority[] _frozenVisitors;
+    private QueryVisitorWithPriority[] _frozenVisitors = [];
     private bool _isDirty = true;
 
-    public void AddVisitor(IQueryNodeVisitorWithResult<IQueryNode> visitor, int priority = 0)
+    public void AddVisitor(IQueryNodeVisitorWithResult<IQueryNode?> visitor, int priority = 0)
     {
         AddVisitor(new QueryVisitorWithPriority
         {
@@ -75,14 +75,23 @@ public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode>, I
         _isDirty = true;
     }
 
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    public override async Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
         if (_isDirty)
+        {
             _frozenVisitors = _visitors.OrderBy(v => v.Priority).ToArray();
+            _isDirty = false;
+        }
 
+        IQueryNode? current = node;
         foreach (var visitor in _frozenVisitors)
-            node = await visitor.AcceptAsync(node, context).AnyContext();
+        {
+            if (current is null)
+                break;
 
-        return node;
+            current = await visitor.AcceptAsync(current, context).AnyContext();
+        }
+
+        return current;
     }
 }

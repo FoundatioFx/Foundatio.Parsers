@@ -18,7 +18,7 @@ public static class QueryVisitorContextExtensions
         return elasticContext.EnableRuntimeFieldResolver;
     }
 
-    public static RuntimeFieldResolver GetRuntimeFieldResolver(this IQueryVisitorContext context)
+    public static RuntimeFieldResolver? GetRuntimeFieldResolver(this IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -46,13 +46,13 @@ public static class QueryVisitorContextExtensions
         return context;
     }
 
-    public static Task<string> GetTimeZoneAsync(this IQueryVisitorContext context)
+    public static Task<string?> GetTimeZoneAsync(this IQueryVisitorContext context)
     {
         var elasticContext = context as IElasticQueryVisitorContext;
         if (elasticContext?.DefaultTimeZone != null)
-            return elasticContext.DefaultTimeZone.Invoke();
+            return elasticContext.DefaultTimeZone.Invoke()!;
 
-        return Task.FromResult<string>(null);
+        return Task.FromResult<string?>(null);
     }
 
     public static T SetMappingResolver<T>(this T context, ElasticMappingResolver mappingResolver) where T : IQueryVisitorContext

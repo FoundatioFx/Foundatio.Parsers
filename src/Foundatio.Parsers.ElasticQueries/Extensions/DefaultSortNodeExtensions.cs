@@ -17,19 +17,19 @@ public static class DefaultSortNodeExtensions
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        string field = elasticContext.MappingResolver.GetSortFieldName(node.UnescapedField);
+        string? field = elasticContext.MappingResolver.GetSortFieldName(node.UnescapedField);
         var fieldType = elasticContext.MappingResolver.GetFieldType(field);
 
         if (fieldType == FieldType.GeoPoint && !String.IsNullOrEmpty(node.UnescapedTerm))
-            return GetGeoDistanceSort(node, elasticContext, field);
+            return GetGeoDistanceSort(node, elasticContext, field!)!;
 
-        var fieldSort = new FieldSort(field)
+        var fieldSort = new FieldSort(field!)
         {
             UnmappedType = fieldType == FieldType.None ? FieldType.Keyword : fieldType,
             Order = node.IsNodeOrGroupNegated() ? SortOrder.Desc : SortOrder.Asc
         };
 
-        string nestedPath = node.GetNestedPath();
+        string? nestedPath = node.GetNestedPath();
         if (nestedPath is not null)
         {
             var nestedSort = new NestedSortValue { Path = nestedPath };
@@ -46,9 +46,9 @@ public static class DefaultSortNodeExtensions
         };
     }
 
-    private static SortOptions GetGeoDistanceSort(TermNode node, IElasticQueryVisitorContext context, string field)
+    private static SortOptions? GetGeoDistanceSort(TermNode node, IElasticQueryVisitorContext context, string field)
     {
-        string location = node.UnescapedTerm;
+        string? location = node.UnescapedTerm;
         var geoLocations = ParseGeoLocations(location);
         if (geoLocations is null || geoLocations.Count == 0)
             return null;
@@ -65,7 +65,7 @@ public static class DefaultSortNodeExtensions
         };
     }
 
-    private static IList<GeoLocation> ParseGeoLocations(string location)
+    private static IList<GeoLocation>? ParseGeoLocations(string? location)
     {
         if (String.IsNullOrEmpty(location))
             return null;

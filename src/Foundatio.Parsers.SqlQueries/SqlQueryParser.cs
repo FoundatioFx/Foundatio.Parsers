@@ -20,7 +20,7 @@ namespace Foundatio.Parsers.SqlQueries;
 
 public class SqlQueryParser : LuceneQueryParser
 {
-    public SqlQueryParser(Action<SqlQueryParserConfiguration> configure = null)
+    public SqlQueryParser(Action<SqlQueryParserConfiguration>? configure = null)
     {
         var config = new SqlQueryParserConfiguration();
         configure?.Invoke(config);
@@ -33,7 +33,7 @@ public class SqlQueryParser : LuceneQueryParser
         CustomTypeProvider = new DynamicLinqTypeProvider()
     };
 
-    public override async Task<IQueryNode> ParseAsync(string query, IQueryVisitorContext context = null)
+    public override async Task<IQueryNode?> ParseAsync(string query, IQueryVisitorContext? context = null)
     {
         query ??= String.Empty;
         context ??= new SqlQueryVisitorContext();
@@ -42,6 +42,9 @@ public class SqlQueryParser : LuceneQueryParser
         try
         {
             var result = await base.ParseAsync(query, context).AnyContext();
+            if (result is null)
+                return null;
+
             switch (context.QueryType)
             {
                 case QueryTypes.Aggregation:
@@ -61,7 +64,7 @@ public class SqlQueryParser : LuceneQueryParser
         {
             var cursor = ex.Data["cursor"] as Cursor;
             context.GetValidationResult().QueryType = context.QueryType;
-            context.AddValidationError(ex.Message, cursor.Column);
+            context.AddValidationError(ex.Message, cursor?.Column ?? 0);
 
             return null;
         }
@@ -71,6 +74,10 @@ public class SqlQueryParser : LuceneQueryParser
     public async Task<QueryValidationResult> ValidateAsync(string query, SqlQueryVisitorContext context)
     {
         var node = await ParseAsync(query, context).AnyContext();
+        var validationResult = context.GetValidationResult();
+        if (!validationResult.IsValid || node is null)
+            return validationResult;
+
         return await ValidationVisitor.RunAsync(node, context).AnyContext();
     }
 
@@ -78,7 +85,7 @@ public class SqlQueryParser : LuceneQueryParser
     {
         var node = await ParseAsync(query, context).AnyContext();
         var result = context.GetValidationResult();
-        if (!result.IsValid)
+        if (!result.IsValid || node is null)
             throw new ValidationException("Invalid query: " + result.Message);
 
         return await GenerateSqlVisitor.RunAsync(node, context).AnyContext();
@@ -97,7 +104,7 @@ public class SqlQueryParser : LuceneQueryParser
         fields = fields.ToList();
 
         var validationOptions = new QueryValidationOptions();
-        foreach (string field in fields.Where(f => !f.IsNavigation).Select(f => f.FullName))
+        foreach (string field in fields.Where(f => !f.IsNavigation && f.FullName is not null).Select(f => f.FullName!))
             validationOptions.AllowedFields.Add(field);
 
         Configuration.SetValidationOptions(validationOptions);
@@ -108,7 +115,7 @@ public class SqlQueryParser : LuceneQueryParser
         };
     }
 
-    private void AddEntityFields(List<EntityFieldInfo> fields, EntityFieldInfo parent, IEntityType entityType, Stack<IEntityType> entityTypeStack = null, string prefix = null, int depth = 0)
+    private void AddEntityFields(List<EntityFieldInfo> fields, EntityFieldInfo? parent, IEntityType entityType, Stack<IEntityType>? entityTypeStack = null, string? prefix = null, int depth = 0)
     {
         entityTypeStack ??= new Stack<IEntityType>();
 
@@ -132,10 +139,10 @@ public class SqlQueryParser : LuceneQueryParser
             {
                 Name = property.Name,
                 FullName = propertyPath,
-                IsNumber = property.ClrType.UnwrapNullable().IsNumeric(),
-                IsDate = property.ClrType.UnwrapNullable().IsDateTime(),
-                IsDateOnly = property.ClrType.UnwrapNullable().IsDateOnly(),
-                IsBoolean = property.ClrType.UnwrapNullable().IsBoolean(),
+                IsNumber = property.ClrType.UnwrapNullable()?.IsNumeric() ?? false,
+                IsDate = property.ClrType.UnwrapNullable()?.IsDateTime() ?? false,
+                IsDateOnly = property.ClrType.UnwrapNullable()?.IsDateOnly() ?? false,
+                IsBoolean = property.ClrType.UnwrapNullable()?.IsBoolean() ?? false,
                 Parent = parent
             });
         }
@@ -187,21 +194,21 @@ public class SqlQueryParser : LuceneQueryParser
     private void SetupQueryVisitorContextDefaults(IQueryVisitorContext context)
     {
         if (!context.Data.ContainsKey("@OriginalContextResolver"))
-            context.SetValue("@OriginalContextResolver", context.GetFieldResolver());
+            context.SetValue("@OriginalContextResolver", context.GetFieldResolver()!);
 
         context.SetFieldResolver(async (field, context) =>
         {
-            string resolvedField = null;
-            if (context.Data.TryGetValue("@OriginalContextResolver", out object data) && data is QueryFieldResolver resolver)
+            string? resolvedField = null;
+            if (context?.Data.TryGetValue("@OriginalContextResolver", out object? data) is true && data is QueryFieldResolver resolver)
             {
-                string contextResolvedField = await resolver(field, context).AnyContext();
+                string? contextResolvedField = await resolver(field, context).AnyContext();
                 if (contextResolvedField != null)
                     resolvedField = contextResolvedField;
             }
 
             if (Configuration.FieldResolver != null)
             {
-                string configResolvedField = await Configuration.FieldResolver(resolvedField ?? field, context).AnyContext();
+                string? configResolvedField = await Configuration.FieldResolver(resolvedField ?? field, context).AnyContext();
                 if (configResolvedField != null)
                     resolvedField = configResolvedField;
             }
@@ -214,7 +221,8 @@ public class SqlQueryParser : LuceneQueryParser
 
         if (context.QueryType == QueryTypes.Query)
         {
-            context.SetDefaultFields(Configuration.DefaultFields);
+            if (Configuration.DefaultFields is not null)
+                context.SetDefaultFields(Configuration.DefaultFields);
             if (Configuration.IncludeResolver != null && context.GetIncludeResolver() == null)
                 context.SetIncludeResolver(Configuration.IncludeResolver);
         }
@@ -225,7 +233,7 @@ public class SqlQueryParser : LuceneQueryParser
             sqlContext.DateTimeParser = Configuration.DateTimeParser;
             sqlContext.DateOnlyParser = Configuration.DateOnlyParser;
             sqlContext.DefaultSearchOperator = Configuration.DefaultFieldsSearchOperator;
-            sqlContext.FullTextFields = Configuration.FullTextFields;
+            sqlContext.FullTextFields = Configuration.FullTextFields ?? [];
         }
     }
 }

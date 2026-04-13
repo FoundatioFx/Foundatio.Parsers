@@ -44,7 +44,7 @@ public class AggregationMap
     public List<AggregationMap> Aggregations { get; } = [];
 
     /// <summary>Metadata key/value pairs attached to this aggregation via the <c>meta</c> field.</summary>
-    public Dictionary<string, object> Meta { get; } = [];
+    public Dictionary<string, object?> Meta { get; } = [];
 
     /// <summary>
     /// Converts the tree into an Elasticsearch aggregation dictionary suitable for
@@ -81,7 +81,7 @@ public class AggregationMap
             result[map.Name] = aggregation;
     }
 
-    private static Aggregation CreateAggregation(AggregationMap map)
+    private static Aggregation? CreateAggregation(AggregationMap map)
     {
         if (map?.Value is null)
             return null;
@@ -122,7 +122,7 @@ public class AggregationMap
         {
             aggregation.Meta = map.Meta
                 .Where(kvp => kvp.Value is not null)
-                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!);
 
             if (aggregation.Meta.Count == 0)
                 aggregation.Meta = null;
