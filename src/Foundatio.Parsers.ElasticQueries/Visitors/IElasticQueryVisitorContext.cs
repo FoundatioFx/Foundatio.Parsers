@@ -69,7 +69,10 @@ namespace Foundatio.Parsers
         /// <summary>
         /// The Painless script that computes the field value.
         /// </summary>
-        public required string Script { get; set; }
+        /// <remarks>
+        /// When null, Elasticsearch evaluates the field from the mapping without a script.
+        /// </remarks>
+        public string? Script { get; set; }
     }
 
     /// <summary>
