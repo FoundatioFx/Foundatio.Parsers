@@ -24,6 +24,15 @@ public class ElasticQueryParser : LuceneQueryParser
 
     public ElasticQueryParserConfiguration Configuration { get; }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// This override applies Elasticsearch-specific visitor pipelines (query, aggregation, sort)
+    /// after parsing. If a <see cref="FormatException"/> occurs during visitor processing, the
+    /// error is captured in the context's validation result and the method returns <c>null</c>
+    /// rather than throwing. This dual-mode design allows callers like <c>ValidateQueryAsync</c>
+    /// to inspect errors without exception handling, while callers like <c>BuildQueryAsync</c>
+    /// explicitly check for <c>null</c> and throw.
+    /// </remarks>
     public override async Task<IQueryNode?> ParseAsync(string query, IQueryVisitorContext? context = null)
     {
         query ??= String.Empty;
