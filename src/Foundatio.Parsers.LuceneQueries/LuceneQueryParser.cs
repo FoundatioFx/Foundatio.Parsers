@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -28,6 +29,12 @@ public interface IQueryParser
     /// </summary>
     /// <param name="query">The query string to parse.</param>
     /// <param name="context">Optional visitor context for parsing configuration.</param>
-    /// <returns>The root node of the parsed query AST, or null if parsing failed (check context for validation errors).</returns>
+    /// <returns>
+    /// The root node of the parsed query AST, or <c>null</c> if parsing failed.
+    /// When <c>null</c> is returned, check the context's validation result for error details.
+    /// Derived parsers (e.g., <c>ElasticQueryParser</c>) may return <c>null</c> when a
+    /// <see cref="FormatException"/> occurs during visitor processing, recording the error
+    /// in the validation result rather than throwing.
+    /// </returns>
     Task<IQueryNode?> ParseAsync(string query, IQueryVisitorContext? context = null);
 }
