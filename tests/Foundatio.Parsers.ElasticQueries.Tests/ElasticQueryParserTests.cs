@@ -955,18 +955,18 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4" }
-        ], cancellationToken: TestCancellationToken);
+        ], index, TestCancellationToken);
         await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseFieldMap(new FieldMap { { "blah", "nested" } }).UseMappings<MyNestedType>(Client).UseNested());
         var result = await processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1)", new ElasticQueryVisitorContext().UseScoring());
 
-        var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(result), TestCancellationToken);
+        var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         var expectedResponse = await Client.SearchAsync<MyNestedType>(d => d
-            .Query(q => q.Bool(b => b.Must(
+            .Indices(index).Query(q => q.Bool(b => b.Must(
                 m => m.Match(ma => ma.Field(e => e.Field1).Query("value1")),
                 m => m.Nested(n => n
                     .Path(p => p.Nested)
@@ -983,12 +983,12 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         result = await processor.BuildQueryAsync("field1:value1 blah:(blah.field1:value1 blah.field4:4)", new ElasticQueryVisitorContext().UseScoring());
 
-        actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(result), TestCancellationToken);
+        actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Query(result), TestCancellationToken);
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
         expectedResponse = await Client.SearchAsync<MyNestedType>(d => d
-            .Query(q => q.Bool(b => b.Must(
+            .Indices(index).Query(q => q.Bool(b => b.Must(
                 m => m.Match(ma => ma.Field(e => e.Field1).Query("value1")),
                 m => m.Nested(n => n
                     .Path(p => p.Nested)
@@ -1029,18 +1029,18 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
             },
             new MyNestedType { Field1 = "value2", Field2 = "value2" },
             new MyNestedType { Field1 = "value1", Field2 = "value4", Field3 = "value3" }
-        ], cancellationToken: TestCancellationToken);
+        ], index, TestCancellationToken);
         await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
         var result = await processor.BuildQueryAsync("field1:value1 nested:(nested.field1:value1 nested.field4:4 nested.field3:value3)",
                 new ElasticQueryVisitorContext { UseScoring = true });
 
-        var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(result), TestCancellationToken);
+        var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
-        var expectedResponse = await Client.SearchAsync<MyNestedType>(d => d.Query(q => q.Bool(b => b.Must(
+        var expectedResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Query(q => q.Bool(b => b.Must(
             m => m.Match(ma => ma.Field(e => e.Field1).Query("value1")),
             m => m.Nested(n => n.Path(p => p.Nested).Query(q2 => q2.Bool(b2 => b2.Must(
                 m2 => m2.Match(ma => ma.Field("nested.field1").Query("value1")),
