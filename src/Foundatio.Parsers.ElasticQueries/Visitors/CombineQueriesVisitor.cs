@@ -61,7 +61,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         foreach (var (child, childQuery) in regularQueries)
         {
-            Query q = childQuery;
+            Query? q = childQuery;
             if (child.IsExcluded())
                 q = !q;
 
@@ -76,7 +76,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             {
                 if (child.IsExcluded())
                 {
-                    Query negatedNested = !(Query)(new NestedQuery(path, innerQuery));
+                    Query? negatedNested = !(Query)(new NestedQuery(path, innerQuery));
                     container = Combine(container, negatedNested, op, useScoring);
                 }
                 else
@@ -152,7 +152,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         return op;
     }
 
-    private static Query? Combine(Query? left, Query right, GroupOperator op, bool useScoring = true)
+    private static Query? Combine(Query? left, Query? right, GroupOperator op, bool useScoring = true)
     {
         if (left is null)
             return right;
