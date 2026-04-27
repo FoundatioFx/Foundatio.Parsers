@@ -4,7 +4,7 @@
     <Compile Include="..\Foundatio.Parsers.LuceneQueries\Extensions\TaskExtensions.cs" Link="Extensions\TaskExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="8.19.19" />
+    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="8.19.18" />
     <PackageReference Include="Exceptionless.DateTimeExtensions" Version="6.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
   </ItemGroup>
