@@ -47,17 +47,17 @@ public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLife
     /// <summary>
     /// per test setup
     /// </summary>
-    public virtual ValueTask InitializeAsync()
+    public override ValueTask InitializeAsync()
     {
-        return ValueTask.CompletedTask;
+        return base.InitializeAsync();
     }
 
     /// <summary>
     /// per test tear down
     /// </summary>
-    public virtual ValueTask DisposeAsync()
+    public override ValueTask DisposeAsync()
     {
-        return ValueTask.CompletedTask;
+        return base.DisposeAsync();
     }
 }
 
