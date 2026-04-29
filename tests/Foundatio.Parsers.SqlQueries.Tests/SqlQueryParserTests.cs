@@ -97,7 +97,11 @@ public class SqlQueryParserTests : TestWithLoggingBase
             if (s.FieldInfo.FullName != "NationalPhoneNumber")
                 return;
 
-            s.Tokens = [TryGetNationalNumber(s.Term)!];
+            var nationalNumber = TryGetNationalNumber(s.Term);
+            if (nationalNumber is null)
+                return;
+
+            s.Tokens = [nationalNumber];
             s.Operator = SqlSearchOperator.StartsWith;
         });
 

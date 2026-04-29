@@ -13,7 +13,7 @@ public class CleanupQueryVisitor : ChainableQueryVisitor
         if (result is null)
             return null;
 
-        result = await base.VisitAsync(result, context).ConfigureAwait(false);
+        result = await base.VisitAsync(result, context).AnyContext();
         if (result is null)
             return null;
 
@@ -131,7 +131,7 @@ public class CleanupQueryVisitor : ChainableQueryVisitor
     public static async Task<string?> RunAsync(IQueryNode node, IQueryVisitorContext? context = null)
     {
         context ??= new QueryVisitorContext();
-        var result = await new CleanupQueryVisitor().AcceptAsync(node, context).ConfigureAwait(false);
+        var result = await new CleanupQueryVisitor().AcceptAsync(node, context).AnyContext();
         return result?.ToString();
     }
 

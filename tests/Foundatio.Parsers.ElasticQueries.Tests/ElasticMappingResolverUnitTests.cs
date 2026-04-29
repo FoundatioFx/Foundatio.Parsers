@@ -1,28 +1,29 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Foundatio.Xunit;
 using Microsoft.Extensions.Time.Testing;
-using Nest;
 using Xunit;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
 public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
 {
-    private readonly ConnectionSettings _connectionSettings;
+    private readonly ElasticsearchClientSettings _clientSettings;
     private readonly Inferrer _inferrer;
 
     public ElasticMappingResolverUnitTests(ITestOutputHelper output) : base(output)
     {
         Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
-        _connectionSettings = new ConnectionSettings(new Uri("http://localhost:9200"));
-        _inferrer = new Inferrer(_connectionSettings);
+        _clientSettings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
+        _inferrer = new Inferrer(_clientSettings);
     }
 
     public void Dispose()
     {
-        (_connectionSettings as IDisposable)?.Dispose();
+        (_clientSettings as IDisposable)?.Dispose();
     }
 
     [Fact]
@@ -33,9 +34,10 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             CreateTextWithKeywordMapping("title"), _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetNonAnalyzedFieldName("title", "keyword")!;
+        string? result = resolver.GetNonAnalyzedFieldName("title", "keyword");
 
         // Assert
+        Assert.NotNull(result);
         Assert.Equal("title.keyword", result);
     }
 
@@ -47,9 +49,10 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             CreateTextWithKeywordMapping("title"), _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetAggregationsFieldName("title")!;
+        string? result = resolver.GetAggregationsFieldName("title");
 
         // Assert
+        Assert.NotNull(result);
         Assert.Equal("title.keyword", result);
     }
 
@@ -61,9 +64,10 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             CreateTextWithKeywordAndSortMapping("title"), _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetSortFieldName("title")!;
+        string? result = resolver.GetSortFieldName("title");
 
         // Assert
+        Assert.NotNull(result);
         Assert.Equal("title.sort", result);
     }
 
@@ -71,19 +75,16 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     public void GetNonAnalyzedFieldName_WithKeywordProperty_ReturnsBareFieldName()
     {
         // Arrange
-        var codeMapping = new TypeMapping
-        {
-            Properties = new Properties
-            {
-                { "status", new KeywordProperty { Name = "status" } }
-            }
-        };
+        var props = new Properties();
+        props.Add("status", new KeywordProperty());
+        var codeMapping = new TypeMapping { Properties = props };
         var resolver = new ElasticMappingResolver(codeMapping, _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetNonAnalyzedFieldName("status", "keyword")!;
+        string? result = resolver.GetNonAnalyzedFieldName("status", "keyword");
 
         // Assert
+        Assert.NotNull(result);
         Assert.Equal("status", result);
     }
 
@@ -95,9 +96,10 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             CreateTextOnlyMapping("body"), _inferrer, () => null, logger: _logger);
 
         // Act
-        string result = resolver.GetNonAnalyzedFieldName("body", "keyword")!;
+        string? result = resolver.GetNonAnalyzedFieldName("body", "keyword");
 
         // Assert
+        Assert.NotNull(result);
         Assert.Equal("body", result);
     }
 
@@ -115,11 +117,13 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         }, _inferrer, logger: _logger);
 
         // Act
-        string beforeRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
+        string? beforeRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword");
         resolver.RefreshMapping();
-        string afterRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
+        string? afterRefresh = resolver.GetNonAnalyzedFieldName("name", "keyword");
 
         // Assert
+        Assert.NotNull(beforeRefresh);
+        Assert.NotNull(afterRefresh);
         Assert.Equal("name", beforeRefresh);
         Assert.Equal("name.keyword", afterRefresh);
         Assert.True(serverFetchCount >= 2, "Server mapping should have been fetched at least twice");
@@ -139,11 +143,13 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         }, _inferrer, logger: _logger);
 
         // Act
-        string first = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
+        string? first = resolver.GetNonAnalyzedFieldName("name", "keyword");
         resolver.RefreshMapping();
-        string second = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
+        string? second = resolver.GetNonAnalyzedFieldName("name", "keyword");
 
         // Assert
+        Assert.NotNull(first);
+        Assert.NotNull(second);
         Assert.Equal("name", first);
         Assert.Equal("name.keyword", second);
     }
@@ -158,9 +164,10 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         resolver.RefreshMapping();
 
         // Act
-        string result = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
+        string? result = resolver.GetNonAnalyzedFieldName("name", "keyword");
 
         // Assert
+        Assert.NotNull(result);
         Assert.Equal("name.keyword", result);
     }
 
@@ -177,11 +184,13 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             }, logger: _logger);
 
         // Act
-        string initial = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
+        string? initial = resolver.GetNonAnalyzedFieldName("name", "keyword");
         resolver.RefreshMapping();
-        string updated = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
+        string? updated = resolver.GetNonAnalyzedFieldName("name", "keyword");
 
         // Assert
+        Assert.NotNull(initial);
+        Assert.NotNull(updated);
         Assert.Equal("name", initial);
         Assert.Equal("name.keyword", updated);
     }
@@ -205,7 +214,8 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             barrier.SignalAndWait(TestCancellationToken);
             for (int i = 0; i < iterations; i++)
             {
-                string result = resolver.GetNonAnalyzedFieldName("name", "keyword")!;
+                string? result = resolver.GetNonAnalyzedFieldName("name", "keyword");
+                Assert.NotNull(result);
                 Assert.Equal("name.keyword", result);
             }
         }, TestCancellationToken);
@@ -215,7 +225,8 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             barrier.SignalAndWait(TestCancellationToken);
             for (int i = 0; i < iterations; i++)
             {
-                string result = resolver.GetAggregationsFieldName("name")!;
+                string? result = resolver.GetAggregationsFieldName("name");
+                Assert.NotNull(result);
                 Assert.Equal("name.keyword", result);
             }
         }, TestCancellationToken);
@@ -278,55 +289,34 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.True(afterTimeAdvance > afterRefresh, "Fetch should happen after time advances past throttle without RefreshMapping");
     }
 
-    private static ITypeMapping CreateTextWithKeywordMapping(string fieldName)
+    private static TypeMapping CreateTextWithKeywordMapping(string fieldName)
     {
-        return new TypeMapping
-        {
-            Properties = new Properties
-            {
-                {
-                    fieldName, new TextProperty
-                    {
-                        Name = fieldName,
-                        Fields = new Properties
-                        {
-                            { "keyword", new KeywordProperty { Name = "keyword", IgnoreAbove = 256 } }
-                        }
-                    }
-                }
-            }
-        };
+        var subFields = new Properties();
+        subFields.Add("keyword", new KeywordProperty { IgnoreAbove = 256 });
+
+        var props = new Properties();
+        props.Add(fieldName, new TextProperty { Fields = subFields });
+
+        return new TypeMapping { Properties = props };
     }
 
-    private static ITypeMapping CreateTextWithKeywordAndSortMapping(string fieldName)
+    private static TypeMapping CreateTextWithKeywordAndSortMapping(string fieldName)
     {
-        return new TypeMapping
-        {
-            Properties = new Properties
-            {
-                {
-                    fieldName, new TextProperty
-                    {
-                        Name = fieldName,
-                        Fields = new Properties
-                        {
-                            { "keyword", new KeywordProperty { Name = "keyword", IgnoreAbove = 256 } },
-                            { "sort", new KeywordProperty { Name = "sort", IgnoreAbove = 256 } }
-                        }
-                    }
-                }
-            }
-        };
+        var subFields = new Properties();
+        subFields.Add("keyword", new KeywordProperty { IgnoreAbove = 256 });
+        subFields.Add("sort", new KeywordProperty { IgnoreAbove = 256 });
+
+        var props = new Properties();
+        props.Add(fieldName, new TextProperty { Fields = subFields });
+
+        return new TypeMapping { Properties = props };
     }
 
-    private static ITypeMapping CreateTextOnlyMapping(string fieldName)
+    private static TypeMapping CreateTextOnlyMapping(string fieldName)
     {
-        return new TypeMapping
-        {
-            Properties = new Properties
-            {
-                { fieldName, new TextProperty { Name = fieldName } }
-            }
-        };
+        var props = new Properties();
+        props.Add(fieldName, new TextProperty());
+
+        return new TypeMapping { Properties = props };
     }
 }

@@ -1,6 +1,10 @@
 using System;
+using System.Linq;
 using System.Linq.Expressions;
-using Nest;
+using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 using Xunit;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
@@ -12,30 +16,29 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
-    private ITypeMapping MapMyNestedType(TypeMappingDescriptor<ElasticNestedQueryParserTests.MyNestedType> m)
+    private void MapMyNestedType(TypeMappingDescriptor<MyNestedType> m)
     {
-        return m
-            .AutoMap<ElasticNestedQueryParserTests.MyNestedType>()
-            .Dynamic()
-            .DynamicTemplates(t => t.DynamicTemplate("idx_text", t => t.Match("text*").Mapping(m => m.Text(mp => mp.AddKeywordAndSortFields()))))
+        m.Dynamic(DynamicMapping.True)
+            .DynamicTemplates(dt => dt.Add("idx_text", d => d.Mapping(dm => dm.Text(o => o.AddKeywordAndSortFields())).Match("text*")))
             .Properties(p => p
-                .Text(p1 => p1.Name(n => n.Field1).AddKeywordAndSortFields())
-                .Text(p1 => p1.Name(n => n.Field4).AddKeywordAndSortFields())
-                    .FieldAlias(a => a.Path(n => n.Field4).Name("field4alias"))
-                .Text(p1 => p1.Name(n => n.Field5).AddKeywordAndSortFields(true))
+                .Text(p1 => p1.Field1, o => o.AddKeywordAndSortFields())
+                .Text(p1 => p1.Field4, o => o.AddKeywordAndSortFields())
+                .FieldAlias("field4alias", o => o.Path("field4"))
+                .Text(p1 => p1.Field5, o => o.AddKeywordAndSortFields(true))
             );
     }
 
     [Fact]
-    public void CanResolveCodedProperty()
+    public async Task CanResolveCodedProperty()
     {
-        string index = CreateRandomIndex<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType);
+        string index = await CreateRandomIndexAsync<MyNestedType>(MapMyNestedType);
 
-        Client.IndexMany([
-            new ElasticNestedQueryParserTests.MyNestedType
+        await Client.IndexManyAsync([
+            new MyNestedType
             {
                 Field1 = "value1",
                 Field2 = "value2",
+                Payload = "test payload",
                 Nested =
             [
                 new MyType
@@ -49,25 +52,26 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
                 }
             ]
             },
-            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value2", Field2 = "value2" },
-            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        Client.Indices.Refresh(index);
+            new MyNestedType { Field1 = "value2", Field2 = "value2", Payload = "another payload" },
+            new MyNestedType { Field1 = "value1", Field2 = "value4", Payload = "third payload" }
+        ], index, TestCancellationToken);
 
-        var resolver = ElasticMappingResolver.Create<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType, Client, index, _logger);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
 
         var payloadProperty = resolver.GetMappingProperty("payload");
         Assert.IsType<TextProperty>(payloadProperty);
-        Assert.NotNull(payloadProperty.Name);
+        // TryGetName() returns null in the new Elastic client as property names are stored in dictionary keys
     }
 
     [Fact]
-    public void CanResolveProperties()
+    public async Task CanResolveProperties()
     {
-        string index = CreateRandomIndex<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType);
+        string index = await CreateRandomIndexAsync<MyNestedType>(MapMyNestedType);
 
-        Client.IndexMany([
-            new ElasticNestedQueryParserTests.MyNestedType
+        await Client.IndexManyAsync([
+            new MyNestedType
             {
                 Field1 = "value1",
                 Field2 = "value2",
@@ -75,6 +79,7 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
             [
                 new MyType
                 {
+                    Id = "nested-id-1",
                     Field1 = "banana",
                     Data = {
                         { "number-0001", 23 },
@@ -84,12 +89,12 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
                 }
             ]
             },
-            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value2", Field2 = "value2" },
-            new ElasticNestedQueryParserTests.MyNestedType { Field1 = "value1", Field2 = "value4" }
-        ], index);
-        Client.Indices.Refresh(index);
+            new MyNestedType { Field1 = "value2", Field2 = "value2" },
+            new MyNestedType { Field1 = "value1", Field2 = "value4" }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
-        var resolver = ElasticMappingResolver.Create<ElasticNestedQueryParserTests.MyNestedType>(MapMyNestedType, Client, index, _logger);
+        var resolver = ElasticMappingResolver.Create<MyNestedType>(MapMyNestedType, Client, index, _logger);
 
         string? dynamicTextAggregation = resolver.GetAggregationsFieldName("nested.data.text-0001");
         Assert.NotNull(dynamicTextAggregation);
@@ -134,7 +139,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         var field4Property = resolver.GetMappingProperty("Field4");
         Assert.IsType<TextProperty>(field4Property);
 
-        var field4ReflectionProperty = resolver.GetMappingProperty(new Field(typeof(ElasticNestedQueryParserTests.MyNestedType).GetProperty("Field4")!));
+        var field4ReflectionProperty = resolver.GetMappingProperty(new Field(typeof(MyNestedType).GetProperty("Field4")
+            ?? throw new InvalidOperationException("Field4 property not found on MyNestedType")));
         Assert.IsType<TextProperty>(field4ReflectionProperty);
 
         var field4ExpressionProperty = resolver.GetMappingProperty(new Field(GetObjectPath(p => p.Field4)));
@@ -145,13 +151,13 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<TextProperty>(field4AliasMapping.Property);
         Assert.Same(field4Property, field4AliasMapping.Property);
 
-        string? field4sort = resolver.GetSortFieldName("Field4Alias");
-        Assert.NotNull(field4sort);
-        Assert.Equal("field4.sort", field4sort);
+        string? field4Sort = resolver.GetSortFieldName("Field4Alias");
+        Assert.NotNull(field4Sort);
+        Assert.Equal("field4.sort", field4Sort);
 
-        string? field4aggs = resolver.GetAggregationsFieldName("Field4Alias");
-        Assert.NotNull(field4aggs);
-        Assert.Equal("field4.keyword", field4aggs);
+        string? field4Aggs = resolver.GetAggregationsFieldName("Field4Alias");
+        Assert.NotNull(field4Aggs);
+        Assert.Equal("field4.keyword", field4Aggs);
 
         var nestedIdProperty = resolver.GetMappingProperty("Nested.Id");
         Assert.IsType<TextProperty>(nestedIdProperty);
@@ -168,8 +174,8 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         nestedField1Property = resolver.GetMappingProperty("nEsted.fieLD1");
         Assert.IsType<TextProperty>(nestedField1Property);
 
-        var nestedField2Property = resolver.GetMappingProperty("Nested.Field4");
-        Assert.IsType<NumberProperty>(nestedField2Property);
+        var nestedField4Property = resolver.GetMappingProperty("Nested.Field4");
+        Assert.IsType<LongNumberProperty>(nestedField4Property);
 
         var nestedField5Property = resolver.GetMappingProperty("Nested.Field5");
         Assert.IsType<DateProperty>(nestedField5Property);
@@ -178,8 +184,59 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         Assert.IsType<ObjectProperty>(nestedDataProperty);
     }
 
-    private static Expression GetObjectPath(Expression<Func<ElasticNestedQueryParserTests.MyNestedType, object>> objectPath)
+    private static Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath)
     {
         return objectPath;
+    }
+
+    [Fact]
+    public async Task PropertyMetadataIsThreadSafe()
+    {
+        var resolver = new ElasticMappingResolver(() => null);
+
+        // Create multiple properties and set metadata in parallel
+        var properties = Enumerable.Range(0, 100)
+            .Select(_ => new KeywordProperty())
+            .ToArray();
+
+        // Set metadata in parallel
+        var setTasks = properties.Select((p, i) => Task.Run(() =>
+        {
+            resolver.SetPropertyMetadataValue(p, "index", i);
+            resolver.SetPropertyMetadataValue(p, "name", $"property_{i}");
+        }));
+        await Task.WhenAll(setTasks);
+
+        // Read metadata in parallel
+        var readTasks = properties.Select((p, i) => Task.Run(() =>
+        {
+            var index = resolver.GetPropertyMetadataValue<int>(p, "index");
+            var name = resolver.GetPropertyMetadataValue<string>(p, "name");
+            return (ExpectedIndex: i, ActualIndex: index, ExpectedName: $"property_{i}", ActualName: name);
+        }));
+        var results = await Task.WhenAll(readTasks);
+
+        // Verify all values are correct
+        foreach (var result in results)
+        {
+            Assert.Equal(result.ExpectedIndex, result.ActualIndex);
+            Assert.Equal(result.ExpectedName, result.ActualName);
+        }
+    }
+
+    [Fact]
+    public void PropertyMetadataCopyPreservesValues()
+    {
+        var resolver = new ElasticMappingResolver(() => null);
+
+        var source = new KeywordProperty();
+        resolver.SetPropertyMetadataValue(source, "key1", "value1");
+        resolver.SetPropertyMetadataValue(source, "key2", 42);
+
+        var target = new TextProperty();
+        resolver.CopyPropertyMetadata(source, target);
+
+        Assert.Equal("value1", resolver.GetPropertyMetadataValue<string>(target, "key1"));
+        Assert.Equal(42, resolver.GetPropertyMetadataValue<int>(target, "key2"));
     }
 }

@@ -1,6 +1,6 @@
 # Elasticsearch Integration
 
-The `ElasticQueryParser` extends the base Lucene parser to build NEST query objects for Elasticsearch. It provides a powerful replacement for Elasticsearch's `query_string` query with additional features.
+The `ElasticQueryParser` extends the base Lucene parser to build Elasticsearch query objects for Elasticsearch. It provides a powerful replacement for Elasticsearch's `query_string` query with additional features.
 
 ## Installation
 
@@ -12,21 +12,22 @@ dotnet add package Foundatio.Parsers.ElasticQueries
 
 ```csharp
 using Foundatio.Parsers.ElasticQueries;
-using Nest;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 
-var client = new ElasticClient();
+var client = new ElasticsearchClient();
 
 var parser = new ElasticQueryParser(c => c
     .SetLoggerFactory(loggerFactory)
     .UseMappings(client, "my-index"));
 
 // Build a query
-QueryContainer query = await parser.BuildQueryAsync("status:active AND created:>2024-01-01");
+Query query = await parser.BuildQueryAsync("status:active AND created:>2024-01-01");
 
 // Use in search
 var response = await client.SearchAsync<MyDocument>(s => s
     .Index("my-index")
-    .Query(_ => query));
+    .Query(query));
 ```
 
 ## Configuration
@@ -135,7 +136,7 @@ var query = await parser.BuildQueryAsync(ast, context);
 var parser = new ElasticQueryParser(c => c.UseMappings(client, "my-index"));
 
 // Build aggregations
-AggregationContainer aggs = await parser.BuildAggregationsAsync(
+AggregationMap aggs = await parser.BuildAggregationsAsync(
     "terms:(category min:price max:price avg:price)");
 
 // Use in search
@@ -163,7 +164,7 @@ aggs = await parser.BuildAggregationsAsync(
 var parser = new ElasticQueryParser(c => c.UseMappings(client, "my-index"));
 
 // Build sort (- for descending, + for ascending)
-IEnumerable<IFieldSort> sort = await parser.BuildSortAsync("-created +name");
+ICollection<SortOptions> sort = await parser.BuildSortAsync("-created +name");
 
 // Use in search
 var response = await client.SearchAsync<MyDocument>(s => s
@@ -386,7 +387,7 @@ The resolver is called for each standalone nested field node during visitor trav
 // Output: nested(path=resellers) > filter(term(resellers.type, official)) > max(resellers.price)
 ```
 
-**Sorts** -- The filter is set on `NestedSort.Filter`:
+**Sorts** -- The filter is set on `NestedSortValue.Filter`:
 
 ```csharp
 // Input: -resellers.price
@@ -491,14 +492,15 @@ var parser = new ElasticQueryParser(c => c
 ```csharp
 using Foundatio.Parsers.ElasticQueries;
 using Foundatio.Parsers.ElasticQueries.Visitors;
-using Nest;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 
 public class SearchService
 {
-    private readonly IElasticClient _client;
+    private readonly ElasticsearchClient _client;
     private readonly ElasticQueryParser _parser;
 
-    public SearchService(IElasticClient client, ILoggerFactory loggerFactory)
+    public SearchService(ElasticsearchClient client, ILoggerFactory loggerFactory)
     {
         _client = client;
         _parser = new ElasticQueryParser(c => c
@@ -539,28 +541,28 @@ public class SearchService
         var context = new ElasticQueryVisitorContext().UseSearchMode();
         var esQuery = await _parser.BuildQueryAsync(query, context);
 
-        // Build search request
-        var searchDescriptor = new SearchDescriptor<Product>()
-            .Index("products")
-            .From((page - 1) * pageSize)
-            .Size(pageSize)
-            .Query(_ => esQuery);
+        // Build components
+        var esQuery = await _parser.BuildQueryAsync(query, context);
+        var aggs = !string.IsNullOrEmpty(aggregations)
+            ? await _parser.BuildAggregationsAsync(aggregations)
+            : null;
+        var sortFields = !string.IsNullOrEmpty(sort)
+            ? await _parser.BuildSortAsync(sort)
+            : null;
 
-        // Add aggregations if provided
-        if (!string.IsNullOrEmpty(aggregations))
+        // Execute search
+        var response = await _client.SearchAsync<Product>(s =>
         {
-            var aggs = await _parser.BuildAggregationsAsync(aggregations);
-            searchDescriptor.Aggregations(aggs);
-        }
+            s.Index("products")
+                .From((page - 1) * pageSize)
+                .Size(pageSize)
+                .Query(esQuery);
 
-        // Add sort if provided
-        if (!string.IsNullOrEmpty(sort))
-        {
-            var sortFields = await _parser.BuildSortAsync(sort);
-            searchDescriptor.Sort(sortFields);
-        }
-
-        var response = await _client.SearchAsync<Product>(searchDescriptor);
+            if (aggs is not null)
+                s.Aggregations(aggs);
+            if (sortFields is not null)
+                s.Sort(sortFields);
+        });
 
         return new SearchResult
         {
@@ -570,10 +572,9 @@ public class SearchService
         };
     }
 
-    private string ResolveLocation(string location)
+    private Task<string> ResolveLocation(string location)
     {
-        // Implement location resolution
-        return location;
+        return Task.FromResult(location);
     }
 }
 ```

@@ -193,7 +193,7 @@ This example shows a visitor that resolves custom filter syntax to Elasticsearch
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
+using Elastic.Clients.Elasticsearch;
 
 /// <summary>
 /// Resolves @custom:(filter) syntax to actual queries.
@@ -237,7 +237,7 @@ public class CustomFilterVisitor : ChainableQueryVisitor
         return GenerateQueryVisitor.Run(node.Left);
     }
 
-    private async Task<QueryContainer> ResolveFilter(string filterName)
+    private async Task<Query> ResolveFilter(string filterName)
     {
         switch (filterName?.ToLowerInvariant())
         {
@@ -246,7 +246,7 @@ public class CustomFilterVisitor : ChainableQueryVisitor
                 return new TermsQuery { Field = "user_id", Terms = premiumIds };
             
             case "active":
-                return new TermQuery { Field = "status", Value = "active" };
+                return new TermQuery("status", "active");
             
             default:
                 return null;
