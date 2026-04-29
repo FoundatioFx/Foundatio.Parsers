@@ -20,10 +20,11 @@ public class GeoVisitor : ChainableQueryVisitor
 
     public override async Task VisitAsync(TermNode node, IQueryVisitorContext context)
     {
-        if (context.QueryType != QueryTypes.Query || context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
+        if (context.QueryType != QueryTypes.Query || context is not IElasticQueryVisitorContext elasticContext)
             return;
 
-        if (node.Field is null)
+        string? fieldName = node.Field;
+        if (String.IsNullOrEmpty(fieldName) || !elasticContext.MappingResolver.IsGeoPropertyType(fieldName))
             return;
 
         string? location = null;
@@ -38,21 +39,25 @@ public class GeoVisitor : ChainableQueryVisitor
         if (location is null)
             return;
 
-        var query = new GeoDistanceQuery(node.Proximity ?? "10mi", node.Field, location);
+        var query = new GeoDistanceQuery(node.Proximity ?? "10mi", fieldName, location);
         node.SetQuery(query);
     }
 
     public override void Visit(TermRangeNode node, IQueryVisitorContext context)
     {
-        if (context is not IElasticQueryVisitorContext elasticContext || !elasticContext.MappingResolver.IsGeoPropertyType(node.Field))
+        if (context is not IElasticQueryVisitorContext elasticContext)
             return;
 
-        if (node.Field is null || node.Min is null || node.Max is null)
+        string? fieldName = node.Field;
+        if (String.IsNullOrEmpty(fieldName) || !elasticContext.MappingResolver.IsGeoPropertyType(fieldName))
+            return;
+
+        if (node.Min is null || node.Max is null)
             return;
 
         // GeoBoundingBoxQuery ergonomic feedback: https://github.com/elastic/elasticsearch-net/issues/8496
         var box = GeoBounds.TopLeftBottomRight(new TopLeftBottomRightGeoBounds { TopLeft = GeoLocation.Text(node.Min), BottomRight = GeoLocation.Text(node.Max) });
-        var query = new GeoBoundingBoxQuery(box, node.Field);
+        var query = new GeoBoundingBoxQuery(box, fieldName);
         node.SetQuery(query);
     }
 }
