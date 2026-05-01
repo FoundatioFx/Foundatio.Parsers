@@ -1,12 +1,12 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
@@ -30,7 +30,7 @@ public class NestedVisitor : ChainableQueryVisitor
 
         node.SetNestedPath(nestedProperty);
         if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
-            node.SetQuery(new NestedQuery { Path = nestedProperty });
+            node.SetQuery(new NestedQuery { Path = nestedProperty, Query = new MatchAllQuery() });
 
         if (_filterResolver is not null)
             return VisitGroupWithFilterAsync(node, nestedProperty, context);
@@ -40,13 +40,20 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private async Task VisitGroupWithFilterAsync(GroupNode node, string nestedProperty, IQueryVisitorContext context)
     {
-        string? originalField = node.GetOriginalField();
         ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
-        var filter = await _filterResolver!(nestedProperty, originalField!, node.Field!, context).ConfigureAwait(false);
+
+        if (node.Field is not { } field || _filterResolver is null)
+        {
+            await base.VisitAsync(node, context).AnyContext();
+            return;
+        }
+
+        string? originalField = node.GetOriginalField();
+        var filter = await _filterResolver(nestedProperty, originalField ?? field, field, context).AnyContext();
         if (filter is not null)
             node.SetNestedFilter(filter);
 
-        await base.VisitAsync(node, context).ConfigureAwait(false);
+        await base.VisitAsync(node, context).AnyContext();
     }
 
     public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
@@ -95,9 +102,13 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private async Task HandleNestedFieldWithFilterAsync(IFieldQueryNode node, string nestedProperty, IQueryVisitorContext context)
     {
-        string? originalField = node.GetOriginalField();
         ArgumentException.ThrowIfNullOrEmpty(nestedProperty);
-        var filter = await _filterResolver!(nestedProperty, originalField!, node.Field!, context).ConfigureAwait(false);
+
+        if (node.Field is not { } field || _filterResolver is null)
+            return;
+
+        string? originalField = node.GetOriginalField();
+        var filter = await _filterResolver(nestedProperty, originalField ?? field, field, context).AnyContext();
         if (filter is not null)
             node.SetNestedFilter(filter);
 
@@ -107,7 +118,7 @@ public class NestedVisitor : ChainableQueryVisitor
         }
         else if (context.QueryType is QueryTypes.Query)
         {
-            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
+            var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
             if (innerQuery is null)
                 return;
 
@@ -117,7 +128,7 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private static async Task WrapInNestedQueryAsync(IFieldQueryNode node, string nestedProperty, IQueryVisitorContext context)
     {
-        var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
+        var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
         if (innerQuery is null)
             return;
 

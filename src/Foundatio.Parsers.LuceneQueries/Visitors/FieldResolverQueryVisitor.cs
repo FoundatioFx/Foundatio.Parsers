@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -17,8 +17,8 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
 
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        await ResolveField(node, context);
-        await base.VisitAsync(node, context);
+        await ResolveField(node, context).AnyContext();
+        await base.VisitAsync(node, context).AnyContext();
     }
 
     public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
@@ -54,9 +54,9 @@ public class FieldResolverQueryVisitor : ChainableQueryVisitor
         {
             string? resolvedField = null;
             if (contextResolver != null)
-                resolvedField = await contextResolver(node.Field, context).ConfigureAwait(false);
+                resolvedField = await contextResolver(node.Field, context).AnyContext();
             if (resolvedField == null && _globalResolver != null)
-                resolvedField = await _globalResolver(node.Field, context).ConfigureAwait(false);
+                resolvedField = await _globalResolver(node.Field, context).AnyContext();
 
             if (resolvedField == null)
             {

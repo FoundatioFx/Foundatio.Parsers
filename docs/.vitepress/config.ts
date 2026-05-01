@@ -58,6 +58,12 @@ export default withMermaid(defineConfig({
             { text: 'SQL Integration', link: '/guide/sql-query-parser' },
             { text: 'Troubleshooting', link: '/guide/troubleshooting' }
           ]
+        },
+        {
+          text: 'Migration',
+          items: [
+            { text: 'Upgrading to ES 9', link: '/guide/upgrading-to-es9' }
+          ]
         }
       ]
     },

@@ -23,7 +23,7 @@ features:
     link: /guide/query-syntax
   - icon: ⚡
     title: Elasticsearch Integration
-    details: Enhanced query_string replacement that builds NEST QueryContainer, AggregationContainer, and sort expressions.
+    details: Enhanced query_string replacement that builds Elasticsearch Query, AggregationMap, and sort expressions.
     link: /guide/elastic-query-parser
   - icon: 🗄️
     title: SQL/EF Core Integration
@@ -89,7 +89,7 @@ var parser = new ElasticQueryParser(c => c
         { "user", "data.user.name" }
     }));
 
-// Build a NEST QueryContainer
+// Build an Elasticsearch Query
 var query = await parser.BuildQueryAsync("user:john AND status:active");
 
 // Build aggregations

@@ -83,20 +83,20 @@ string query = await GenerateQueryVisitor.RunAsync(result);
 
 ## Elasticsearch Integration
 
-The `ElasticQueryParser` extends the base parser to build NEST query objects:
+The `ElasticQueryParser` extends the base parser to build Elasticsearch query objects:
 
 ```csharp
 using Foundatio.Parsers.ElasticQueries;
-using Nest;
+using Elastic.Clients.Elasticsearch;
 
-var client = new ElasticClient();
+var client = new ElasticsearchClient();
 
 var parser = new ElasticQueryParser(c => c
     .SetLoggerFactory(loggerFactory)
     .UseMappings(client, "my-index"));
 
 // Build a query
-QueryContainer query = await parser.BuildQueryAsync("status:active AND created:>2024-01-01");
+Query query = await parser.BuildQueryAsync("status:active AND created:>2024-01-01");
 
 // Use in a search
 var response = await client.SearchAsync<MyDocument>(s => s
@@ -110,7 +110,7 @@ var response = await client.SearchAsync<MyDocument>(s => s
 var parser = new ElasticQueryParser(c => c.UseMappings(client, "my-index"));
 
 // Build aggregations from expression
-AggregationContainer aggs = await parser.BuildAggregationsAsync(
+AggregationMap aggs = await parser.BuildAggregationsAsync(
     "terms:(status min:amount max:amount avg:amount)");
 
 var response = await client.SearchAsync<MyDocument>(s => s

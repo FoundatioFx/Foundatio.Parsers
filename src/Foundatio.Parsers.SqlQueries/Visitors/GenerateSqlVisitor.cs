@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -55,7 +55,7 @@ public class GenerateSqlVisitor : QueryNodeVisitorWithResultBase<string>
 
     public override async Task<string> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        await node.AcceptAsync(this, context).ConfigureAwait(false);
+        await node.AcceptAsync(this, context).AnyContext();
         return _builder.ToString();
     }
 

@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
@@ -20,7 +22,7 @@ namespace Foundatio.Parsers.ElasticQueries;
 /// <param name="originalField">The field name before alias resolution (from GetOriginalField()).</param>
 /// <param name="resolvedField">The field name after alias resolution (the current node.Field).</param>
 /// <param name="context">The visitor context, providing Data dictionary for arbitrary state.</param>
-public delegate Task<QueryContainer?> NestedFilterResolver(
+public delegate Task<Query?> NestedFilterResolver(
     string nestedPath,
     string originalField,
     string resolvedField,
@@ -51,6 +53,7 @@ public class ElasticQueryParserConfiguration
     public bool? EnableRuntimeFieldResolver { get; private set; }
     public ElasticMappingResolver? MappingResolver { get; private set; }
     public QueryValidationOptions? ValidationOptions { get; private set; }
+    public Func<string, Task<string>>? GeoLocationResolver { get; private set; }
     public ChainedQueryVisitor SortVisitor { get; } = new ChainedQueryVisitor();
     public ChainedQueryVisitor QueryVisitor { get; } = new ChainedQueryVisitor();
     public ChainedQueryVisitor AggregationVisitor { get; } = new ChainedQueryVisitor();
@@ -79,7 +82,7 @@ public class ElasticQueryParserConfiguration
 
     public ElasticQueryParserConfiguration UseFieldMap(IDictionary<string, string>? fields, int priority = 10)
     {
-        if (fields != null)
+        if (fields is not null)
             return UseFieldResolver(fields.ToHierarchicalFieldResolver(), priority);
 
         return UseFieldResolver(null);
@@ -92,6 +95,7 @@ public class ElasticQueryParserConfiguration
 
     public ElasticQueryParserConfiguration UseGeo(Func<string, Task<string>>? resolveGeoLocation, int priority = 200)
     {
+        GeoLocationResolver = resolveGeoLocation;
         return AddVisitor(new GeoVisitor(resolveGeoLocation), priority);
     }
 
@@ -154,7 +158,7 @@ public class ElasticQueryParserConfiguration
     }
 
     public ElasticQueryParserConfiguration UseNestedFilter(
-        Func<string, string, string, IQueryVisitorContext, QueryContainer?>? resolver)
+        Func<string, string, string, IQueryVisitorContext, Query?>? resolver)
     {
         if (resolver is null)
             return UseNestedFilter((NestedFilterResolver?)null);
@@ -313,35 +317,35 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, IElasticClient client, string index) where T : class
+    public ElasticQueryParserConfiguration UseMappings<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, string index) where T : class
     {
         MappingResolver = ElasticMappingResolver.Create<T>(mappingBuilder, client, index, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings<T>(Func<TypeMappingDescriptor<T>, TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<ITypeMapping> getMapping) where T : class
+    public ElasticQueryParserConfiguration UseMappings<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<TypeMapping?> getMapping) where T : class
     {
         MappingResolver = ElasticMappingResolver.Create<T>(mappingBuilder, inferrer, getMapping, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings<T>(IElasticClient client)
+    public ElasticQueryParserConfiguration UseMappings<T>(ElasticsearchClient client)
     {
         MappingResolver = ElasticMappingResolver.Create<T>(client, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings(IElasticClient client, string index)
+    public ElasticQueryParserConfiguration UseMappings(ElasticsearchClient client, string index)
     {
         MappingResolver = ElasticMappingResolver.Create(client, index, logger: _logger);
 
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings(Func<ITypeMapping> getMapping, Inferrer? inferrer = null)
+    public ElasticQueryParserConfiguration UseMappings(Func<TypeMapping?> getMapping, Inferrer? inferrer = null)
     {
         MappingResolver = ElasticMappingResolver.Create(getMapping, inferrer, logger: _logger);
 

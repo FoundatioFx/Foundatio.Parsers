@@ -39,6 +39,13 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors
         /// Resolves field names to runtime field definitions for dynamic field support.
         /// </summary>
         RuntimeFieldResolver? RuntimeFieldResolver { get; set; }
+
+        /// <summary>
+        /// Resolves user-entered geo text (e.g., zip codes, place names) to a "lat,lon" coordinate
+        /// string. Used by <see cref="GeoVisitor"/> for geo-distance queries.
+        /// When null, the raw term value is used directly as the location.
+        /// </summary>
+        Func<string, Task<string>>? GeoLocationResolver { get; set; }
     }
 }
 
