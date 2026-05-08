@@ -15,7 +15,7 @@ public abstract class ElasticsearchTestBase : ElasticsearchTestBase<Elasticsearc
     protected ElasticsearchTestBase(ITestOutputHelper output, ElasticsearchFixture fixture) : base(output, fixture) { }
 }
 
-public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IAsyncLifetime, IClassFixture<T> where T : ElasticsearchFixture
+public abstract class ElasticsearchTestBase<T> : TestWithLoggingBase, IClassFixture<T> where T : ElasticsearchFixture
 {
     private readonly T _fixture;
 
