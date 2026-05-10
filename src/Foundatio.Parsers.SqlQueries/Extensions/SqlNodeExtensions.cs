@@ -310,7 +310,7 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(", ");
-                AppendField(builder, field, "\\\"" + node.Term + "*\\\"", context);
+                AppendField(builder, field, "\\\"" + node.Term.TrimEnd('*') + "*\\\"", context);
                 builder.Append(")");
             }
             else
