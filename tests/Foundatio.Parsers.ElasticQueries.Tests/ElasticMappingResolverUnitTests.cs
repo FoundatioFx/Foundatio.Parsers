@@ -539,6 +539,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
         string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
         Assert.Contains("items.visible", json);
+        Assert.Contains("\"filter\"", json);
     }
 
     [Fact]
@@ -730,5 +731,45 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var nestedInMustNot = Assert.IsAssignableFrom<IQueryContainer>(mustNotClauses[0]);
         Assert.NotNull(nestedInMustNot.Nested);
         Assert.Equal("items", nestedInMustNot.Nested.Path);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithNegatedNestedFieldAndFilter_AppliesFilterBeforeNegating()
+    {
+        // Arrange
+        var itemProps = new Properties
+        {
+            { "status", new KeywordProperty { Name = "status" } },
+            { "visible", new BooleanProperty { Name = "visible" } }
+        };
+        var rootProps = new Properties
+        {
+            { "title", new KeywordProperty { Name = "title" } },
+            { "items", new NestedProperty { Name = "items", Properties = itemProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested()
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+                path is "items" ? new TermQuery { Field = "items.visible", Value = true } : null));
+
+        // Act — negated nested field with a filter should include filter inside the nested query
+        var query = await parser.BuildQueryAsync("title:Hello AND NOT items.status:archived",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — must_not should contain nested(path=items, query=bool{must:[status:archived], filter:[visible:true]})
+        Assert.NotNull(query);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("\"path\":\"items\"", json);
+        Assert.Contains("must_not", json);
+        Assert.Contains("items.status", json);
+        Assert.Contains("items.visible", json);
     }
 }

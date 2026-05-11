@@ -66,7 +66,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         }
 
         // Build nested queries per path, then nest child paths inside parent paths
-        var builtNestedQueries = new Dictionary<string, (QueryBase Query, bool IsNegated)>();
+        var builtNestedQueries = new Dictionary<string, QueryBase>();
 
         foreach (var (path, pathQueries) in nestedQueries)
         {
@@ -75,6 +75,10 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             {
                 QueryContainer q = innerQuery;
 
+                var childFilter = child.GetNestedFilter();
+                if (childFilter is not null)
+                    q = new BoolQuery { Must = [q], Filter = [childFilter] };
+
                 if (child.IsExcluded())
                 {
                     QueryBase negatedNested = new NestedQuery { Path = path, Query = q };
@@ -82,15 +86,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
                     continue;
                 }
 
-                var childFilter = child.GetNestedFilter();
-                if (childFilter is not null)
-                    q = new BoolQuery { Must = [q], Filter = [childFilter] };
-
                 combinedInner = Combine(combinedInner, q, op);
             }
 
             if (combinedInner is not null)
-                builtNestedQueries[path] = (new NestedQuery { Path = path, Query = combinedInner }, false);
+                builtNestedQueries[path] = new NestedQuery { Path = path, Query = combinedInner };
         }
 
         // Nest child paths inside their parent paths (deepest first)
@@ -102,8 +102,8 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
             if (parentPath is not null && builtNestedQueries.TryGetValue(parentPath, out var parentEntry))
             {
-                var parentNested = (NestedQuery)parentEntry.Query;
-                QueryContainer childQuery = builtNestedQueries[childPath].Query;
+                var parentNested = (NestedQuery)parentEntry;
+                QueryContainer childQuery = builtNestedQueries[childPath];
                 parentNested.Query = parentNested.Query is not null
                     ? Combine(parentNested.Query, childQuery, op)
                     : childQuery;
@@ -111,7 +111,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             }
         }
 
-        foreach (var (_, (nestedQuery, _)) in builtNestedQueries)
+        foreach (var (_, nestedQuery) in builtNestedQueries)
         {
             container = Combine(container, nestedQuery, op);
         }
