@@ -599,6 +599,20 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.NotNull(innerContainer.Bool.Should);
         var shouldClauses = innerContainer.Bool.Should.ToList();
         Assert.Equal(2, shouldClauses.Count);
+
+        var branch0 = Assert.IsAssignableFrom<IQueryContainer>(shouldClauses[0]);
+        Assert.NotNull(branch0.Bool);
+        Assert.NotNull(branch0.Bool.Must);
+        Assert.NotNull(branch0.Bool.Filter);
+        Assert.Single(branch0.Bool.Must);
+        Assert.Single(branch0.Bool.Filter);
+
+        var branch1 = Assert.IsAssignableFrom<IQueryContainer>(shouldClauses[1]);
+        Assert.NotNull(branch1.Bool);
+        Assert.NotNull(branch1.Bool.Must);
+        Assert.NotNull(branch1.Bool.Filter);
+        Assert.Single(branch1.Bool.Must);
+        Assert.Single(branch1.Bool.Filter);
     }
 
     [Fact]
@@ -643,6 +657,52 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var container = Assert.IsAssignableFrom<IQueryContainer>(query);
         Assert.NotNull(container.Nested);
         Assert.Equal("parent", container.Nested.Path);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithNegatedChildInMultiLevel_ProducesNonCorrelatedNegation()
+    {
+        // Arrange — parent and parent.child are both nested types
+        var grandchildProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var childProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } },
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — negated child in multi-level: known limitation produces non-correlated output
+        var query = await parser.BuildQueryAsync("parent.name:Bob AND NOT parent.child.name:Alice",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — KNOWN LIMITATION: negated child is placed at top level rather than inside parent nested.
+        // Produces: nested(parent, name:Bob) AND must_not(nested(parent.child, name:Alice))
+        // instead of: nested(parent, name:Bob AND must_not(nested(parent.child, name:Alice)))
+        Assert.NotNull(query);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("\"path\":\"parent\"", json);
+        Assert.Contains("\"path\":\"parent.child\"", json);
+        Assert.Contains("must_not", json);
+
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Bool);
+        Assert.NotNull(container.Bool.Must);
     }
 
     [Fact]

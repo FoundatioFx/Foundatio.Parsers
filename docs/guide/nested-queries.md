@@ -508,9 +508,31 @@ A synchronous overload is available that wraps the return in `Task.FromResult`.
 
 ### Multi-Level Deeply Nested Types
 
-Fields nested more than one level deep (e.g., `parent.child.field1` where both `parent` and `parent.child` are nested types) are wrapped at the **deepest** nested path. The `GetNestedProperty` method in `NestedVisitor` walks the dot-separated path and returns the last nested ancestor found, so a query like `parent.child.field1:value` produces `nested(path=parent.child, query=...)`. This does **not** generate the doubly-nested structure `nested(path=parent, query=nested(path=parent.child, query=...))` that Elasticsearch requires for true multi-level nesting.
+Fields nested more than one level deep (e.g., `parent.child.field1` where both `parent` and `parent.child` are nested types) are wrapped at the **deepest** nested path. The `GetNestedProperty` method in `NestedVisitor` walks the dot-separated path and returns the last nested ancestor found, so a query like `parent.child.field1:value` produces `nested(path=parent.child, query=...)`.
 
-Single-level nested queries (e.g., `parent.field1:value` where only `parent` is nested) work correctly.
+When a query combines fields at different nested levels, `CombineQueriesVisitor` produces correlated hierarchical chains. For example:
+
+```text
+parent.name:Bob AND parent.child.name:Alice
+```
+
+generates the correlated structure:
+
+```text
+nested(path=parent, query=name:Bob AND nested(path=parent.child, query=name:Alice))
+```
+
+This ensures Elasticsearch evaluates both conditions against the same parent document.
+
+**Limitation — negated multi-level children**: When a deeper nested field is negated (e.g., `parent.name:Bob AND NOT parent.child.name:Alice`), the negated clause is placed as `must_not` at the top level rather than inside the parent nested query. This produces two independent queries rather than the correlated form. This means the exclusion applies across all parent documents, not just the matching parent.
+
+Single-level nested queries (e.g., `parent.field1:value` where only `parent` is nested) work correctly in all cases including negation.
+
+### Explicit Nested Groups and Deeper Nested Fields
+
+When a field is inside an explicit nested group (e.g., `parent:(parent.child.name:Alice)`), `NestedVisitor.IsInsideNestedGroup()` detects the enclosing group and skips nested processing for inner fields. This prevents double-wrapping but means deeper nested fields inside an explicit group will not get their own nested query wrapper.
+
+If you need correlated multi-level queries, use the implicit form (`parent.name:Bob AND parent.child.name:Alice`) rather than explicit nested group syntax.
 
 ### No Nested Field Context Stack
 
