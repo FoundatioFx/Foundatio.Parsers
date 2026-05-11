@@ -247,10 +247,10 @@ var createIndexResponse = await client.Indices.CreateAsync("my-index", c => c
         .Properties(p => p
             // Add .keyword sub-field
             .Text(t => t.Name(n => n.Title).AddKeywordField())
-            
+
             // Add .sort sub-field with lowercase normalizer
             .Text(t => t.Name(n => n.Name).AddSortField())
-            
+
             // Add both .keyword and .sort sub-fields
             .Text(t => t.Name(n => n.Description).AddKeywordAndSortFields())
         )));
@@ -318,10 +318,10 @@ public class FieldMapping
 {
     // Whether the field was found in mappings
     public bool Found { get; }
-    
+
     // The full resolved path (e.g., "data.user.name")
     public string FullPath { get; }
-    
+
     // The NEST IProperty for the field
     public IProperty Property { get; }
 }

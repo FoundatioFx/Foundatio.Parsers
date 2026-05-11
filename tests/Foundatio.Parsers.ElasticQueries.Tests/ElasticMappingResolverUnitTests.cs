@@ -540,4 +540,141 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
         Assert.Contains("items.visible", json);
     }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithOrQueryAndDistinctFilters_PreservesPerChildFilters()
+    {
+        // Arrange
+        var nestedChildProps = new Properties
+        {
+            { "status", new KeywordProperty { Name = "status" } },
+            { "priority", new KeywordProperty { Name = "priority" } },
+            { "status_filter", new KeywordProperty { Name = "status_filter" } },
+            { "priority_filter", new KeywordProperty { Name = "priority_filter" } }
+        };
+        var rootProps = new Properties
+        {
+            { "items", new NestedProperty { Name = "items", Properties = nestedChildProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested()
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+            {
+                if (path is not "items")
+                    return null;
+
+                return resolved switch
+                {
+                    "items.status" => new TermQuery { Field = "items.status_filter", Value = "A" },
+                    "items.priority" => new TermQuery { Field = "items.priority_filter", Value = "B" },
+                    _ => null
+                };
+            }));
+
+        // Act
+        var query = await parser.BuildQueryAsync("items.status:active OR items.priority:high",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — each branch must have its own distinct filter: (status AND filter_A) OR (priority AND filter_B)
+        Assert.NotNull(query);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("items.status_filter", json);
+        Assert.Contains("items.priority_filter", json);
+
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Nested);
+        Assert.Equal("items", container.Nested.Path);
+
+        var innerContainer = Assert.IsAssignableFrom<IQueryContainer>(container.Nested.Query);
+        Assert.NotNull(innerContainer.Bool);
+        Assert.NotNull(innerContainer.Bool.Should);
+        var shouldClauses = innerContainer.Bool.Should.ToList();
+        Assert.Equal(2, shouldClauses.Count);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithMixedNestedLevels_DocumentsCurrentNonCorrelatedLimitation()
+    {
+        // Arrange — parent and parent.child are both nested types
+        var grandchildProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var childProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } },
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — query mixing parent-level and child-level nested fields
+        var query = await parser.BuildQueryAsync("parent.name:Bob AND parent.child.name:Alice",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — KNOWN LIMITATION: produces two independent nested queries instead of
+        // the correct correlated structure: nested(path=parent, query=name:Bob AND nested(path=parent.child, query=...))
+        // See: https://github.com/FoundatioFx/Foundatio.Parsers/issues/XXX
+        Assert.NotNull(query);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("\"path\":\"parent\"", json);
+        Assert.Contains("\"path\":\"parent.child\"", json);
+
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Bool);
+        Assert.NotNull(container.Bool.Must);
+        var mustClauses = container.Bool.Must.ToList();
+        Assert.Equal(2, mustClauses.Count);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithUnsignedLongValueExceedingInt64Max_PreservesAsString()
+    {
+        // Arrange
+        var mapping = new TypeMapping
+        {
+            Properties = new Properties
+            {
+                { "counter", new NumberProperty(NumberType.UnsignedLong) { Name = "counter" } }
+            }
+        };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c.UseMappings(resolver));
+
+        const string maxUnsignedLong = "18446744073709551615";
+
+        // Act — value exceeds Int64.MaxValue, should not throw
+        var query = await parser.BuildQueryAsync($"counter:{maxUnsignedLong}",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — value is preserved as the exact string (Int64.TryParse fails, falls through to string)
+        Assert.NotNull(query);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains(maxUnsignedLong, json);
+    }
 }
