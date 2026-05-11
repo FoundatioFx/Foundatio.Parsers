@@ -133,6 +133,8 @@ FieldType fieldType = resolver.GetFieldType("price");
 - **Text**: `text`, `match_only_text`, `search_as_you_type` (legacy `string` also supported)
 - **Keyword**: `keyword`, `constant_keyword`, `wildcard`
 - **Numeric**: `long`, `unsigned_long`, `integer`, `short`, `byte`, `double`, `float`, `half_float`, `scaled_float`
+
+> **Note**: `unsigned_long` is mapped to `FieldType.Long` in NEST 7.x because the NEST `FieldType` enum does not include an `UnsignedLong` variant. For term queries, values exceeding `Int64.MaxValue` are preserved as strings. For sorting with `unmapped_type`, the `long` type is used, which may produce incorrect results for values above `Int64.MaxValue` in multi-index scenarios where one index lacks the field. This is a NEST 7.x limitation resolved in the Elasticsearch .NET client 8.x.
 - **Date**: `date`, `date_nanos`
 - **Range**: `integer_range`, `float_range`, `long_range`, `double_range`, `date_range`, `ip_range`
 - **Geo**: `geo_point`, `geo_shape`, `point`, `shape`

@@ -363,15 +363,18 @@ For example, `terms:nested.field1 max:nested.field4` produces a single `nested` 
 
 ### Nested Sort Support
 
-When sorting by a nested field (e.g., `-nested.field4`), `NestedVisitor` tags the `TermNode` with its nested path. `DefaultSortNodeExtensions.GetDefaultSort` reads this tag and adds a `Nested` property to the `FieldSort`:
+When sorting by a nested field (e.g., `-nested.field4`), `NestedVisitor` tags the `TermNode` with its nested path. `DefaultSortNodeExtensions.GetDefaultSort` reads this tag and builds a `NestedSort` hierarchy. For multi-level nested paths (e.g., `parent.child.score`), it produces a hierarchical chain:
 
 ```csharp
-string nestedPath = node.GetNestedPath();
-if (nestedPath is not null)
-    sort.Nested = new NestedSort { Path = nestedPath };
+// For -parent.child.score where parent and parent.child are both nested:
+sort.Nested = new NestedSort
+{
+    Path = "parent",
+    Nested = new NestedSort { Path = "parent.child" }
+};
 ```
 
-This produces the correct Elasticsearch sort clause with the required `nested` context.
+This produces the correct Elasticsearch sort clause with hierarchical `nested` context.
 
 ### Default Fields with Nested Types
 
@@ -502,7 +505,7 @@ A synchronous overload is available that wraps the return in `Task.FromResult`.
 ### Resolver Behavior Notes
 
 - For explicit nested groups, the resolver is called once on the group node, not on the individual inner field nodes. To use different discriminators for different fields within the same nested path, use separate explicit nested groups or encode the distinction via field aliases or `IQueryVisitorContext.Data`.
-- Default field searches (`SetDefaultFields` with nested fields) bypass the visitor chain and do not invoke the filter resolver.
+- Default field searches (`SetDefaultFields` with nested fields) apply the filter resolver when building nested queries for default fields. The resolver is invoked for each nested field in the default fields list.
 
 ## Known Limitations
 
@@ -524,17 +527,21 @@ nested(path=parent, query=name:Bob AND nested(path=parent.child, query=name:Alic
 
 This ensures Elasticsearch evaluates both conditions against the same parent document.
 
-**Scope**: Correlated multi-level chain support applies to **query building** only. Sort and aggregation contexts still use the resolved deepest nested path directly (e.g., `NestedSort { Path = "parent.child" }`) without hierarchical nesting.
+**Scope**: Correlated multi-level chain support applies to **query building** including negation. Sort and aggregation contexts also build hierarchical nested structures when multiple nested levels are detected.
 
-**Limitation — negated multi-level children**: When a deeper nested field is negated (e.g., `parent.name:Bob AND NOT parent.child.name:Alice`), the negated clause is placed as `must_not` at the top level rather than inside the parent nested query. This produces two independent queries rather than the correlated form. This means the exclusion applies across all parent documents, not just the matching parent.
+**Negated multi-level children**: Negated deeper nested fields (e.g., `parent.name:Bob AND NOT parent.child.name:Alice`) are correctly folded inside the parent nested query, producing:
+
+```text
+nested(path=parent, query=name:Bob AND must_not(nested(path=parent.child, query=name:Alice)))
+```
+
+This ensures the exclusion applies only within the matching parent document's scope.
 
 Single-level nested queries (e.g., `parent.field1:value` where only `parent` is nested) work correctly in all cases including negation.
 
 ### Explicit Nested Groups and Deeper Nested Fields
 
-When a field is inside an explicit nested group (e.g., `parent:(parent.child.name:Alice)`), `NestedVisitor.IsInsideNestedGroup()` detects the enclosing group and skips nested processing for inner fields. This prevents double-wrapping but means deeper nested fields inside an explicit group will not get their own nested query wrapper.
-
-If you need correlated multi-level queries, use the implicit form (`parent.name:Bob AND parent.child.name:Alice`) rather than explicit nested group syntax.
+When a field is inside an explicit nested group (e.g., `parent:(parent.child.name:Alice)`) and the inner field resolves to a *deeper* nested path than the enclosing group, the inner field correctly receives its own nested query wrapper. The `IsInsideMatchingNestedGroup` check only skips processing when the inner field's nested path matches the enclosing group's path exactly.
 
 ### No Nested Field Context Stack
 

@@ -535,6 +535,23 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var mustClauses = innerContainer.Bool.Must.ToList();
         Assert.True(mustClauses.Count >= 2, $"Expected at least 2 must clauses, got {mustClauses.Count}");
 
+        // Verify filter is present in the structure. With AND combining, each child's
+        // bool{must+filter} may be nested inside the top-level must array, or NEST may
+        // flatten. We verify structurally by checking filters exist at some level.
+        int filterCount = 0;
+        foreach (var clause in mustClauses)
+        {
+            var clauseContainer = Assert.IsAssignableFrom<IQueryContainer>(clause);
+            if (clauseContainer.Bool?.Filter is not null)
+                filterCount++;
+        }
+
+        // If NEST didn't flatten the bool queries, each must clause has its own filter
+        if (filterCount == 0 && innerContainer.Bool.Filter is not null)
+            filterCount = innerContainer.Bool.Filter.Count();
+
+        Assert.True(filterCount >= 1, $"Expected at least 1 filter, got {filterCount}");
+
         using var stream = new System.IO.MemoryStream();
         new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
         string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
@@ -673,7 +690,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
-    public async Task BuildQueryAsync_WithNegatedChildInMultiLevel_ProducesNonCorrelatedNegation()
+    public async Task BuildQueryAsync_WithNegatedChildInMultiLevel_ProducesCorrelatedNegation()
     {
         // Arrange — parent and parent.child are both nested types
         var grandchildProps = new Properties
@@ -696,13 +713,12 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             .UseMappings(resolver)
             .UseNested());
 
-        // Act — negated child in multi-level: known limitation produces non-correlated output
+        // Act — negated child in multi-level should be correlated inside parent nested
         var query = await parser.BuildQueryAsync("parent.name:Bob AND NOT parent.child.name:Alice",
             new ElasticQueryVisitorContext { UseScoring = true });
 
-        // Assert — KNOWN LIMITATION: negated child is placed at top level rather than inside parent nested.
-        // Produces: nested(parent, name:Bob) AND must_not(nested(parent.child, name:Alice))
-        // instead of: nested(parent, name:Bob AND must_not(nested(parent.child, name:Alice)))
+        // Assert — produces correlated nested chain:
+        // nested(parent, query=name:Bob AND must_not(nested(parent.child, query=name:Alice)))
         Assert.NotNull(query);
 
         using var stream = new System.IO.MemoryStream();
@@ -713,9 +729,33 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.Contains("\"path\":\"parent.child\"", json);
         Assert.Contains("must_not", json);
 
+        // The top-level query should be a single nested(parent) — no top-level bool
         var container = Assert.IsAssignableFrom<IQueryContainer>(query);
-        Assert.NotNull(container.Bool);
-        Assert.NotNull(container.Bool.Must);
+        Assert.NotNull(container.Nested);
+        Assert.Equal("parent", container.Nested.Path);
+
+        // Inside the parent nested, there should be a bool with must_not containing nested(parent.child)
+        var parentInner = Assert.IsAssignableFrom<IQueryContainer>(container.Nested.Query);
+        Assert.NotNull(parentInner.Bool);
+        Assert.NotNull(parentInner.Bool.Must);
+        var mustClauses = parentInner.Bool.Must.ToList();
+        Assert.True(mustClauses.Count >= 1);
+
+        // Find the must_not containing the nested child
+        var mustNotSource = parentInner.Bool.MustNot?.ToList();
+        if (mustNotSource is null || mustNotSource.Count == 0)
+        {
+            var clauseWithMustNot = mustClauses
+                .Select(c => Assert.IsAssignableFrom<IQueryContainer>(c))
+                .FirstOrDefault(c => c.Bool?.MustNot is not null);
+            Assert.NotNull(clauseWithMustNot);
+            mustNotSource = clauseWithMustNot!.Bool!.MustNot!.ToList();
+        }
+
+        Assert.Single(mustNotSource);
+        var negatedChild = Assert.IsAssignableFrom<IQueryContainer>(mustNotSource[0]);
+        Assert.NotNull(negatedChild.Nested);
+        Assert.Equal("parent.child", negatedChild.Nested.Path);
     }
 
     [Fact]
@@ -844,5 +884,315 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.Contains("must_not", json);
         Assert.Contains("items.status", json);
         Assert.Contains("items.visible", json);
+
+        // Structural assertions: navigate object graph to prove filter is inside nested
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Bool);
+
+        var mustNotClauses = container.Bool.MustNot?.ToList();
+        if (mustNotClauses is null || mustNotClauses.Count == 0)
+        {
+            Assert.NotNull(container.Bool.Must);
+            var negated = container.Bool.Must
+                .Select(c => Assert.IsAssignableFrom<IQueryContainer>(c))
+                .FirstOrDefault(c => c.Bool?.MustNot is not null);
+            Assert.NotNull(negated);
+            mustNotClauses = negated!.Bool!.MustNot!.ToList();
+        }
+
+        Assert.Single(mustNotClauses);
+        var nestedInMustNot = Assert.IsAssignableFrom<IQueryContainer>(mustNotClauses[0]);
+        Assert.NotNull(nestedInMustNot.Nested);
+        Assert.Equal("items", nestedInMustNot.Nested.Path);
+
+        // The nested query's inner query should be a bool with must (term) + filter (visible)
+        var nestedInner = Assert.IsAssignableFrom<IQueryContainer>(nestedInMustNot.Nested.Query);
+        Assert.NotNull(nestedInner.Bool);
+        Assert.NotNull(nestedInner.Bool.Must);
+        Assert.NotNull(nestedInner.Bool.Filter);
+        Assert.Single(nestedInner.Bool.Must);
+        Assert.Single(nestedInner.Bool.Filter);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithOrGroupMixedLevels_PreservesBranchBoundaries()
+    {
+        // Arrange — parent and parent.child are both nested types
+        var grandchildProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var childProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } },
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — OR group with mixed levels should preserve branch correlation within a single nested(parent)
+        var query = await parser.BuildQueryAsync(
+            "(parent.name:Bob AND parent.child.name:Alice) OR (parent.name:Sue AND parent.child.name:Charlie)",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — coalesced into single nested(parent) with OR inner query preserving branches:
+        // nested(parent, (name:Bob AND nested(parent.child, name:Alice)) OR (name:Sue AND nested(parent.child, name:Charlie)))
+        Assert.NotNull(query);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("Bob", json);
+        Assert.Contains("Alice", json);
+        Assert.Contains("Sue", json);
+        Assert.Contains("Charlie", json);
+        Assert.Contains("\"path\":\"parent\"", json);
+        Assert.Contains("\"path\":\"parent.child\"", json);
+
+        // Top-level should be a single nested(parent) query — not a bool/should of two nested queries
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Nested);
+        Assert.Equal("parent", container.Nested.Path);
+
+        // Inner query should be a bool with should (from OR)
+        var innerContainer = Assert.IsAssignableFrom<IQueryContainer>(container.Nested.Query);
+        Assert.NotNull(innerContainer.Bool);
+        Assert.NotNull(innerContainer.Bool.Should);
+        var shouldClauses = innerContainer.Bool.Should.ToList();
+        Assert.Equal(2, shouldClauses.Count);
+
+        // Each OR branch should contain its own correlated child nested(parent.child)
+        using var s0 = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(shouldClauses[0], s0);
+        string branch0Json = System.Text.Encoding.UTF8.GetString(s0.ToArray());
+
+        using var s1 = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(shouldClauses[1], s1);
+        string branch1Json = System.Text.Encoding.UTF8.GetString(s1.ToArray());
+
+        // Branch isolation: Bob+Alice in one branch, Sue+Charlie in the other
+        bool bobInBranch0 = branch0Json.Contains("Bob");
+        string bobBranch = bobInBranch0 ? branch0Json : branch1Json;
+        string sueBranch = bobInBranch0 ? branch1Json : branch0Json;
+
+        Assert.Contains("Bob", bobBranch);
+        Assert.Contains("Alice", bobBranch);
+        Assert.Contains("\"path\":\"parent.child\"", bobBranch);
+
+        Assert.Contains("Sue", sueBranch);
+        Assert.Contains("Charlie", sueBranch);
+        Assert.Contains("\"path\":\"parent.child\"", sueBranch);
+
+        // Cross-branch isolation
+        Assert.DoesNotContain("Sue", bobBranch);
+        Assert.DoesNotContain("Bob", sueBranch);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithExplicitNestedGroupAndDeeperChild_WrapsChildInNestedQuery()
+    {
+        // Arrange — parent and parent.child are both nested types
+        var grandchildProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var childProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } },
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — explicit nested group with a deeper child field
+        var query = await parser.BuildQueryAsync("parent:(parent.child.name:Alice)",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — should produce: nested(parent, nested(parent.child, name:Alice))
+        Assert.NotNull(query);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("\"path\":\"parent\"", json);
+        Assert.Contains("\"path\":\"parent.child\"", json);
+        Assert.Contains("Alice", json);
+
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Nested);
+        Assert.Equal("parent", container.Nested.Path);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithDefaultFieldNestedAndFilter_AppliesNestedWrapperWithFilter()
+    {
+        // Arrange — items.status is nested, filter resolver is configured
+        var itemProps = new Properties
+        {
+            { "status", new KeywordProperty { Name = "status" } },
+            { "visible", new BooleanProperty { Name = "visible" } }
+        };
+        var rootProps = new Properties
+        {
+            { "items", new NestedProperty { Name = "items", Properties = itemProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .SetDefaultFields(["items.status"])
+            .UseMappings(resolver)
+            .UseNested()
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+                path is "items" ? new TermQuery { Field = "items.visible", Value = true } : null));
+
+        // Act — search without field name uses default field (nested)
+        var query = await parser.BuildQueryAsync("active",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — should produce: nested(path=items, query=bool{must:[status:active], filter:[visible:true]})
+        Assert.NotNull(query);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("\"path\":\"items\"", json);
+        Assert.Contains("items.status", json);
+        Assert.Contains("items.visible", json);
+        Assert.Contains("\"filter\"", json);
+
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Nested);
+        Assert.Equal("items", container.Nested.Path);
+
+        var innerContainer = Assert.IsAssignableFrom<IQueryContainer>(container.Nested.Query);
+        Assert.NotNull(innerContainer.Bool);
+        Assert.NotNull(innerContainer.Bool.Must);
+        Assert.NotNull(innerContainer.Bool.Filter);
+    }
+
+    [Fact]
+    public async Task BuildSortAsync_WithMultiLevelNestedField_ProducesHierarchicalNestedSort()
+    {
+        // Arrange — parent and parent.child are both nested types
+        var grandchildProps = new Properties
+        {
+            { "score", new NumberProperty(NumberType.Integer) { Name = "score" } }
+        };
+        var childProps = new Properties
+        {
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — sort on multi-level nested field
+        var sorts = await parser.BuildSortAsync("-parent.child.score");
+
+        // Assert — should produce hierarchical nested sort: nested(parent, nested(parent.child))
+        Assert.NotNull(sorts);
+        var sortList = sorts.ToList();
+        Assert.Single(sortList);
+
+        var fieldSort = Assert.IsAssignableFrom<IFieldSort>(sortList[0]);
+        Assert.Equal(SortOrder.Descending, fieldSort.Order);
+        Assert.NotNull(fieldSort.Nested);
+        Assert.Equal("parent", fieldSort.Nested.Path);
+        Assert.NotNull(fieldSort.Nested.Nested);
+        Assert.Equal("parent.child", fieldSort.Nested.Nested.Path);
+    }
+
+    [Fact]
+    public async Task BuildAggregationsAsync_WithMultiLevelNestedField_ProducesHierarchicalNestedAggregation()
+    {
+        // Arrange — parent and parent.child are both nested types
+        var grandchildProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var childProps = new Properties
+        {
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — aggregation on multi-level nested field
+        var aggs = await parser.BuildAggregationsAsync("terms:parent.child.name");
+
+        // Assert — should produce hierarchical nested agg: nested(parent) > nested(parent.child) > terms
+        Assert.NotNull(aggs);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(aggs, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("nested_parent", json);
+        Assert.Contains("\"path\":\"parent\"", json);
+        Assert.Contains("nested_parent.child", json);
+        Assert.Contains("\"path\":\"parent.child\"", json);
+    }
+
+    [Fact]
+    public async Task BuildSortAsync_WithUnsignedLongField_UsesLongUnmappedType()
+    {
+        // Arrange — unsigned_long maps to FieldType.Long in NEST 7.x (best available approximation)
+        var mapping = new TypeMapping
+        {
+            Properties = new Properties
+            {
+                { "counter", new NumberProperty(NumberType.UnsignedLong) { Name = "counter" } }
+            }
+        };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c.UseMappings(resolver));
+
+        // Act
+        var sorts = await parser.BuildSortAsync("-counter");
+
+        // Assert — sort should use 'long' as unmapped_type (NEST 7.x limitation: no unsigned_long field type)
+        Assert.NotNull(sorts);
+        var sortList = sorts.ToList();
+        Assert.Single(sortList);
+
+        var fieldSort = Assert.IsAssignableFrom<IFieldSort>(sortList[0]);
+        Assert.Equal(SortOrder.Descending, fieldSort.Order);
+        Assert.Equal(FieldType.Long, fieldSort.UnmappedType);
     }
 }

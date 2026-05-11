@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -54,7 +55,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         foreach (var (nestedPath, childAggregations) in nestedAggregations)
         {
-            var nestedAgg = new NestedAggregation($"nested_{nestedPath}")
+            var innermostAgg = new NestedAggregation($"nested_{nestedPath}")
             {
                 Path = nestedPath,
                 Aggregations = new AggregationDictionary()
@@ -73,23 +74,27 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                             [((IAggregation)aggregation).Name] = (AggregationContainer)aggregation
                         }
                     };
-                    nestedAgg.Aggregations[((IAggregation)filteredAgg).Name] = (AggregationContainer)filteredAgg;
+                    innermostAgg.Aggregations[((IAggregation)filteredAgg).Name] = (AggregationContainer)filteredAgg;
                 }
                 else
                 {
-                    nestedAgg.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                    innermostAgg.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
                 }
 
+                string bucketPrefix = BuildHierarchicalBucketPathPrefix(nestedPath, context);
                 if (nestedFilter is not null)
-                    AddTermsOrder(termsAggregation, child, aggregation, $"nested_{nestedPath}>filtered_{((IAggregation)aggregation).Name}>");
+                    AddTermsOrder(termsAggregation, child, aggregation, $"{bucketPrefix}filtered_{((IAggregation)aggregation).Name}>");
                 else
-                    AddTermsOrder(termsAggregation, child, aggregation);
+                    AddTermsOrder(termsAggregation, child, aggregation, bucketPrefix.Length > 0 ? bucketPrefix : null);
             }
+
+            // Build hierarchical nested aggregation chain if needed
+            var topLevelAgg = BuildHierarchicalNestedAgg(nestedPath, innermostAgg, context);
 
             if (container is BucketAggregationBase bucketContainer)
             {
                 bucketContainer.Aggregations ??= new AggregationDictionary();
-                bucketContainer.Aggregations[((IAggregation)nestedAgg).Name] = (AggregationContainer)nestedAgg;
+                bucketContainer.Aggregations[((IAggregation)topLevelAgg).Name] = (AggregationContainer)topLevelAgg;
             }
         }
 
@@ -199,5 +204,65 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         }
 
         return container;
+    }
+
+    private static AggregationBase BuildHierarchicalNestedAgg(
+        string deepestPath, NestedAggregation innermostAgg, IQueryVisitorContext context)
+    {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            return innermostAgg;
+
+        var pathSegments = deepestPath.Split('.');
+        var nestedPaths = new List<string>();
+        string current = "";
+        for (int i = 0; i < pathSegments.Length; i++)
+        {
+            current = i == 0 ? pathSegments[i] : $"{current}.{pathSegments[i]}";
+            if (elasticContext.MappingResolver.IsNestedPropertyType(current))
+                nestedPaths.Add(current);
+        }
+
+        if (nestedPaths.Count <= 1)
+            return innermostAgg;
+
+        // Build from outermost to innermost, placing the innermost aggregation at the deepest level
+        AggregationBase result = innermostAgg;
+        for (int i = nestedPaths.Count - 2; i >= 0; i--)
+        {
+            var wrapper = new NestedAggregation($"nested_{nestedPaths[i]}")
+            {
+                Path = nestedPaths[i],
+                Aggregations = new AggregationDictionary
+                {
+                    [((IAggregation)result).Name] = (AggregationContainer)result
+                }
+            };
+            result = wrapper;
+        }
+
+        return result;
+    }
+
+    private static string BuildHierarchicalBucketPathPrefix(
+        string deepestPath, IQueryVisitorContext context)
+    {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            return $"nested_{deepestPath}>";
+
+        var pathSegments = deepestPath.Split('.');
+        var nestedPaths = new List<string>();
+        string current = "";
+        for (int i = 0; i < pathSegments.Length; i++)
+        {
+            current = i == 0 ? pathSegments[i] : $"{current}.{pathSegments[i]}";
+            if (elasticContext.MappingResolver.IsNestedPropertyType(current))
+                nestedPaths.Add(current);
+        }
+
+        if (nestedPaths.Count <= 1)
+            return $"nested_{deepestPath}>";
+
+        var parts = nestedPaths.Select(p => $"nested_{p}>").ToList();
+        return string.Join("", parts);
     }
 }

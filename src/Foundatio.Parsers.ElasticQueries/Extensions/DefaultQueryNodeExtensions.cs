@@ -42,9 +42,30 @@ public static class DefaultQueryNodeExtensions
         if (!String.IsNullOrEmpty(field))
             return GetSingleFieldQuery(node, field, elasticContext);
 
-        // If only one default field, use single-field query
+        // If only one default field, use single-field query (wrapped in nested if applicable)
         if (defaultFields is { Length: 1 })
-            return GetSingleFieldQuery(node, defaultFields[0], elasticContext);
+        {
+            var singleQuery = GetSingleFieldQuery(node, defaultFields[0], elasticContext);
+            if (singleQuery is null)
+                return null;
+
+            string? nestedPath = GetNestedPath(defaultFields[0], elasticContext);
+            if (nestedPath is not null)
+            {
+                QueryContainer innerQuery = singleQuery;
+                var filterResolver = GetNestedFilterResolver(elasticContext);
+                if (filterResolver is not null)
+                {
+                    var filter = filterResolver(nestedPath, defaultFields[0], defaultFields[0], context).GetAwaiter().GetResult();
+                    if (filter is not null)
+                        innerQuery = new BoolQuery { Must = [innerQuery], Filter = [filter] };
+                }
+
+                return new NestedQuery { Path = nestedPath, Query = innerQuery };
+            }
+
+            return singleQuery;
+        }
 
         if (defaultFields is { Length: > 1 })
         {
@@ -296,13 +317,29 @@ public static class DefaultQueryNodeExtensions
 
             if (!String.IsNullOrEmpty(nestedPath))
             {
+                QueryContainer innerQuery = query;
+
+                var filterResolver = GetNestedFilterResolver(context);
+                if (filterResolver is not null)
+                {
+                    QueryContainer? filter = null;
+                    foreach (string field in fields)
+                    {
+                        filter = filterResolver(nestedPath, field, field, context).GetAwaiter().GetResult();
+                        if (filter is not null)
+                            break;
+                    }
+
+                    if (filter is not null)
+                        innerQuery = new BoolQuery { Must = [innerQuery], Filter = [filter] };
+                }
+
                 queryContainers.Add(new NestedQuery
                 {
                     Path = nestedPath,
-                    Query = query
+                    Query = innerQuery
                 });
             }
-            // Flatten inner should clauses to avoid unnecessary bool nesting.
             else if (query is BoolQuery boolQuery && boolQuery.Should is not null)
             {
                 foreach (var shouldClause in boolQuery.Should)
@@ -315,6 +352,15 @@ public static class DefaultQueryNodeExtensions
         }
 
         return new BoolQuery { Should = queryContainers };
+    }
+
+    private static NestedFilterResolver? GetNestedFilterResolver(IElasticQueryVisitorContext context)
+    {
+        if (context is IQueryVisitorContext visitorContext &&
+            visitorContext.Data.TryGetValue("@NestedFilterResolver", out object? value))
+            return value as NestedFilterResolver;
+
+        return null;
     }
 
     public static async Task<QueryBase> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)
