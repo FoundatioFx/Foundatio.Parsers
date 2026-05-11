@@ -128,16 +128,18 @@ FieldType fieldType = resolver.GetFieldType("price");
 
 ### Field Type Enum
 
-`GetFieldType` returns `Nest.FieldType`, a NEST enum with values such as:
+`GetFieldType` returns `Nest.FieldType`, a NEST enum. The following Elasticsearch field types are recognized:
 
-- `FieldType.Text`
-- `FieldType.Keyword`
-- `FieldType.Date`
-- `FieldType.Boolean`
-- `FieldType.Long`, `FieldType.Integer`, `FieldType.Short`, `FieldType.Byte`
-- `FieldType.Double`, `FieldType.Float`, `FieldType.HalfFloat`, `FieldType.ScaledFloat`
-- `FieldType.GeoPoint`, `FieldType.GeoShape`
-- `FieldType.Nested`, `FieldType.Object`
+- **Text**: `text`, `match_only_text`, `search_as_you_type` (legacy `string` also supported)
+- **Keyword**: `keyword`, `constant_keyword`, `wildcard`
+- **Numeric**: `long`, `unsigned_long`, `integer`, `short`, `byte`, `double`, `float`, `half_float`, `scaled_float`
+- **Date**: `date`, `date_nanos`
+- **Range**: `integer_range`, `float_range`, `long_range`, `double_range`, `date_range`, `ip_range`
+- **Geo**: `geo_point`, `geo_shape`, `point`, `shape`
+- **Structured**: `nested`, `object`, `flattened`, `join`
+- **Other**: `boolean`, `ip`, `binary`, `completion`, `murmur3`, `token_count`, `percolator`, `alias`, `rank_feature`, `rank_features`, `histogram`, `dense_vector`, `version`
+
+Unrecognized types return `FieldType.None`.
 
 ```csharp
 FieldType fieldType = resolver.GetFieldType("price");

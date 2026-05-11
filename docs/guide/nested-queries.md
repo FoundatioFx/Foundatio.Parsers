@@ -466,7 +466,7 @@ When a single nested array contains documents of different logical types (e.g., 
 
 1. **`NestedVisitor`** calls the resolver whenever a node introduces or participates in a nested scope. For standalone nested field nodes (e.g., `resellers.price:10`), the resolver is called for each field. For explicit nested groups (e.g., `resellers:(resellers.name:x resellers.price:10)`), inner field nodes are skipped and the resolver is called once on the group node. If the resolver returns a non-null `QueryContainer`, it is stored as `@NestedFilter` metadata on that node.
 
-2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and AND-s the filter once per nested path into the inner query. For explicit grouped nested queries, the filter stored on the group node is applied to the group's inner query.
+2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and AND-s the filter into each child's query before combining with the group operator. This ensures correct semantics for both AND and OR groups — each child query is individually constrained by its filter. For explicit grouped nested queries, the filter stored on the group node is applied to the group's inner query.
 
 3. **`CombineAggregationsVisitor`** reads the `@NestedFilter` and wraps each inner aggregation in a `FilterAggregation` before adding it to the `NestedAggregation`.
 
@@ -508,7 +508,7 @@ A synchronous overload is available that wraps the return in `Task.FromResult`.
 
 ### Multi-Level Deeply Nested Types
 
-Fields nested more than one level deep (e.g., `parent.child.field1` where both `parent` and `parent.child` are nested types) are wrapped at the **outermost** nested path only. The `GetNestedProperty` method in `NestedVisitor` returns the first nested ancestor found when walking the dot-separated path, so a query like `parent.child.field1:value` produces `nested(path=parent, query=...)` but does **not** generate the doubly-nested structure `nested(path=parent, query=nested(path=parent.child, query=...))` that Elasticsearch requires for true multi-level nesting.
+Fields nested more than one level deep (e.g., `parent.child.field1` where both `parent` and `parent.child` are nested types) are wrapped at the **deepest** nested path. The `GetNestedProperty` method in `NestedVisitor` walks the dot-separated path and returns the last nested ancestor found, so a query like `parent.child.field1:value` produces `nested(path=parent.child, query=...)`. This does **not** generate the doubly-nested structure `nested(path=parent, query=nested(path=parent.child, query=...))` that Elasticsearch requires for true multi-level nesting.
 
 Single-level nested queries (e.g., `parent.field1:value` where only `parent` is nested) work correctly.
 

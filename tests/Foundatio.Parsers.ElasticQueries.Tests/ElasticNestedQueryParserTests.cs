@@ -1437,13 +1437,14 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public async Task NestedFilterQuery_WithMultipleFieldsSamePath_AppliesFilterOnceInCoalescedQuery()
+    public async Task NestedFilterQuery_WithMultipleFieldsSamePath_AppliesFilterPerChildQuery()
     {
         // Arrange
         string index = CreateRandomIndex<Product>(d => d.Properties(p => p
             .Text(e => e.Name(n => n.Name))
             .Nested<Reseller>(r => r.Name(n => n.Resellers.First()).Properties(p1 => p1
                 .Keyword(e => e.Name(n => n.Name))
+                .Keyword(e => e.Name("type"))
                 .Number(e => e.Name(n => n.Price).Type(NumberType.Double))
             ))
         ));
@@ -1465,7 +1466,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
             .UseNestedFilter((path, orig, resolved, ctx) =>
-                path is "resellers" ? new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+                path is "resellers" ? new TermQuery { Field = "resellers.type", Value = "official" } : null)
             .UseNested());
 
         // Act
@@ -1481,9 +1482,9 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 .Path("resellers")
                 .Query(q2 =>
                     (q2.Term(t => t.Field("resellers.name").Value("Official"))
-                        && q2.Term(t => t.Field("resellers.name").Value("Official")))
+                        && q2.Term(t => t.Field("resellers.type").Value("official")))
                     && (q2.Term(t => t.Field("resellers.price").Value(10.0))
-                        && q2.Term(t => t.Field("resellers.name").Value("Official")))))));
+                        && q2.Term(t => t.Field("resellers.type").Value("official")))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);

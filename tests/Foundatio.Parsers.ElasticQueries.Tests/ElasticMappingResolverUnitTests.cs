@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -452,7 +453,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
-    public void GetNestedProperty_WithMultiLevelNesting_ReturnsDeepestNestedPath()
+    public async Task BuildQueryAsync_WithMultiLevelNesting_UsesDeepestNestedPath()
     {
         // Arrange
         var grandchildProps = new Properties
@@ -470,13 +471,19 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var mapping = new TypeMapping { Properties = rootProps };
         var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
 
-        // Act
-        bool parentIsNested = resolver.IsNestedPropertyType("parent");
-        bool childIsNested = resolver.IsNestedPropertyType("parent.child");
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
 
-        // Assert
-        Assert.True(parentIsNested);
-        Assert.True(childIsNested);
+        // Act
+        var query = await parser.BuildQueryAsync("parent.child.name:test",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — query should be nested at parent.child (deepest), not parent (shallowest)
+        Assert.NotNull(query);
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Nested);
+        Assert.Equal("parent.child", container.Nested.Path);
     }
 
     [Fact]
@@ -486,7 +493,8 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var nestedChildProps = new Properties
         {
             { "status", new KeywordProperty { Name = "status" } },
-            { "priority", new KeywordProperty { Name = "priority" } }
+            { "priority", new KeywordProperty { Name = "priority" } },
+            { "visible", new BooleanProperty { Name = "visible" } }
         };
         var rootProps = new Properties
         {
@@ -509,10 +517,27 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
 
         // Act
         var query = await parser.BuildQueryAsync("items.status:active AND items.priority:high",
-            new ElasticQueryVisitorContext());
+            new ElasticQueryVisitorContext { UseScoring = true });
 
-        // Assert
+        // Assert — filter should be called per child and the generated query should contain nested with bool must
         Assert.NotNull(query);
         Assert.True(filterCallCount >= 2, $"Filter should be called per child, got {filterCallCount} calls");
+
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Nested);
+        Assert.Equal("items", container.Nested.Path);
+        Assert.NotNull(container.Nested.Query);
+
+        var innerContainer = Assert.IsAssignableFrom<IQueryContainer>(container.Nested.Query);
+        Assert.NotNull(innerContainer.Bool);
+        Assert.NotNull(innerContainer.Bool.Must);
+
+        var mustClauses = innerContainer.Bool.Must.ToList();
+        Assert.True(mustClauses.Count >= 2, $"Expected at least 2 must clauses, got {mustClauses.Count}");
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        Assert.Contains("items.visible", json);
     }
 }

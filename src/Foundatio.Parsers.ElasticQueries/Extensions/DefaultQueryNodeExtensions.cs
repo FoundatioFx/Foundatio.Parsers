@@ -265,6 +265,7 @@ public static class DefaultQueryNodeExtensions
             return null;
 
         var builder = new StringBuilder();
+        string? deepestNestedPath = null;
         for (int i = 0; i < nameParts.Length; i++)
         {
             if (i > 0)
@@ -274,10 +275,10 @@ public static class DefaultQueryNodeExtensions
 
             string fieldName = builder.ToString();
             if (context.MappingResolver.IsNestedPropertyType(fieldName))
-                return fieldName;
+                deepestNestedPath = fieldName;
         }
 
-        return null;
+        return deepestNestedPath;
     }
 
     private static QueryBase GetSplitNestedQuery(TermNode node, Dictionary<string, List<string>> fieldsByNestedPath, IElasticQueryVisitorContext context)
