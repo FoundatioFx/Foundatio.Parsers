@@ -68,21 +68,18 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         foreach (var (path, pathQueries) in nestedQueries)
         {
             QueryContainer? combinedInner = null;
-            QueryContainer? nestedFilter = null;
             foreach (var (child, innerQuery) in pathQueries)
             {
                 QueryContainer q = innerQuery;
                 if (child.IsExcluded())
                     q = !q;
 
-                combinedInner = Combine(combinedInner, q, op);
                 var childFilter = child.GetNestedFilter();
                 if (childFilter is not null)
-                    nestedFilter = nestedFilter is null ? childFilter : nestedFilter & childFilter;
-            }
+                    q &= childFilter;
 
-            if (nestedFilter is not null)
-                combinedInner &= nestedFilter;
+                combinedInner = Combine(combinedInner, q, op);
+            }
 
             QueryBase combinedNested = new NestedQuery { Path = path, Query = combinedInner };
             container = Combine(container, combinedNested, op);
