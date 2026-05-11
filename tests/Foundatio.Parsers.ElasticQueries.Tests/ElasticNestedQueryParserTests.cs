@@ -1481,10 +1481,12 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .Query(q => q.Nested(n => n
                 .Path("resellers")
                 .Query(q2 =>
-                    (q2.Term(t => t.Field("resellers.name").Value("Official"))
-                        && q2.Term(t => t.Field("resellers.type").Value("official")))
-                    && (q2.Term(t => t.Field("resellers.price").Value(10.0))
-                        && q2.Term(t => t.Field("resellers.type").Value("official")))))));
+                    q2.Bool(b => b
+                        .Must(m => m.Term(t => t.Field("resellers.name").Value("Official")))
+                        .Filter(f => f.Term(t => t.Field("resellers.type").Value("official"))))
+                    && q2.Bool(b => b
+                        .Must(m => m.Term(t => t.Field("resellers.price").Value(10.0)))
+                        .Filter(f => f.Term(t => t.Field("resellers.type").Value("official"))))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);

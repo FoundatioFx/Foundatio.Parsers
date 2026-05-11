@@ -601,7 +601,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
-    public async Task BuildQueryAsync_WithMixedNestedLevels_DocumentsCurrentNonCorrelatedLimitation()
+    public async Task BuildQueryAsync_WithMixedNestedLevels_ProducesCorrelatedNestedChain()
     {
         // Arrange — parent and parent.child are both nested types
         var grandchildProps = new Properties
@@ -628,9 +628,8 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var query = await parser.BuildQueryAsync("parent.name:Bob AND parent.child.name:Alice",
             new ElasticQueryVisitorContext { UseScoring = true });
 
-        // Assert — KNOWN LIMITATION: produces two independent nested queries instead of
-        // the correct correlated structure: nested(path=parent, query=name:Bob AND nested(path=parent.child, query=...))
-        // See: https://github.com/FoundatioFx/Foundatio.Parsers/issues/XXX
+        // Assert — produces correlated nested chain:
+        // nested(path=parent, query=name:Bob AND nested(path=parent.child, query=name:Alice))
         Assert.NotNull(query);
 
         using var stream = new System.IO.MemoryStream();
@@ -641,10 +640,8 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.Contains("\"path\":\"parent.child\"", json);
 
         var container = Assert.IsAssignableFrom<IQueryContainer>(query);
-        Assert.NotNull(container.Bool);
-        Assert.NotNull(container.Bool.Must);
-        var mustClauses = container.Bool.Must.ToList();
-        Assert.Equal(2, mustClauses.Count);
+        Assert.NotNull(container.Nested);
+        Assert.Equal("parent", container.Nested.Path);
     }
 
     [Fact]
@@ -676,5 +673,62 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
 
         Assert.Contains(maxUnsignedLong, json);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithNegatedNestedField_WrapsMustNotOutsideNestedQuery()
+    {
+        // Arrange
+        var itemProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } },
+            { "status", new KeywordProperty { Name = "status" } }
+        };
+        var rootProps = new Properties
+        {
+            { "title", new KeywordProperty { Name = "title" } },
+            { "items", new NestedProperty { Name = "items", Properties = itemProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — NOT on a nested field should wrap must_not OUTSIDE the nested query
+        var query = await parser.BuildQueryAsync("title:Hello AND NOT items.status:archived",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — should produce: bool { must: [term(title), must_not: [nested(path=items, query=term(status))]] }
+        Assert.NotNull(query);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("\"path\":\"items\"", json);
+        Assert.Contains("must_not", json);
+        Assert.Contains("items.status", json);
+
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Bool);
+
+        // must_not can be at the top-level bool or nested in a must clause
+        var mustNotClauses = container.Bool.MustNot?.ToList();
+        if (mustNotClauses is null || mustNotClauses.Count == 0)
+        {
+            Assert.NotNull(container.Bool.Must);
+            var negated = container.Bool.Must
+                .Select(c => Assert.IsAssignableFrom<IQueryContainer>(c))
+                .FirstOrDefault(c => c.Bool?.MustNot is not null);
+            Assert.NotNull(negated);
+            mustNotClauses = negated!.Bool!.MustNot!.ToList();
+        }
+
+        Assert.Single(mustNotClauses);
+        var nestedInMustNot = Assert.IsAssignableFrom<IQueryContainer>(mustNotClauses[0]);
+        Assert.NotNull(nestedInMustNot.Nested);
+        Assert.Equal("items", nestedInMustNot.Nested.Path);
     }
 }
