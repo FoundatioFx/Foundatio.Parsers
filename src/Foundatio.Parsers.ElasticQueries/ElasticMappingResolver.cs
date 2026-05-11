@@ -388,6 +388,7 @@ public class ElasticMappingResolver : IDisposable
             "object" => FieldType.Object,
             "murmur3" => FieldType.Murmur3Hash,
             "token_count" => FieldType.TokenCount,
+            "unsigned_long" => FieldType.Long,
             "percolator" => FieldType.Percolator,
             "integer" => FieldType.Integer,
             "long" => FieldType.Long,

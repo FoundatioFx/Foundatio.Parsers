@@ -76,7 +76,9 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
                     q = !q;
 
                 combinedInner = Combine(combinedInner, q, op);
-                nestedFilter ??= child.GetNestedFilter();
+                var childFilter = child.GetNestedFilter();
+                if (childFilter is not null)
+                    nestedFilter = nestedFilter is null ? childFilter : nestedFilter & childFilter;
             }
 
             if (nestedFilter is not null)

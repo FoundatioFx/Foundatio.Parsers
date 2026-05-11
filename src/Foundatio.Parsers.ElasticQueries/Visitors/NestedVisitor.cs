@@ -146,6 +146,7 @@ public class NestedVisitor : ChainableQueryVisitor
             return null;
 
         var builder = new StringBuilder();
+        string? deepestNestedPath = null;
         for (int i = 0; i < nameParts.Length; i++)
         {
             if (i > 0)
@@ -155,9 +156,9 @@ public class NestedVisitor : ChainableQueryVisitor
 
             string fieldName = builder.ToString();
             if (elasticContext.MappingResolver.IsNestedPropertyType(fieldName))
-                return fieldName;
+                deepestNestedPath = fieldName;
         }
 
-        return null;
+        return deepestNestedPath;
     }
 }
