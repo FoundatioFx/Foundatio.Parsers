@@ -466,7 +466,7 @@ When a single nested array contains documents of different logical types (e.g., 
 
 1. **`NestedVisitor`** calls the resolver whenever a node introduces or participates in a nested scope. For standalone nested field nodes (e.g., `resellers.price:10`), the resolver is called for each field. For explicit nested groups (e.g., `resellers:(resellers.name:x resellers.price:10)`), inner field nodes are skipped and the resolver is called once on the group node. If the resolver returns a non-null `QueryContainer`, it is stored as `@NestedFilter` metadata on that node.
 
-2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and AND-s the filter into each child's query before combining with the group operator. This ensures correct semantics for both AND and OR groups — each child query is individually constrained by its filter. For explicit grouped nested queries, the filter stored on the group node is applied to the group's inner query.
+2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and combines the filter into each child's query (in `bool.filter` context) before combining with the group operator. This ensures correct semantics for both AND and OR groups — each child query is individually constrained by its filter. For explicit grouped nested queries, the filter stored on the group node is applied to the group's inner query.
 
 3. **`CombineAggregationsVisitor`** reads the `@NestedFilter` and wraps each inner aggregation in a `FilterAggregation` before adding it to the `NestedAggregation`.
 
