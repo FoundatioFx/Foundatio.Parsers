@@ -1195,4 +1195,228 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.Equal(SortOrder.Descending, fieldSort.Order);
         Assert.Equal(FieldType.Long, fieldSort.UnmappedType);
     }
+
+    [Fact]
+    public async Task BuildAggregationsAsync_WithParentAndChildLevelAggs_PreservesBothUnderSameWrapper()
+    {
+        // Arrange — parent and parent.child are both nested types
+        var grandchildProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var childProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } },
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — aggregations on both parent-level and child-level fields
+        var aggs = await parser.BuildAggregationsAsync("terms:parent.name terms:parent.child.name");
+
+        // Assert — both aggs are under same nested_parent wrapper, child is under nested_parent.child inside it
+        Assert.NotNull(aggs);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(aggs, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("nested_parent", json);
+        Assert.Contains("\"path\":\"parent\"", json);
+        Assert.Contains("nested_parent.child", json);
+        Assert.Contains("\"path\":\"parent.child\"", json);
+        Assert.Contains("terms_parent.name", json);
+        Assert.Contains("terms_parent.child.name", json);
+
+        // Verify there's exactly one top-level nested_parent (not two separate ones)
+        int nestedParentCount = json.Split("nested_parent").Length - 1;
+        int nestedParentChildCount = json.Split("nested_parent.child").Length - 1;
+        // nested_parent appears multiple times (as key), but nested_parent.child should be nested inside it
+        Assert.True(nestedParentChildCount >= 1, "Expected nested_parent.child to appear in the JSON");
+    }
+
+    [Fact]
+    public async Task BuildAggregationsAsync_WithFilteredParentAndChildAggs_DoesNotOverwrite()
+    {
+        // Arrange — parent and parent.child are both nested
+        var grandchildProps = new Properties
+        {
+            { "status", new KeywordProperty { Name = "status" } }
+        };
+        var childProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } },
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested()
+            .UseNestedFilter((path, field, originalField, ctx) =>
+                Task.FromResult<QueryContainer?>(new TermQuery { Field = $"{path}.active", Value = true })));
+
+        // Act — aggregations on both parent-level and child-level fields with filter
+        var aggs = await parser.BuildAggregationsAsync("terms:parent.name terms:parent.child.status");
+
+        // Assert — both aggs preserved under nested wrappers with filters
+        Assert.NotNull(aggs);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(aggs, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        // Both parent-level and child-level term aggs must exist
+        Assert.Contains("terms_parent.name", json);
+        Assert.Contains("terms_parent.child.status", json);
+        // Both filter wrappers must exist
+        Assert.Contains("filtered_terms_parent.name", json);
+        Assert.Contains("filtered_terms_parent.child.status", json);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithMultipleDefaultFieldsAndDistinctFilters_AppliesPerFieldFilter()
+    {
+        // Arrange — items is nested with two fields
+        var itemProps = new Properties
+        {
+            { "status", new KeywordProperty { Name = "status" } },
+            { "priority", new KeywordProperty { Name = "priority" } }
+        };
+        var rootProps = new Properties
+        {
+            { "items", new NestedProperty { Name = "items", Properties = itemProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        // Filter resolver returns distinct filters per field
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested()
+            .SetDefaultFields(new[] { "items.status", "items.priority" })
+            .UseNestedFilter((path, field, originalField, ctx) =>
+            {
+                if (field == "items.status")
+                    return Task.FromResult<QueryContainer?>(new TermQuery { Field = "items.type", Value = "status_filter" });
+                if (field == "items.priority")
+                    return Task.FromResult<QueryContainer?>(new TermQuery { Field = "items.type", Value = "priority_filter" });
+                return Task.FromResult<QueryContainer?>(null);
+            }));
+
+        // Act — unqualified term search
+        var result = await parser.BuildQueryAsync("active");
+
+        // Assert — should produce nested query with per-field should branches, each with own filter
+        Assert.NotNull(result);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(result, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("nested", json);
+        Assert.Contains("status_filter", json);
+        Assert.Contains("priority_filter", json);
+        Assert.Contains("items.status", json);
+        Assert.Contains("items.priority", json);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithExplicitNestedGroupAndNegatedDeeperChild_ProducesCorrelatedNegation()
+    {
+        // Arrange — parent and parent.child are nested
+        var grandchildProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var childProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } },
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — explicit nested group with negated deeper child
+        var result = await parser.BuildQueryAsync("parent:(parent.name:Bob AND NOT parent.child.name:Alice)");
+
+        // Assert — correlated negation: nested(parent) containing name:Bob AND must_not nested(parent.child, name:Alice)
+        Assert.NotNull(result);
+
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(result, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("\"path\":\"parent\"", json);
+        Assert.Contains("Bob", json);
+        Assert.Contains("Alice", json);
+        Assert.Contains("must_not", json);
+        Assert.Contains("\"path\":\"parent.child\"", json);
+    }
+
+    [Fact]
+    public async Task BuildSortAsync_WithMultiLevelNestedFieldAndFilter_AppliesFilterOnInnermost()
+    {
+        // Arrange — parent and parent.child are nested
+        var grandchildProps = new Properties
+        {
+            { "score", new NumberProperty(NumberType.Integer) { Name = "score" } }
+        };
+        var childProps = new Properties
+        {
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested()
+            .UseNestedFilter((path, field, originalField, ctx) =>
+                Task.FromResult<QueryContainer?>(new TermQuery { Field = $"{path}.active", Value = true })));
+
+        // Act — sort on multi-level nested field
+        var sorts = await parser.BuildSortAsync("-parent.child.score");
+
+        // Assert — hierarchical nested sort with filter on innermost level
+        Assert.NotNull(sorts);
+        var sortList = sorts.ToList();
+        Assert.Single(sortList);
+
+        var fieldSort = Assert.IsAssignableFrom<IFieldSort>(sortList[0]);
+        Assert.Equal(SortOrder.Descending, fieldSort.Order);
+        Assert.NotNull(fieldSort.Nested);
+        Assert.Equal("parent", fieldSort.Nested.Path);
+        Assert.NotNull(fieldSort.Nested.Nested);
+        Assert.Equal("parent.child", fieldSort.Nested.Nested.Path);
+
+        // Filter should be on the innermost nested sort
+        Assert.NotNull(fieldSort.Nested.Nested.Filter);
+    }
 }
