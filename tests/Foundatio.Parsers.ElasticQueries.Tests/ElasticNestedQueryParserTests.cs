@@ -1445,7 +1445,6 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .Text(e => e.Name(n => n.Name))
             .Nested<Reseller>(r => r.Name(n => n.Resellers.First()).Properties(p1 => p1
                 .Keyword(e => e.Name(n => n.Name))
-                .Keyword(e => e.Name("type"))
                 .Number(e => e.Name(n => n.Price).Type(NumberType.Double))
             ))
         ));
@@ -1467,7 +1466,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
             .UseNestedFilter((path, orig, resolved, ctx) =>
-                path is "resellers" ? new TermQuery { Field = "resellers.type", Value = "official" } : null)
+                path is "resellers" ? new TermQuery { Field = "resellers.name", Value = "Official" } : null)
             .UseNested());
 
         // Act
@@ -1484,10 +1483,10 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 .Query(q2 =>
                     q2.Bool(b => b
                         .Must(m => m.Term(t => t.Field("resellers.name").Value("Official")))
-                        .Filter(f => f.Term(t => t.Field("resellers.type").Value("official"))))
+                        .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official"))))
                     && q2.Bool(b => b
                         .Must(m => m.Term(t => t.Field("resellers.price").Value(10.0)))
-                        .Filter(f => f.Term(t => t.Field("resellers.type").Value("official"))))))));
+                        .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official"))))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
