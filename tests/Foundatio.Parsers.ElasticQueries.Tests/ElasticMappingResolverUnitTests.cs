@@ -1237,10 +1237,8 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.Contains("terms_parent.name", json);
         Assert.Contains("terms_parent.child.name", json);
 
-        // Verify there's exactly one top-level nested_parent (not two separate ones)
-        int nestedParentCount = json.Split("nested_parent").Length - 1;
+        // Verify nested_parent.child is nested inside nested_parent
         int nestedParentChildCount = json.Split("nested_parent.child").Length - 1;
-        // nested_parent appears multiple times (as key), but nested_parent.child should be nested inside it
         Assert.True(nestedParentChildCount >= 1, "Expected nested_parent.child to appear in the JSON");
     }
 

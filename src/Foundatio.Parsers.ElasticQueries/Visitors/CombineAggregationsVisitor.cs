@@ -226,16 +226,12 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
     private static bool TryGetNestedAgg(AggregationDictionary dict, string name, out NestedAggregation? nested)
     {
         nested = null;
-        try
+        var backingDict = dict as IDictionary<string, IAggregationContainer>;
+        if (backingDict is not null && backingDict.TryGetValue(name, out var container) && container is not null)
         {
-            var container = dict[name];
-            if (container is not null)
-            {
-                nested = (NestedAggregation)((IAggregationContainer)container).Nested;
-                return true;
-            }
+            nested = (NestedAggregation)container.Nested;
+            return true;
         }
-        catch (KeyNotFoundException) { }
         return false;
     }
 
