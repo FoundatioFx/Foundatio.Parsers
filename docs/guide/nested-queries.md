@@ -357,9 +357,10 @@ This grouping ensures that multiple individual nested field terms targeting the 
 
 1. Collecting all leaf field nodes from the AST
 2. Grouping them by nested path (using the `@NestedPath` metadata set by `NestedVisitor`)
-3. Wrapping grouped aggregations in a `NestedAggregation` with the appropriate path
+3. For each nested path, computing the full chain of nested ancestors (e.g., `parent.child` produces `[parent, parent.child]`)
+4. Merging aggregations into a shared hierarchical nested wrapper tree via `EnsureNestedAggPath` — if a `nested_parent` wrapper already exists (from parent-level aggs), child-level aggs are inserted inside it rather than creating a duplicate
 
-For example, `terms:nested.field1 max:nested.field4` produces a single `nested` aggregation containing both the `terms` and `max` sub-aggregations.
+For example, `terms:nested.field1 max:nested.field4` produces a single `nested` aggregation containing both the `terms` and `max` sub-aggregations. For multi-level nesting (`terms:parent.name terms:parent.child.name`), the child-level aggregation is nested inside the parent wrapper: `nested_parent > nested_parent.child > terms_parent.child.name`.
 
 ### Nested Sort Support
 
@@ -388,7 +389,7 @@ parser.SetDefaultFields(["field1", "nested.field1", "nested.field2"]);
 // Produces: match(field1, "searchterm") OR nested(match(nested.field1, "searchterm") OR match(nested.field2, "searchterm"))
 ```
 
-Fields are grouped by their nested path. Non-nested fields use standard `match`/`term` queries, while nested fields from the same path are combined into a single `NestedQuery` with `multi_match` inside. Fields of different types (text vs keyword vs integer) are split into appropriate query types.
+Fields are grouped by their nested path. Non-nested fields use standard `match`/`term` queries, while nested fields from the same path are combined into a single `NestedQuery`. When a `NestedFilterResolver` is configured, each field gets its own branch with its own filter applied (combined via `bool.should`), ensuring distinct per-field filters are preserved. Without a filter resolver, fields of the same type are combined with `multi_match` for efficiency.
 
 ### Exists and Missing Queries on Nested Fields
 
