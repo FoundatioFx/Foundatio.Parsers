@@ -1426,8 +1426,9 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var expectedResponse = Client.Search<Product>(d => d.Index(index)
             .Query(q => q.Nested(n => n
                 .Path("resellers")
-                .Query(q2 => q2.Term(t => t.Field("resellers.price").Value(10.0))
-                    && q2.Term(t => t.Field("resellers.name").Value("Official"))))));
+                .Query(q2 => q2.Bool(b => b
+                    .Must(m => m.Term(t => t.Field("resellers.price").Value(10.0)))
+                    .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official"))))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -1653,9 +1654,10 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var expectedResponse = Client.Search<Product>(d => d.Index(index)
             .Query(q => q.Nested(n => n
                 .Path("resellers")
-                .Query(q2 => q2.Term(t => t.Field("resellers.name").Value("Official"))
-                    && q2.Term(t => t.Field("resellers.price").Value(10.0))
-                    && q2.Term(t => t.Field("resellers.name").Value("Official"))))));
+                .Query(q2 => q2.Bool(b => b
+                    .Must(m => m.Term(t => t.Field("resellers.name").Value("Official"))
+                        && m.Term(t => t.Field("resellers.price").Value(10.0)))
+                    .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official"))))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
@@ -1759,12 +1761,14 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .Query(q =>
                 q.Nested(n => n
                     .Path("resellers")
-                    .Query(q2 => q2.Term(t => t.Field("resellers.price").Value(10.0))
-                        && q2.Term(t => t.Field("resellers.name").Value("Official"))))
+                    .Query(q2 => q2.Bool(b => b
+                        .Must(m => m.Term(t => t.Field("resellers.price").Value(10.0)))
+                        .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official"))))))
                 && q.Nested(n => n
                     .Path("tags")
-                    .Query(q2 => q2.Term(t => t.Field("tags.label").Value("sale"))
-                        && q2.Term(t => t.Field("tags.label").Value("sale"))))));
+                    .Query(q2 => q2.Bool(b => b
+                        .Must(m => m.Term(t => t.Field("tags.label").Value("sale")))
+                        .Filter(f => f.Term(t => t.Field("tags.label").Value("sale"))))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
