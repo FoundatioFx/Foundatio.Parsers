@@ -1471,7 +1471,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         // Act
         var result = await processor.BuildQueryAsync("resellers.name:Official AND resellers.price:10", new ElasticQueryVisitorContext { UseScoring = true });
 
-        // Assert
+        // Assert — filter is applied to each child query before combining
         var actualResponse = Client.Search<Product>(d => d.Index(index).Query(_ => result));
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -1479,9 +1479,11 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var expectedResponse = Client.Search<Product>(d => d.Index(index)
             .Query(q => q.Nested(n => n
                 .Path("resellers")
-                .Query(q2 => q2.Term(t => t.Field("resellers.name").Value("Official"))
-                    && q2.Term(t => t.Field("resellers.price").Value(10.0))
-                    && q2.Term(t => t.Field("resellers.name").Value("Official"))))));
+                .Query(q2 =>
+                    (q2.Term(t => t.Field("resellers.name").Value("Official"))
+                        && q2.Term(t => t.Field("resellers.name").Value("Official")))
+                    && (q2.Term(t => t.Field("resellers.price").Value(10.0))
+                        && q2.Term(t => t.Field("resellers.name").Value("Official")))))));
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);

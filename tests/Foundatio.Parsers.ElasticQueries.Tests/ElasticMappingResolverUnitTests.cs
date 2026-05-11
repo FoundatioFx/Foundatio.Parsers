@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Xunit;
 using Microsoft.Extensions.Time.Testing;
 using Nest;
@@ -328,5 +329,190 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
                 { fieldName, new TextProperty { Name = fieldName } }
             }
         };
+    }
+
+    [Fact]
+    public void GetFieldType_WithUnsignedLongProperty_ReturnsLong()
+    {
+        // Arrange - NumberProperty with UnsignedLong type
+        var mapping = new TypeMapping
+        {
+            Properties = new Properties
+            {
+                { "counter", new NumberProperty(NumberType.UnsignedLong) { Name = "counter" } }
+            }
+        };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        // Act
+        var result = resolver.GetFieldType("counter");
+
+        // Assert
+        Assert.Equal(FieldType.Long, result);
+    }
+
+    [Fact]
+    public void GetFieldType_WithDateNanosProperty_ReturnsDate()
+    {
+        // Arrange
+        var mapping = new TypeMapping
+        {
+            Properties = new Properties
+            {
+                { "timestamp", new DateNanosProperty { Name = "timestamp" } }
+            }
+        };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        // Act
+        var result = resolver.GetFieldType("timestamp");
+
+        // Assert
+        Assert.Equal(FieldType.Date, result);
+    }
+
+    [Fact]
+    public void GetFieldType_WithSearchAsYouTypeProperty_ReturnsSearchAsYouType()
+    {
+        // Arrange
+        var mapping = new TypeMapping
+        {
+            Properties = new Properties
+            {
+                { "suggest", new SearchAsYouTypeProperty { Name = "suggest" } }
+            }
+        };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        // Act
+        var result = resolver.GetFieldType("suggest");
+
+        // Assert
+        Assert.Equal(FieldType.SearchAsYouType, result);
+    }
+
+    [Fact]
+    public void GetFieldType_WithConstantKeywordProperty_ReturnsKeyword()
+    {
+        // Arrange
+        var mapping = new TypeMapping
+        {
+            Properties = new Properties
+            {
+                { "tenant", new ConstantKeywordProperty { Name = "tenant" } }
+            }
+        };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        // Act
+        var result = resolver.GetFieldType("tenant");
+
+        // Assert
+        Assert.Equal(FieldType.Keyword, result);
+    }
+
+    [Fact]
+    public void GetFieldType_WithFlattenedProperty_ReturnsFlattened()
+    {
+        // Arrange
+        var mapping = new TypeMapping
+        {
+            Properties = new Properties
+            {
+                { "labels", new FlattenedProperty { Name = "labels" } }
+            }
+        };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        // Act
+        var result = resolver.GetFieldType("labels");
+
+        // Assert
+        Assert.Equal(FieldType.Flattened, result);
+    }
+
+    [Fact]
+    public void GetFieldType_WithJoinProperty_ReturnsJoin()
+    {
+        // Arrange
+        var mapping = new TypeMapping
+        {
+            Properties = new Properties
+            {
+                { "relation", new JoinProperty { Name = "relation" } }
+            }
+        };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        // Act
+        var result = resolver.GetFieldType("relation");
+
+        // Assert
+        Assert.Equal(FieldType.Join, result);
+    }
+
+    [Fact]
+    public void GetNestedProperty_WithMultiLevelNesting_ReturnsDeepestNestedPath()
+    {
+        // Arrange
+        var grandchildProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var childProps = new Properties
+        {
+            { "child", new NestedProperty { Name = "child", Properties = grandchildProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = childProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        // Act
+        bool parentIsNested = resolver.IsNestedPropertyType("parent");
+        bool childIsNested = resolver.IsNestedPropertyType("parent.child");
+
+        // Assert
+        Assert.True(parentIsNested);
+        Assert.True(childIsNested);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithNestedFilter_AppliesFilterPerChild()
+    {
+        // Arrange
+        var nestedChildProps = new Properties
+        {
+            { "status", new KeywordProperty { Name = "status" } },
+            { "priority", new KeywordProperty { Name = "priority" } }
+        };
+        var rootProps = new Properties
+        {
+            { "items", new NestedProperty { Name = "items", Properties = nestedChildProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        int filterCallCount = 0;
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested()
+            .UseNestedFilter((path, orig, resolved, ctx) =>
+            {
+                Interlocked.Increment(ref filterCallCount);
+                return path is "items"
+                    ? new TermQuery { Field = "items.visible", Value = true }
+                    : null;
+            }));
+
+        // Act
+        var query = await parser.BuildQueryAsync("items.status:active AND items.priority:high",
+            new ElasticQueryVisitorContext());
+
+        // Assert
+        Assert.NotNull(query);
+        Assert.True(filterCallCount >= 2, $"Filter should be called per child, got {filterCallCount} calls");
     }
 }
