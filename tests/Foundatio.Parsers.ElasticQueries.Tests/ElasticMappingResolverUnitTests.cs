@@ -613,6 +613,19 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.NotNull(branch1.Bool.Filter);
         Assert.Single(branch1.Bool.Must);
         Assert.Single(branch1.Bool.Filter);
+
+        using var s0 = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(branch0, s0);
+        string branch0Json = System.Text.Encoding.UTF8.GetString(s0.ToArray());
+
+        using var s1 = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(branch1, s1);
+        string branch1Json = System.Text.Encoding.UTF8.GetString(s1.ToArray());
+
+        Assert.Contains("items.status", branch0Json);
+        Assert.Contains("items.status_filter", branch0Json);
+        Assert.Contains("items.priority", branch1Json);
+        Assert.Contains("items.priority_filter", branch1Json);
     }
 
     [Fact]

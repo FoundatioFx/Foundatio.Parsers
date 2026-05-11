@@ -524,6 +524,8 @@ nested(path=parent, query=name:Bob AND nested(path=parent.child, query=name:Alic
 
 This ensures Elasticsearch evaluates both conditions against the same parent document.
 
+**Scope**: Correlated multi-level chain support applies to **query building** only. Sort and aggregation contexts still use the resolved deepest nested path directly (e.g., `NestedSort { Path = "parent.child" }`) without hierarchical nesting.
+
 **Limitation — negated multi-level children**: When a deeper nested field is negated (e.g., `parent.name:Bob AND NOT parent.child.name:Alice`), the negated clause is placed as `must_not` at the top level rather than inside the parent nested query. This produces two independent queries rather than the correlated form. This means the exclusion applies across all parent documents, not just the matching parent.
 
 Single-level nested queries (e.g., `parent.field1:value` where only `parent` is nested) work correctly in all cases including negation.
