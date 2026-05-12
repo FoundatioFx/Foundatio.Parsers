@@ -306,6 +306,8 @@ public static class DefaultQueryNodeExtensions
                         branches.Add(branch);
                     }
 
+                    if (branches.Count == 0) continue;
+
                     QueryContainer innerQuery = branches.Count == 1
                         ? branches[0]
                         : new BoolQuery { Should = branches };
