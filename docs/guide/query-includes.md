@@ -260,7 +260,7 @@ public class SavedSearchService
         return search?.Query;
     }
     
-    public async Task<QueryContainer> BuildQuery(string userQuery)
+    public async Task<Query> BuildQuery(string userQuery)
     {
         // User can reference saved searches: @include:my-filter AND category:books
         return await _parser.BuildQueryAsync(userQuery);

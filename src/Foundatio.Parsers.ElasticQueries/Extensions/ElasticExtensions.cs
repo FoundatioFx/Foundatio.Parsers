@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -6,17 +6,147 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Elasticsearch.Net;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Aggregations;
+using Elastic.Clients.Elasticsearch.Mapping;
+using Elastic.Clients.Elasticsearch.QueryDsl;
+using Elastic.Transport.Products.Elasticsearch;
 using Microsoft.Extensions.Logging;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class ElasticExtensions
 {
+    /// <summary>
+    /// Returns true when the query is a <see cref="BoolQuery"/> that contains only
+    /// filter clauses (no must, should, or must_not). Used to avoid double-wrapping
+    /// queries inside <c>bool { filter: [bool { filter: [...] }] }</c>.
+    /// </summary>
+    public static bool IsFilterOnlyBoolQuery(this Query query)
+    {
+        if (query?.Bool is not { } boolQuery)
+            return false;
+
+        return boolQuery.Filter is { Count: > 0 }
+            && (boolQuery.Must is null or { Count: 0 })
+            && (boolQuery.Should is null or { Count: 0 })
+            && (boolQuery.MustNot is null or { Count: 0 });
+    }
+
+    /// <summary>
+    /// Parses a Lucene query string and applies it as the query for the search request.
+    /// </summary>
+    public static async Task<SearchRequestDescriptor<TDocument>> QueryLuceneSyntaxAsync<TDocument>(
+        this SearchRequestDescriptor<TDocument> descriptor,
+        string query,
+        Action<ElasticQueryParserConfiguration>? configure = null)
+    {
+        var parser = new ElasticQueryParser(configure);
+        var elasticQuery = await parser.BuildQueryAsync(query).AnyContext();
+        return descriptor.Query(elasticQuery);
+    }
+
+    public static SearchRequestDescriptor<TDocument> QueryOnQueryString<TDocument>(
+        this SearchRequestDescriptor<TDocument> descriptor,
+        string query)
+    {
+        return descriptor.Query(q => q.QueryString(qs => qs.Query(query)));
+    }
+
+    public static SearchRequestDescriptor<TDocument> Aggregations<TDocument>(this SearchRequestDescriptor<TDocument> descriptor, AggregationMap? aggregations)
+    {
+        if (aggregations is null)
+            return descriptor;
+
+        return descriptor.Aggregations(aggregations.ToDictionary());
+    }
+
+    public static bool IsBucketAggregation(this object aggregation)
+    {
+        return aggregation is AdjacencyMatrixAggregation or AutoDateHistogramAggregation or CategorizeTextAggregation
+            or ChildrenAggregation or CompositeAggregation or DateHistogramAggregation or DateRangeAggregation
+            or DiversifiedSamplerAggregation or FiltersAggregation or FrequentItemSetsAggregation
+            or GeoDistanceAggregation or GeohashGridAggregation or GeohexGridAggregation or GeotileGridAggregation
+            or GlobalAggregation or HistogramAggregation or IpPrefixAggregation or IpRangeAggregation
+            or MissingAggregation or MultiTermsAggregation or NestedAggregation or ParentAggregation
+            or RandomSamplerAggregation or RangeAggregation or RareTermsAggregation or ReverseNestedAggregation
+            or SamplerAggregation or SignificantTermsAggregation or SignificantTextAggregation or TermsAggregation
+            or TimeSeriesAggregation or VariableWidthHistogramAggregation;
+    }
+
+    /// <summary>
+    /// Returns the sub-fields (multi-fields) of a property. The new
+    /// Elastic.Clients.Elasticsearch client removed the base
+    /// <c>IProperty.Fields</c> accessor, so each concrete type must be matched.
+    /// When upgrading the client, verify that newly added property types are
+    /// included here.
+    /// </summary>
+    public static Properties? GetFields(this IProperty property)
+    {
+        return property switch
+        {
+            AggregateMetricDoubleProperty p => p.Fields,
+            BinaryProperty p => p.Fields,
+            BooleanProperty p => p.Fields,
+            ByteNumberProperty p => p.Fields,
+            CompletionProperty p => p.Fields,
+            ConstantKeywordProperty p => p.Fields,
+            CountedKeywordProperty p => p.Fields,
+            DateNanosProperty p => p.Fields,
+            DateProperty p => p.Fields,
+            DateRangeProperty p => p.Fields,
+            DenseVectorProperty p => p.Fields,
+            DoubleNumberProperty p => p.Fields,
+            DoubleRangeProperty p => p.Fields,
+            DynamicProperty p => p.Fields,
+#if ELASTICSEARCH9
+            ExponentialHistogramProperty p => p.Fields,
+#endif
+            FieldAliasProperty p => p.Fields,
+            FlattenedProperty p => p.Fields,
+            FloatNumberProperty p => p.Fields,
+            FloatRangeProperty p => p.Fields,
+            GeoPointProperty p => p.Fields,
+            GeoShapeProperty p => p.Fields,
+            HalfFloatNumberProperty p => p.Fields,
+            HistogramProperty p => p.Fields,
+            IcuCollationProperty p => p.Fields,
+            IntegerNumberProperty p => p.Fields,
+            IntegerRangeProperty p => p.Fields,
+            IpProperty p => p.Fields,
+            IpRangeProperty p => p.Fields,
+            JoinProperty p => p.Fields,
+            KeywordProperty p => p.Fields,
+            LongNumberProperty p => p.Fields,
+            LongRangeProperty p => p.Fields,
+            MatchOnlyTextProperty p => p.Fields,
+            Murmur3HashProperty p => p.Fields,
+            NestedProperty p => p.Fields,
+            ObjectProperty p => p.Fields,
+            PassthroughObjectProperty p => p.Fields,
+            PercolatorProperty p => p.Fields,
+            PointProperty p => p.Fields,
+            RankFeatureProperty p => p.Fields,
+            RankFeaturesProperty p => p.Fields,
+            RankVectorProperty p => p.Fields,
+            ScaledFloatNumberProperty p => p.Fields,
+            SearchAsYouTypeProperty p => p.Fields,
+            SemanticTextProperty p => p.Fields,
+            ShapeProperty p => p.Fields,
+            ShortNumberProperty p => p.Fields,
+            SparseVectorProperty p => p.Fields,
+            TextProperty p => p.Fields,
+            TokenCountProperty p => p.Fields,
+            UnsignedLongNumberProperty p => p.Fields,
+            VersionProperty p => p.Fields,
+            WildcardProperty p => p.Fields,
+            _ => null
+        };
+    }
+
     public static TermsInclude AddValue(this TermsInclude include, string value)
     {
-        if (include?.Values == null)
+        if (include?.Values is null)
             return new TermsInclude([value]);
 
         var values = include.Values.ToList();
@@ -27,7 +157,7 @@ public static class ElasticExtensions
 
     public static TermsExclude AddValue(this TermsExclude exclude, string value)
     {
-        if (exclude?.Values == null)
+        if (exclude?.Values is null)
             return new TermsExclude([value]);
 
         var values = exclude.Values.ToList();
@@ -36,10 +166,9 @@ public static class ElasticExtensions
         return new TermsExclude(values);
     }
 
-    // TODO: Handle IFailureReason/BulkIndexByScrollFailure and other bulk response types.
-    public static string GetErrorMessage(this IElasticsearchResponse elasticResponse, string? message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
+    public static string GetErrorMessage(this ElasticsearchResponse elasticResponse, string? message = null, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
     {
-        if (elasticResponse == null)
+        if (elasticResponse is null)
             return String.Empty;
 
         var sb = new StringBuilder();
@@ -47,32 +176,31 @@ public static class ElasticExtensions
         if (!String.IsNullOrEmpty(message))
             sb.AppendLine(message);
 
-        var response = elasticResponse as IResponse;
-        if (includeDebugInformation && response?.DebugInformation != null)
-            sb.AppendLine(response.DebugInformation);
+        if (includeDebugInformation && elasticResponse.DebugInformation is not null)
+            sb.AppendLine(elasticResponse.DebugInformation);
 
-        if (response?.OriginalException != null)
-            sb.AppendLine($"Original: [{response.OriginalException.GetType().Name}] {response.OriginalException.Message}");
+        if (elasticResponse.TryGetOriginalException(out var exception) && exception is not null)
+            sb.AppendLine($"Original: [{exception.GetType().Name}] {exception.Message}");
 
-        if (response?.ServerError?.Error != null)
-            sb.AppendLine($"Server Error (Index={response.ServerError.Error.Index}): {response.ServerError.Error.Reason}");
+        if (elasticResponse.ElasticsearchServerError?.Error is not null)
+            sb.AppendLine($"Server Error (Index={elasticResponse.ElasticsearchServerError.Error.Index}): {elasticResponse.ElasticsearchServerError.Error.Reason}");
 
         if (elasticResponse is BulkResponse bulkResponse)
             sb.AppendLine($"Bulk: {String.Join("\r\n", bulkResponse.ItemsWithErrors.Select(i => i.Error))}");
 
-        if (elasticResponse.ApiCall != null)
-            sb.AppendLine($"[{elasticResponse.ApiCall.HttpStatusCode}] {elasticResponse.ApiCall.HttpMethod} {elasticResponse.ApiCall.Uri?.PathAndQuery}");
+        var apiCall = elasticResponse.ApiCallDetails;
+        if (apiCall is not null)
+            sb.AppendLine($"[{apiCall.HttpStatusCode}] {apiCall.HttpMethod} {apiCall.Uri?.PathAndQuery}");
 
-        if (elasticResponse.ApiCall?.RequestBodyInBytes != null)
+        if (apiCall is not null && apiCall.RequestBodyInBytes is not null)
         {
-            string body = Encoding.UTF8.GetString(elasticResponse.ApiCall.RequestBodyInBytes);
+            string body = Encoding.UTF8.GetString(apiCall.RequestBodyInBytes);
             if (normalize)
                 body = JsonUtility.Normalize(body);
             sb.AppendLine(body);
         }
 
-        var apiCall = response?.ApiCall;
-        if (includeResponse && apiCall?.ResponseBodyInBytes is not null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
+        if (includeResponse && apiCall is not null && apiCall.ResponseBodyInBytes is not null && apiCall.ResponseBodyInBytes.Length > 0 && apiCall.ResponseBodyInBytes.Length < 20000)
         {
             string body = Encoding.UTF8.GetString(apiCall.ResponseBodyInBytes);
             if (normalize)
@@ -88,53 +216,49 @@ public static class ElasticExtensions
         return sb.ToString();
     }
 
-    public static string GetRequest(this IElasticsearchResponse elasticResponse, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
+    public static string GetRequest(this ElasticsearchResponse elasticResponse, bool normalize = false, bool includeResponse = false, bool includeDebugInformation = false)
     {
         return GetErrorMessage(elasticResponse, null, normalize, includeResponse, includeDebugInformation);
     }
 
-    public static async Task<bool> WaitForReadyAsync(this IElasticClient client, CancellationToken cancellationToken, ILogger? logger = null)
+    public static async Task<bool> WaitForReadyAsync(this ElasticsearchClient client, CancellationToken cancellationToken, ILogger? logger = null)
     {
-        var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
+        var nodes = client.ElasticsearchClientSettings.NodePool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var pingResponse = await client.PingAsync(ct: cancellationToken);
-            if (pingResponse.IsValid)
+            var healthResponse = await client.Cluster.HealthAsync(cancellationToken).AnyContext();
+            if (healthResponse.IsValidResponse)
                 return true;
 
-            if (logger != null)
-                logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+            logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
-            await Task.Delay(1000, cancellationToken);
+            await Task.Delay(1000, cancellationToken).AnyContext();
         }
 
-        if (logger != null)
-            logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+        logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
     }
 
-    public static bool WaitForReady(this IElasticClient client, CancellationToken cancellationToken, ILogger? logger = null)
+    public static bool WaitForReady(this ElasticsearchClient client, CancellationToken cancellationToken, ILogger? logger = null)
     {
-        var nodes = client.ConnectionSettings.ConnectionPool.Nodes.Select(n => n.Uri.ToString());
+        var nodes = client.ElasticsearchClientSettings.NodePool.Nodes.Select(n => n.Uri.ToString());
         var startTime = DateTime.UtcNow;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var pingResponse = client.Ping();
-            if (pingResponse.IsValid)
+            var healthResponse = client.Cluster.Health();
+            if (healthResponse.IsValidResponse)
                 return true;
 
-            if (logger != null)
-                logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
+            logger?.LogInformation("Waiting for Elasticsearch to be ready {Server} after {Duration:g}...", nodes, DateTime.UtcNow.Subtract(startTime));
 
             Thread.Sleep(1000);
         }
 
-        if (logger != null)
-            logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
+        logger?.LogError("Unable to connect to Elasticsearch {Server} after attempting for {Duration:g}", nodes, DateTime.UtcNow.Subtract(startTime));
 
         return false;
     }
@@ -213,7 +337,6 @@ internal class JsonUtility
 
             default:
                 throw new NotImplementedException($"Kind: {element.ValueKind}");
-
         }
     }
 }

@@ -43,7 +43,7 @@ graph TD
     end
     
     subgraph output [Output]
-        ElasticQuery[NEST QueryContainer]
+        ElasticQuery[Elasticsearch Query]
         SqlQuery[Dynamic LINQ String]
         GeneratedQuery[Query String]
     end
@@ -142,7 +142,7 @@ var sqlQuery = await sqlParser.ToDynamicLinqAsync(queryString, context);
 | Package | Description |
 |---------|-------------|
 | `Foundatio.Parsers.LuceneQueries` | Core Lucene query parser and visitors |
-| `Foundatio.Parsers.ElasticQueries` | Elasticsearch/NEST integration |
+| `Foundatio.Parsers.ElasticQueries` | Elasticsearch integration |
 | `Foundatio.Parsers.SqlQueries` | SQL/Entity Framework Core integration |
 
 ## Next Steps

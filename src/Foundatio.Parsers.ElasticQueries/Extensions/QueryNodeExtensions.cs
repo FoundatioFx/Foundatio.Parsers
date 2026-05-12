@@ -1,27 +1,29 @@
 using System;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Core.Search;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.LuceneQueries.Nodes;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class QueryNodeExtensions
 {
     private const string QueryKey = "@Query";
-    public static Task<QueryBase?> GetQueryAsync(this IQueryNode node, Func<Task<QueryBase?>>? getDefaultValue = null)
+    public static Task<Query?> GetQueryAsync(this IQueryNode node, Func<Task<Query?>>? getDefaultValue = null)
     {
         if (!node.Data.TryGetValue(QueryKey, out object? value))
         {
-            if (getDefaultValue == null)
-                return Task.FromResult<QueryBase?>(null);
+            if (getDefaultValue is null)
+                return Task.FromResult<Query?>(null);
 
             return getDefaultValue.Invoke();
         }
 
-        return Task.FromResult(value as QueryBase);
+        return Task.FromResult(value as Query);
     }
 
-    public static void SetQuery(this IQueryNode node, QueryBase? container)
+    public static void SetQuery(this IQueryNode node, Query? container)
     {
         if (container is null)
             node.Data.Remove(QueryKey);
@@ -45,20 +47,20 @@ public static class QueryNodeExtensions
     }
 
     private const string AggregationKey = "@Aggregation";
-    public static Task<AggregationBase?> GetAggregationAsync(this IQueryNode node, Func<Task<AggregationBase?>>? getDefaultValue = null)
+    public static Task<AggregationMap?> GetAggregationAsync(this IQueryNode node, Func<Task<AggregationMap?>>? getDefaultValue = null)
     {
         if (!node.Data.TryGetValue(AggregationKey, out object? value))
         {
-            if (getDefaultValue == null)
-                return Task.FromResult<AggregationBase?>(null);
+            if (getDefaultValue is null)
+                return Task.FromResult<AggregationMap?>(null);
 
             return getDefaultValue.Invoke();
         }
 
-        return Task.FromResult(value as AggregationBase);
+        return Task.FromResult(value as AggregationMap);
     }
 
-    public static void SetAggregation(this IQueryNode node, AggregationBase aggregation)
+    public static void SetAggregation(this IQueryNode node, AggregationMap aggregation)
     {
         node.Data[AggregationKey] = aggregation;
     }
@@ -69,15 +71,15 @@ public static class QueryNodeExtensions
     }
 
     private const string SortKey = "@Sort";
-    public static IFieldSort? GetSort(this IQueryNode node, Func<IFieldSort>? getDefaultValue = null)
+    public static SortOptions? GetSort(this IQueryNode node, Func<SortOptions?>? getDefaultValue = null)
     {
         if (!node.Data.TryGetValue(SortKey, out object? value))
             return getDefaultValue?.Invoke();
 
-        return value as IFieldSort;
+        return value as SortOptions;
     }
 
-    public static void SetSort(this IQueryNode node, IFieldSort sort)
+    public static void SetSort(this IQueryNode node, SortOptions sort)
     {
         node.Data[SortKey] = sort;
     }
@@ -109,15 +111,15 @@ public static class QueryNodeExtensions
     }
 
     private const string NestedFilterKey = "@NestedFilter";
-    public static QueryContainer? GetNestedFilter(this IQueryNode node)
+    public static Query? GetNestedFilter(this IQueryNode node)
     {
         if (!node.Data.TryGetValue(NestedFilterKey, out object? value))
             return null;
 
-        return value as QueryContainer;
+        return value as Query;
     }
 
-    public static void SetNestedFilter(this IQueryNode node, QueryContainer filter)
+    public static void SetNestedFilter(this IQueryNode node, Query filter)
     {
         node.Data[NestedFilterKey] = filter;
     }

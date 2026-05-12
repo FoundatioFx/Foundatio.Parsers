@@ -1,9 +1,10 @@
 {
     "cSpell.words": [
+        "aggs",
+        "Foundatio",
         "Lucene",
         "Niemyjski",
-        "Xunit",
-        "aggs"
+        "Xunit"
     ],
     "msbuildProjectTools.nuget.includePreRelease": true
 }

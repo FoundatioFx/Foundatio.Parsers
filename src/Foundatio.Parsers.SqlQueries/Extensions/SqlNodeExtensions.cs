@@ -294,7 +294,7 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(".Contains(");
-                AppendField(builder, field, node.Term, context);
+                AppendField(builder, field, node.Term.Trim('*'), context);
                 builder.Append(")");
             }
 
@@ -310,15 +310,15 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(", ");
-                AppendField(builder, field, "\\\"" + node.Term + "*\\\"", context);
+                AppendField(builder, field, "\\\"" + node.Term.TrimEnd('*') + "*\\\"", context);
                 builder.Append(")");
             }
             else
             {
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
-                builder.Append(".Contains(");
-                AppendField(builder, field, node.Term, context);
+                builder.Append(".StartsWith(");
+                AppendField(builder, field, node.Term.TrimEnd('*'), context);
                 builder.Append(")");
             }
 

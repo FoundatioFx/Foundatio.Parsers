@@ -89,7 +89,7 @@ public class ChainedQueryVisitor : QueryNodeVisitorWithResultBase<IQueryNode?>, 
             if (current is null)
                 break;
 
-            current = await visitor.AcceptAsync(current, context).ConfigureAwait(false);
+            current = await visitor.AcceptAsync(current, context).AnyContext();
         }
 
         return current;

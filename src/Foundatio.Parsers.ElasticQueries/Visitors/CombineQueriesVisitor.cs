@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
@@ -14,14 +14,14 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 {
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        await base.VisitAsync(node, context).ConfigureAwait(false);
+        await base.VisitAsync(node, context).AnyContext();
 
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        QueryBase? query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).ConfigureAwait(false);
-        QueryBase? container = query;
-        var nested = query as NestedQuery;
+        Query? query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
+        Query? container = query;
+        var nested = query?.Nested;
 
         // Reset container for non-root nested groups so children combine into a fresh
         // query that becomes the NestedQuery's inner query at the end of this method.
@@ -30,12 +30,12 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         var op = GetEffectiveOperator(node, elasticContext);
 
-        var nestedQueries = new Dictionary<string, List<(IFieldQueryNode Node, QueryContainer InnerQuery)>>();
-        var regularQueries = new List<(IFieldQueryNode Node, QueryBase Query)>();
+        var nestedQueries = new Dictionary<string, List<(IFieldQueryNode Node, Query InnerQuery)>>();
+        var regularQueries = new List<(IFieldQueryNode Node, Query Query)>();
 
         foreach (var child in node.Children.OfType<IFieldQueryNode>())
         {
-            var childQuery = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).ConfigureAwait(false);
+            var childQuery = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).AnyContext();
             if (childQuery is null)
                 continue;
 
@@ -43,11 +43,12 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             // visit, so treat them as atomic queries rather than coalescing their inner queries.
             bool isExplicitNestedGroup = child is GroupNode groupChild && groupChild.GetNestedPath() is not null;
 
-            if (childQuery is NestedQuery childNested && childNested.Path is not null && !isExplicitNestedGroup)
+            var childNested = childQuery.Nested;
+            if (childNested is not null && childNested.Path is not null && !isExplicitNestedGroup)
             {
-                string pathKey = childNested.Path.Name;
+                string pathKey = childNested.Path.ToString();
                 if (!nestedQueries.ContainsKey(pathKey))
-                    nestedQueries[pathKey] = new List<(IFieldQueryNode, QueryContainer)>();
+                    nestedQueries[pathKey] = [];
                 nestedQueries[pathKey].Add((child, childNested.Query));
             }
             else
@@ -56,44 +57,69 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             }
         }
 
+        bool useScoring = elasticContext.UseScoring;
+
         foreach (var (child, childQuery) in regularQueries)
         {
-            QueryBase q = childQuery;
+            Query? q = childQuery;
             if (child.IsExcluded())
                 q = !q;
 
-            container = Combine(container, q, op);
+            container = Combine(container, q, op, useScoring);
         }
 
         // Build nested queries per path, then nest child paths inside parent paths
-        var builtNestedQueries = new Dictionary<string, QueryBase>();
-        var negatedNestedQueries = new Dictionary<string, List<QueryBase>>();
+        var builtNestedQueries = new Dictionary<string, Query>();
+        var negatedNestedQueries = new Dictionary<string, List<Query>>();
 
         foreach (var (path, pathQueries) in nestedQueries)
         {
-            QueryContainer? combinedInner = null;
+            Query? combinedInner = null;
+            List<Query>? filteredChildren = null;
+
             foreach (var (child, innerQuery) in pathQueries)
             {
-                QueryContainer q = innerQuery;
+                Query q = innerQuery;
 
                 var childFilter = child.GetNestedFilter();
                 if (childFilter is not null)
-                    q = new BoolQuery { Must = [q], Filter = [childFilter] };
-
-                if (child.IsExcluded())
                 {
-                    QueryBase negatedNested = new NestedQuery { Path = path, Query = q };
-                    if (!negatedNestedQueries.ContainsKey(path))
-                        negatedNestedQueries[path] = new List<QueryBase>();
-                    negatedNestedQueries[path].Add(negatedNested);
+                    q = ApplyNestedFilter(q, childFilter);
+                    if (child.IsExcluded())
+                    {
+                        if (!negatedNestedQueries.ContainsKey(path))
+                            negatedNestedQueries[path] = new List<Query>();
+                        negatedNestedQueries[path].Add(new NestedQuery(path, q));
+                        continue;
+                    }
+
+                    (filteredChildren ??= []).Add(q);
                     continue;
                 }
 
-                combinedInner = Combine(combinedInner, q, op);
+                if (child.IsExcluded())
+                {
+                    if (!negatedNestedQueries.ContainsKey(path))
+                        negatedNestedQueries[path] = new List<Query>();
+                    negatedNestedQueries[path].Add(new NestedQuery(path, q));
+                    continue;
+                }
+
+                combinedInner = Combine(combinedInner, q, op, useScoring);
+            }
+
+            if (filteredChildren is { Count: > 0 })
+            {
+                Query filteredQuery = filteredChildren.Count == 1
+                    ? filteredChildren[0]
+                    : op == GroupOperator.Or
+                        ? new BoolQuery { Should = filteredChildren }
+                        : new BoolQuery { Must = filteredChildren };
+                combinedInner = Combine(combinedInner, filteredQuery, op, useScoring);
             }
 
             if (combinedInner is not null)
-                builtNestedQueries[path] = new NestedQuery { Path = path, Query = combinedInner };
+                builtNestedQueries[path] = new NestedQuery(path, combinedInner);
         }
 
         // Nest child paths inside their parent paths (deepest first).
@@ -126,47 +152,68 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             if (parentPath is null)
                 continue;
 
-            // Ensure parent nested query exists as a container for child queries
-            if (!builtNestedQueries.TryGetValue(parentPath, out var parentEntry))
-            {
-                parentEntry = new NestedQuery { Path = parentPath };
-                builtNestedQueries[parentPath] = parentEntry;
-            }
+            // Collect child queries to fold into the parent nested query's inner query.
+            Query? childInner = null;
 
-            var parentNested = (NestedQuery)parentEntry;
-
-            // Fold positive child into parent
             if (builtNestedQueries.TryGetValue(childPath, out var childPositive))
             {
-                parentNested.Query = parentNested.Query is not null
-                    ? Combine(parentNested.Query, (QueryContainer)childPositive, op)
-                    : childPositive;
+                childInner = Combine(childInner, childPositive, op, useScoring);
                 builtNestedQueries.Remove(childPath);
             }
 
-            // Fold negated children into parent
             if (negatedNestedQueries.TryGetValue(childPath, out var childNegated))
             {
                 foreach (var negated in childNegated)
-                {
-                    parentNested.Query = parentNested.Query is not null
-                        ? Combine(parentNested.Query, !negated, op)
-                        : !negated;
-                }
+                    childInner = Combine(childInner, !negated, op, useScoring);
+
                 negatedNestedQueries.Remove(childPath);
+            }
+
+            if (childInner is null)
+                continue;
+
+            // Get or create the parent nested query, then fold child into its inner query.
+            if (builtNestedQueries.TryGetValue(parentPath, out var existingParent) && existingParent.Nested is { } parentNested)
+            {
+                parentNested.Query = Combine(parentNested.Query, childInner, op, useScoring)!;
+            }
+            else
+            {
+                builtNestedQueries[parentPath] = new NestedQuery(parentPath, childInner);
             }
         }
 
         foreach (var (_, nestedQuery) in builtNestedQueries)
         {
-            container = Combine(container, nestedQuery, op);
+            container = Combine(container, nestedQuery, op, useScoring);
         }
 
         // Any remaining negated nested queries that have no parent get combined at top level
         foreach (var (_, negatedList) in negatedNestedQueries)
         {
             foreach (var negated in negatedList)
-                container = Combine(container, !negated, op);
+                container = Combine(container, !negated, op, useScoring);
+        }
+
+        // If we have OR clauses and the container is a BoolQuery with only should clauses,
+        // set minimum_should_match = 1 so at least one clause must match.
+        if (op == GroupOperator.Or && container?.Bool is { } boolQuery)
+        {
+            bool isRootQuery = node.Parent is null;
+            bool parentUsesAndOperator = node.Parent is GroupNode parentGroup && parentGroup.GetOperator(elasticContext) == GroupOperator.And;
+            bool shouldSetMinimumShouldMatch = isRootQuery || (node.HasParens && parentUsesAndOperator);
+
+            if (shouldSetMinimumShouldMatch)
+            {
+                bool hasOnlyShouldClauses = boolQuery.Should is { Count: > 0 }
+                    && (boolQuery.Must is null or { Count: 0 })
+                    && (boolQuery.Filter is null or { Count: 0 });
+
+                if (hasOnlyShouldClauses && boolQuery.MinimumShouldMatch is null)
+                {
+                    boolQuery.MinimumShouldMatch = 1;
+                }
+            }
         }
 
         if (nested is not null)
@@ -177,11 +224,10 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
                 return;
             }
 
-            var nestedFilter = node.GetNestedFilter();
-            if (nestedFilter is not null)
+            var groupNestedFilter = node.GetNestedFilter();
+            if (groupNestedFilter is not null)
             {
-                QueryContainer inner = new BoolQuery { Must = [container], Filter = [nestedFilter] };
-                nested.Query = inner;
+                nested.Query = ApplyNestedFilter(container, groupNestedFilter);
             }
             else
             {
@@ -204,13 +250,25 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         return op;
     }
 
-    private static QueryBase? Combine(QueryBase? left, QueryBase right, GroupOperator op)
+    private static Query? Combine(Query? left, Query? right, GroupOperator op, bool useScoring = true)
     {
         if (left is null)
             return right;
+        if (right is null)
+            return left;
 
-        if (op is GroupOperator.And)
+        if (op == GroupOperator.And)
+        {
+            if (!useScoring)
+            {
+                var filters = new List<Query>();
+                AddToFilterList(filters, left);
+                AddToFilterList(filters, right);
+                return new BoolQuery { Filter = filters };
+            }
+
             return left & right;
+        }
 
         if (op is GroupOperator.Or)
             return left | right;
@@ -218,17 +276,42 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         return left;
     }
 
-    private static QueryContainer? Combine(QueryContainer? left, QueryContainer right, GroupOperator op)
+    private static void AddToFilterList(List<Query> filters, Query? query)
     {
-        if (left is null)
-            return right;
+        if (query is null)
+            return;
 
-        if (op is GroupOperator.And)
-            return left & right;
+        if (query.IsFilterOnlyBoolQuery() && query.Bool is { Filter: { } existingFilters })
+        {
+            filters.AddRange(existingFilters);
+        }
+        else
+        {
+            filters.Add(query);
+        }
+    }
 
-        if (op is GroupOperator.Or)
-            return left | right;
 
-        return left;
+    private static Query ApplyNestedFilter(Query query, Query? filter)
+    {
+        if (filter is null)
+            return query;
+
+        if (query.Bool is { } existingBool
+            && existingBool.Must is { Count: > 0 }
+            && existingBool.Should is null or { Count: 0 }
+            && existingBool.MustNot is null or { Count: 0 })
+        {
+            existingBool.Filter = existingBool.Filter is { Count: > 0 }
+                ? [..existingBool.Filter, filter]
+                : [filter];
+            return query;
+        }
+
+        return new BoolQuery
+        {
+            Must = [query],
+            Filter = [filter]
+        };
     }
 }

@@ -1,24 +1,27 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class DefaultQueryNodeExtensions
 {
-    public static async Task<QueryBase?> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
+    public static async Task<Query?> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
     {
         if (node is TermNode termNode)
             return await termNode.GetDefaultQueryAsync(context).ConfigureAwait(false);
 
         if (node is TermRangeNode termRangeNode)
-            return await termRangeNode.GetDefaultQueryAsync(context).ConfigureAwait(false);
+            return await termRangeNode.GetDefaultQueryAsync(context).AnyContext();
 
         if (node is ExistsNode existsNode)
             return existsNode.GetDefaultQuery(context);
@@ -29,7 +32,7 @@ public static class DefaultQueryNodeExtensions
         return null;
     }
 
-    public static async Task<QueryBase?> GetDefaultQueryAsync(this TermNode node, IQueryVisitorContext context)
+    public static async Task<Query?> GetDefaultQueryAsync(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -51,7 +54,7 @@ public static class DefaultQueryNodeExtensions
             string? nestedPath = GetNestedPath(defaultFields[0], elasticContext);
             if (nestedPath is not null)
             {
-                QueryContainer innerQuery = singleQuery;
+                Query innerQuery = singleQuery;
                 var filterResolver = GetNestedFilterResolver(elasticContext);
                 if (filterResolver is not null)
                 {
@@ -60,7 +63,7 @@ public static class DefaultQueryNodeExtensions
                         innerQuery = new BoolQuery { Must = [innerQuery], Filter = [filter] };
                 }
 
-                return new NestedQuery { Path = nestedPath, Query = innerQuery };
+                return new NestedQuery(nestedPath, innerQuery);
             }
 
             return singleQuery;
@@ -89,90 +92,70 @@ public static class DefaultQueryNodeExtensions
     /// Synchronous compatibility shim. Prefer <see cref="GetDefaultQueryAsync(TermNode, IQueryVisitorContext)"/> for async nested filter resolution.
     /// </summary>
     [Obsolete("Use GetDefaultQueryAsync to support async nested filter resolution.")]
-    public static QueryBase? GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
+    public static Query? GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
     {
         return GetDefaultQueryAsync(node, context).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
-    private static QueryBase? GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
+    private static Query? GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
     {
         if (context.MappingResolver.IsPropertyAnalyzed(field))
         {
-            // MatchQuery treats '*' as literal; PrefixQuery only works on non-analyzed fields.
-            if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") is true)
+            if (node.UnescapedTerm is not { } term)
+                return null;
+
+            // MatchQuery treats '*' as literal; use QueryStringQuery for wildcard support on analyzed fields
+            if (!node.IsQuotedTerm && term.EndsWith("*"))
             {
-                return new QueryStringQuery
+                return new QueryStringQuery(term)
                 {
-                    Fields = Infer.Fields(field),
+                    Fields = new[] { field },
                     AllowLeadingWildcard = false,
-                    AnalyzeWildcard = true,
-                    Query = node.UnescapedTerm
+                    AnalyzeWildcard = true
                 };
             }
 
             if (node.IsQuotedTerm)
-            {
-                return new MatchPhraseQuery
-                {
-                    Field = field,
-                    Query = node.UnescapedTerm
-                };
-            }
+                return new MatchPhraseQuery(field, term);
 
-            return new MatchQuery
-            {
-                Field = field,
-                Query = node.UnescapedTerm
-            };
+            return new MatchQuery(field, term);
         }
 
         if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") is true)
-        {
-            return new PrefixQuery
-            {
-                Field = field,
-                Value = node.UnescapedTerm.TrimEnd('*')
-            };
-        }
+            return new PrefixQuery(field, node.UnescapedTerm.TrimEnd('*'));
 
         if (node.UnescapedTerm is null)
             return null;
 
-        // For non-analyzed fields, try to convert value to appropriate type
-        object termValue = GetTypedValue(node.UnescapedTerm, field, context);
-
-        return new TermQuery
-        {
-            Field = field,
-            Value = termValue
-        };
+        // For non-analyzed fields, convert value to appropriate type
+        FieldValue termValue = GetTypedFieldValue(node.UnescapedTerm, field, context);
+        return new TermQuery(field, termValue);
     }
 
-    private static object GetTypedValue(string value, string field, IElasticQueryVisitorContext context)
+    private static FieldValue GetTypedFieldValue(string value, string field, IElasticQueryVisitorContext context)
     {
         var fieldType = context.MappingResolver.GetFieldType(field);
 
         return fieldType switch
         {
-            FieldType.Integer or FieldType.Short or FieldType.Byte when Int32.TryParse(value, out int intValue) => intValue,
-            FieldType.Long when Int64.TryParse(value, out long longValue) => longValue,
-            FieldType.Float or FieldType.HalfFloat when Single.TryParse(value, out float floatValue) => floatValue,
-            FieldType.Double or FieldType.ScaledFloat when Double.TryParse(value, out double doubleValue) => doubleValue,
+            FieldType.Integer or FieldType.Short or FieldType.Byte when Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue) => intValue,
+            FieldType.Long when Int64.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long longValue) => longValue,
+            FieldType.Float or FieldType.HalfFloat when Single.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue) => floatValue,
+            FieldType.Double or FieldType.ScaledFloat when Double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double doubleValue) => doubleValue,
             FieldType.Boolean when Boolean.TryParse(value, out bool boolValue) => boolValue,
-            _ => value // Return as string for other types (keyword, date, ip, etc.)
+            _ => value
         };
     }
 
-    private static QueryBase? GetMultiFieldQuery(TermNode node, string[]? fields, IElasticQueryVisitorContext context)
+    private static Query? GetMultiFieldQuery(TermNode node, string[]? fields, IElasticQueryVisitorContext context)
     {
         // Handle null or empty fields - use default multi_match behavior
         if (fields is null or { Length: 0 })
         {
-            var defaultQuery = new MultiMatchQuery
-            {
-                Fields = fields,
-                Query = node.UnescapedTerm
-            };
+            if (node.UnescapedTerm is null)
+                return null;
+
+            var defaultQuery = new MultiMatchQuery(node.UnescapedTerm);
             if (node.IsQuotedTerm)
                 defaultQuery.Type = TextQueryType.Phrase;
             return defaultQuery;
@@ -190,25 +173,19 @@ public static class DefaultQueryNodeExtensions
                 nonAnalyzedFields.Add(field);
         }
 
-        // If all fields are of the same type, use simple query
         if (nonAnalyzedFields.Count == 0)
-        {
             return GetAnalyzedFieldsQuery(node, analyzedFields.ToArray());
-        }
 
         if (analyzedFields.Count == 0)
-        {
             return GetNonAnalyzedFieldsQuery(node, nonAnalyzedFields, context);
-        }
 
         // multi_match doesn't work well across analyzed + non-analyzed field types,
         // so split into separate queries and combine with bool should.
-        var queries = new List<QueryBase>();
+        var queries = new List<Query>();
+        var analyzedQuery = GetAnalyzedFieldsQuery(node, analyzedFields.ToArray());
+        if (analyzedQuery is not null)
+            queries.Add(analyzedQuery);
 
-        // Add query for analyzed fields
-        queries.Add(GetAnalyzedFieldsQuery(node, analyzedFields.ToArray()));
-
-        // Add individual queries for non-analyzed fields
         foreach (string field in nonAnalyzedFields)
         {
             var query = GetSingleFieldQuery(node, field, context);
@@ -216,56 +193,47 @@ public static class DefaultQueryNodeExtensions
                 queries.Add(query);
         }
 
-        return new BoolQuery
-        {
-            Should = queries.Select(q => (QueryContainer)q).ToList()
-        };
+        return new BoolQuery { Should = queries };
     }
 
-    private static QueryBase GetAnalyzedFieldsQuery(TermNode node, string[] fields)
+    private static Query? GetAnalyzedFieldsQuery(TermNode node, string[] fields)
     {
-        if (!node.IsQuotedTerm && node.UnescapedTerm?.EndsWith("*") is true)
+        if (node.UnescapedTerm is not { } term)
+            return null;
+
+        if (!node.IsQuotedTerm && term.EndsWith("*"))
         {
-            return new QueryStringQuery
+            return new QueryStringQuery(term)
             {
                 Fields = fields,
                 AllowLeadingWildcard = false,
-                AnalyzeWildcard = true,
-                Query = node.UnescapedTerm
+                AnalyzeWildcard = true
             };
         }
 
         if (fields.Length == 1)
         {
             if (node.IsQuotedTerm)
-                return new MatchPhraseQuery { Field = fields[0], Query = node.UnescapedTerm };
+                return new MatchPhraseQuery(fields[0], term);
 
-            return new MatchQuery { Field = fields[0], Query = node.UnescapedTerm };
+            return new MatchQuery(fields[0], term);
         }
 
-        var query = new MultiMatchQuery
-        {
-            Fields = fields,
-            Query = node.UnescapedTerm
-        };
+        var query = new MultiMatchQuery(term);
+        query.Fields = fields;
         if (node.IsQuotedTerm)
             query.Type = TextQueryType.Phrase;
 
         return query;
     }
 
-    private static QueryBase? GetNonAnalyzedFieldsQuery(TermNode node, List<string> fields, IElasticQueryVisitorContext context)
+    private static Query? GetNonAnalyzedFieldsQuery(TermNode node, List<string> fields, IElasticQueryVisitorContext context)
     {
-        // For a single non-analyzed field, use single query
         if (fields.Count == 1)
             return GetSingleFieldQuery(node, fields[0], context);
 
-        // Multiple non-analyzed fields - combine with bool should
-        var queries = fields.Select(f => GetSingleFieldQuery(node, f, context)).Where(q => q is not null).ToList();
-        return new BoolQuery
-        {
-            Should = queries.Select(q => (QueryContainer)q).ToList()
-        };
+        var queries = fields.Select(f => GetSingleFieldQuery(node, f, context)).Where(q => q is not null).Cast<Query>().ToList();
+        return new BoolQuery { Should = queries };
     }
 
     private static Dictionary<string, List<string>> GroupFieldsByNestedPath(string[] fields, IElasticQueryVisitorContext context)
@@ -291,9 +259,9 @@ public static class DefaultQueryNodeExtensions
         return NestedPathResolver.GetDeepestNestedPath(fullName, context.MappingResolver);
     }
 
-    private static async Task<QueryBase> GetSplitNestedQueryAsync(TermNode node, Dictionary<string, List<string>> fieldsByNestedPath, IElasticQueryVisitorContext context)
+    private static async Task<Query> GetSplitNestedQueryAsync(TermNode node, Dictionary<string, List<string>> fieldsByNestedPath, IElasticQueryVisitorContext context)
     {
-        var queryContainers = new List<QueryContainer>();
+        var queryList = new List<Query>();
 
         foreach (var (nestedPath, fields) in fieldsByNestedPath)
         {
@@ -303,14 +271,14 @@ public static class DefaultQueryNodeExtensions
                 if (filterResolver is not null)
                 {
                     // Build per-field branches to preserve distinct filters
-                    var branches = new List<QueryContainer>();
+                    var branches = new List<Query>();
                     foreach (string field in fields)
                     {
                         var q = GetSingleFieldQuery(node, field, context);
                         if (q is null)
                             continue;
 
-                        QueryContainer branch = q;
+                        Query branch = q;
                         var filter = await filterResolver(nestedPath, field, field, context).ConfigureAwait(false);
                         if (filter is not null)
                             branch = new BoolQuery { Must = [branch], Filter = [filter] };
@@ -320,44 +288,45 @@ public static class DefaultQueryNodeExtensions
                     if (branches.Count is 0)
                         continue;
 
-                    QueryContainer innerQuery = branches.Count == 1
+                    Query innerQuery = branches.Count == 1
                         ? branches[0]
                         : new BoolQuery { Should = branches };
 
-                    queryContainers.Add(new NestedQuery { Path = nestedPath, Query = innerQuery });
+                    queryList.Add(new NestedQuery(nestedPath, innerQuery));
                 }
                 else
                 {
-                    QueryBase? query = fields.Count == 1
+                    Query? query = fields.Count == 1
                         ? GetSingleFieldQuery(node, fields[0], context)
                         : GetMultiFieldQuery(node, fields.ToArray(), context);
 
                     if (query is not null)
-                        queryContainers.Add(new NestedQuery { Path = nestedPath, Query = query });
+                        queryList.Add(new NestedQuery(nestedPath, query));
                 }
             }
             else
             {
-                QueryBase? query = fields.Count == 1
+                Query? query = fields.Count == 1
                     ? GetSingleFieldQuery(node, fields[0], context)
                     : GetMultiFieldQuery(node, fields.ToArray(), context);
 
                 if (query is null)
                     continue;
 
-                if (query is BoolQuery boolQuery && boolQuery.Should is not null)
+                // Flatten inner should clauses to avoid unnecessary bool nesting
+                if (query is { Bool: { Should: not null } boolQuery })
                 {
                     foreach (var shouldClause in boolQuery.Should)
-                        queryContainers.Add(shouldClause);
+                        queryList.Add(shouldClause);
                 }
                 else
                 {
-                    queryContainers.Add(query);
+                    queryList.Add(query);
                 }
             }
         }
 
-        return new BoolQuery { Should = queryContainers };
+        return new BoolQuery { Should = queryList };
     }
 
     private static NestedFilterResolver? GetNestedFilterResolver(IElasticQueryVisitorContext context)
@@ -369,71 +338,77 @@ public static class DefaultQueryNodeExtensions
         return null;
     }
 
-    public static async Task<QueryBase> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)
+    public static async Task<Query?> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
         string? field = node.UnescapedField;
+        if (String.IsNullOrEmpty(field))
+            return null;
+
         if (elasticContext.MappingResolver.IsDatePropertyType(field))
         {
-            var range = new DateRangeQuery { Field = field, TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().ConfigureAwait(false)) };
+            var range = new DateRangeQuery(field) { TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext()) };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
-                    range.GreaterThan = node.UnescapedMin;
+                    range.Gt = node.UnescapedMin;
                 else
-                    range.GreaterThanOrEqualTo = node.UnescapedMin;
+                    range.Gte = node.UnescapedMin;
             }
 
             if (!String.IsNullOrWhiteSpace(node.UnescapedMax) && node.UnescapedMax != "*")
             {
                 if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
-                    range.LessThan = node.UnescapedMax;
+                    range.Lt = node.UnescapedMax;
                 else
-                    range.LessThanOrEqualTo = node.UnescapedMax;
+                    range.Lte = node.UnescapedMax;
             }
 
             return range;
         }
         else
         {
-            var range = new TermRangeQuery { Field = field };
+            var range = new TermRangeQuery(field);
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {
                 if (node.MinInclusive.HasValue && !node.MinInclusive.Value)
-                    range.GreaterThan = node.UnescapedMin;
+                    range.Gt = node.UnescapedMin;
                 else
-                    range.GreaterThanOrEqualTo = node.UnescapedMin;
+                    range.Gte = node.UnescapedMin;
             }
 
             if (!String.IsNullOrWhiteSpace(node.UnescapedMax) && node.UnescapedMax != "*")
             {
                 if (node.MaxInclusive.HasValue && !node.MaxInclusive.Value)
-                    range.LessThan = node.UnescapedMax;
+                    range.Lt = node.UnescapedMax;
                 else
-                    range.LessThanOrEqualTo = node.UnescapedMax;
+                    range.Lte = node.UnescapedMax;
             }
 
             return range;
         }
     }
 
-    public static QueryBase GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context)
+    public static Query? GetDefaultQuery(this ExistsNode node, IQueryVisitorContext context)
     {
-        return new ExistsQuery { Field = node.UnescapedField };
+        if (node.UnescapedField is not { } field)
+            return null;
+
+        return new ExistsQuery(field);
     }
 
-    public static QueryBase GetDefaultQuery(this MissingNode node, IQueryVisitorContext context)
+    public static Query? GetDefaultQuery(this MissingNode node, IQueryVisitorContext context)
     {
+        if (node.UnescapedField is not { } field)
+            return null;
+
         return new BoolQuery
         {
             MustNot =
             [
-                new ExistsQuery
-                {
-                    Field = node.UnescapedField
-                }
+                new ExistsQuery(field)
             ]
         };
     }

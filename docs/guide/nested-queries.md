@@ -308,7 +308,7 @@ public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
 
     node.SetNestedPath(nestedProperty);
     if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
-        node.SetQuery(new NestedQuery { Path = nestedProperty });
+        node.SetQuery(new NestedQuery(nestedProperty, new MatchAllQuery()));
 
     return base.VisitAsync(node, context);
 }
@@ -331,7 +331,7 @@ private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisito
     else if (context.QueryType == QueryTypes.Query)
     {
         var innerQuery = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context));
-        node.SetQuery(new NestedQuery { Path = nestedProperty, Query = innerQuery });
+        node.SetQuery(new NestedQuery(nestedProperty, innerQuery));
     }
 }
 ```
@@ -368,10 +368,10 @@ When sorting by a nested field (e.g., `-nested.field4`), `NestedVisitor` tags th
 
 ```csharp
 // For -parent.child.score where parent and parent.child are both nested:
-sort.Nested = new NestedSort
+sort.Nested = new NestedSortValue
 {
     Path = "parent",
-    Nested = new NestedSort { Path = "parent.child" }
+    Nested = new NestedSortValue { Path = "parent.child" }
 };
 ```
 
@@ -459,7 +459,7 @@ The following nested query scenarios are fully supported with test coverage:
 | Field aliases to nested paths | `UseFieldMap({ "alias", "nested" })` | Supported |
 | Filtered nested query | `UseNestedFilter()` + `resellers.price:10` | Supported |
 | Filtered nested aggregation | `UseNestedFilter()` + `max:resellers.price` (FilterAgg wrapper) | Supported |
-| Filtered nested sort | `UseNestedFilter()` + `-resellers.price` (NestedSort.Filter) | Supported |
+| Filtered nested sort | `UseNestedFilter()` + `-resellers.price` (NestedSortValue.Filter) | Supported |
 | Multiple nested paths with different filters | `UseNestedFilter()` with path-based dispatch | Supported |
 
 ## Nested Filter Resolver
@@ -468,13 +468,13 @@ When a single nested array contains documents of different logical types (e.g., 
 
 ### How It Works
 
-1. **`NestedVisitor`** calls the resolver whenever a node introduces or participates in a nested scope. For standalone nested field nodes (e.g., `resellers.price:10`), the resolver is called for each field. For explicit nested groups (e.g., `resellers:(resellers.name:x resellers.price:10)`), inner field nodes are skipped and the resolver is called once on the group node. If the resolver returns a non-null `QueryContainer`, it is stored as `@NestedFilter` metadata on that node.
+1. **`NestedVisitor`** calls the resolver whenever a node introduces or participates in a nested scope. For standalone nested field nodes (e.g., `resellers.price:10`), the resolver is called for each field. For explicit nested groups (e.g., `resellers:(resellers.name:x resellers.price:10)`), inner field nodes are skipped and the resolver is called once on the group node. If the resolver returns a non-null `Query`, it is stored as `@NestedFilter` metadata on that node.
 
 2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and combines the filter into each child's query (in `bool.filter` context) before combining with the group operator. This ensures correct semantics for both AND and OR groups — each child query is individually constrained by its filter. For explicit grouped nested queries, the filter stored on the group node is applied to the group's inner query.
 
 3. **`CombineAggregationsVisitor`** reads the `@NestedFilter` and wraps each inner aggregation in a `FilterAggregation` before adding it to the `NestedAggregation`.
 
-4. **`DefaultSortNodeExtensions`** reads the `@NestedFilter` and sets `NestedSort.Filter`.
+4. **`DefaultSortNodeExtensions`** reads the `@NestedFilter` and sets `NestedSortValue.Filter`.
 
 ### Configuration
 
@@ -484,7 +484,7 @@ var parser = new ElasticQueryParser(c => c
     .UseNestedFilter((nestedPath, originalField, resolvedField, context) =>
     {
         if (nestedPath is "resellers")
-            return new TermQuery { Field = "resellers.type", Value = "official" };
+            return new TermQuery("resellers.type", "official");
 
         return null;
     })
@@ -494,7 +494,7 @@ var parser = new ElasticQueryParser(c => c
 ### Delegate Signature
 
 ```csharp
-public delegate Task<QueryContainer> NestedFilterResolver(
+public delegate Task<Query?> NestedFilterResolver(
     string nestedPath,       // e.g., "resellers"
     string originalField,    // field name before alias resolution
     string resolvedField,    // field name after alias resolution

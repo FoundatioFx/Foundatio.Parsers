@@ -45,7 +45,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
 
         try
         {
-            string? includedQuery = await includeResolver(node.Term).ConfigureAwait(false);
+            string? includedQuery = await includeResolver(node.Term).AnyContext();
             if (includedQuery == null)
             {
                 context.AddValidationError($"Unresolved {_includeName} ({node.Term})");
@@ -57,11 +57,11 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
 
             includeStack.Push(node.Term);
 
-            var parsed = await _parser.ParseAsync(includedQuery).ConfigureAwait(false)
+            var parsed = await _parser.ParseAsync(includedQuery).AnyContext()
                 ?? throw new InvalidOperationException($"Parser returned null for included query: {includedQuery}");
             var result = (GroupNode)parsed;
             result.HasParens = true;
-            await VisitAsync(result, context).ConfigureAwait(false);
+            await VisitAsync(result, context).AnyContext();
 
             includeStack.Pop();
 

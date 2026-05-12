@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
-using Nest;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
