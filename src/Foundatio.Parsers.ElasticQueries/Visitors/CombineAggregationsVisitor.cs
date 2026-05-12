@@ -240,17 +240,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext elasticContext)
             return [deepestPath];
 
-        var pathSegments = deepestPath.Split('.');
-        var nestedPaths = new List<string>();
-        string current = "";
-        for (int i = 0; i < pathSegments.Length; i++)
-        {
-            current = i == 0 ? pathSegments[i] : $"{current}.{pathSegments[i]}";
-            if (elasticContext.MappingResolver.IsNestedPropertyType(current))
-                nestedPaths.Add(current);
-        }
-
-        return nestedPaths.Count > 0 ? nestedPaths : [deepestPath];
+        return NestedPathResolver.GetNestedPathChain(deepestPath, elasticContext.MappingResolver);
     }
 
     private static string BuildHierarchicalBucketPathPrefix(
@@ -259,15 +249,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext elasticContext)
             return $"nested_{deepestPath}>";
 
-        var pathSegments = deepestPath.Split('.');
-        var nestedPaths = new List<string>();
-        string current = "";
-        for (int i = 0; i < pathSegments.Length; i++)
-        {
-            current = i == 0 ? pathSegments[i] : $"{current}.{pathSegments[i]}";
-            if (elasticContext.MappingResolver.IsNestedPropertyType(current))
-                nestedPaths.Add(current);
-        }
+        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, elasticContext.MappingResolver);
 
         if (nestedPaths.Count <= 1)
             return $"nested_{deepestPath}>";

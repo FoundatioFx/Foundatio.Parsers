@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -1226,20 +1227,39 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Assert — both aggs are under same nested_parent wrapper, child is under nested_parent.child inside it
         Assert.NotNull(aggs);
 
+        // Serialize to JSON and parse to validate structural hierarchy
         using var stream = new System.IO.MemoryStream();
         new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(aggs, stream);
         string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
 
-        Assert.Contains("nested_parent", json);
-        Assert.Contains("\"path\":\"parent\"", json);
-        Assert.Contains("nested_parent.child", json);
-        Assert.Contains("\"path\":\"parent.child\"", json);
-        Assert.Contains("terms_parent.name", json);
-        Assert.Contains("terms_parent.child.name", json);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var root = doc.RootElement;
 
-        // Verify nested_parent.child is nested inside nested_parent
-        int nestedParentChildCount = json.Split("nested_parent.child").Length - 1;
-        Assert.True(nestedParentChildCount >= 1, "Expected nested_parent.child to appear in the JSON");
+        // The root is a ChildrenAggregation container; sub-aggregations are in "aggs"
+        Assert.True(root.TryGetProperty("aggs", out var topAggs) || root.TryGetProperty("aggregations", out topAggs),
+            $"Root should contain aggs or aggregations. Actual JSON: {json}");
+
+        // Top-level aggs should contain nested_parent
+        Assert.True(topAggs.TryGetProperty("nested_parent", out var nestedParentEl),
+            $"Top aggs should contain nested_parent. Actual JSON: {json}");
+        Assert.True(nestedParentEl.TryGetProperty("nested", out var nestedDef), "nested_parent should have nested definition");
+        Assert.Equal("parent", nestedDef.GetProperty("path").GetString());
+
+        // nested_parent should have aggregations including terms_parent.name
+        Assert.True(nestedParentEl.TryGetProperty("aggs", out var parentAggs) || nestedParentEl.TryGetProperty("aggregations", out parentAggs),
+            "nested_parent should have aggs");
+        Assert.True(parentAggs.TryGetProperty("terms_parent.name", out _), "nested_parent should contain terms_parent.name");
+
+        // nested_parent should have nested_parent.child
+        Assert.True(parentAggs.TryGetProperty("nested_parent.child", out var nestedChildEl),
+            "nested_parent should contain nested_parent.child");
+        Assert.True(nestedChildEl.TryGetProperty("nested", out var childNestedDef), "nested_parent.child should have nested definition");
+        Assert.Equal("parent.child", childNestedDef.GetProperty("path").GetString());
+
+        // nested_parent.child should have terms_parent.child.name
+        Assert.True(nestedChildEl.TryGetProperty("aggs", out var childAggs) || nestedChildEl.TryGetProperty("aggregations", out childAggs),
+            "nested_parent.child should have aggs");
+        Assert.True(childAggs.TryGetProperty("terms_parent.child.name", out _), "nested_parent.child should contain terms_parent.child.name");
     }
 
     [Fact]

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -280,26 +279,7 @@ public static class DefaultQueryNodeExtensions
 
     private static string? GetNestedPath(string fullName, IElasticQueryVisitorContext context)
     {
-        string[]? nameParts = fullName?.Split('.');
-
-        if (nameParts is null or { Length: 0 })
-            return null;
-
-        var builder = new StringBuilder();
-        string? deepestNestedPath = null;
-        for (int i = 0; i < nameParts.Length; i++)
-        {
-            if (i > 0)
-                builder.Append('.');
-
-            builder.Append(nameParts[i]);
-
-            string fieldName = builder.ToString();
-            if (context.MappingResolver.IsNestedPropertyType(fieldName))
-                deepestNestedPath = fieldName;
-        }
-
-        return deepestNestedPath;
+        return NestedPathResolver.GetDeepestNestedPath(fullName, context.MappingResolver);
     }
 
     private static async Task<QueryBase> GetSplitNestedQueryAsync(TermNode node, Dictionary<string, List<string>> fieldsByNestedPath, IElasticQueryVisitorContext context)

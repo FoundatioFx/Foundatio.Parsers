@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries;
@@ -144,25 +143,9 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private static string? GetNestedProperty(string? fullName, IQueryVisitorContext context)
     {
-        string[]? nameParts = fullName?.Split('.');
-
-        if (nameParts is null || context is not IElasticQueryVisitorContext elasticContext || nameParts is { Length: 0 })
+        if (fullName is null || context is not IElasticQueryVisitorContext elasticContext)
             return null;
 
-        var builder = new StringBuilder();
-        string? deepestNestedPath = null;
-        for (int i = 0; i < nameParts.Length; i++)
-        {
-            if (i > 0)
-                builder.Append('.');
-
-            builder.Append(nameParts[i]);
-
-            string fieldName = builder.ToString();
-            if (elasticContext.MappingResolver.IsNestedPropertyType(fieldName))
-                deepestNestedPath = fieldName;
-        }
-
-        return deepestNestedPath;
+        return NestedPathResolver.GetDeepestNestedPath(fullName, elasticContext.MappingResolver);
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -37,16 +36,7 @@ public static class DefaultSortNodeExtensions
     private static NestedSort BuildHierarchicalNestedSort(
         string deepestPath, QueryContainer? filter, IElasticQueryVisitorContext context)
     {
-        var pathSegments = deepestPath.Split('.');
-        var nestedPaths = new List<string>();
-
-        string current = "";
-        for (int i = 0; i < pathSegments.Length; i++)
-        {
-            current = i == 0 ? pathSegments[i] : $"{current}.{pathSegments[i]}";
-            if (context.MappingResolver.IsNestedPropertyType(current))
-                nestedPaths.Add(current);
-        }
+        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, context.MappingResolver);
 
         if (nestedPaths.Count <= 1)
         {
