@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
@@ -137,10 +138,10 @@ public static class DefaultQueryNodeExtensions
 
         return fieldType switch
         {
-            FieldType.Integer or FieldType.Short or FieldType.Byte when Int32.TryParse(value, out int intValue) => intValue,
-            FieldType.Long when Int64.TryParse(value, out long longValue) => longValue,
-            FieldType.Float or FieldType.HalfFloat when Single.TryParse(value, out float floatValue) => floatValue,
-            FieldType.Double or FieldType.ScaledFloat when Double.TryParse(value, out double doubleValue) => doubleValue,
+            FieldType.Integer or FieldType.Short or FieldType.Byte when Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue) => intValue,
+            FieldType.Long when Int64.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long longValue) => longValue,
+            FieldType.Float or FieldType.HalfFloat when Single.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue) => floatValue,
+            FieldType.Double or FieldType.ScaledFloat when Double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double doubleValue) => doubleValue,
             FieldType.Boolean when Boolean.TryParse(value, out bool boolValue) => boolValue,
             _ => value
         };

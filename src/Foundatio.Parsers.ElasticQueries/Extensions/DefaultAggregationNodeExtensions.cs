@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
@@ -72,7 +73,7 @@ public static class DefaultAggregationNodeExtensions
 
             case AggregationType.GeoHashGrid:
                 var precision = new GeohashPrecision(1);
-                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out int parsedPrecision))
+                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedPrecision))
                 {
                     if (parsedPrecision is >= 1 and <= 12)
                     {
@@ -204,7 +205,7 @@ public static class DefaultAggregationNodeExtensions
 
             case AggregationType.GeoHashGrid:
                 var precision = new GeohashPrecision(1);
-                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out int parsedPrecision))
+                if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedPrecision))
                 {
                     if (parsedPrecision is >= 1 and <= 12)
                     {
@@ -255,7 +256,7 @@ public static class DefaultAggregationNodeExtensions
             percents = new List<double>();
             foreach (string ps in percentStrings)
             {
-                if (Double.TryParse(ps, out double percent))
+                if (Double.TryParse(ps, NumberStyles.Float, CultureInfo.InvariantCulture, out double percent))
                     percents.Add(percent);
             }
         }
@@ -270,7 +271,7 @@ public static class DefaultAggregationNodeExtensions
     private static AggregationMap GetHistogramAggregation(string originalField, string field, string? proximity, string? boost, IQueryVisitorContext context)
     {
         double interval = 50;
-        if (Double.TryParse(proximity, out double prox))
+        if (Double.TryParse(proximity, NumberStyles.Float, CultureInfo.InvariantCulture, out double prox))
             interval = prox;
 
         return new AggregationMap(originalField, new HistogramAggregation
@@ -385,7 +386,7 @@ public static class DefaultAggregationNodeExtensions
 
     public static int? GetProximityAsInt32(this IFieldQueryWithProximityAndBoostNode node)
     {
-        if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, out int parsedValue))
+        if (!String.IsNullOrEmpty(node.UnescapedProximity) && Int32.TryParse(node.UnescapedProximity, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedValue))
             return parsedValue;
 
         return null;
@@ -393,7 +394,7 @@ public static class DefaultAggregationNodeExtensions
 
     public static int? GetBoostAsInt32(this IFieldQueryWithProximityAndBoostNode node)
     {
-        if (!String.IsNullOrEmpty(node.UnescapedBoost) && Int32.TryParse(node.UnescapedBoost, out int parsedValue))
+        if (!String.IsNullOrEmpty(node.UnescapedBoost) && Int32.TryParse(node.UnescapedBoost, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedValue))
             return parsedValue;
 
         return null;
@@ -401,7 +402,7 @@ public static class DefaultAggregationNodeExtensions
 
     public static double? GetProximityAsDouble(this IFieldQueryWithProximityAndBoostNode node)
     {
-        if (!String.IsNullOrEmpty(node.UnescapedProximity) && Double.TryParse(node.UnescapedProximity, out double parsedValue))
+        if (!String.IsNullOrEmpty(node.UnescapedProximity) && Double.TryParse(node.UnescapedProximity, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsedValue))
             return parsedValue;
 
         return null;
@@ -409,7 +410,7 @@ public static class DefaultAggregationNodeExtensions
 
     public static double? GetBoostAsDouble(this IFieldQueryWithProximityAndBoostNode node)
     {
-        if (!String.IsNullOrEmpty(node.UnescapedBoost) && Double.TryParse(node.UnescapedBoost, out double parsedValue))
+        if (!String.IsNullOrEmpty(node.UnescapedBoost) && Double.TryParse(node.UnescapedBoost, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsedValue))
             return parsedValue;
 
         return null;
@@ -458,7 +459,7 @@ public static class DefaultAggregationNodeExtensions
                     termsAggregation.Missing = termNode.UnescapedTerm; break;
                 case "@min":
                     {
-                        if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, out int minCount))
+                        if (!String.IsNullOrEmpty(termNode.Term) && Int32.TryParse(termNode.UnescapedTerm, NumberStyles.Integer, CultureInfo.InvariantCulture, out int minCount))
                             termsAggregation.MinDocCount = minCount;
                         break;
                     }

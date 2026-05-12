@@ -81,7 +81,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
                 var childFilter = child.GetNestedFilter();
                 if (childFilter is not null)
-                    q = q & childFilter;
+                    q = ApplyNestedFilter(q, childFilter);
 
                 if (child.IsExcluded())
                 {
@@ -200,8 +200,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             var groupNestedFilter = node.GetNestedFilter();
             if (groupNestedFilter is not null)
             {
-                Query inner = container & groupNestedFilter;
-                nested.Query = inner;
+                nested.Query = ApplyNestedFilter(container, groupNestedFilter);
             }
             else
             {
@@ -263,5 +262,17 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         {
             filters.Add(query);
         }
+    }
+
+    private static Query ApplyNestedFilter(Query query, Query? filter)
+    {
+        if (filter is null)
+            return query;
+
+        return new BoolQuery
+        {
+            Must = [query],
+            Filter = [filter]
+        };
     }
 }

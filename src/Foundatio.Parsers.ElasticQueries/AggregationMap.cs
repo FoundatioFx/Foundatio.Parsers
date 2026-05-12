@@ -28,17 +28,26 @@ public class AggregationFilterQuery(Query query)
 /// </summary>
 public class AggregationMap
 {
-    public AggregationMap(string name, object value)
+    public AggregationMap(string name, object? value)
     {
         Name = name;
         Value = value;
     }
 
+    /// <summary>
+    /// Creates a root container that holds top-level aggregations without itself representing
+    /// a named Elasticsearch aggregation. Used internally during tree construction.
+    /// </summary>
+    public static AggregationMap Root() => new(String.Empty, null);
+
     /// <summary>The aggregation name used as the dictionary key in the Elasticsearch request.</summary>
     public string Name { get; set; }
 
-    /// <summary>The concrete aggregation instance (e.g. <see cref="TermsAggregation"/>, <see cref="MinAggregation"/>).</summary>
-    public object Value { get; set; }
+    /// <summary>
+    /// The concrete aggregation instance (e.g. <see cref="TermsAggregation"/>, <see cref="MinAggregation"/>),
+    /// or <c>null</c> for root containers that only hold child aggregations.
+    /// </summary>
+    public object? Value { get; set; }
 
     /// <summary>Child (sub) aggregations nested under this bucket aggregation.</summary>
     public List<AggregationMap> Aggregations { get; } = [];

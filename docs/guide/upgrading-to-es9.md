@@ -1,6 +1,8 @@
-# Migrating to Elastic.Clients.Elasticsearch (ES 9)
+# Migrating to Elastic.Clients.Elasticsearch
 
-This guide covers breaking changes when upgrading Foundatio.Parsers.ElasticQueries from `NEST` (ES 7) to `Elastic.Clients.Elasticsearch` (ES 9). This is a major version bump to **v8.0**.
+This guide covers breaking changes when upgrading Foundatio.Parsers.ElasticQueries from `NEST` (7.x) to `Elastic.Clients.Elasticsearch` (8.x). This is a major version bump to **Foundatio.Parsers 8.0**.
+
+> **Note:** Foundatio.Parsers 8.0 uses the `Elastic.Clients.Elasticsearch` 8.19.x package and is validated against Elasticsearch 9.x servers. The new .NET client package (8.x) is the official successor to NEST and supports both Elasticsearch 8.x and 9.x clusters.
 
 ## Package Changes
 
@@ -33,7 +35,7 @@ using Elastic.Clients.Elasticsearch.IndexManagement;
 
 ## Client Type Changes
 
-| Before (NEST)          | After (ES 9.x)               |
+| Before (NEST)          | After (new client)            |
 |------------------------|-------------------------------|
 | `IElasticClient`       | `ElasticsearchClient`         |
 | `ElasticClient`        | `ElasticsearchClient`         |
@@ -108,7 +110,7 @@ var response = await client.SearchAsync<MyDoc>(s => s
 ```
 
 ::: tip
-The deleted `SearchDescriptorExtensions.Sort()` extension is no longer needed. The ES 9.x `SearchRequestDescriptor<T>.Sort()` accepts `ICollection<SortOptions>` natively.
+The deleted `SearchDescriptorExtensions.Sort()` extension is no longer needed. The new client's `SearchRequestDescriptor<T>.Sort()` accepts `ICollection<SortOptions>` natively.
 :::
 
 ### UseMappings
@@ -149,7 +151,7 @@ Other `UseMappings` overload changes:
 
 All query types changed from object-initializer style to constructor-based:
 
-| Before (NEST)                                                       | After (ES 9.x)                                        |
+| Before (NEST)                                                       | After (new client)                                    |
 |---------------------------------------------------------------------|-------------------------------------------------------|
 | `new MatchQuery { Field = "f", Query = "v" }`                      | `new MatchQuery("f", "v")`                            |
 | `new MatchPhraseQuery { Field = "f", Query = "v" }`                | `new MatchPhraseQuery("f", "v")`                      |
@@ -181,7 +183,7 @@ var boolQuery = new BoolQuery
 
 ## Aggregation Changes
 
-`AggregationBase` and `AggregationContainer` are replaced by `AggregationMap`, a custom intermediate type that bridges the gap between the parser's tree-building phase and the ES 9.x client's discriminated-union `Aggregation` type.
+`AggregationBase` and `AggregationContainer` are replaced by `AggregationMap`, a custom intermediate type that bridges the gap between the parser's tree-building phase and the new client's discriminated-union `Aggregation` type.
 
 **Before:**
 ```csharp
@@ -198,7 +200,7 @@ IDictionary<string, Aggregation> dict = aggs.ToDictionary();
 
 ## Sort Changes
 
-| Before (NEST)            | After (ES 9.x)  |
+| Before (NEST)            | After (new client)  |
 |--------------------------|------------------|
 | `IFieldSort`             | `SortOptions`    |
 | `ISort`                  | `SortOptions`    |
@@ -209,9 +211,9 @@ The `SearchDescriptorExtensions.Sort()` extension method has been removed. Use t
 
 ## Property Mapping Changes
 
-The ES 9.x client uses a simpler expression-based syntax:
+The new client uses a simpler expression-based syntax:
 
-| Before (NEST)                                                | After (ES 9.x)                                     |
+| Before (NEST)                                                | After (new client)                                  |
 |--------------------------------------------------------------|-----------------------------------------------------|
 | `.Keyword(f => f.Name(e => e.Id))`                           | `.Keyword(e => e.Id)`                               |
 | `.Text(f => f.Name(e => e.Name))`                            | `.Text(e => e.Name)`                                |
@@ -274,7 +276,7 @@ This enables per-request geo location resolution (e.g., converting zip codes to 
 
 ## Response Validation
 
-| Before (NEST)              | After (ES 9.x)                |
+| Before (NEST)              | After (new client)                |
 |----------------------------|-------------------------------|
 | `response.IsValid`         | `response.IsValidResponse`    |
 
@@ -288,7 +290,7 @@ Non-scoring queries now produce flat `bool { filter: [a, b, c] }` instead of nes
 
 ### Explicit minimum_should_match on OR queries
 
-NEST's `|` operator implicitly set `minimum_should_match: 1`. The ES 9.x client does not, so the parser now explicitly sets it on root-level OR queries and parenthesized OR groups inside AND context.
+NEST's `|` operator implicitly set `minimum_should_match: 1`. The new `Elastic.Clients.Elasticsearch` client does not, so the parser now explicitly sets it on root-level OR queries and parenthesized OR groups inside AND context.
 
 ### Nested query negation
 
@@ -296,7 +298,7 @@ Negated nested terms (e.g., `NOT nested.field:value`) now negate the entire `Nes
 
 ### Integer fields map to long
 
-ES 9.x auto-mapping maps C# `int` properties to `long` instead of `integer`. This means `@field_type` metadata on aggregations will report `"long"` instead of `"integer"` for `int`-typed fields.
+The new client's auto-mapping maps C# `int` properties to `long` instead of `integer`. This means `@field_type` metadata on aggregations will report `"long"` instead of `"integer"` for `int`-typed fields.
 
 ## Migration Checklist
 

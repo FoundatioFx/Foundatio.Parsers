@@ -177,7 +177,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         if (container is null)
         {
-            container = new AggregationMap(string.Empty, null!);
+            container = AggregationMap.Root();
             currentNode!.SetAggregation(container);
         }
 

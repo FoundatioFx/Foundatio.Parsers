@@ -190,10 +190,12 @@ Console.WriteLine($"Complexity: {complexity}");
 This example shows a visitor that resolves custom filter syntax to Elasticsearch queries:
 
 ```csharp
+using System.Linq;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 
 /// <summary>
 /// Resolves @custom:(filter) syntax to actual queries.
@@ -217,11 +219,9 @@ public class CustomFilterVisitor : ChainableQueryVisitor
             
             if (query != null)
             {
-                // Set the resolved query on the parent node
-                node.Parent?.SetQuery(query);
+                node.SetQuery(query);
             }
             
-            // Clear the node's children (they've been processed)
             node.Left = null;
             node.Right = null;
         }
@@ -243,7 +243,11 @@ public class CustomFilterVisitor : ChainableQueryVisitor
         {
             case "premium":
                 var premiumIds = await _userService.GetPremiumUserIdsAsync();
-                return new TermsQuery { Field = "user_id", Terms = premiumIds };
+                return new TermsQuery
+                {
+                    Field = "user_id",
+                    Terms = new TermsQueryField(premiumIds.Select(id => FieldValue.String(id)).ToList())
+                };
             
             case "active":
                 return new TermQuery("status", "active");

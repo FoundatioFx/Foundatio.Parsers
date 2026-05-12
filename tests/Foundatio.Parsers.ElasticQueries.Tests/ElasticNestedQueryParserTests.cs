@@ -1297,7 +1297,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
             .UseNestedFilter((path, orig, resolved, ctx) =>
-                path is "resellers" ? (Query?)new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+                path is "resellers" ? (Query?)new TermQuery("resellers.name", "Official") : null)
             .UseNested());
 
         // Act
@@ -1351,7 +1351,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
             .UseNestedFilter((path, orig, resolved, ctx) =>
-                path is "resellers" ? (Query?)new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+                path is "resellers" ? (Query?)new TermQuery("resellers.name", "Official") : null)
             .UseNested());
 
         // Act
@@ -1410,7 +1410,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
             .UseNestedFilter((path, orig, resolved, ctx) =>
-                path is "resellers" ? (Query?)new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+                path is "resellers" ? (Query?)new TermQuery("resellers.name", "Official") : null)
             .UseNested());
 
         // Act
@@ -1468,7 +1468,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
             .UseNestedFilter((path, orig, resolved, ctx) =>
-                path is "resellers" ? (Query?)new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+                path is "resellers" ? (Query?)new TermQuery("resellers.name", "Official") : null)
             .UseNested());
 
         // Act
@@ -1524,7 +1524,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
             .UseNestedFilter((path, orig, resolved, ctx) =>
-                path is "resellers" ? (Query?)new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+                path is "resellers" ? (Query?)new TermQuery("resellers.name", "Official") : null)
             .UseNested());
 
         // Act
@@ -1627,8 +1627,8 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .UseMappings<MultiNestedProduct>(Client)
             .UseNestedFilter((path, orig, resolved, ctx) => path switch
             {
-                "resellers" => (Query?)new TermQuery { Field = "resellers.name", Value = "Official" },
-                "tags" => (Query?)new TermQuery { Field = "tags.label", Value = "sale" },
+                "resellers" => (Query?)new TermQuery("resellers.name", "Official"),
+                "tags" => (Query?)new TermQuery("tags.label", "sale"),
                 _ => null
             })
             .UseNested());
@@ -1690,7 +1690,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .SetLoggerFactory(Log)
             .UseMappings<Product>(Client)
             .UseNestedFilter((path, orig, resolved, ctx) =>
-                path is "resellers" ? (Query?)new TermQuery { Field = "resellers.name", Value = "Official" } : null)
+                path is "resellers" ? (Query?)new TermQuery("resellers.name", "Official") : null)
             .UseNested());
 
         // Act
