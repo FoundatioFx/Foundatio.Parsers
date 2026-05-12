@@ -75,13 +75,27 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         foreach (var (path, pathQueries) in nestedQueries)
         {
             Query? combinedInner = null;
+            List<Query>? filteredChildren = null;
+
             foreach (var (child, innerQuery) in pathQueries)
             {
                 Query q = innerQuery;
 
                 var childFilter = child.GetNestedFilter();
                 if (childFilter is not null)
+                {
                     q = ApplyNestedFilter(q, childFilter);
+                    if (child.IsExcluded())
+                    {
+                        if (!negatedNestedQueries.ContainsKey(path))
+                            negatedNestedQueries[path] = new List<Query>();
+                        negatedNestedQueries[path].Add(new NestedQuery(path, q));
+                        continue;
+                    }
+
+                    (filteredChildren ??= []).Add(q);
+                    continue;
+                }
 
                 if (child.IsExcluded())
                 {
@@ -92,6 +106,16 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
                 }
 
                 combinedInner = Combine(combinedInner, q, op, useScoring);
+            }
+
+            if (filteredChildren is { Count: > 0 })
+            {
+                Query filteredQuery = filteredChildren.Count == 1
+                    ? filteredChildren[0]
+                    : op == GroupOperator.Or
+                        ? new BoolQuery { Should = filteredChildren }
+                        : new BoolQuery { Must = filteredChildren };
+                combinedInner = Combine(combinedInner, filteredQuery, op, useScoring);
             }
 
             if (combinedInner is not null)
@@ -266,6 +290,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             filters.Add(query);
         }
     }
+
 
     private static Query ApplyNestedFilter(Query query, Query? filter)
     {
