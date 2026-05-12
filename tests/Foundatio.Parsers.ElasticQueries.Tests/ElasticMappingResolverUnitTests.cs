@@ -760,7 +760,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
-    public async Task BuildQueryAsync_WithSiblingNestedPaths_FoldsIntosharedParent()
+    public async Task BuildQueryAsync_WithSiblingNestedPaths_FoldsIntoSharedParent()
     {
         // Arrange — parent, parent.childA, and parent.childB are all nested types
         var childAProps = new Properties
