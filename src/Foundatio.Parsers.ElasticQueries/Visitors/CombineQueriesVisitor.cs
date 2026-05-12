@@ -98,7 +98,25 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         // Nest child paths inside their parent paths (deepest first).
         // Both positive and negated child nested queries are folded into parent nested queries.
-        var allPaths = builtNestedQueries.Keys.Union(negatedNestedQueries.Keys).Distinct().ToList();
+        // Include shared ancestor paths so sibling children (e.g., parent.childA + parent.childB)
+        // are correlated within the same parent nested query.
+        var originalPaths = builtNestedQueries.Keys.Union(negatedNestedQueries.Keys).Distinct().ToList();
+        var allPaths = new HashSet<string>(originalPaths);
+
+        var ancestorUseCounts = new Dictionary<string, int>();
+        foreach (var path in originalPaths)
+        {
+            var chain = NestedPathResolver.GetNestedPathChain(path, elasticContext.MappingResolver);
+            foreach (var ancestor in chain.Take(chain.Count - 1))
+                ancestorUseCounts[ancestor] = ancestorUseCounts.GetValueOrDefault(ancestor) + 1;
+        }
+
+        foreach (var (ancestor, count) in ancestorUseCounts)
+        {
+            if (count > 1 || originalPaths.Contains(ancestor))
+                allPaths.Add(ancestor);
+        }
+
         var sortedPaths = allPaths.OrderByDescending(p => p.Length).ToList();
         foreach (string childPath in sortedPaths)
         {

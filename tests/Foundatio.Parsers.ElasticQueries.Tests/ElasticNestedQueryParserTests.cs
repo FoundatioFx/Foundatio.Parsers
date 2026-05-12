@@ -2067,6 +2067,156 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         public string Type { get; set; } = null!;
     }
 
+    [Fact]
+    public async Task NestedSiblingPaths_PositiveCorrelation_MatchesOnlySameParent()
+    {
+        // Arrange — parent is nested, parent.childA and parent.childB are sibling nested types
+        string index = CreateRandomIndex<SiblingNestedDoc>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Title))
+            .Nested<SiblingParent>(r => r.Name(n => n.Parent.First()).Properties(p1 => p1
+                .Nested<SiblingChild>(ca => ca.Name(n => n.ChildA.First()).Properties(pa => pa
+                    .Keyword(e => e.Name(n => n.Name))
+                ))
+                .Nested<SiblingChild>(cb => cb.Name(n => n.ChildB.First()).Properties(pb => pb
+                    .Keyword(e => e.Name(n => n.Name))
+                ))
+            ))
+        ));
+
+        // docA: parent[0].childA.name=Alice, parent[0].childB.name=NotBob
+        //        parent[1].childA.name=NotAlice, parent[1].childB.name=Bob
+        // docB: parent[0].childA.name=Alice, parent[0].childB.name=Bob
+        await Client.IndexManyAsync([
+            new SiblingNestedDoc
+            {
+                Title = "docA",
+                Parent =
+                {
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "Alice" } },
+                        ChildB = { new SiblingChild { Name = "NotBob" } }
+                    },
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "NotAlice" } },
+                        ChildB = { new SiblingChild { Name = "Bob" } }
+                    }
+                }
+            },
+            new SiblingNestedDoc
+            {
+                Title = "docB",
+                Parent =
+                {
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "Alice" } },
+                        ChildB = { new SiblingChild { Name = "Bob" } }
+                    }
+                }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<SiblingNestedDoc>(Client)
+            .UseNested());
+
+        // Act — sibling nested paths under same parent
+        var result = await processor.BuildQueryAsync("parent.childA.name:Alice AND parent.childB.name:Bob", new ElasticQueryVisitorContext().UseScoring());
+        var response = Client.Search<SiblingNestedDoc>(d => d.Index(index).Query(_ => result));
+        _logger.LogInformation("Request: {Request}", response.GetRequest());
+
+        // Assert — only docB matches (Alice+Bob in same parent)
+        Assert.True(response.IsValid, response.DebugInformation);
+        Assert.Equal(1, response.Total);
+        Assert.Contains(response.Documents, d => d.Title == "docB");
+    }
+
+    [Fact]
+    public async Task NestedSiblingPaths_NegatedCorrelation_MatchesOnlyParentWithoutSibling()
+    {
+        // Arrange — same structure as positive sibling test
+        string index = CreateRandomIndex<SiblingNestedDoc>(d => d.Properties(p => p
+            .Text(e => e.Name(n => n.Title))
+            .Nested<SiblingParent>(r => r.Name(n => n.Parent.First()).Properties(p1 => p1
+                .Nested<SiblingChild>(ca => ca.Name(n => n.ChildA.First()).Properties(pa => pa
+                    .Keyword(e => e.Name(n => n.Name))
+                ))
+                .Nested<SiblingChild>(cb => cb.Name(n => n.ChildB.First()).Properties(pb => pb
+                    .Keyword(e => e.Name(n => n.Name))
+                ))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new SiblingNestedDoc
+            {
+                Title = "docA",
+                Parent =
+                {
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "Alice" } },
+                        ChildB = { new SiblingChild { Name = "NotBob" } }
+                    },
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "NotAlice" } },
+                        ChildB = { new SiblingChild { Name = "Bob" } }
+                    }
+                }
+            },
+            new SiblingNestedDoc
+            {
+                Title = "docB",
+                Parent =
+                {
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "Alice" } },
+                        ChildB = { new SiblingChild { Name = "Bob" } }
+                    }
+                }
+            }
+        ], cancellationToken: TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, ct: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<SiblingNestedDoc>(Client)
+            .UseNested());
+
+        // Act — negated sibling: childA.name:Alice AND NOT childB.name:Bob (same parent)
+        var result = await processor.BuildQueryAsync("parent.childA.name:Alice AND NOT parent.childB.name:Bob", new ElasticQueryVisitorContext().UseScoring());
+        var response = Client.Search<SiblingNestedDoc>(d => d.Index(index).Query(_ => result));
+        _logger.LogInformation("Request: {Request}", response.GetRequest());
+
+        // Assert — only docA matches (has parent with childA=Alice but NOT childB=Bob in same parent)
+        Assert.True(response.IsValid, response.DebugInformation);
+        Assert.Equal(1, response.Total);
+        Assert.Contains(response.Documents, d => d.Title == "docA");
+    }
+
+    public class SiblingNestedDoc
+    {
+        public string Title { get; set; } = null!;
+        public IList<SiblingParent> Parent { get; set; } = new List<SiblingParent>();
+    }
+
+    public class SiblingParent
+    {
+        public IList<SiblingChild> ChildA { get; set; } = new List<SiblingChild>();
+        public IList<SiblingChild> ChildB { get; set; } = new List<SiblingChild>();
+    }
+
+    public class SiblingChild
+    {
+        public string Name { get; set; } = null!;
+    }
+
     public class Product
     {
         public string Name { get; set; } = null!;

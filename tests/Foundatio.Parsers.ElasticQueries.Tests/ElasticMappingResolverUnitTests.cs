@@ -760,6 +760,56 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
+    public async Task BuildQueryAsync_WithSiblingNestedPaths_FoldsIntosharedParent()
+    {
+        // Arrange — parent, parent.childA, and parent.childB are all nested types
+        var childAProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var childBProps = new Properties
+        {
+            { "name", new KeywordProperty { Name = "name" } }
+        };
+        var parentProps = new Properties
+        {
+            { "childA", new NestedProperty { Name = "childA", Properties = childAProps } },
+            { "childB", new NestedProperty { Name = "childB", Properties = childBProps } }
+        };
+        var rootProps = new Properties
+        {
+            { "parent", new NestedProperty { Name = "parent", Properties = parentProps } }
+        };
+        var mapping = new TypeMapping { Properties = rootProps };
+        var resolver = new ElasticMappingResolver(mapping, _inferrer, () => null, logger: _logger);
+
+        var parser = new ElasticQueryParser(c => c
+            .UseMappings(resolver)
+            .UseNested());
+
+        // Act — sibling nested paths under same parent
+        var query = await parser.BuildQueryAsync("parent.childA.name:Alice AND parent.childB.name:Bob",
+            new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert — both sibling nested queries are wrapped in a single parent nested query:
+        // nested(path=parent, query=nested(parent.childA, ...) AND nested(parent.childB, ...))
+        Assert.NotNull(query);
+
+        var container = Assert.IsAssignableFrom<IQueryContainer>(query);
+        Assert.NotNull(container.Nested);
+        Assert.Equal("parent", container.Nested.Path);
+
+        // Inside the parent nested, both childA and childB nested queries should be present
+        using var stream = new System.IO.MemoryStream();
+        new ElasticClient(_connectionSettings).RequestResponseSerializer.Serialize(query, stream);
+        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        Assert.Contains("\"path\":\"parent\"", json);
+        Assert.Contains("\"path\":\"parent.childA\"", json);
+        Assert.Contains("\"path\":\"parent.childB\"", json);
+    }
+
+    [Fact]
     public async Task BuildQueryAsync_WithUnsignedLongValueExceedingInt64Max_PreservesAsString()
     {
         // Arrange
