@@ -128,31 +128,34 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             if (parentPath is null)
                 continue;
 
-            // Ensure parent nested query exists as a container for child queries
-            if (!builtNestedQueries.TryGetValue(parentPath, out var parentEntry))
-            {
-                parentEntry = new NestedQuery(parentPath, null!);
-                builtNestedQueries[parentPath] = parentEntry;
-            }
+            // Collect child queries to fold into the parent nested query's inner query.
+            Query? childInner = null;
 
-            // Fold positive child into parent
             if (builtNestedQueries.TryGetValue(childPath, out var childPositive))
             {
-                parentEntry = Combine(parentEntry, childPositive, op, useScoring)!;
-                builtNestedQueries[parentPath] = parentEntry;
+                childInner = Combine(childInner, childPositive, op, useScoring);
                 builtNestedQueries.Remove(childPath);
             }
 
-            // Fold negated children into parent
             if (negatedNestedQueries.TryGetValue(childPath, out var childNegated))
             {
                 foreach (var negated in childNegated)
-                {
-                    parentEntry = Combine(parentEntry, !negated, op, useScoring)!;
-                    builtNestedQueries[parentPath] = parentEntry;
-                }
+                    childInner = Combine(childInner, !negated, op, useScoring);
 
                 negatedNestedQueries.Remove(childPath);
+            }
+
+            if (childInner is null)
+                continue;
+
+            // Get or create the parent nested query, then fold child into its inner query.
+            if (builtNestedQueries.TryGetValue(parentPath, out var existingParent) && existingParent.Nested is { } parentNested)
+            {
+                parentNested.Query = Combine(parentNested.Query, childInner, op, useScoring)!;
+            }
+            else
+            {
+                builtNestedQueries[parentPath] = new NestedQuery(parentPath, childInner);
             }
         }
 
@@ -268,6 +271,17 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
     {
         if (filter is null)
             return query;
+
+        if (query.Bool is { } existingBool
+            && existingBool.Must is { Count: > 0 }
+            && existingBool.Should is null or { Count: 0 }
+            && existingBool.MustNot is null or { Count: 0 })
+        {
+            existingBool.Filter = existingBool.Filter is { Count: > 0 }
+                ? [..existingBool.Filter, filter]
+                : [filter];
+            return query;
+        }
 
         return new BoolQuery
         {
