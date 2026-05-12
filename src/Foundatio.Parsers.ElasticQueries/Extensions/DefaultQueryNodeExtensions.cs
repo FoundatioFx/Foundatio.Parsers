@@ -307,7 +307,9 @@ public static class DefaultQueryNodeExtensions
                     foreach (string field in fields)
                     {
                         var q = GetSingleFieldQuery(node, field, context);
-                        if (q is null) continue;
+                        if (q is null)
+                            continue;
+
                         QueryContainer branch = q;
                         var filter = await filterResolver(nestedPath, field, field, context).ConfigureAwait(false);
                         if (filter is not null)
@@ -315,7 +317,8 @@ public static class DefaultQueryNodeExtensions
                         branches.Add(branch);
                     }
 
-                    if (branches.Count == 0) continue;
+                    if (branches.Count is 0)
+                        continue;
 
                     QueryContainer innerQuery = branches.Count == 1
                         ? branches[0]

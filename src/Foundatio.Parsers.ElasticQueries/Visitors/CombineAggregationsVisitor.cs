@@ -85,9 +85,9 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
                 string bucketPrefix = BuildHierarchicalBucketPathPrefix(nestedPath, context);
                 if (nestedFilter is not null)
-                    AddTermsOrder(termsAggregation, child, aggregation, $"{bucketPrefix}filtered_{((IAggregation)aggregation).Name}>");
+                    AddTermsOrder(termsAggregation, child, aggregation, $"{bucketPrefix}filtered_{((IAggregation)aggregation).Name}{BucketPathSeparator}");
                 else
-                    AddTermsOrder(termsAggregation, child, aggregation, bucketPrefix.Length > 0 ? bucketPrefix : null);
+                    AddTermsOrder(termsAggregation, child, aggregation, bucketPrefix is { Length: > 0 } ? bucketPrefix : null);
             }
         }
 
@@ -205,7 +205,7 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         var current = rootAggs;
         foreach (var path in nestedChain)
         {
-            var name = $"nested_{path}";
+            var name = NestedPathResolver.GetNestedAggName(path);
             NestedAggregation nested;
 
             if (TryGetNestedAgg(current, name, out var existingNested))
@@ -217,9 +217,11 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                 nested = new NestedAggregation(name) { Path = path, Aggregations = new AggregationDictionary() };
                 current[name] = (AggregationContainer)nested;
             }
+
             nested.Aggregations ??= new AggregationDictionary();
             current = nested.Aggregations;
         }
+
         return current;
     }
 
@@ -227,11 +229,13 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
     {
         nested = null;
         var backingDict = dict as IDictionary<string, IAggregationContainer>;
+
         if (backingDict is not null && backingDict.TryGetValue(name, out var container) && container is not null)
         {
             nested = (NestedAggregation)container.Nested;
             return true;
         }
+
         return false;
     }
 
@@ -247,14 +251,20 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
         string deepestPath, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
-            return $"nested_{deepestPath}>";
+            return NestedPathResolver.GetNestedAggName(deepestPath) + BucketPathSeparator;
 
         var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, elasticContext.MappingResolver);
 
         if (nestedPaths.Count <= 1)
-            return $"nested_{deepestPath}>";
+            return NestedPathResolver.GetNestedAggName(deepestPath) + BucketPathSeparator;
 
-        var parts = nestedPaths.Select(p => $"nested_{p}>").ToList();
+        var parts = nestedPaths.Select(p => NestedPathResolver.GetNestedAggName(p) + BucketPathSeparator).ToList();
         return string.Join("", parts);
     }
+
+    /// <summary>
+    /// Elasticsearch bucket path separator character used to traverse nested aggregation hierarchy
+    /// (e.g., "nested_parent>nested_parent.child>terms_field").
+    /// </summary>
+    private const string BucketPathSeparator = ">";
 }

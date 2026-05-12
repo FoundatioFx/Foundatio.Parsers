@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace Foundatio.Parsers.ElasticQueries;
@@ -10,23 +9,29 @@ namespace Foundatio.Parsers.ElasticQueries;
 /// </summary>
 public static class NestedPathResolver
 {
+    private const string NestedAggPrefix = "nested_";
+
+    /// <summary>
+    /// Returns the standard nested aggregation name for a given path (e.g., "parent" becomes "nested_parent").
+    /// </summary>
+    public static string GetNestedAggName(string path) => $"{NestedAggPrefix}{path}";
+
     /// <summary>
     /// Returns the deepest nested path for a given fully-qualified field name,
     /// or null if no nested property is found in the path segments.
     /// </summary>
     public static string? GetDeepestNestedPath(string fullName, ElasticMappingResolver mappingResolver)
     {
-        var segments = fullName.Split('.');
-        if (segments.Length == 0)
-            return null;
-
         string? deepestNestedPath = null;
-        string current = "";
-        for (int i = 0; i < segments.Length; i++)
+
+        for (int i = 0; i <= fullName.Length; i++)
         {
-            current = i == 0 ? segments[i] : $"{current}.{segments[i]}";
-            if (mappingResolver.IsNestedPropertyType(current))
-                deepestNestedPath = current;
+            if (i < fullName.Length && fullName[i] is not '.')
+                continue;
+
+            string prefix = fullName[..i];
+            if (mappingResolver.IsNestedPropertyType(prefix))
+                deepestNestedPath = prefix;
         }
 
         return deepestNestedPath;
@@ -39,14 +44,16 @@ public static class NestedPathResolver
     /// </summary>
     public static IReadOnlyList<string> GetNestedPathChain(string deepestPath, ElasticMappingResolver mappingResolver)
     {
-        var segments = deepestPath.Split('.');
         var nestedPaths = new List<string>();
-        string current = "";
-        for (int i = 0; i < segments.Length; i++)
+
+        for (int i = 0; i <= deepestPath.Length; i++)
         {
-            current = i == 0 ? segments[i] : $"{current}.{segments[i]}";
-            if (mappingResolver.IsNestedPropertyType(current))
-                nestedPaths.Add(current);
+            if (i < deepestPath.Length && deepestPath[i] is not '.')
+                continue;
+
+            string prefix = deepestPath[..i];
+            if (mappingResolver.IsNestedPropertyType(prefix))
+                nestedPaths.Add(prefix);
         }
 
         return nestedPaths.Count > 0 ? nestedPaths : [deepestPath];
