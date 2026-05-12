@@ -65,34 +65,122 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             container = Combine(container, q, op);
         }
 
+        // Build nested queries per path, then nest child paths inside parent paths
+        var builtNestedQueries = new Dictionary<string, QueryBase>();
+        var negatedNestedQueries = new Dictionary<string, List<QueryBase>>();
+
         foreach (var (path, pathQueries) in nestedQueries)
         {
             QueryContainer? combinedInner = null;
-            QueryContainer? nestedFilter = null;
             foreach (var (child, innerQuery) in pathQueries)
             {
                 QueryContainer q = innerQuery;
+
+                var childFilter = child.GetNestedFilter();
+                if (childFilter is not null)
+                    q = new BoolQuery { Must = [q], Filter = [childFilter] };
+
                 if (child.IsExcluded())
-                    q = !q;
+                {
+                    QueryBase negatedNested = new NestedQuery { Path = path, Query = q };
+                    if (!negatedNestedQueries.ContainsKey(path))
+                        negatedNestedQueries[path] = new List<QueryBase>();
+                    negatedNestedQueries[path].Add(negatedNested);
+                    continue;
+                }
 
                 combinedInner = Combine(combinedInner, q, op);
-                nestedFilter ??= child.GetNestedFilter();
             }
 
-            if (nestedFilter is not null)
-                combinedInner &= nestedFilter;
+            if (combinedInner is not null)
+                builtNestedQueries[path] = new NestedQuery { Path = path, Query = combinedInner };
+        }
 
-            QueryBase combinedNested = new NestedQuery { Path = path, Query = combinedInner };
-            container = Combine(container, combinedNested, op);
+        // Nest child paths inside their parent paths (deepest first).
+        // Both positive and negated child nested queries are folded into parent nested queries.
+        // Include shared ancestor paths so sibling children (e.g., parent.childA + parent.childB)
+        // are correlated within the same parent nested query.
+        var originalPaths = builtNestedQueries.Keys.Union(negatedNestedQueries.Keys).Distinct().ToList();
+        var allPaths = new HashSet<string>(originalPaths);
+
+        var ancestorUseCounts = new Dictionary<string, int>();
+        foreach (var path in originalPaths)
+        {
+            var chain = NestedPathResolver.GetNestedPathChain(path, elasticContext.MappingResolver);
+            foreach (var ancestor in chain.Take(chain.Count - 1))
+                ancestorUseCounts[ancestor] = ancestorUseCounts.GetValueOrDefault(ancestor) + 1;
+        }
+
+        foreach (var (ancestor, count) in ancestorUseCounts)
+        {
+            if (count > 1 || originalPaths.Contains(ancestor))
+                allPaths.Add(ancestor);
+        }
+
+        var sortedPaths = allPaths.OrderByDescending(p => p.Length).ToList();
+        foreach (string childPath in sortedPaths)
+        {
+            string? parentPath = sortedPaths.FirstOrDefault(p =>
+                p.Length < childPath.Length && childPath.StartsWith(p + "."));
+
+            if (parentPath is null)
+                continue;
+
+            // Ensure parent nested query exists as a container for child queries
+            if (!builtNestedQueries.TryGetValue(parentPath, out var parentEntry))
+            {
+                parentEntry = new NestedQuery { Path = parentPath };
+                builtNestedQueries[parentPath] = parentEntry;
+            }
+
+            var parentNested = (NestedQuery)parentEntry;
+
+            // Fold positive child into parent
+            if (builtNestedQueries.TryGetValue(childPath, out var childPositive))
+            {
+                parentNested.Query = parentNested.Query is not null
+                    ? Combine(parentNested.Query, (QueryContainer)childPositive, op)
+                    : childPositive;
+                builtNestedQueries.Remove(childPath);
+            }
+
+            // Fold negated children into parent
+            if (negatedNestedQueries.TryGetValue(childPath, out var childNegated))
+            {
+                foreach (var negated in childNegated)
+                {
+                    parentNested.Query = parentNested.Query is not null
+                        ? Combine(parentNested.Query, !negated, op)
+                        : !negated;
+                }
+                negatedNestedQueries.Remove(childPath);
+            }
+        }
+
+        foreach (var (_, nestedQuery) in builtNestedQueries)
+        {
+            container = Combine(container, nestedQuery, op);
+        }
+
+        // Any remaining negated nested queries that have no parent get combined at top level
+        foreach (var (_, negatedList) in negatedNestedQueries)
+        {
+            foreach (var negated in negatedList)
+                container = Combine(container, !negated, op);
         }
 
         if (nested is not null)
         {
+            if (container is null)
+            {
+                node.RemoveQuery();
+                return;
+            }
+
             var nestedFilter = node.GetNestedFilter();
             if (nestedFilter is not null)
             {
-                QueryContainer inner = container;
-                inner &= nestedFilter;
+                QueryContainer inner = new BoolQuery { Must = [container], Filter = [nestedFilter] };
                 nested.Query = inner;
             }
             else

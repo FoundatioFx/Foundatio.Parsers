@@ -27,14 +27,38 @@ public static class DefaultSortNodeExtensions
         string? nestedPath = node.GetNestedPath();
         if (nestedPath is not null)
         {
-            var nestedSort = new NestedSort { Path = nestedPath };
-            var nestedFilter = node.GetNestedFilter();
-            if (nestedFilter is not null)
-                nestedSort.Filter = nestedFilter;
-
-            sort.Nested = nestedSort;
+            sort.Nested = BuildHierarchicalNestedSort(nestedPath, node.GetNestedFilter(), elasticContext);
         }
 
         return sort;
+    }
+
+    private static NestedSort BuildHierarchicalNestedSort(
+        string deepestPath, QueryContainer? filter, IElasticQueryVisitorContext context)
+    {
+        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, context.MappingResolver);
+
+        if (nestedPaths.Count <= 1)
+        {
+            var nestedSort = new NestedSort { Path = deepestPath };
+            if (filter is not null)
+                nestedSort.Filter = filter;
+            return nestedSort;
+        }
+
+        NestedSort? innermost = null;
+        for (int i = nestedPaths.Count - 1; i >= 0; i--)
+        {
+            var nestedSort = new NestedSort { Path = nestedPaths[i] };
+            if (i == nestedPaths.Count - 1 && filter is not null)
+                nestedSort.Filter = filter;
+
+            if (innermost is not null)
+                nestedSort.Nested = innermost;
+
+            innermost = nestedSort;
+        }
+
+        return innermost!;
     }
 }

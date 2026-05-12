@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -54,11 +55,13 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         foreach (var (nestedPath, childAggregations) in nestedAggregations)
         {
-            var nestedAgg = new NestedAggregation($"nested_{nestedPath}")
-            {
-                Path = nestedPath,
-                Aggregations = new AggregationDictionary()
-            };
+            if (container is not BucketAggregationBase bucketContainer)
+                continue;
+
+            bucketContainer.Aggregations ??= new AggregationDictionary();
+
+            var nestedChain = GetNestedPathChain(nestedPath, context);
+            var deepestAggs = EnsureNestedAggPath(bucketContainer.Aggregations, nestedChain);
 
             foreach (var (child, aggregation) in childAggregations)
             {
@@ -73,23 +76,18 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                             [((IAggregation)aggregation).Name] = (AggregationContainer)aggregation
                         }
                     };
-                    nestedAgg.Aggregations[((IAggregation)filteredAgg).Name] = (AggregationContainer)filteredAgg;
+                    deepestAggs[((IAggregation)filteredAgg).Name] = (AggregationContainer)filteredAgg;
                 }
                 else
                 {
-                    nestedAgg.Aggregations[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
+                    deepestAggs[((IAggregation)aggregation).Name] = (AggregationContainer)aggregation;
                 }
 
+                string bucketPrefix = BuildHierarchicalBucketPathPrefix(nestedPath, context);
                 if (nestedFilter is not null)
-                    AddTermsOrder(termsAggregation, child, aggregation, $"nested_{nestedPath}>filtered_{((IAggregation)aggregation).Name}>");
+                    AddTermsOrder(termsAggregation, child, aggregation, $"{bucketPrefix}filtered_{((IAggregation)aggregation).Name}{BucketPathSeparator}");
                 else
-                    AddTermsOrder(termsAggregation, child, aggregation);
-            }
-
-            if (container is BucketAggregationBase bucketContainer)
-            {
-                bucketContainer.Aggregations ??= new AggregationDictionary();
-                bucketContainer.Aggregations[((IAggregation)nestedAgg).Name] = (AggregationContainer)nestedAgg;
+                    AddTermsOrder(termsAggregation, child, aggregation, bucketPrefix is { Length: > 0 } ? bucketPrefix : null);
             }
         }
 
@@ -200,4 +198,73 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         return container;
     }
+
+    private static AggregationDictionary EnsureNestedAggPath(
+        AggregationDictionary rootAggs, IReadOnlyList<string> nestedChain)
+    {
+        var current = rootAggs;
+        foreach (var path in nestedChain)
+        {
+            var name = NestedPathResolver.GetNestedAggName(path);
+            NestedAggregation nested;
+
+            if (TryGetNestedAgg(current, name, out var existingNested))
+            {
+                nested = existingNested!;
+            }
+            else
+            {
+                nested = new NestedAggregation(name) { Path = path, Aggregations = new AggregationDictionary() };
+                current[name] = (AggregationContainer)nested;
+            }
+
+            nested.Aggregations ??= new AggregationDictionary();
+            current = nested.Aggregations;
+        }
+
+        return current;
+    }
+
+    private static bool TryGetNestedAgg(AggregationDictionary dict, string name, out NestedAggregation? nested)
+    {
+        nested = null;
+        var backingDict = dict as IDictionary<string, IAggregationContainer>;
+
+        if (backingDict is not null && backingDict.TryGetValue(name, out var container) && container is not null)
+        {
+            nested = (NestedAggregation)container.Nested;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static IReadOnlyList<string> GetNestedPathChain(string deepestPath, IQueryVisitorContext context)
+    {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            return [deepestPath];
+
+        return NestedPathResolver.GetNestedPathChain(deepestPath, elasticContext.MappingResolver);
+    }
+
+    private static string BuildHierarchicalBucketPathPrefix(
+        string deepestPath, IQueryVisitorContext context)
+    {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            return NestedPathResolver.GetNestedAggName(deepestPath) + BucketPathSeparator;
+
+        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, elasticContext.MappingResolver);
+
+        if (nestedPaths.Count <= 1)
+            return NestedPathResolver.GetNestedAggName(deepestPath) + BucketPathSeparator;
+
+        var parts = nestedPaths.Select(p => NestedPathResolver.GetNestedAggName(p) + BucketPathSeparator).ToList();
+        return string.Join("", parts);
+    }
+
+    /// <summary>
+    /// Elasticsearch bucket path separator character used to traverse nested aggregation hierarchy
+    /// (e.g., "nested_parent>nested_parent.child>terms_field").
+    /// </summary>
+    private const string BucketPathSeparator = ">";
 }

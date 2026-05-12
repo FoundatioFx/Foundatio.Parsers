@@ -357,21 +357,25 @@ This grouping ensures that multiple individual nested field terms targeting the 
 
 1. Collecting all leaf field nodes from the AST
 2. Grouping them by nested path (using the `@NestedPath` metadata set by `NestedVisitor`)
-3. Wrapping grouped aggregations in a `NestedAggregation` with the appropriate path
+3. For each nested path, computing the full chain of nested ancestors (e.g., `parent.child` produces `[parent, parent.child]`)
+4. Merging aggregations into a shared hierarchical nested wrapper tree via `EnsureNestedAggPath` — if a `nested_parent` wrapper already exists (from parent-level aggs), child-level aggs are inserted inside it rather than creating a duplicate
 
-For example, `terms:nested.field1 max:nested.field4` produces a single `nested` aggregation containing both the `terms` and `max` sub-aggregations.
+For example, `terms:nested.field1 max:nested.field4` produces a single `nested` aggregation containing both the `terms` and `max` sub-aggregations. For multi-level nesting (`terms:parent.name terms:parent.child.name`), the child-level aggregation is nested inside the parent wrapper: `nested_parent > nested_parent.child > terms_parent.child.name`.
 
 ### Nested Sort Support
 
-When sorting by a nested field (e.g., `-nested.field4`), `NestedVisitor` tags the `TermNode` with its nested path. `DefaultSortNodeExtensions.GetDefaultSort` reads this tag and adds a `Nested` property to the `FieldSort`:
+When sorting by a nested field (e.g., `-nested.field4`), `NestedVisitor` tags the `TermNode` with its nested path. `DefaultSortNodeExtensions.GetDefaultSort` reads this tag and builds a `NestedSort` hierarchy. For multi-level nested paths (e.g., `parent.child.score`), it produces a hierarchical chain:
 
 ```csharp
-string nestedPath = node.GetNestedPath();
-if (nestedPath is not null)
-    sort.Nested = new NestedSort { Path = nestedPath };
+// For -parent.child.score where parent and parent.child are both nested:
+sort.Nested = new NestedSort
+{
+    Path = "parent",
+    Nested = new NestedSort { Path = "parent.child" }
+};
 ```
 
-This produces the correct Elasticsearch sort clause with the required `nested` context.
+This produces the correct Elasticsearch sort clause with hierarchical `nested` context.
 
 ### Default Fields with Nested Types
 
@@ -385,7 +389,7 @@ parser.SetDefaultFields(["field1", "nested.field1", "nested.field2"]);
 // Produces: match(field1, "searchterm") OR nested(match(nested.field1, "searchterm") OR match(nested.field2, "searchterm"))
 ```
 
-Fields are grouped by their nested path. Non-nested fields use standard `match`/`term` queries, while nested fields from the same path are combined into a single `NestedQuery` with `multi_match` inside. Fields of different types (text vs keyword vs integer) are split into appropriate query types.
+Fields are grouped by their nested path. Non-nested fields use standard `match`/`term` queries, while nested fields from the same path are combined into a single `NestedQuery`. When a `NestedFilterResolver` is configured, each field gets its own branch with its own filter applied (combined via `bool.should`), ensuring distinct per-field filters are preserved. Without a filter resolver, fields of the same type are combined with `multi_match` for efficiency.
 
 ### Exists and Missing Queries on Nested Fields
 
@@ -466,7 +470,7 @@ When a single nested array contains documents of different logical types (e.g., 
 
 1. **`NestedVisitor`** calls the resolver whenever a node introduces or participates in a nested scope. For standalone nested field nodes (e.g., `resellers.price:10`), the resolver is called for each field. For explicit nested groups (e.g., `resellers:(resellers.name:x resellers.price:10)`), inner field nodes are skipped and the resolver is called once on the group node. If the resolver returns a non-null `QueryContainer`, it is stored as `@NestedFilter` metadata on that node.
 
-2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and AND-s the filter once per nested path into the inner query. For explicit grouped nested queries, the filter stored on the group node is applied to the group's inner query.
+2. **`CombineQueriesVisitor`** reads the `@NestedFilter` from coalesced nodes and combines the filter into each child's query (in `bool.filter` context) before combining with the group operator. This ensures correct semantics for both AND and OR groups — each child query is individually constrained by its filter. For explicit grouped nested queries, the filter stored on the group node is applied to the group's inner query.
 
 3. **`CombineAggregationsVisitor`** reads the `@NestedFilter` and wraps each inner aggregation in a `FilterAggregation` before adding it to the `NestedAggregation`.
 
@@ -502,15 +506,43 @@ A synchronous overload is available that wraps the return in `Task.FromResult`.
 ### Resolver Behavior Notes
 
 - For explicit nested groups, the resolver is called once on the group node, not on the individual inner field nodes. To use different discriminators for different fields within the same nested path, use separate explicit nested groups or encode the distinction via field aliases or `IQueryVisitorContext.Data`.
-- Default field searches (`SetDefaultFields` with nested fields) bypass the visitor chain and do not invoke the filter resolver.
+- Default field searches (`SetDefaultFields` with nested fields) apply the filter resolver when building nested queries for default fields. The resolver is invoked for each nested field in the default fields list.
 
 ## Known Limitations
 
 ### Multi-Level Deeply Nested Types
 
-Fields nested more than one level deep (e.g., `parent.child.field1` where both `parent` and `parent.child` are nested types) are wrapped at the **outermost** nested path only. The `GetNestedProperty` method in `NestedVisitor` returns the first nested ancestor found when walking the dot-separated path, so a query like `parent.child.field1:value` produces `nested(path=parent, query=...)` but does **not** generate the doubly-nested structure `nested(path=parent, query=nested(path=parent.child, query=...))` that Elasticsearch requires for true multi-level nesting.
+Fields nested more than one level deep (e.g., `parent.child.field1` where both `parent` and `parent.child` are nested types) are wrapped at the **deepest** nested path. The `GetNestedProperty` method in `NestedVisitor` walks the dot-separated path and returns the last nested ancestor found, so a query like `parent.child.field1:value` produces `nested(path=parent.child, query=...)`.
 
-Single-level nested queries (e.g., `parent.field1:value` where only `parent` is nested) work correctly.
+When a query combines fields at different nested levels, `CombineQueriesVisitor` produces correlated hierarchical chains. For example:
+
+```text
+parent.name:Bob AND parent.child.name:Alice
+```
+
+generates the correlated structure:
+
+```text
+nested(path=parent, query=name:Bob AND nested(path=parent.child, query=name:Alice))
+```
+
+This ensures Elasticsearch evaluates both conditions against the same parent document.
+
+**Scope**: Correlated multi-level chain support applies to **query building** including negation. Sort and aggregation contexts also build hierarchical nested structures when multiple nested levels are detected.
+
+**Negated multi-level children**: Negated deeper nested fields (e.g., `parent.name:Bob AND NOT parent.child.name:Alice`) are correctly folded inside the parent nested query, producing:
+
+```text
+nested(path=parent, query=name:Bob AND must_not(nested(path=parent.child, query=name:Alice)))
+```
+
+This ensures the exclusion applies only within the matching parent document's scope.
+
+Single-level nested queries (e.g., `parent.field1:value` where only `parent` is nested) work correctly in all cases including negation.
+
+### Explicit Nested Groups and Deeper Nested Fields
+
+When a field is inside an explicit nested group (e.g., `parent:(parent.child.name:Alice)`) and the inner field resolves to a *deeper* nested path than the enclosing group, the inner field correctly receives its own nested query wrapper. The `IsInsideMatchingNestedGroup` check only skips processing when the inner field's nested path matches the enclosing group's path exactly.
 
 ### No Nested Field Context Stack
 
