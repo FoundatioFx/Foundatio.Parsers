@@ -237,7 +237,7 @@ public class CustomFilterVisitor : ChainableQueryVisitor
         return GenerateQueryVisitor.Run(node.Left);
     }
 
-    private async Task<Query> ResolveFilter(string filterName)
+    private async Task<Query?> ResolveFilter(string filterName)
     {
         switch (filterName?.ToLowerInvariant())
         {

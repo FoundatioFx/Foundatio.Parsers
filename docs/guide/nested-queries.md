@@ -484,7 +484,7 @@ var parser = new ElasticQueryParser(c => c
     .UseNestedFilter((nestedPath, originalField, resolvedField, context) =>
     {
         if (nestedPath is "resellers")
-            return new TermQuery { Field = "resellers.type", Value = "official" };
+            return new TermQuery("resellers.type", "official");
 
         return null;
     })
@@ -494,7 +494,7 @@ var parser = new ElasticQueryParser(c => c
 ### Delegate Signature
 
 ```csharp
-public delegate Task<Query> NestedFilterResolver(
+public delegate Task<Query?> NestedFilterResolver(
     string nestedPath,       // e.g., "resellers"
     string originalField,    // field name before alias resolution
     string resolvedField,    // field name after alias resolution

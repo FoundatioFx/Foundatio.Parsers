@@ -1749,4 +1749,350 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
     {
         public string Label { get; set; } = null!;
     }
+
+    [Fact]
+    public async Task NestedMultiLevel_PositiveCorrelation_MatchesOnlySameParent()
+    {
+        string index = await CreateRandomIndexAsync<MyDeeplyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Field1)
+            .Nested("parent", o => o.Properties(p1 => p1
+                .Keyword("field1")
+                .Nested("child", o1 => o1.Properties(p2 => p2
+                    .Keyword("field1")
+                ))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyDeeplyNestedType
+            {
+                Field1 = "docA",
+                Parent =
+                {
+                    new MyMiddleNestedType { Field1 = "Bob", Child = { new MyType { Field1 = "Charlie" } } },
+                    new MyMiddleNestedType { Field1 = "Sue", Child = { new MyType { Field1 = "Alice" } } }
+                }
+            },
+            new MyDeeplyNestedType
+            {
+                Field1 = "docB",
+                Parent =
+                {
+                    new MyMiddleNestedType { Field1 = "Bob", Child = { new MyType { Field1 = "Alice" } } }
+                }
+            }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<MyDeeplyNestedType>(Client)
+            .UseNested());
+
+        var result = await processor.BuildQueryAsync("parent.field1:Bob AND parent.child.field1:Alice", new ElasticQueryVisitorContext().UseScoring());
+        var response = await Client.SearchAsync<MyDeeplyNestedType>(d => d.Indices(index).Query(result), TestCancellationToken);
+        _logger.LogInformation("Request: {Request}", response.GetRequest());
+
+        Assert.True(response.IsValidResponse, response.GetRequest());
+        Assert.Equal(1, response.Total);
+        Assert.Contains(response.Documents, d => d.Field1 == "docB");
+    }
+
+    [Fact]
+    public async Task NestedMultiLevel_NegatedCorrelation_MatchesOnlyParentWithoutChild()
+    {
+        string index = await CreateRandomIndexAsync<MyDeeplyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Field1)
+            .Nested("parent", o => o.Properties(p1 => p1
+                .Keyword("field1")
+                .Nested("child", o1 => o1.Properties(p2 => p2
+                    .Keyword("field1")
+                ))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyDeeplyNestedType
+            {
+                Field1 = "docA",
+                Parent =
+                {
+                    new MyMiddleNestedType { Field1 = "Bob", Child = { new MyType { Field1 = "Charlie" } } },
+                    new MyMiddleNestedType { Field1 = "Sue", Child = { new MyType { Field1 = "Alice" } } }
+                }
+            },
+            new MyDeeplyNestedType
+            {
+                Field1 = "docB",
+                Parent =
+                {
+                    new MyMiddleNestedType { Field1 = "Bob", Child = { new MyType { Field1 = "Alice" } } }
+                }
+            }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<MyDeeplyNestedType>(Client)
+            .UseNested());
+
+        var result = await processor.BuildQueryAsync("parent.field1:Bob AND NOT parent.child.field1:Alice", new ElasticQueryVisitorContext().UseScoring());
+        var response = await Client.SearchAsync<MyDeeplyNestedType>(d => d.Indices(index).Query(result), TestCancellationToken);
+        _logger.LogInformation("Request: {Request}", response.GetRequest());
+
+        Assert.True(response.IsValidResponse, response.GetRequest());
+        Assert.Equal(1, response.Total);
+        Assert.Contains(response.Documents, d => d.Field1 == "docA");
+    }
+
+    [Fact]
+    public async Task NestedMultiLevel_OrBranchPreservation_DoesNotMatchCrossParent()
+    {
+        string index = await CreateRandomIndexAsync<MyDeeplyNestedType>(d => d.Properties(p => p
+            .Text(e => e.Field1)
+            .Nested("parent", o => o.Properties(p1 => p1
+                .Keyword("field1")
+                .Nested("child", o1 => o1.Properties(p2 => p2
+                    .Keyword("field1")
+                ))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new MyDeeplyNestedType
+            {
+                Field1 = "docX",
+                Parent =
+                {
+                    new MyMiddleNestedType { Field1 = "Bob", Child = { new MyType { Field1 = "Charlie" } } },
+                    new MyMiddleNestedType { Field1 = "Sue", Child = { new MyType { Field1 = "Alice" } } }
+                }
+            }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<MyDeeplyNestedType>(Client)
+            .UseNested());
+
+        var result = await processor.BuildQueryAsync(
+            "(parent.field1:Bob AND parent.child.field1:Alice) OR (parent.field1:Sue AND parent.child.field1:Charlie)",
+            new ElasticQueryVisitorContext().UseScoring());
+        var response = await Client.SearchAsync<MyDeeplyNestedType>(d => d.Indices(index).Query(result), TestCancellationToken);
+        _logger.LogInformation("Request: {Request}", response.GetRequest());
+
+        Assert.True(response.IsValidResponse, response.GetRequest());
+        Assert.Equal(0, response.Total);
+    }
+
+    [Fact]
+    public async Task NestedDefaultFields_WithPerFieldFilter_OnlyMatchesCorrectDiscriminator()
+    {
+        string index = await CreateRandomIndexAsync<FilteredItemsDoc>(d => d.Properties(p => p
+            .Text("title")
+            .Nested("items", o => o.Properties(p1 => p1
+                .Keyword("status")
+                .Keyword("priority")
+                .Keyword("type")
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new FilteredItemsDoc
+            {
+                Title = "doc1",
+                Items =
+                {
+                    new FilteredItem { Status = "active", Type = "priority_filter" },
+                    new FilteredItem { Priority = "active", Type = "priority_filter" }
+                }
+            },
+            new FilteredItemsDoc
+            {
+                Title = "doc2",
+                Items =
+                {
+                    new FilteredItem { Status = "active", Type = "status_filter" }
+                }
+            }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<FilteredItemsDoc>(Client)
+            .UseNested()
+            .SetDefaultFields(["items.status", "items.priority"])
+            .UseNestedFilter((nestedPath, originalField, resolvedField, ctx) =>
+            {
+                if (resolvedField == "items.status")
+                    return Task.FromResult<Query?>((Query)new TermQuery("items.type", "status_filter"));
+                if (resolvedField == "items.priority")
+                    return Task.FromResult<Query?>((Query)new TermQuery("items.type", "priority_filter"));
+                return Task.FromResult<Query?>(null);
+            }));
+
+        var result = await processor.BuildQueryAsync("active", new ElasticQueryVisitorContext().UseScoring());
+        var response = await Client.SearchAsync<FilteredItemsDoc>(d => d.Indices(index).Query(result), TestCancellationToken);
+        _logger.LogInformation("Request: {Request}", response.GetRequest());
+
+        Assert.True(response.IsValidResponse, response.GetRequest());
+        Assert.Equal(2, response.Total);
+    }
+
+    [Fact]
+    public async Task NestedSiblingPaths_PositiveCorrelation_MatchesOnlySameParent()
+    {
+        string index = await CreateRandomIndexAsync<SiblingNestedDoc>(d => d.Properties(p => p
+            .Text("title")
+            .Nested("parent", o => o.Properties(p1 => p1
+                .Nested("childA", oa => oa.Properties(pa => pa
+                    .Keyword("name")
+                ))
+                .Nested("childB", ob => ob.Properties(pb => pb
+                    .Keyword("name")
+                ))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new SiblingNestedDoc
+            {
+                Title = "docA",
+                Parent =
+                {
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "Alice" } },
+                        ChildB = { new SiblingChild { Name = "NotBob" } }
+                    },
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "NotAlice" } },
+                        ChildB = { new SiblingChild { Name = "Bob" } }
+                    }
+                }
+            },
+            new SiblingNestedDoc
+            {
+                Title = "docB",
+                Parent =
+                {
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "Alice" } },
+                        ChildB = { new SiblingChild { Name = "Bob" } }
+                    }
+                }
+            }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<SiblingNestedDoc>(Client)
+            .UseNested());
+
+        var result = await processor.BuildQueryAsync("parent.childA.name:Alice AND parent.childB.name:Bob", new ElasticQueryVisitorContext().UseScoring());
+        var response = await Client.SearchAsync<SiblingNestedDoc>(d => d.Indices(index).Query(result), TestCancellationToken);
+        _logger.LogInformation("Request: {Request}", response.GetRequest());
+
+        Assert.True(response.IsValidResponse, response.GetRequest());
+        Assert.Equal(1, response.Total);
+        Assert.Contains(response.Documents, d => d.Title == "docB");
+    }
+
+    [Fact]
+    public async Task NestedSiblingPaths_NegatedCorrelation_MatchesOnlyParentWithoutSibling()
+    {
+        string index = await CreateRandomIndexAsync<SiblingNestedDoc>(d => d.Properties(p => p
+            .Text("title")
+            .Nested("parent", o => o.Properties(p1 => p1
+                .Nested("childA", oa => oa.Properties(pa => pa
+                    .Keyword("name")
+                ))
+                .Nested("childB", ob => ob.Properties(pb => pb
+                    .Keyword("name")
+                ))
+            ))
+        ));
+
+        await Client.IndexManyAsync([
+            new SiblingNestedDoc
+            {
+                Title = "docA",
+                Parent =
+                {
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "Alice" } },
+                        ChildB = { new SiblingChild { Name = "NotBob" } }
+                    },
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "NotAlice" } },
+                        ChildB = { new SiblingChild { Name = "Bob" } }
+                    }
+                }
+            },
+            new SiblingNestedDoc
+            {
+                Title = "docB",
+                Parent =
+                {
+                    new SiblingParent
+                    {
+                        ChildA = { new SiblingChild { Name = "Alice" } },
+                        ChildB = { new SiblingChild { Name = "Bob" } }
+                    }
+                }
+            }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        var processor = new ElasticQueryParser(c => c
+            .SetLoggerFactory(Log)
+            .UseMappings<SiblingNestedDoc>(Client)
+            .UseNested());
+
+        var result = await processor.BuildQueryAsync("parent.childA.name:Alice AND NOT parent.childB.name:Bob", new ElasticQueryVisitorContext().UseScoring());
+        var response = await Client.SearchAsync<SiblingNestedDoc>(d => d.Indices(index).Query(result), TestCancellationToken);
+        _logger.LogInformation("Request: {Request}", response.GetRequest());
+
+        Assert.True(response.IsValidResponse, response.GetRequest());
+        Assert.Equal(1, response.Total);
+        Assert.Contains(response.Documents, d => d.Title == "docA");
+    }
+
+    public class FilteredItemsDoc
+    {
+        public string Title { get; set; } = null!;
+        public IList<FilteredItem> Items { get; set; } = new List<FilteredItem>();
+    }
+
+    public class FilteredItem
+    {
+        public string Status { get; set; } = null!;
+        public string Priority { get; set; } = null!;
+        public string Type { get; set; } = null!;
+    }
+
+    public class SiblingNestedDoc
+    {
+        public string Title { get; set; } = null!;
+        public IList<SiblingParent> Parent { get; set; } = new List<SiblingParent>();
+    }
+
+    public class SiblingParent
+    {
+        public IList<SiblingChild> ChildA { get; set; } = new List<SiblingChild>();
+        public IList<SiblingChild> ChildB { get; set; } = new List<SiblingChild>();
+    }
+
+    public class SiblingChild
+    {
+        public string Name { get; set; } = null!;
+    }
 }
