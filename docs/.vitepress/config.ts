@@ -62,7 +62,7 @@ export default withMermaid(defineConfig({
         {
           text: 'Migration',
           items: [
-            { text: 'Upgrading to Elastic.Clients.Elasticsearch', link: '/guide/upgrading-to-es9' }
+            { text: 'Upgrading to Elastic.Clients.Elasticsearch', link: '/guide/upgrading-to-elastic-clients-elasticsearch' }
           ]
         }
       ]
