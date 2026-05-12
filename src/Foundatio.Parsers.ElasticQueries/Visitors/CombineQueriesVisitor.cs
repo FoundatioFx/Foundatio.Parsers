@@ -171,6 +171,12 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         if (nested is not null)
         {
+            if (container is null)
+            {
+                node.RemoveQuery();
+                return;
+            }
+
             var nestedFilter = node.GetNestedFilter();
             if (nestedFilter is not null)
             {
