@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Xunit;
 using Microsoft.Extensions.Time.Testing;
 using Xunit;
@@ -319,4 +322,5 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
 
         return new TypeMapping { Properties = props };
     }
+
 }

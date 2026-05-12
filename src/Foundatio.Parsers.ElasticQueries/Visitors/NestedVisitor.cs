@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
@@ -78,11 +77,11 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
     {
-        if (IsInsideNestedGroup(node))
-            return Task.CompletedTask;
-
         string? nestedProperty = GetNestedProperty(node.Field, context);
         if (nestedProperty is null)
+            return Task.CompletedTask;
+
+        if (IsInsideMatchingNestedGroup(node, nestedProperty))
             return Task.CompletedTask;
 
         if (_filterResolver is not null)
@@ -135,13 +134,17 @@ public class NestedVisitor : ChainableQueryVisitor
         node.SetQuery(new NestedQuery { Path = nestedProperty, Query = innerQuery });
     }
 
-    private static bool IsInsideNestedGroup(IQueryNode node)
+    private static bool IsInsideMatchingNestedGroup(IQueryNode node, string nestedProperty)
     {
         var parent = node.Parent;
         while (parent is not null)
         {
-            if (parent is GroupNode groupNode && groupNode.GetNestedPath() is not null)
-                return true;
+            if (parent is GroupNode groupNode)
+            {
+                string? groupNestedPath = groupNode.GetNestedPath();
+                if (groupNestedPath is not null && groupNestedPath == nestedProperty)
+                    return true;
+            }
 
             parent = parent.Parent;
         }
@@ -151,24 +154,9 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private static string? GetNestedProperty(string? fullName, IQueryVisitorContext context)
     {
-        string[]? nameParts = fullName?.Split('.');
-
-        if (nameParts is null || context is not IElasticQueryVisitorContext elasticContext || nameParts is { Length: 0 })
+        if (fullName is null || context is not IElasticQueryVisitorContext elasticContext)
             return null;
 
-        var builder = new StringBuilder();
-        for (int i = 0; i < nameParts.Length; i++)
-        {
-            if (i > 0)
-                builder.Append('.');
-
-            builder.Append(nameParts[i]);
-
-            string fieldName = builder.ToString();
-            if (elasticContext.MappingResolver.IsNestedPropertyType(fieldName))
-                return fieldName;
-        }
-
-        return null;
+        return NestedPathResolver.GetDeepestNestedPath(fullName, elasticContext.MappingResolver);
     }
 }

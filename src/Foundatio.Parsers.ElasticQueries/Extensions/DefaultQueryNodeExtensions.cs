@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -18,7 +17,7 @@ public static class DefaultQueryNodeExtensions
     public static async Task<Query?> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
     {
         if (node is TermNode termNode)
-            return termNode.GetDefaultQuery(context);
+            return await termNode.GetDefaultQueryAsync(context).ConfigureAwait(false);
 
         if (node is TermRangeNode termRangeNode)
             return await termRangeNode.GetDefaultQueryAsync(context).AnyContext();
@@ -32,7 +31,7 @@ public static class DefaultQueryNodeExtensions
         return null;
     }
 
-    public static Query? GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
+    public static async Task<Query?> GetDefaultQueryAsync(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
@@ -44,9 +43,30 @@ public static class DefaultQueryNodeExtensions
         if (!String.IsNullOrEmpty(field))
             return GetSingleFieldQuery(node, field, elasticContext);
 
-        // If only one default field, use single-field query
+        // If only one default field, use single-field query (wrapped in nested if applicable)
         if (defaultFields is { Length: 1 })
-            return GetSingleFieldQuery(node, defaultFields[0], elasticContext);
+        {
+            var singleQuery = GetSingleFieldQuery(node, defaultFields[0], elasticContext);
+            if (singleQuery is null)
+                return null;
+
+            string? nestedPath = GetNestedPath(defaultFields[0], elasticContext);
+            if (nestedPath is not null)
+            {
+                Query innerQuery = singleQuery;
+                var filterResolver = GetNestedFilterResolver(elasticContext);
+                if (filterResolver is not null)
+                {
+                    var filter = await filterResolver(nestedPath, defaultFields[0], defaultFields[0], context).ConfigureAwait(false);
+                    if (filter is not null)
+                        innerQuery = new BoolQuery { Must = [innerQuery], Filter = [filter] };
+                }
+
+                return new NestedQuery(nestedPath, innerQuery);
+            }
+
+            return singleQuery;
+        }
 
         if (defaultFields is { Length: > 1 })
         {
@@ -59,12 +79,21 @@ public static class DefaultQueryNodeExtensions
                 return GetMultiFieldQuery(node, defaultFields, elasticContext);
             }
 
-            // Otherwise, split into separate queries for each nested group
-            return GetSplitNestedQuery(node, fieldsByNestedPath, elasticContext);
+            // Otherwise, split into separate queries for each group
+            return await GetSplitNestedQueryAsync(node, fieldsByNestedPath, elasticContext).ConfigureAwait(false);
         }
 
         // Fallback for no fields
         return GetMultiFieldQuery(node, defaultFields, elasticContext);
+    }
+
+    /// <summary>
+    /// Synchronous compatibility shim. Prefer <see cref="GetDefaultQueryAsync(TermNode, IQueryVisitorContext)"/> for async nested filter resolution.
+    /// </summary>
+    [Obsolete("Use GetDefaultQueryAsync to support async nested filter resolution.")]
+    public static Query? GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
+    {
+        return GetDefaultQueryAsync(node, context).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     private static Query? GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
@@ -226,57 +255,86 @@ public static class DefaultQueryNodeExtensions
 
     private static string? GetNestedPath(string fullName, IElasticQueryVisitorContext context)
     {
-        string[]? nameParts = fullName?.Split('.');
-
-        if (nameParts is null or { Length: 0 })
-            return null;
-
-        var builder = new StringBuilder();
-        for (int i = 0; i < nameParts.Length; i++)
-        {
-            if (i > 0)
-                builder.Append('.');
-
-            builder.Append(nameParts[i]);
-
-            string fieldName = builder.ToString();
-            if (context.MappingResolver.IsNestedPropertyType(fieldName))
-                return fieldName;
-        }
-
-        return null;
+        return NestedPathResolver.GetDeepestNestedPath(fullName, context.MappingResolver);
     }
 
-    private static Query GetSplitNestedQuery(TermNode node, Dictionary<string, List<string>> fieldsByNestedPath, IElasticQueryVisitorContext context)
+    private static async Task<Query> GetSplitNestedQueryAsync(TermNode node, Dictionary<string, List<string>> fieldsByNestedPath, IElasticQueryVisitorContext context)
     {
         var queryList = new List<Query>();
 
         foreach (var (nestedPath, fields) in fieldsByNestedPath)
         {
-            Query? query = fields.Count == 1
-                ? GetSingleFieldQuery(node, fields[0], context)
-                : GetMultiFieldQuery(node, fields.ToArray(), context);
-
-            if (query is null)
-                continue;
-
             if (!String.IsNullOrEmpty(nestedPath))
             {
-                queryList.Add(new NestedQuery(nestedPath, query));
-            }
-            // Flatten inner should clauses to avoid unnecessary bool nesting
-            else if (query is { Bool: { Should: not null } boolQuery })
-            {
-                foreach (var shouldClause in boolQuery.Should)
-                    queryList.Add(shouldClause);
+                var filterResolver = GetNestedFilterResolver(context);
+                if (filterResolver is not null)
+                {
+                    // Build per-field branches to preserve distinct filters
+                    var branches = new List<Query>();
+                    foreach (string field in fields)
+                    {
+                        var q = GetSingleFieldQuery(node, field, context);
+                        if (q is null)
+                            continue;
+
+                        Query branch = q;
+                        var filter = await filterResolver(nestedPath, field, field, context).ConfigureAwait(false);
+                        if (filter is not null)
+                            branch = new BoolQuery { Must = [branch], Filter = [filter] };
+                        branches.Add(branch);
+                    }
+
+                    if (branches.Count is 0)
+                        continue;
+
+                    Query innerQuery = branches.Count == 1
+                        ? branches[0]
+                        : new BoolQuery { Should = branches };
+
+                    queryList.Add(new NestedQuery(nestedPath, innerQuery));
+                }
+                else
+                {
+                    Query? query = fields.Count == 1
+                        ? GetSingleFieldQuery(node, fields[0], context)
+                        : GetMultiFieldQuery(node, fields.ToArray(), context);
+
+                    if (query is not null)
+                        queryList.Add(new NestedQuery(nestedPath, query));
+                }
             }
             else
             {
-                queryList.Add(query);
+                Query? query = fields.Count == 1
+                    ? GetSingleFieldQuery(node, fields[0], context)
+                    : GetMultiFieldQuery(node, fields.ToArray(), context);
+
+                if (query is null)
+                    continue;
+
+                // Flatten inner should clauses to avoid unnecessary bool nesting
+                if (query is { Bool: { Should: not null } boolQuery })
+                {
+                    foreach (var shouldClause in boolQuery.Should)
+                        queryList.Add(shouldClause);
+                }
+                else
+                {
+                    queryList.Add(query);
+                }
             }
         }
 
         return new BoolQuery { Should = queryList };
+    }
+
+    private static NestedFilterResolver? GetNestedFilterResolver(IElasticQueryVisitorContext context)
+    {
+        if (context is IQueryVisitorContext visitorContext &&
+            visitorContext.Data.TryGetValue("@NestedFilterResolver", out object? value))
+            return value as NestedFilterResolver;
+
+        return null;
     }
 
     public static async Task<Query?> GetDefaultQueryAsync(this TermRangeNode node, IQueryVisitorContext context)

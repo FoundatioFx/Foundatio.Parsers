@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
+using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
@@ -32,12 +33,7 @@ public static class DefaultSortNodeExtensions
         string? nestedPath = node.GetNestedPath();
         if (nestedPath is not null)
         {
-            var nestedSort = new NestedSortValue { Path = nestedPath };
-            var nestedFilter = node.GetNestedFilter();
-            if (nestedFilter is not null)
-                nestedSort.Filter = nestedFilter;
-
-            fieldSort.Nested = nestedSort;
+            fieldSort.Nested = BuildHierarchicalNestedSort(nestedPath, node.GetNestedFilter(), elasticContext);
         }
 
         return new SortOptions
@@ -79,5 +75,34 @@ public static class DefaultSortNodeExtensions
         }
 
         return [GeoLocation.Text(location)];
+    }
+
+    private static NestedSortValue BuildHierarchicalNestedSort(
+        string deepestPath, Query? filter, IElasticQueryVisitorContext context)
+    {
+        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, context.MappingResolver);
+
+        if (nestedPaths.Count <= 1)
+        {
+            var nestedSort = new NestedSortValue { Path = deepestPath };
+            if (filter is not null)
+                nestedSort.Filter = filter;
+            return nestedSort;
+        }
+
+        NestedSortValue? innermost = null;
+        for (int i = nestedPaths.Count - 1; i >= 0; i--)
+        {
+            var nestedSort = new NestedSortValue { Path = nestedPaths[i] };
+            if (i == nestedPaths.Count - 1 && filter is not null)
+                nestedSort.Filter = filter;
+
+            if (innermost is not null)
+                nestedSort.Nested = innermost;
+
+            innermost = nestedSort;
+        }
+
+        return innermost!;
     }
 }

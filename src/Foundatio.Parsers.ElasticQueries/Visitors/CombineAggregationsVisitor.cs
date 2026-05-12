@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
@@ -55,7 +56,8 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         foreach (var (nestedPath, childAggregations) in nestedAggregations)
         {
-            var nestedAgg = new AggregationMap($"nested_{nestedPath}", new NestedAggregation { Path = nestedPath });
+            var nestedChain = GetNestedPathChain(nestedPath, context);
+            var nestedAgg = EnsureNestedAggPath(container, nestedChain);
 
             foreach (var (child, aggregation) in childAggregations)
             {
@@ -66,18 +68,16 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
                     filteredAgg.Aggregations.Add(aggregation);
                     nestedAgg.Aggregations.Add(filteredAgg);
 
-                    AddTermsOrder(termsAggregation, child, aggregation, $"nested_{nestedPath}>filtered_{aggregation.Name}>");
+                    string bucketPrefix = BuildHierarchicalBucketPathPrefix(nestedPath, context);
+                    AddTermsOrder(termsAggregation, child, aggregation, $"{bucketPrefix}filtered_{aggregation.Name}{BucketPathSeparator}");
                 }
                 else
                 {
                     nestedAgg.Aggregations.Add(aggregation);
-                    AddTermsOrder(termsAggregation, child, aggregation);
-                }
-            }
 
-            if (container.Value is null || container.Value.IsBucketAggregation())
-            {
-                container.Aggregations.Add(nestedAgg);
+                    string bucketPrefix = BuildHierarchicalBucketPathPrefix(nestedPath, context);
+                    AddTermsOrder(termsAggregation, child, aggregation, bucketPrefix is { Length: > 0 } ? bucketPrefix : null);
+                }
             }
         }
 
@@ -183,4 +183,57 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
         return container;
     }
+
+    private static AggregationMap EnsureNestedAggPath(
+        AggregationMap container, IReadOnlyList<string> nestedChain)
+    {
+        var current = container;
+        foreach (var path in nestedChain)
+        {
+            var name = NestedPathResolver.GetNestedAggName(path);
+            var existing = current.Aggregations.FirstOrDefault(a => a.Name == name);
+
+            if (existing is not null)
+            {
+                current = existing;
+            }
+            else
+            {
+                var nested = new AggregationMap(name, new NestedAggregation { Path = path });
+                current.Aggregations.Add(nested);
+                current = nested;
+            }
+        }
+
+        return current;
+    }
+
+    private static IReadOnlyList<string> GetNestedPathChain(string deepestPath, IQueryVisitorContext context)
+    {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            return [deepestPath];
+
+        return NestedPathResolver.GetNestedPathChain(deepestPath, elasticContext.MappingResolver);
+    }
+
+    private static string BuildHierarchicalBucketPathPrefix(
+        string deepestPath, IQueryVisitorContext context)
+    {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            return NestedPathResolver.GetNestedAggName(deepestPath) + BucketPathSeparator;
+
+        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, elasticContext.MappingResolver);
+
+        if (nestedPaths.Count <= 1)
+            return NestedPathResolver.GetNestedAggName(deepestPath) + BucketPathSeparator;
+
+        var parts = nestedPaths.Select(p => NestedPathResolver.GetNestedAggName(p) + BucketPathSeparator).ToList();
+        return string.Join("", parts);
+    }
+
+    /// <summary>
+    /// Elasticsearch bucket path separator character used to traverse nested aggregation hierarchy
+    /// (e.g., "nested_parent>nested_parent.child>terms_field").
+    /// </summary>
+    private const string BucketPathSeparator = ">";
 }

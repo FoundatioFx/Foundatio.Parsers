@@ -1311,9 +1311,10 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
             .Query(q => q.Nested(n => n
                 .Path("resellers")
-                .Query(q2 => q2.Bool(b => b.Must(
-                    m => m.Term(t => t.Field("resellers.price").Value(10.0)),
-                    m => m.Term(t => t.Field("resellers.name").Value("Official"))))))), TestCancellationToken);
+                .Query(q2 => q2.Bool(b => b
+                    .Must(m => m.Term(t => t.Field("resellers.price").Value(10.0)))
+                    .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official"))))))), TestCancellationToken);
+
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1322,7 +1323,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public async Task NestedFilterQuery_WithMultipleFieldsSamePath_AppliesFilterOnceInCoalescedQuery()
+    public async Task NestedFilterQuery_WithMultipleFieldsSamePath_AppliesFilterPerChildQuery()
     {
         // Arrange
         string index = await CreateRandomIndexAsync<Product>(d => d.Properties(p => p
@@ -1356,7 +1357,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         // Act
         var result = await processor.BuildQueryAsync("resellers.name:Official AND resellers.price:10", new ElasticQueryVisitorContext { UseScoring = true });
 
-        // Assert
+        // Assert — filter is applied to each child query before combining
         var actualResponse = await Client.SearchAsync<Product>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
@@ -1364,10 +1365,15 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
             .Query(q => q.Nested(n => n
                 .Path("resellers")
-                .Query(q2 => q2.Bool(b => b.Must(
-                    m => m.Term(t => t.Field("resellers.name").Value("Official")),
-                    m => m.Term(t => t.Field("resellers.price").Value(10.0)),
-                    m => m.Term(t => t.Field("resellers.name").Value("Official"))))))), TestCancellationToken);
+                .Query(q2 => q2.Bool(b => b
+                    .Must(
+                        m => m.Bool(b2 => b2
+                            .Must(m2 => m2.Term(t => t.Field("resellers.name").Value("Official")))
+                            .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official")))),
+                        m => m.Bool(b2 => b2
+                            .Must(m2 => m2.Term(t => t.Field("resellers.price").Value(10.0)))
+                            .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official"))))))))), TestCancellationToken);
+
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1532,10 +1538,12 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var expectedResponse = await Client.SearchAsync<Product>(d => d.Indices(index)
             .Query(q => q.Nested(n => n
                 .Path("resellers")
-                .Query(q2 => q2.Bool(b => b.Must(
-                    m => m.Term(t => t.Field("resellers.name").Value("Official")),
-                    m => m.Term(t => t.Field("resellers.price").Value(10.0)),
-                    m => m.Term(t => t.Field("resellers.name").Value("Official"))))))), TestCancellationToken);
+                .Query(q2 => q2.Bool(b => b
+                    .Must(
+                        m => m.Term(t => t.Field("resellers.name").Value("Official")),
+                        m => m.Term(t => t.Field("resellers.price").Value(10.0)))
+                    .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official"))))))), TestCancellationToken);
+
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -1637,14 +1645,15 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .Query(q => q.Bool(b => b.Must(
                 m => m.Nested(n => n
                     .Path("resellers")
-                    .Query(q2 => q2.Bool(b2 => b2.Must(
-                        m2 => m2.Term(t => t.Field("resellers.price").Value(10.0)),
-                        m2 => m2.Term(t => t.Field("resellers.name").Value("Official")))))),
+                    .Query(q2 => q2.Bool(b2 => b2
+                        .Must(m2 => m2.Term(t => t.Field("resellers.price").Value(10.0)))
+                        .Filter(f => f.Term(t => t.Field("resellers.name").Value("Official")))))),
                 m => m.Nested(n => n
                     .Path("tags")
-                    .Query(q2 => q2.Bool(b2 => b2.Must(
-                        m2 => m2.Term(t => t.Field("tags.label").Value("sale")),
-                        m2 => m2.Term(t => t.Field("tags.label").Value("sale"))))))))), TestCancellationToken);
+                    .Query(q2 => q2.Bool(b2 => b2
+                        .Must(m2 => m2.Term(t => t.Field("tags.label").Value("sale")))
+                        .Filter(f => f.Term(t => t.Field("tags.label").Value("sale"))))))))), TestCancellationToken);
+
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 

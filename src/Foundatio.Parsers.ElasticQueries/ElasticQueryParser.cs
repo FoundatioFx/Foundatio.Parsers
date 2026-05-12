@@ -81,6 +81,9 @@ public class ElasticQueryParser : LuceneQueryParser
 
         context.SetMappingResolver(Configuration.MappingResolver ?? ElasticMappingResolver.NullInstance);
 
+        if (Configuration.NestedFilterResolver is not null)
+            context.SetValue("@NestedFilterResolver", Configuration.NestedFilterResolver);
+
         if (!context.Data.ContainsKey("@OriginalContextResolver"))
             context.SetValue("@OriginalContextResolver", context.GetFieldResolver()!);
 

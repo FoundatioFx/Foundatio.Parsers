@@ -130,14 +130,16 @@ FieldType fieldType = resolver.GetFieldType("price");
 
 `GetFieldType` returns a `FieldType` enum with values such as:
 
-- `FieldType.Text`
-- `FieldType.Keyword`
-- `FieldType.Date`
-- `FieldType.Boolean`
-- `FieldType.Long`, `FieldType.Integer`, `FieldType.Short`, `FieldType.Byte`
-- `FieldType.Double`, `FieldType.Float`, `FieldType.HalfFloat`, `FieldType.ScaledFloat`
-- `FieldType.GeoPoint`, `FieldType.GeoShape`
-- `FieldType.Nested`, `FieldType.Object`
+- **Text**: `text`, `match_only_text`, `search_as_you_type` (legacy `string` also supported)
+- **Keyword**: `keyword`, `constant_keyword`, `wildcard`
+- **Numeric**: `long`, `unsigned_long`, `integer`, `short`, `byte`, `double`, `float`, `half_float`, `scaled_float`
+- **Date**: `date`, `date_nanos`
+- **Range**: `integer_range`, `float_range`, `long_range`, `double_range`, `date_range`, `ip_range`
+- **Geo**: `geo_point`, `geo_shape`, `point`, `shape`
+- **Structured**: `nested`, `object`, `flattened`, `join`
+- **Other**: `boolean`, `ip`, `binary`, `completion`, `murmur3`, `token_count`, `percolator`, `alias`, `rank_feature`, `rank_features`, `histogram`, `dense_vector`, `version`
+
+Unrecognized types return `FieldType.None`.
 
 ```csharp
 FieldType fieldType = resolver.GetFieldType("price");
@@ -245,10 +247,11 @@ var createIndexResponse = await client.Indices.CreateAsync("my-index", c => c
         .Properties(p => p
             // Add .keyword sub-field
             .Text(n => n.Title, t => t.AddKeywordField())
-            
+
             // Add .sort sub-field with lowercase normalizer
             .Text(n => n.Name, t => t.AddSortField())
-            
+
+
             // Add both .keyword and .sort sub-fields
             .Text(n => n.Description, t => t.AddKeywordAndSortFields())
         )));
@@ -316,10 +319,10 @@ public class FieldMapping
 {
     // Whether the field was found in mappings
     public bool Found { get; }
-    
+
     // The full resolved path (e.g., "data.user.name")
     public string FullPath { get; }
-    
+
     // The Elasticsearch IProperty for the field
     public IProperty Property { get; }
 }
