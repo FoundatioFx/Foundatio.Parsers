@@ -85,6 +85,15 @@ public static class DefaultQueryNodeExtensions
         return GetMultiFieldQuery(node, defaultFields, elasticContext);
     }
 
+    /// <summary>
+    /// Synchronous compatibility shim. Prefer <see cref="GetDefaultQueryAsync(TermNode, IQueryVisitorContext)"/> for async nested filter resolution.
+    /// </summary>
+    [Obsolete("Use GetDefaultQueryAsync to support async nested filter resolution.")]
+    public static QueryBase? GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
+    {
+        return GetDefaultQueryAsync(node, context).ConfigureAwait(false).GetAwaiter().GetResult();
+    }
+
     private static QueryBase? GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
     {
         if (context.MappingResolver.IsPropertyAnalyzed(field))
