@@ -36,7 +36,7 @@ public class GeoVisitor : ChainableQueryVisitor
             location = await _resolveGeoLocation(node.Term).AnyContext();
 
         location ??= node.Term;
-        if (location is null)
+        if (String.IsNullOrWhiteSpace(location))
             return;
 
         var query = new GeoDistanceQuery(node.Proximity ?? "10mi", fieldName, location);

@@ -539,7 +539,6 @@ public class SearchService
 
         // Build query with scoring for relevance
         var context = new ElasticQueryVisitorContext().UseSearchMode();
-        var esQuery = await _parser.BuildQueryAsync(query, context);
 
         // Build components
         var esQuery = await _parser.BuildQueryAsync(query, context);
