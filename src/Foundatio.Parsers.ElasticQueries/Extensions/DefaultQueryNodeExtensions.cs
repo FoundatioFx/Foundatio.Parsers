@@ -345,7 +345,12 @@ public static class DefaultQueryNodeExtensions
 
         string? field = node.UnescapedField;
         if (String.IsNullOrEmpty(field))
-            return null;
+        {
+            if (node.Parent is GroupNode parentGroup && !String.IsNullOrEmpty(parentGroup.UnescapedField))
+                field = parentGroup.UnescapedField;
+            else
+                return null;
+        }
 
         if (elasticContext.MappingResolver.IsDatePropertyType(field))
         {

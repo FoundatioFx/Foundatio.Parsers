@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
@@ -1713,6 +1714,78 @@ public class UpdateFixedTermFieldToDateFixedExistsQueryVisitor : ChainableQueryV
         var query = new Query { Exists = new ExistsQuery { Field = "date_fixed" } };
         node.SetQuery(isFixed ? query : !query);
     }
+
+    [Fact]
+    public async Task BuildQueryAsync_GroupedRangeWithExclusiveBounds_PropagatesFieldToTermRangeNodes()
+    {
+        // Arrange
+        var sut = new ElasticQueryParser();
+
+        // Act
+        var result = await sut.BuildQueryAsync("field:(>30 AND <=40)");
+
+        // Assert
+        Assert.NotNull(result);
+        var boolQuery = result.Bool;
+        Assert.NotNull(boolQuery);
+        var clauses = boolQuery.Filter ?? boolQuery.Must;
+        Assert.NotNull(clauses);
+        Assert.Equal(2, clauses.Count);
+
+        var termRange1 = clauses.ElementAt(0).Range as TermRangeQuery;
+        Assert.NotNull(termRange1);
+        Assert.Equal("field", termRange1.Field.ToString());
+        Assert.Equal("30", termRange1.Gt);
+
+        var termRange2 = clauses.ElementAt(1).Range as TermRangeQuery;
+        Assert.NotNull(termRange2);
+        Assert.Equal("field", termRange2.Field.ToString());
+        Assert.Equal("40", termRange2.Lte);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_GroupedRangeWithInclusiveBounds_PropagatesFieldToTermRangeNodes()
+    {
+        // Arrange
+        var sut = new ElasticQueryParser();
+
+        // Act
+        var result = await sut.BuildQueryAsync("field:(>=10 AND <20)");
+
+        // Assert
+        Assert.NotNull(result);
+        var boolQuery = result.Bool;
+        Assert.NotNull(boolQuery);
+        var clauses = boolQuery.Filter ?? boolQuery.Must;
+        Assert.NotNull(clauses);
+        Assert.Equal(2, clauses.Count);
+
+        var termRange1 = clauses.ElementAt(0).Range as TermRangeQuery;
+        Assert.NotNull(termRange1);
+        Assert.Equal("field", termRange1.Field.ToString());
+        Assert.Equal("10", termRange1.Gte);
+
+        var termRange2 = clauses.ElementAt(1).Range as TermRangeQuery;
+        Assert.NotNull(termRange2);
+        Assert.Equal("field", termRange2.Field.ToString());
+        Assert.Equal("20", termRange2.Lt);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_GroupedRangeWithOtherTerms_ProducesBoolQueryWithAllClauses()
+    {
+        // Arrange
+        var sut = new ElasticQueryParser();
+
+        // Act
+        var result = await sut.BuildQueryAsync("field:(>30 AND <=40) AND other:value");
+
+        // Assert
+        Assert.NotNull(result);
+        var boolQuery = result.Bool;
+        Assert.NotNull(boolQuery);
+    }
+
 }
 
 public class TestQueryVisitor : ChainableQueryVisitor
