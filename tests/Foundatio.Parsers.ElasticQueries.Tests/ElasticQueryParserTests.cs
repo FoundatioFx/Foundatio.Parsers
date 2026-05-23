@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
@@ -1674,6 +1675,90 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.True(result.IsValid, result.Message);
         Assert.Single(result.ReferencedFields, "field1");
         Assert.Empty(result.UnresolvedFields);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_GroupedRangeWithExclusiveBounds_PropagatesFieldToTermRangeNodes()
+    {
+        // Arrange
+        var sut = new ElasticQueryParser();
+
+        // Act
+        var result = await sut.BuildQueryAsync("field:(>30 AND <=40)");
+
+        // Assert
+        Assert.NotNull(result);
+        var boolQuery = result.Bool;
+        Assert.NotNull(boolQuery);
+        var clauses = boolQuery.Filter ?? boolQuery.Must;
+        Assert.NotNull(clauses);
+        Assert.Equal(2, clauses.Count);
+
+        var ranges = clauses.Select(c => c.Range).OfType<TermRangeQuery>().ToList();
+        Assert.Equal(2, ranges.Count);
+
+        var gtRange = ranges.First(r => r.Gt is not null && r.Gt == "30");
+        Assert.Equal("field", gtRange.Field.ToString());
+
+        var lteRange = ranges.First(r => r.Lte is not null && r.Lte == "40");
+        Assert.Equal("field", lteRange.Field.ToString());
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_GroupedRangeWithInclusiveBounds_PropagatesFieldToTermRangeNodes()
+    {
+        // Arrange
+        var sut = new ElasticQueryParser();
+
+        // Act
+        var result = await sut.BuildQueryAsync("field:(>=10 AND <20)");
+
+        // Assert
+        Assert.NotNull(result);
+        var boolQuery = result.Bool;
+        Assert.NotNull(boolQuery);
+        var clauses = boolQuery.Filter ?? boolQuery.Must;
+        Assert.NotNull(clauses);
+        Assert.Equal(2, clauses.Count);
+
+        var ranges = clauses.Select(c => c.Range).OfType<TermRangeQuery>().ToList();
+        Assert.Equal(2, ranges.Count);
+
+        var gteRange = ranges.First(r => r.Gte is not null && r.Gte == "10");
+        Assert.Equal("field", gteRange.Field.ToString());
+
+        var ltRange = ranges.First(r => r.Lt is not null && r.Lt == "20");
+        Assert.Equal("field", ltRange.Field.ToString());
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_GroupedRangeWithOtherTerms_ProducesBoolQueryWithAllClauses()
+    {
+        // Arrange
+        var sut = new ElasticQueryParser();
+
+        // Act
+        var result = await sut.BuildQueryAsync("field:(>30 AND <=40) AND other:value");
+
+        // Assert
+        Assert.NotNull(result);
+        var boolQuery = result.Bool;
+        Assert.NotNull(boolQuery);
+        var clauses = boolQuery.Filter ?? boolQuery.Must;
+        Assert.NotNull(clauses);
+        Assert.True(clauses.Count >= 3, $"Expected at least 3 clauses but found {clauses.Count}");
+
+        var rangeQueries = clauses.Where(c => c.Range is TermRangeQuery).ToList();
+        Assert.Equal(2, rangeQueries.Count);
+        Assert.All(rangeQueries, rq =>
+        {
+            var termRange = Assert.IsType<TermRangeQuery>(rq.Range);
+            Assert.Equal("field", termRange.Field.ToString());
+        });
+
+        var termQueries = clauses.Where(c => c.Term is not null).ToList();
+        Assert.Single(termQueries);
+        Assert.Equal("other", termQueries[0].Term!.Field.ToString());
     }
 }
 
