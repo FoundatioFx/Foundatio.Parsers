@@ -1694,13 +1694,14 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.NotNull(clauses);
         Assert.Equal(2, clauses.Count);
 
-        var termRange1 = Assert.IsType<TermRangeQuery>(clauses.ElementAt(0).Range);
-        Assert.Equal("field", termRange1.Field.ToString());
-        Assert.Equal("30", termRange1.Gt);
+        var ranges = clauses.Select(c => c.Range).OfType<TermRangeQuery>().ToList();
+        Assert.Equal(2, ranges.Count);
 
-        var termRange2 = Assert.IsType<TermRangeQuery>(clauses.ElementAt(1).Range);
-        Assert.Equal("field", termRange2.Field.ToString());
-        Assert.Equal("40", termRange2.Lte);
+        var gtRange = ranges.First(r => r.Gt is not null && r.Gt == "30");
+        Assert.Equal("field", gtRange.Field.ToString());
+
+        var lteRange = ranges.First(r => r.Lte is not null && r.Lte == "40");
+        Assert.Equal("field", lteRange.Field.ToString());
     }
 
     [Fact]
@@ -1720,13 +1721,14 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.NotNull(clauses);
         Assert.Equal(2, clauses.Count);
 
-        var termRange1 = Assert.IsType<TermRangeQuery>(clauses.ElementAt(0).Range);
-        Assert.Equal("field", termRange1.Field.ToString());
-        Assert.Equal("10", termRange1.Gte);
+        var ranges = clauses.Select(c => c.Range).OfType<TermRangeQuery>().ToList();
+        Assert.Equal(2, ranges.Count);
 
-        var termRange2 = Assert.IsType<TermRangeQuery>(clauses.ElementAt(1).Range);
-        Assert.Equal("field", termRange2.Field.ToString());
-        Assert.Equal("20", termRange2.Lt);
+        var gteRange = ranges.First(r => r.Gte is not null && r.Gte == "10");
+        Assert.Equal("field", gteRange.Field.ToString());
+
+        var ltRange = ranges.First(r => r.Lt is not null && r.Lt == "20");
+        Assert.Equal("field", ltRange.Field.ToString());
     }
 
     [Fact]
@@ -1748,11 +1750,11 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
 
         var rangeQueries = clauses.Where(c => c.Range is TermRangeQuery).ToList();
         Assert.Equal(2, rangeQueries.Count);
-        foreach (var rq in rangeQueries)
+        Assert.All(rangeQueries, rq =>
         {
             var termRange = Assert.IsType<TermRangeQuery>(rq.Range);
             Assert.Equal("field", termRange.Field.ToString());
-        }
+        });
 
         var termQueries = clauses.Where(c => c.Term is not null).ToList();
         Assert.Single(termQueries);
