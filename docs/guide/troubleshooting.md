@@ -145,7 +145,7 @@ var parser = new ElasticQueryParser(c => c
     }));
 
 // Option 3: Refresh mappings. Recently added fields are picked up automatically within
-// UnmappedFieldRefreshInterval (default 5 seconds); invalidate a single field to pick it up immediately.
+// UnmappedFieldRefreshInterval (default 1 second); invalidate a single field to pick it up immediately.
 parser.Configuration.MappingResolver.InvalidateFieldMapping("user_field");
 ```
 
@@ -378,7 +378,7 @@ var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));
 **Cause:** Queries reference fields that do not exist, so every one of them triggers a mapping reload.
 
 Fields that cannot be resolved reload the mapping on their own short interval
-(`UnmappedFieldRefreshInterval`, default 5 seconds) because that is how dynamically created fields become
+(`UnmappedFieldRefreshInterval`, default 1 second) because that is how dynamically created fields become
 visible. Reloads that do not resolve the field back off exponentially up to `MappingRefreshInterval`, and
 concurrent lookups of the same unmapped field are coalesced into a single `GetMapping` call. Raise the base
 interval if a workload legitimately queries many non-existent fields:
@@ -406,6 +406,15 @@ immediately after creating it, invalidate just that field:
 
 ```csharp
 resolver.InvalidateFieldMapping("idx.string-000001");
+```
+
+If the field stays unmapped for much longer than `UnmappedFieldRefreshInterval`, look for the
+`did not complete within` warning. It means a mapping reload was already running but took longer than
+`FetchJoinTimeout` (default 30 seconds), so resolutions gave up waiting for it. Raise `FetchJoinTimeout` to
+match how long your `GetMapping` call actually takes:
+
+```csharp
+resolver.FetchJoinTimeout = TimeSpan.FromMinutes(2);
 ```
 
 ## Debugging

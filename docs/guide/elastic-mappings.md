@@ -288,25 +288,50 @@ dynamically created fields become visible quickly without turning every query in
 | Trigger | Setting | Default | Behavior |
 | --- | --- | --- | --- |
 | The loaded mapping is stale | `MappingRefreshInterval` | 1 minute | Maximum age of the loaded mapping before an ordinary resolution reloads it. |
-| A field could not be resolved | `UnmappedFieldRefreshInterval` | 5 seconds | A resolution failure is the strongest signal the index mapping changed, so it reloads on a much shorter interval. |
+| A field could not be resolved | `UnmappedFieldRefreshInterval` | 1 second | A resolution failure is the strongest signal the index mapping changed, so it reloads on a much shorter interval. |
+| A reload is already running | `FetchJoinTimeout` | 30 seconds | How long a resolution waits to join an in-flight reload instead of issuing its own. |
 
 A field that cannot be resolved is the normal outcome for fields created at runtime — dynamic templates
 (including the `idx.*` custom field templates used by Foundatio.Repositories) only add a field to the index
 mapping after the first document that uses it is indexed. Because of that, an unresolved field reloads the
 server mapping on its own short interval and is never blocked by the mapping having been loaded at startup.
 
-Reloads that still do not resolve the field back off exponentially (5s, 10s, 20s, 40s, up to
+Reloads that still do not resolve the field back off exponentially (1s, 2s, 4s, 8s, up to
 `MappingRefreshInterval`), so a flood of queries against fields that genuinely do not exist cannot hammer the
 cluster. The interval resets to the base value as soon as a reload does resolve a field. Concurrent lookups of
-an unmapped field are coalesced into a single `GetMapping` call.
+an unmapped field are coalesced into a single `GetMapping` call, so the worst case reload rate is one per
+`UnmappedFieldRefreshInterval` per resolver, and only while unresolved fields are actually being queried.
 
 ```csharp
 var resolver = parser.Configuration.MappingResolver;
 
 // Reload sooner (or set to TimeSpan.Zero to always reload when a field cannot be resolved)
-resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(1);
+resolver.UnmappedFieldRefreshInterval = TimeSpan.FromMilliseconds(250);
 resolver.MappingRefreshInterval = TimeSpan.FromMinutes(5);
 ```
+
+### Waiting For An In-Flight Reload
+
+Only one mapping reload runs at a time. Other resolutions that need a fresh mapping wait for that reload
+rather than issuing their own, because waiting is never more expensive than performing the fetch. If the wait
+exceeds `FetchJoinTimeout`, the resolution gives up and treats the field as unmapped, and a warning is logged.
+
+`FetchJoinTimeout` must therefore comfortably exceed how long your `GetMapping` call takes. It defaults to 30
+seconds, which is far above a normal round trip, but the Elasticsearch client permits a request to run for up
+to its own request timeout (10 minutes by default). Raise it if your mapping fetch can legitimately run
+longer, or set it to a negative value to wait indefinitely:
+
+```csharp
+resolver.FetchJoinTimeout = TimeSpan.FromMinutes(2);
+```
+
+### Residual Staleness
+
+Elasticsearch does not expose a cheap way to ask whether an index mapping has changed, so the resolver cannot
+detect a schema change without fetching the whole mapping. That means a field created between reloads can
+still resolve as unmapped for up to `UnmappedFieldRefreshInterval`. If your workload cannot tolerate any
+window, use `InvalidateFieldMapping` at the point the field is created (see below) or set
+`UnmappedFieldRefreshInterval` to `TimeSpan.Zero` to reload on every unresolved field.
 
 ### Invalidating a Single Field
 

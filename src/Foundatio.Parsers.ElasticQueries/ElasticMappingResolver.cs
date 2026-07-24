@@ -16,8 +16,6 @@ namespace Foundatio.Parsers.ElasticQueries;
 
 public class ElasticMappingResolver : IDisposable
 {
-    private static readonly TimeSpan _fetchJoinTimeout = TimeSpan.FromSeconds(5);
-
     private readonly TypeMapping? _codeMapping;
     private readonly Lazy<Properties?> _inferredCodeProperties;
     private readonly Inferrer? _inferrer;
@@ -71,7 +69,18 @@ public class ElasticMappingResolver : IDisposable
     /// Reloads that do not resolve the field back off exponentially up to <see cref="MappingRefreshInterval"/>.
     /// Set to <see cref="TimeSpan.Zero"/> to always reload on an unresolved field.
     /// </summary>
-    public TimeSpan UnmappedFieldRefreshInterval { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan UnmappedFieldRefreshInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Maximum time a resolution will wait to join a server mapping fetch that is already in flight. Only one
+    /// fetch runs at a time, so concurrent lookups of a field that is missing from the loaded mapping wait for
+    /// that fetch instead of issuing their own. Waiting is never more expensive than performing the fetch, so
+    /// this must comfortably exceed the latency of the configured mapping fetch; giving up early would resolve
+    /// the field as unmapped even though a fetch that could have resolved it was already running. It is bounded
+    /// rather than infinite so that an unresponsive cluster cannot pin request threads indefinitely.
+    /// Set to a negative value to wait indefinitely.
+    /// </summary>
+    public TimeSpan FetchJoinTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Approximate upper bound on the number of resolved field mappings held in memory. Field names come
@@ -308,6 +317,9 @@ public class ElasticMappingResolver : IDisposable
         // bogus field names cannot turn every query into a mapping fetch.
         if (reloadedForMiss)
             IncreaseUnmappedRefreshBackoff(snapshot.Version);
+        else if (lastFetchResult == MappingFetchResult.JoinTimedOut && ShouldLogSuppressedReload())
+            _logger.LogWarning("Unable to resolve mapping for field {Field}. A server mapping reload was already in flight but did not complete within {JoinTimeout}, so this field is being treated as unmapped. Increase {Property} if the mapping fetch is expected to take longer than this", field,
+                FetchJoinTimeout, nameof(FetchJoinTimeout));
         else if (lastFetchResult == MappingFetchResult.Throttled && snapshot.HasServerMapping && ShouldLogSuppressedReload())
             _logger.LogWarning("Unable to resolve mapping for field {Field}. The loaded server mapping is {MappingAge} old and a reload was suppressed by the {RefreshInterval} unmapped field refresh throttle, so this field is being treated as unmapped", field,
                 _timeProvider.GetUtcNow().UtcDateTime - snapshot.CreatedUtc, new TimeSpan(GetUnmappedRefreshIntervalTicks()));
@@ -315,6 +327,8 @@ public class ElasticMappingResolver : IDisposable
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Mapping not found: {Field}", field);
 
+        // A cached miss is always revalidated against an in-flight or throttled reload before it is trusted
+        // (see GetMapping), so caching this result cannot pin a stale answer.
         var notFoundMapping = new FieldMapping(resolvedFieldName.ToString(), null, snapshot.CreatedUtc, snapshot.Version);
         CacheFieldMapping(field, notFoundMapping, snapshot.Version);
 
@@ -779,12 +793,20 @@ public class ElasticMappingResolver : IDisposable
 
         long versionBeforeWait = Snapshot.Version;
 
+        var joinTimeout = FetchJoinTimeout;
+        if (joinTimeout < TimeSpan.Zero)
+            joinTimeout = Timeout.InfiniteTimeSpan;
+        else if (joinTimeout.TotalMilliseconds > Int32.MaxValue)
+            joinTimeout = TimeSpan.FromMilliseconds(Int32.MaxValue);
+
         bool acquired;
         try
         {
-            // Join an in-flight fetch instead of silently continuing with a stale mapping. The wait is
-            // bounded because the fetch callback is user supplied and does blocking network I/O.
-            acquired = _fetchSemaphore.Wait(_fetchJoinTimeout);
+            // Join an in-flight fetch instead of silently continuing with a stale mapping. That fetch is
+            // exactly the work this resolution needs, so waiting for it is never more expensive than doing
+            // it ourselves. The wait is bounded because the fetch callback is user supplied and does
+            // blocking network I/O, and an unresponsive cluster must not pin request threads forever.
+            acquired = _fetchSemaphore.Wait(joinTimeout);
         }
         catch (ObjectDisposedException)
         {
@@ -793,8 +815,12 @@ public class ElasticMappingResolver : IDisposable
 
         if (!acquired)
         {
-            _logger.LogWarning("Timed out after {Timeout} joining an in-flight server mapping fetch, continuing with the loaded mapping", _fetchJoinTimeout);
-            return MappingFetchResult.Throttled;
+            // The in-flight fetch may have published while we were giving up.
+            var snapshotAfterTimeout = Snapshot;
+            if (snapshotAfterTimeout.Version != versionBeforeWait && snapshotAfterTimeout.Fetched)
+                return MappingFetchResult.Updated;
+
+            return MappingFetchResult.JoinTimedOut;
         }
 
         try
@@ -1038,6 +1064,12 @@ public class ElasticMappingResolver : IDisposable
 
         /// <summary>A fetch was warranted but suppressed by a refresh throttle.</summary>
         Throttled,
+
+        /// <summary>
+        /// A fetch was already in flight but did not complete within <see cref="FetchJoinTimeout"/>, so the
+        /// loaded mapping is known to be stale.
+        /// </summary>
+        JoinTimedOut,
 
         /// <summary>The server mapping was reloaded and a new snapshot published.</summary>
         Updated,

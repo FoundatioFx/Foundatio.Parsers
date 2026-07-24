@@ -346,6 +346,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             Interlocked.Increment(ref fetchCount);
             return CreateTextWithKeywordMapping("name");
         }, _inferrer, timeProvider: timeProvider, logger: _logger);
+        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(5);
 
         resolver.GetMapping("name");
         Assert.Equal(1, fetchCount);
@@ -373,6 +374,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             Interlocked.Increment(ref fetchCount);
             return CreateTextWithKeywordMapping("name");
         }, _inferrer, timeProvider: timeProvider, logger: _logger);
+        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(5);
 
         resolver.GetMapping("name");
         resolver.GetMapping("missing_1");
@@ -409,6 +411,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             Interlocked.Increment(ref fetchCount);
             return serverMapping;
         }, _inferrer, timeProvider: timeProvider, logger: _logger);
+        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(5);
 
         resolver.GetMapping("name");
         resolver.GetMapping("missing_1");
@@ -523,6 +526,105 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
+    public async Task GetMapping_WithLookupDuringFetchThatOutlastedJoinTimeout_StillJoinsInFlightFetch()
+    {
+        // Arrange - a lookup that gives up joining an in-flight fetch reports the field as unmapped, but that
+        // must not stop later lookups from joining the same fetch and getting the real answer.
+        var fetchStarted = new ManualResetEventSlim(false);
+        var releaseFetch = new ManualResetEventSlim(false);
+        int fetchCount = 0;
+        var serverMapping = CreateTextWithKeywordMapping("name");
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            if (Interlocked.Increment(ref fetchCount) > 1)
+            {
+                fetchStarted.Set();
+                releaseFetch.Wait(TimeSpan.FromSeconds(30));
+            }
+
+            return serverMapping;
+        }, _inferrer, logger: _logger);
+
+        resolver.GetMapping("name");
+        serverMapping = CreateDynamicCustomFieldMapping("name", "keyword-000001", new KeywordProperty());
+
+        var inFlightFetch = Task.Run(() => resolver.GetMapping("idx.keyword-000001"));
+        Assert.True(fetchStarted.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        // Act - this lookup gives up joining the in-flight fetch
+        resolver.FetchJoinTimeout = TimeSpan.FromMilliseconds(50);
+        var timedOutLookup = resolver.GetMapping("idx.keyword-000001");
+
+        // Act - a later lookup, still while that same fetch is running, must join it rather than be served
+        // the unmapped result the timed out lookup just produced
+        resolver.FetchJoinTimeout = TimeSpan.FromSeconds(30);
+        var joiningLookup = Task.Run(() => resolver.GetMapping("idx.keyword-000001"));
+        await Task.Delay(200, TestContext.Current.CancellationToken);
+        releaseFetch.Set();
+
+        // Assert
+        Assert.NotNull(timedOutLookup);
+        Assert.False(timedOutLookup.Found);
+
+        var joined = await joiningLookup;
+        Assert.NotNull(joined);
+        Assert.True(joined.Found);
+        Assert.Equal("idx.keyword-000001", joined.FullPath);
+
+        var completed = await inFlightFetch;
+        Assert.NotNull(completed);
+        Assert.True(completed.Found);
+    }
+
+    [Fact]
+    public async Task GetMapping_WithServerMappingFetchSlowerThanFiveSeconds_ResolvesFieldForAllConcurrentLookups()
+    {
+        // Arrange - the join timeout must comfortably exceed the mapping fetch latency, otherwise concurrent
+        // lookups give up on the very fetch that would have resolved their field and silently treat it as
+        // unmapped. Six seconds would have exceeded the previously hard coded five second join timeout.
+        int fetchCount = 0;
+        var serverMapping = CreateTextWithKeywordMapping("name");
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            if (Interlocked.Increment(ref fetchCount) > 1)
+                Thread.Sleep(TimeSpan.FromSeconds(6));
+
+            return serverMapping;
+        }, _inferrer, logger: _logger);
+
+        resolver.GetMapping("name");
+        serverMapping = CreateDynamicCustomFieldMapping("name", "keyword-000001", new KeywordProperty());
+
+        // Act
+        var lookups = Enumerable.Range(0, 8)
+            .Select(_ => Task.Run(() => resolver.GetMapping("idx.keyword-000001")))
+            .ToArray();
+        await Task.WhenAll(lookups);
+
+        // Assert - one fetch served them all and every caller got the real mapping
+        Assert.Equal(2, fetchCount);
+        Assert.All(lookups, t =>
+        {
+            Assert.NotNull(t.Result);
+            Assert.True(t.Result!.Found);
+            Assert.Equal("idx.keyword-000001", t.Result.FullPath);
+        });
+    }
+
+    [Fact]
+    public void FetchJoinTimeout_ByDefault_ExceedsTypicalMappingFetchLatency()
+    {
+        // Arrange + Act
+        using var resolver = new ElasticMappingResolver(() => CreateTextWithKeywordMapping("name"), _inferrer, logger: _logger);
+
+        // Assert - waiting for an in-flight fetch is never more expensive than performing it, so the default
+        // must leave plenty of headroom above a normal get mapping round trip
+        Assert.Equal(TimeSpan.FromSeconds(30), resolver.FetchJoinTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(1), resolver.UnmappedFieldRefreshInterval);
+        Assert.Equal(TimeSpan.FromMinutes(1), resolver.MappingRefreshInterval);
+    }
+
+    [Fact]
     public async Task GetMapping_WithConcurrentLookupsOfSameUnmappedField_BacksOffOncePerReload()
     {
         // Arrange - every one of these lookups adopts the result of a single reload, so the backoff must
@@ -534,6 +636,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             Interlocked.Increment(ref fetchCount);
             return CreateTextWithKeywordMapping("name");
         }, _inferrer, timeProvider: timeProvider, logger: _logger);
+        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(5);
 
         resolver.GetMapping("name");
         int afterColdStart = fetchCount;
