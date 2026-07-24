@@ -295,21 +295,18 @@ public class ElasticMappingResolver : IDisposable
                 return resolvedMapping;
             }
 
-            if (fieldMapping is ObjectProperty objectProperty)
+            // Object and nested properties hold sub-objects in Properties; every other property type can
+            // only hold multi-fields. GetFields() covers all property types, so a multi-field on a keyword,
+            // date or numeric property resolves the same way one on a text property does.
+            currentProperties = fieldMapping switch
             {
-                currentProperties = objectProperty.Properties;
-            }
-            else if (fieldMapping is NestedProperty nestedProperty)
-            {
-                currentProperties = nestedProperty.Properties;
-            }
-            else
-            {
-                if (fieldMapping is TextProperty textProperty)
-                    currentProperties = textProperty.Fields;
-                else
-                    break;
-            }
+                ObjectProperty objectProperty => objectProperty.Properties ?? objectProperty.Fields,
+                NestedProperty nestedProperty => nestedProperty.Properties ?? nestedProperty.Fields,
+                _ => fieldMapping.GetFields()
+            };
+
+            if (currentProperties is null)
+                break;
         }
 
         // A freshly reloaded mapping that still does not contain the field means the field probably does not

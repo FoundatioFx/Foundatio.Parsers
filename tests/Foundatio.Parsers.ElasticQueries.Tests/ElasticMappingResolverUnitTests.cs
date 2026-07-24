@@ -624,6 +624,60 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.Equal(TimeSpan.FromMinutes(1), resolver.MappingRefreshInterval);
     }
 
+    [Theory]
+    [InlineData("keyword")]
+    [InlineData("date")]
+    [InlineData("long")]
+    [InlineData("boolean")]
+    [InlineData("ip")]
+    public void GetMapping_WithMultiFieldOnNonTextProperty_ResolvesSubField(string propertyType)
+    {
+        // Arrange - every Elasticsearch property type can carry multi-fields, not just text. Resolving them
+        // for text only silently reports "field.subfield" as unmapped for every other type.
+        IProperty property = propertyType switch
+        {
+            "keyword" => new KeywordProperty(),
+            "date" => new DateProperty(),
+            "long" => new LongNumberProperty(),
+            "boolean" => new BooleanProperty(),
+            "ip" => new IpProperty(),
+            _ => throw new ArgumentOutOfRangeException(nameof(propertyType))
+        };
+
+        var subFields = new Properties();
+        subFields.Add("sort", new KeywordProperty());
+        SetMultiFields(property, subFields);
+
+        var properties = new Properties();
+        properties.Add("code", property);
+        using var resolver = new ElasticMappingResolver(() => new TypeMapping { Properties = properties }, _inferrer, logger: _logger);
+
+        // Act
+        var parent = resolver.GetMapping("code");
+        var subField = resolver.GetMapping("code.sort");
+
+        // Assert
+        Assert.NotNull(parent);
+        Assert.True(parent.Found);
+        Assert.NotNull(subField);
+        Assert.True(subField.Found);
+        Assert.Equal("code.sort", subField.FullPath);
+        Assert.IsType<KeywordProperty>(subField.Property);
+    }
+
+    private static void SetMultiFields(IProperty property, Properties fields)
+    {
+        switch (property)
+        {
+            case KeywordProperty p: p.Fields = fields; break;
+            case DateProperty p: p.Fields = fields; break;
+            case LongNumberProperty p: p.Fields = fields; break;
+            case BooleanProperty p: p.Fields = fields; break;
+            case IpProperty p: p.Fields = fields; break;
+            default: throw new ArgumentOutOfRangeException(nameof(property));
+        }
+    }
+
     [Fact]
     public async Task GetMapping_WithConcurrentLookupsOfSameUnmappedField_BacksOffOncePerReload()
     {
