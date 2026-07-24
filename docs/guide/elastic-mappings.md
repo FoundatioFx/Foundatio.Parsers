@@ -288,15 +288,15 @@ dynamically created fields become visible quickly without turning every query in
 | Trigger | Setting | Default | Behavior |
 | --- | --- | --- | --- |
 | The loaded mapping is stale | `MappingRefreshInterval` | 1 minute | Maximum age of the loaded mapping before an ordinary resolution reloads it. |
-| A field could not be resolved | `UnmappedFieldRefreshInterval` | 1 second | A resolution failure is the strongest signal the index mapping changed, so it reloads on a much shorter interval. |
-| A reload is already running | `FetchJoinTimeout` | 30 seconds | How long a resolution waits to join an in-flight reload instead of issuing its own. |
+| A field could not be resolved | `UnmappedFieldRefreshInterval` | 5 seconds | A resolution failure is the strongest signal the index mapping changed, so it reloads on a much shorter interval. |
+| A reload is already running | `MappingRefreshWaitTimeout` | 30 seconds | How long a resolution waits to join an in-flight reload instead of issuing its own. |
 
 A field that cannot be resolved is the normal outcome for fields created at runtime — dynamic templates
 (including the `idx.*` custom field templates used by Foundatio.Repositories) only add a field to the index
 mapping after the first document that uses it is indexed. Because of that, an unresolved field reloads the
 server mapping on its own short interval and is never blocked by the mapping having been loaded at startup.
 
-Reloads that still do not resolve the field back off exponentially (1s, 2s, 4s, 8s, up to
+Reloads that still do not resolve the field back off exponentially (5s, 10s, 20s, 40s, up to
 `MappingRefreshInterval`), so a flood of queries against fields that genuinely do not exist cannot hammer the
 cluster. The interval resets to the base value as soon as a reload does resolve a field. Concurrent lookups of
 an unmapped field are coalesced into a single `GetMapping` call, so the worst case reload rate is one per
@@ -314,15 +314,19 @@ resolver.MappingRefreshInterval = TimeSpan.FromMinutes(5);
 
 Only one mapping reload runs at a time. Other resolutions that need a fresh mapping wait for that reload
 rather than issuing their own, because waiting is never more expensive than performing the fetch. If the wait
-exceeds `FetchJoinTimeout`, the resolution gives up and treats the field as unmapped, and a warning is logged.
+exceeds `MappingRefreshWaitTimeout`, the resolution gives up and treats the field as unmapped, and a warning is logged.
 
-`FetchJoinTimeout` must therefore comfortably exceed how long your `GetMapping` call takes. It defaults to 30
+`MappingRefreshWaitTimeout` must therefore comfortably exceed how long your `GetMapping` call takes. It defaults to 30
 seconds, which is far above a normal round trip, but the Elasticsearch client permits a request to run for up
 to its own request timeout (10 minutes by default). Raise it if your mapping fetch can legitimately run
 longer, or set it to a negative value to wait indefinitely:
 
 ```csharp
-resolver.FetchJoinTimeout = TimeSpan.FromMinutes(2);
+resolver.MappingRefreshWaitTimeout = TimeSpan.FromMinutes(2);
+
+// Wait as long as the fetch takes. Safe when the callback enforces its own timeout, which the
+// Elasticsearch client does by default.
+resolver.MappingRefreshWaitTimeout = Timeout.InfiniteTimeSpan;
 ```
 
 ### Residual Staleness
@@ -356,12 +360,20 @@ resolver.RefreshMapping();
 
 ### Bounding Cache Memory
 
-Field names come from user supplied queries, so the resolved field cache is bounded. Once
-`MaxCachedFields` (default 10,000) is exceeded the cache is cleared and a warning is logged.
-`CachedFieldCount` reports the approximate current size.
+Field names come from user supplied queries, so the resolved field cache is bounded by `MaxCachedFields`
+(default 10,000). `CachedFieldCount` reports the approximate current size.
+
+When the bound is reached, cached *misses* are evicted first. Misses are the only entries an untrusted
+caller can create without limit, so shedding them means a query referencing thousands of non-existent
+fields cannot displace the resolutions your real queries depend on. If every entry is a resolved field the
+mapping genuinely has more fields than the cache allows: further fields still resolve correctly, just
+without being cached, and a warning names the setting to raise.
 
 ```csharp
 resolver.MaxCachedFields = 50_000;
+
+// Setting it to zero or less disables caching entirely.
+resolver.MaxCachedFields = 0;
 ```
 
 ## Custom Mapping Resolver

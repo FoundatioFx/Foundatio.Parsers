@@ -346,7 +346,6 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             Interlocked.Increment(ref fetchCount);
             return CreateTextWithKeywordMapping("name");
         }, _inferrer, timeProvider: timeProvider, logger: _logger);
-        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(5);
 
         resolver.GetMapping("name");
         Assert.Equal(1, fetchCount);
@@ -374,7 +373,6 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             Interlocked.Increment(ref fetchCount);
             return CreateTextWithKeywordMapping("name");
         }, _inferrer, timeProvider: timeProvider, logger: _logger);
-        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(5);
 
         resolver.GetMapping("name");
         resolver.GetMapping("missing_1");
@@ -411,7 +409,6 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             Interlocked.Increment(ref fetchCount);
             return serverMapping;
         }, _inferrer, timeProvider: timeProvider, logger: _logger);
-        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(5);
 
         resolver.GetMapping("name");
         resolver.GetMapping("missing_1");
@@ -552,12 +549,12 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.True(fetchStarted.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         // Act - this lookup gives up joining the in-flight fetch
-        resolver.FetchJoinTimeout = TimeSpan.FromMilliseconds(50);
+        resolver.MappingRefreshWaitTimeout = TimeSpan.FromMilliseconds(50);
         var timedOutLookup = resolver.GetMapping("idx.keyword-000001");
 
         // Act - a later lookup, still while that same fetch is running, must join it rather than be served
         // the unmapped result the timed out lookup just produced
-        resolver.FetchJoinTimeout = TimeSpan.FromSeconds(30);
+        resolver.MappingRefreshWaitTimeout = TimeSpan.FromSeconds(30);
         var joiningLookup = Task.Run(() => resolver.GetMapping("idx.keyword-000001"));
         await Task.Delay(200, TestContext.Current.CancellationToken);
         releaseFetch.Set();
@@ -612,15 +609,15 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
-    public void FetchJoinTimeout_ByDefault_ExceedsTypicalMappingFetchLatency()
+    public void MappingRefreshWaitTimeout_ByDefault_ExceedsTypicalMappingFetchLatency()
     {
         // Arrange + Act
         using var resolver = new ElasticMappingResolver(() => CreateTextWithKeywordMapping("name"), _inferrer, logger: _logger);
 
         // Assert - waiting for an in-flight fetch is never more expensive than performing it, so the default
         // must leave plenty of headroom above a normal get mapping round trip
-        Assert.Equal(TimeSpan.FromSeconds(30), resolver.FetchJoinTimeout);
-        Assert.Equal(TimeSpan.FromSeconds(1), resolver.UnmappedFieldRefreshInterval);
+        Assert.Equal(TimeSpan.FromSeconds(30), resolver.MappingRefreshWaitTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(5), resolver.UnmappedFieldRefreshInterval);
         Assert.Equal(TimeSpan.FromMinutes(1), resolver.MappingRefreshInterval);
     }
 
@@ -634,15 +631,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     {
         // Arrange - every Elasticsearch property type can carry multi-fields, not just text. Resolving them
         // for text only silently reports "field.subfield" as unmapped for every other type.
-        IProperty property = propertyType switch
-        {
-            "keyword" => new KeywordProperty(),
-            "date" => new DateProperty(),
-            "long" => new LongNumberProperty(),
-            "boolean" => new BooleanProperty(),
-            "ip" => new IpProperty(),
-            _ => throw new ArgumentOutOfRangeException(nameof(propertyType))
-        };
+        var property = CreateProperty(propertyType);
 
         var subFields = new Properties();
         subFields.Add("sort", new KeywordProperty());
@@ -663,6 +652,326 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.True(subField.Found);
         Assert.Equal("code.sort", subField.FullPath);
         Assert.IsType<KeywordProperty>(subField.Property);
+    }
+
+
+    [Theory]
+    [InlineData("keyword")]
+    [InlineData("date")]
+    [InlineData("long")]
+    [InlineData("boolean")]
+    [InlineData("ip")]
+    public void GetMapping_WithCodeDeclaredMultiFieldOnNonTextServerProperty_ResolvesSubField(string propertyType)
+    {
+        // Arrange - the server reports the property without the multi-field the code mapping declares.
+        // Merging has to layer the code declared sub-field on for every property type, not just text.
+        IProperty codeProperty = CreateProperty(propertyType);
+        var codeSubFields = new Properties();
+        codeSubFields.Add("sort", new KeywordProperty());
+        SetMultiFields(codeProperty, codeSubFields);
+
+        var codeProperties = new Properties();
+        codeProperties.Add("code", codeProperty);
+
+        var serverProperties = new Properties();
+        serverProperties.Add("code", CreateProperty(propertyType));
+
+        using var resolver = new ElasticMappingResolver(new TypeMapping { Properties = codeProperties }, _inferrer,
+            () => new TypeMapping { Properties = serverProperties }, logger: _logger);
+
+        // Act
+        var subField = resolver.GetMapping("code.sort");
+
+        // Assert
+        Assert.NotNull(subField);
+        Assert.True(subField.Found);
+        Assert.Equal("code.sort", subField.FullPath);
+        Assert.IsType<KeywordProperty>(subField.Property);
+    }
+
+    [Fact]
+    public void GetMapping_WithCodeAndServerMappings_DoesNotMutateServerMapping()
+    {
+        // Arrange - the merged view must not be written back into the mapping the callback returned,
+        // otherwise a caller that caches or shares that instance sees it grow sub-fields over time.
+        var codeProperty = new KeywordProperty();
+        var codeSubFields = new Properties();
+        codeSubFields.Add("sort", new KeywordProperty());
+        codeProperty.Fields = codeSubFields;
+
+        var codeProperties = new Properties();
+        codeProperties.Add("code", codeProperty);
+
+        var serverProperty = new KeywordProperty();
+        var serverProperties = new Properties();
+        serverProperties.Add("code", serverProperty);
+
+        using var resolver = new ElasticMappingResolver(new TypeMapping { Properties = codeProperties }, _inferrer,
+            () => new TypeMapping { Properties = serverProperties }, logger: _logger);
+
+        // Act
+        var subField = resolver.GetMapping("code.sort");
+
+        // Assert
+        Assert.True(subField?.Found);
+        Assert.Null(serverProperty.Fields);
+    }
+
+    [Fact]
+    public void GetNonAnalyzedFieldName_WithCodeDeclaredKeywordSubField_UsesCodeDeclaredSubField()
+    {
+        // Arrange - sorting on an analyzed field fails unless the non analyzed sub-field is found, and the
+        // sub-field may only be declared in code.
+        var codeProperty = new TextProperty();
+        var codeSubFields = new Properties();
+        codeSubFields.Add("keyword", new KeywordProperty());
+        codeProperty.Fields = codeSubFields;
+
+        var codeProperties = new Properties();
+        codeProperties.Add("name", codeProperty);
+
+        var serverProperties = new Properties();
+        serverProperties.Add("name", new TextProperty());
+
+        using var resolver = new ElasticMappingResolver(new TypeMapping { Properties = codeProperties }, _inferrer,
+            () => new TypeMapping { Properties = serverProperties }, logger: _logger);
+
+        // Act
+        string? resolved = resolver.GetNonAnalyzedFieldName("name");
+
+        // Assert
+        Assert.Equal("name.keyword", resolved);
+    }
+
+    [Fact]
+    public void MaxCachedFields_WhenExceededByUnmappedFields_EvictsMissesAndKeepsResolvedFields()
+    {
+        // Arrange - field names come from user supplied queries, so a caller probing many non-existent
+        // fields must not be able to displace the resolutions real queries depend on.
+        var properties = new Properties();
+        properties.Add("name", new KeywordProperty());
+        properties.Add("status", new KeywordProperty());
+        properties.Add("created", new DateProperty());
+        properties.Add("count", new LongNumberProperty());
+        string[] realFields = ["name", "status", "created", "count"];
+
+        using var resolver = new ElasticMappingResolver(() => new TypeMapping { Properties = properties }, _inferrer,
+            new FakeTimeProvider(DateTimeOffset.UtcNow), _logger);
+        resolver.MaxCachedFields = 8;
+        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromHours(1);
+
+        // Arm both reload throttles before caching anything worth keeping. The first lookup triggers the
+        // cold start load and the second arms the separate unmapped field throttle, so the flood below
+        // exercises cache eviction rather than snapshot replacement.
+        Assert.False(resolver.GetMapping("warmup1")?.Found);
+        Assert.False(resolver.GetMapping("warmup2")?.Found);
+
+        foreach (string realField in realFields)
+            Assert.True(resolver.GetMapping(realField)?.Found);
+
+        // Act
+        for (int i = 0; i < 100; i++)
+            resolver.GetMapping($"missing{i}");
+
+        long countAfterFlood = resolver.CachedFieldCount;
+        foreach (string realField in realFields)
+            Assert.True(resolver.GetMapping(realField)?.Found);
+
+        // Assert - re-resolving the real fields added nothing, so they were still cached.
+        Assert.Equal(countAfterFlood, resolver.CachedFieldCount);
+        Assert.True(countAfterFlood <= resolver.MaxCachedFields,
+            $"Expected cache to stay bounded but it held {countAfterFlood} fields.");
+    }
+
+    [Fact]
+    public void MaxCachedFields_WhenSetToZero_DisablesCachingWithoutBreakingResolution()
+    {
+        // Arrange
+        using var resolver = new ElasticMappingResolver(() => CreateTextWithKeywordMapping("name"), _inferrer, new FakeTimeProvider(DateTimeOffset.UtcNow), _logger);
+        resolver.MaxCachedFields = 0;
+
+        // Act
+        var first = resolver.GetMapping("name");
+        var second = resolver.GetMapping("name");
+
+        // Assert
+        Assert.True(first?.Found);
+        Assert.True(second?.Found);
+        Assert.Equal(0, resolver.CachedFieldCount);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(-60)]
+    public void MappingRefreshInterval_WithNegativeValue_ThrowsArgumentOutOfRangeException(int seconds)
+    {
+        // Arrange
+        using var resolver = new ElasticMappingResolver(() => null, _inferrer, new FakeTimeProvider(DateTimeOffset.UtcNow), _logger);
+
+        // Act
+        var exception = Record.Exception(() => resolver.MappingRefreshInterval = TimeSpan.FromSeconds(seconds));
+
+        // Assert
+        var argumentException = Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.Equal("value", argumentException.ParamName);
+    }
+
+    [Fact]
+    public void UnmappedFieldRefreshInterval_WithNegativeValue_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        using var resolver = new ElasticMappingResolver(() => null, _inferrer, new FakeTimeProvider(DateTimeOffset.UtcNow), _logger);
+
+        // Act
+        var exception = Record.Exception(() => resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(-1));
+
+        // Assert
+        var argumentException = Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.Equal("value", argumentException.ParamName);
+    }
+
+    [Fact]
+    public void UnmappedFieldRefreshInterval_WithZero_AlwaysAllowsReload()
+    {
+        // Arrange - zero means "never throttle", which must be accepted rather than treated as invalid.
+        int callCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            callCount++;
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, new FakeTimeProvider(DateTimeOffset.UtcNow), _logger);
+        resolver.UnmappedFieldRefreshInterval = TimeSpan.Zero;
+
+        Assert.True(resolver.GetMapping("name")?.Found);
+        int callsAfterColdStart = callCount;
+
+        // Act
+        resolver.GetMapping("missing1");
+        resolver.GetMapping("missing2");
+
+        // Assert
+        Assert.True(callCount > callsAfterColdStart + 1,
+            $"Expected each unmapped lookup to reload but only {callCount - callsAfterColdStart} reloads occurred.");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void MappingRefreshWaitTimeout_WithNonPositiveValue_ThrowsArgumentOutOfRangeException(int seconds)
+    {
+        // Arrange - a zero or negative wait would silently resolve fields as unmapped while a reload that
+        // could resolve them is already running.
+        using var resolver = new ElasticMappingResolver(() => null, _inferrer, new FakeTimeProvider(DateTimeOffset.UtcNow), _logger);
+
+        // Act
+        var exception = Record.Exception(() => resolver.MappingRefreshWaitTimeout = TimeSpan.FromSeconds(seconds));
+
+        // Assert
+        var argumentException = Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.Equal("value", argumentException.ParamName);
+    }
+
+    [Fact]
+    public void MappingRefreshWaitTimeout_WithInfiniteTimeSpan_IsAccepted()
+    {
+        // Arrange - waiting forever is safe when the fetch callback enforces its own timeout, and
+        // Timeout.InfiniteTimeSpan is the idiomatic way to express it.
+        using var resolver = new ElasticMappingResolver(() => CreateTextWithKeywordMapping("name"), _inferrer, new FakeTimeProvider(DateTimeOffset.UtcNow), _logger);
+
+        // Act
+        resolver.MappingRefreshWaitTimeout = Timeout.InfiniteTimeSpan;
+
+        // Assert
+        Assert.Equal(Timeout.InfiniteTimeSpan, resolver.MappingRefreshWaitTimeout);
+        Assert.True(resolver.GetMapping("name")?.Found);
+    }
+
+    [Fact]
+    public void NullInstance_WhenResolvingAnyField_ReportsFieldAsUnmapped()
+    {
+        // Arrange - the shared null resolver never has a mapping, so every field resolves to its own name
+        // and callers fall back to the raw field name instead of failing.
+        var resolver = ElasticMappingResolver.NullInstance;
+
+        // Act
+        var mapping = resolver.GetMapping("name");
+
+        // Assert
+        Assert.NotNull(mapping);
+        Assert.False(mapping.Found);
+        Assert.Equal("name", mapping.FullPath);
+    }
+
+    [Fact]
+    public void GetMapping_WithoutAnyMappingSource_ThrowsInvalidOperationException()
+    {
+        // Arrange - a resolver constructed with neither a code mapping nor a server mapping callback is a
+        // configuration error and must fail loudly rather than reporting every field as unmapped.
+        using var resolver = new ElasticMappingResolver(null!, _inferrer, logger: _logger);
+
+        // Act
+        var exception = Record.Exception(() => resolver.GetMapping("name"));
+
+        // Assert
+        Assert.IsType<InvalidOperationException>(exception);
+    }
+
+    [Theory]
+    [InlineData("text", true)]
+    [InlineData("keyword", false)]
+    [InlineData("long", false)]
+    [InlineData("date", false)]
+    public void IsPropertyAnalyzed_ForPropertyType_ReportsWhetherFieldIsAnalyzed(string propertyType, bool expected)
+    {
+        // Arrange
+        var properties = new Properties();
+        properties.Add("field", propertyType == "text" ? new TextProperty() : CreateProperty(propertyType));
+        using var resolver = new ElasticMappingResolver(() => new TypeMapping { Properties = properties }, _inferrer, logger: _logger);
+
+        // Act
+        bool analyzed = resolver.IsPropertyAnalyzed("field");
+
+        // Assert
+        Assert.Equal(expected, analyzed);
+    }
+
+    [Fact]
+    public void PropertyTypePredicates_ForMatchingAndNonMatchingFields_ReportPropertyCategory()
+    {
+        // Arrange
+        var properties = new Properties();
+        properties.Add("location", new GeoPointProperty());
+        properties.Add("count", new LongNumberProperty());
+        properties.Add("enabled", new BooleanProperty());
+        properties.Add("created", new DateProperty());
+        properties.Add("name", new KeywordProperty());
+        using var resolver = new ElasticMappingResolver(() => new TypeMapping { Properties = properties }, _inferrer, logger: _logger);
+
+        // Act & Assert
+        Assert.True(resolver.IsGeoPropertyType("location"));
+        Assert.False(resolver.IsGeoPropertyType("name"));
+
+        Assert.True(resolver.IsNumericPropertyType("count"));
+        Assert.False(resolver.IsNumericPropertyType("name"));
+
+        Assert.True(resolver.IsBooleanPropertyType("enabled"));
+        Assert.False(resolver.IsBooleanPropertyType("name"));
+
+        Assert.True(resolver.IsDatePropertyType("created"));
+        Assert.False(resolver.IsDatePropertyType("name"));
+    }
+
+    private static IProperty CreateProperty(string propertyType)
+    {
+        return propertyType switch
+        {
+            "keyword" => new KeywordProperty(),
+            "date" => new DateProperty(),
+            "long" => new LongNumberProperty(),
+            "boolean" => new BooleanProperty(),
+            "ip" => new IpProperty(),
+            _ => throw new ArgumentOutOfRangeException(nameof(propertyType))
+        };
     }
 
     private static void SetMultiFields(IProperty property, Properties fields)
@@ -690,7 +999,6 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             Interlocked.Increment(ref fetchCount);
             return CreateTextWithKeywordMapping("name");
         }, _inferrer, timeProvider: timeProvider, logger: _logger);
-        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(5);
 
         resolver.GetMapping("name");
         int afterColdStart = fetchCount;
