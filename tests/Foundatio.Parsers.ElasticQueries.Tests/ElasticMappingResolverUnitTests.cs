@@ -249,47 +249,390 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
-    public void GetServerMapping_WhenThrottled_DoesNotRefetchWithinOneMinute()
+    public void GetMapping_WithResolvedFieldWithinRefreshInterval_DoesNotRefetchServerMapping()
     {
         // Arrange
         var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
         int fetchCount = 0;
-        var resolver = new ElasticMappingResolver(() =>
+        using var resolver = new ElasticMappingResolver(() =>
         {
             Interlocked.Increment(ref fetchCount);
             return CreateTextWithKeywordMapping("name");
         }, _inferrer, timeProvider: timeProvider, logger: _logger);
 
-        // Act - first call triggers initial server fetch
+        // Act
         resolver.GetNonAnalyzedFieldName("name", "keyword");
-        int afterFirst = fetchCount;
-        Assert.True(afterFirst >= 1, "First call should trigger at least one fetch");
+        int afterColdStart = fetchCount;
 
-        // Act - second call within throttle window should use cache, no new fetch
-        resolver.GetNonAnalyzedFieldName("name", "keyword");
-        Assert.Equal(afterFirst, fetchCount);
-
-        // Act - advance 30s (still within 1-minute window), query unknown field to bypass cache
         timeProvider.Advance(TimeSpan.FromSeconds(30));
-        resolver.GetNonAnalyzedFieldName("unknown_field", "keyword");
-        Assert.Equal(afterFirst, fetchCount);
+        resolver.GetNonAnalyzedFieldName("name", "keyword");
 
-        // Act - RefreshMapping bypasses throttle even within window
+        // Assert
+        Assert.Equal(1, afterColdStart);
+        Assert.Equal(afterColdStart, fetchCount);
+    }
+
+    [Fact]
+    public void RefreshMapping_WithinRefreshInterval_BypassesThrottleAndRefetchesServerMapping()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        resolver.GetNonAnalyzedFieldName("name", "keyword");
+        int afterColdStart = fetchCount;
+
+        // Act
         resolver.RefreshMapping();
         resolver.GetNonAnalyzedFieldName("name", "keyword");
-        int afterRefresh = fetchCount;
-        Assert.True(afterRefresh > afterFirst, "Refresh should allow a new fetch");
 
-        // Act - call again without refresh, should be throttled
-        resolver.GetNonAnalyzedFieldName("name", "keyword");
-        Assert.Equal(afterRefresh, fetchCount);
+        // Assert
+        Assert.Equal(afterColdStart + 1, fetchCount);
+    }
 
-        // Act - advance past the 1-minute throttle window; resolve an uncached field
-        // WITHOUT calling RefreshMapping() to prove time-based expiry works on its own.
-        timeProvider.Advance(TimeSpan.FromMinutes(2));
-        resolver.GetNonAnalyzedFieldName("another_unknown_field", "keyword");
-        int afterTimeAdvance = fetchCount;
-        Assert.True(afterTimeAdvance > afterRefresh, "Fetch should happen after time advances past throttle without RefreshMapping");
+    [Fact]
+    public void IsNestedPropertyType_WithNestedFieldCreatedAfterColdStartFetch_ReturnsTrue()
+    {
+        // Arrange - a dynamic template creates idx.nested-000001 only after the first document is indexed,
+        // which is always after the resolver has already loaded the mapping at least once.
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var serverMapping = CreateTextWithKeywordMapping("field1");
+        using var resolver = new ElasticMappingResolver(() => serverMapping, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        Assert.Equal("field1.keyword", resolver.GetNonAnalyzedFieldName("field1", "keyword"));
+
+        // Act
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        serverMapping = CreateDynamicCustomFieldMapping("field1", "nested-000001", new NestedProperty { Properties = CreateProperties(("value", new KeywordProperty())) });
+
+        // Assert
+        Assert.True(resolver.IsNestedPropertyType("idx.nested-000001"));
+        Assert.Equal("idx.nested-000001.value", resolver.GetResolvedField("idx.nested-000001.value"));
+    }
+
+    [Fact]
+    public void GetSortFieldName_WithKeywordSubFieldCreatedAfterColdStartFetch_ReturnsKeywordSubField()
+    {
+        // Arrange - sorting on a text field without resolving its keyword sub field produces an
+        // "Fielddata is disabled" error from Elasticsearch, so a stale mapping is a hard failure here.
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var serverMapping = CreateTextWithKeywordMapping("field1");
+        using var resolver = new ElasticMappingResolver(() => serverMapping, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        resolver.GetNonAnalyzedFieldName("field1", "keyword");
+
+        // Act
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        serverMapping = CreateDynamicCustomFieldMapping("field1", "string-000001",
+            new TextProperty { Fields = CreateProperties(("keyword", new KeywordProperty { IgnoreAbove = 256 })) });
+
+        // Assert
+        Assert.Equal("idx.string-000001.keyword", resolver.GetSortFieldName("idx.string-000001"));
+    }
+
+    [Fact]
+    public void GetMapping_WithUnmappedFieldWithinUnmappedRefreshInterval_DoesNotRefetchServerMapping()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        resolver.GetMapping("name");
+        Assert.Equal(1, fetchCount);
+
+        // Act
+        resolver.GetMapping("missing_one");
+        int afterFirstMiss = fetchCount;
+
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        resolver.GetMapping("missing_two");
+
+        // Assert
+        Assert.Equal(2, afterFirstMiss);
+        Assert.Equal(afterFirstMiss, fetchCount);
+    }
+
+    [Fact]
+    public void GetMapping_WithRepeatedlyUnresolvableFields_BacksOffServerMappingReloads()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        resolver.GetMapping("name");
+        resolver.GetMapping("missing_1");
+        Assert.Equal(2, fetchCount);
+
+        // Act + Assert - a reload that did not resolve the field doubles the interval to 10s
+        timeProvider.Advance(TimeSpan.FromSeconds(9));
+        resolver.GetMapping("missing_2");
+        Assert.Equal(2, fetchCount);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        resolver.GetMapping("missing_3");
+        Assert.Equal(3, fetchCount);
+
+        // Act + Assert - and again to 20s
+        timeProvider.Advance(TimeSpan.FromSeconds(19));
+        resolver.GetMapping("missing_4");
+        Assert.Equal(3, fetchCount);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        resolver.GetMapping("missing_5");
+        Assert.Equal(4, fetchCount);
+    }
+
+    [Fact]
+    public void GetMapping_WithFieldResolvedByReload_ResetsUnmappedRefreshBackoff()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        var serverMapping = CreateTextWithKeywordMapping("name");
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return serverMapping;
+        }, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        resolver.GetMapping("name");
+        resolver.GetMapping("missing_1");
+        resolver.GetMapping("missing_2");
+        int afterBackoff = fetchCount;
+
+        // Act - the field now exists, so the reload that finds it must reset the backoff
+        timeProvider.Advance(TimeSpan.FromSeconds(10));
+        serverMapping = CreateDynamicCustomFieldMapping("name", "keyword-000001", new KeywordProperty());
+        var created = resolver.GetMapping("idx.keyword-000001");
+
+        timeProvider.Advance(TimeSpan.FromSeconds(5));
+        resolver.GetMapping("missing_3");
+
+        // Assert
+        Assert.NotNull(created);
+        Assert.True(created.Found);
+        Assert.Equal(afterBackoff + 2, fetchCount);
+    }
+
+    [Fact]
+    public void GetMapping_WithCachedMissAfterFieldIsCreated_ResolvesFieldOnNextLookup()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var serverMapping = CreateTextWithKeywordMapping("name");
+        using var resolver = new ElasticMappingResolver(() => serverMapping, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        var beforeCreate = resolver.GetMapping("idx.keyword-000001");
+        Assert.NotNull(beforeCreate);
+        Assert.False(beforeCreate.Found);
+
+        // Act
+        serverMapping = CreateDynamicCustomFieldMapping("name", "keyword-000001", new KeywordProperty());
+        timeProvider.Advance(TimeSpan.FromSeconds(10));
+        var afterCreate = resolver.GetMapping("idx.keyword-000001");
+
+        // Assert
+        Assert.NotNull(afterCreate);
+        Assert.True(afterCreate.Found);
+        Assert.Equal("idx.keyword-000001", afterCreate.FullPath);
+    }
+
+    [Fact]
+    public void InvalidateFieldMapping_WithCachedMissForNewlyCreatedField_ResolvesFieldWithoutWaitingForThrottle()
+    {
+        // Arrange - arm the unmapped field throttle so the cached miss cannot refresh itself
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var serverMapping = CreateTextWithKeywordMapping("name");
+        using var resolver = new ElasticMappingResolver(() => serverMapping, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        Assert.False(resolver.GetMapping("name.missing")!.Found);
+        Assert.False(resolver.GetMapping("idx.keyword-000001")!.Found);
+
+        serverMapping = CreateDynamicCustomFieldMapping("name", "keyword-000001", new KeywordProperty());
+        Assert.False(resolver.GetMapping("idx.keyword-000001")!.Found);
+
+        // Act
+        resolver.InvalidateFieldMapping("idx.keyword-000001");
+        var mapping = resolver.GetMapping("idx.keyword-000001");
+
+        // Assert
+        Assert.NotNull(mapping);
+        Assert.True(mapping.Found);
+    }
+
+    [Fact]
+    public void GetMapping_WhenServerMappingFuncThrows_DoesNotRefetchOnEveryLookup()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            throw new InvalidOperationException("Elasticsearch is unavailable");
+        }, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        // Act
+        for (int i = 0; i < 25; i++)
+            Assert.False(resolver.GetMapping($"field_{i}")!.Found);
+
+        // Assert - one cold start attempt plus one miss driven attempt, then throttled
+        Assert.Equal(2, fetchCount);
+    }
+
+    [Fact]
+    public async Task GetMapping_WithConcurrentUnmappedLookups_FetchesServerMappingOnce()
+    {
+        // Arrange
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            Thread.Sleep(100);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+
+        resolver.GetMapping("name");
+        int afterColdStart = fetchCount;
+
+        // Act
+        var lookups = Enumerable.Range(0, 16)
+            .Select(_ => Task.Run(() => resolver.GetMapping("idx.keyword-000001")))
+            .ToArray();
+        await Task.WhenAll(lookups);
+
+        // Assert
+        Assert.Equal(1, afterColdStart);
+        Assert.Equal(afterColdStart + 1, fetchCount);
+        Assert.All(lookups, t => Assert.False(t.Result!.Found));
+    }
+
+    [Fact]
+    public async Task GetMapping_WithConcurrentLookupsOfSameUnmappedField_BacksOffOncePerReload()
+    {
+        // Arrange - every one of these lookups adopts the result of a single reload, so the backoff must
+        // only advance one step rather than being ratcheted to the ceiling by the burst.
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        resolver.GetMapping("name");
+        int afterColdStart = fetchCount;
+
+        // Act
+        await Task.WhenAll(Enumerable.Range(0, 32).Select(_ => Task.Run(() => resolver.GetMapping("idx.keyword-000001"))));
+        int afterBurst = fetchCount;
+
+        timeProvider.Advance(TimeSpan.FromSeconds(10));
+        resolver.GetMapping("idx.keyword-000002");
+
+        // Assert - one reload for the burst, then one more after a single 10s backoff step
+        Assert.Equal(1, afterColdStart);
+        Assert.Equal(2, afterBurst);
+        Assert.Equal(3, fetchCount);
+    }
+
+    [Fact]
+    public void GetMapping_WithMoreDistinctFieldsThanMaxCachedFields_BoundsCachedFieldCount()
+    {
+        // Arrange
+        using var resolver = new ElasticMappingResolver(CreateTextWithKeywordMapping("name"), _inferrer, () => null, logger: _logger)
+        {
+            MaxCachedFields = 16
+        };
+
+        // Act
+        for (int i = 0; i < 500; i++)
+            resolver.GetMapping($"unknown_field_{i}");
+
+        // Assert
+        Assert.True(resolver.CachedFieldCount <= 16, $"Expected at most 16 cached fields but found {resolver.CachedFieldCount}");
+    }
+
+    [Fact]
+    public void GetMapping_WithCodeSubPropertyUnderServerNestedProperty_ResolvesCodeSubProperty()
+    {
+        // Arrange - the server mapping only knows the sub fields that have actually been indexed, so
+        // code declared sub properties of a nested property must still be merged in.
+        var codeMapping = new TypeMapping
+        {
+            Properties = CreateProperties(("items", new NestedProperty { Properties = CreateProperties(("code_only", new KeywordProperty())) }))
+        };
+        var serverMapping = new TypeMapping
+        {
+            Properties = CreateProperties(("items", new NestedProperty { Properties = CreateProperties(("server_only", new KeywordProperty())) }))
+        };
+        using var resolver = new ElasticMappingResolver(codeMapping, _inferrer, () => serverMapping, logger: _logger);
+
+        // Act
+        var codeOnly = resolver.GetMapping("items.code_only");
+        var serverOnly = resolver.GetMapping("items.server_only");
+
+        // Assert
+        Assert.NotNull(codeOnly);
+        Assert.True(codeOnly.Found);
+        Assert.IsType<KeywordProperty>(codeOnly.Property);
+        Assert.NotNull(serverOnly);
+        Assert.True(serverOnly.Found);
+        Assert.True(resolver.IsNestedPropertyType("items"));
+    }
+
+    [Fact]
+    public void GetResolvedField_WithPropertyInstanceSharedByMultipleFields_ResolvesEachFieldName()
+    {
+        // Arrange - reusing a single IProperty instance for multiple fields is legal and used to make
+        // every one of those fields resolve to the name of the first one.
+        var shared = new KeywordProperty();
+        var serverMapping = new TypeMapping { Properties = CreateProperties(("alpha", shared), ("beta", shared)) };
+        using var resolver = new ElasticMappingResolver(() => serverMapping, _inferrer, logger: _logger);
+
+        // Act
+        string? alpha = resolver.GetResolvedField("alpha");
+        string? beta = resolver.GetResolvedField("beta");
+
+        // Assert
+        Assert.Equal("alpha", alpha);
+        Assert.Equal("beta", beta);
+    }
+
+    private static Properties CreateProperties(params (string Name, IProperty Property)[] properties)
+    {
+        var props = new Properties();
+        foreach ((string name, var property) in properties)
+            props.Add(name, property);
+
+        return props;
+    }
+
+    /// <summary>
+    /// Builds a mapping containing the original field plus an <c>idx.&lt;name&gt;</c> custom field of the
+    /// kind created at runtime by an <c>idx.*</c> dynamic template.
+    /// </summary>
+    private static TypeMapping CreateDynamicCustomFieldMapping(string existingFieldName, string customFieldName, IProperty customField)
+    {
+        var mapping = CreateTextWithKeywordMapping(existingFieldName);
+        mapping.Properties!.Add("idx", new ObjectProperty { Properties = CreateProperties((customFieldName, customField)) });
+
+        return mapping;
     }
 
     private static TypeMapping CreateTextWithKeywordMapping(string fieldName)

@@ -144,8 +144,9 @@ var parser = new ElasticQueryParser(c => c
         { "user_field", "actual.field.path" }
     }));
 
-// Option 3: Refresh mappings (if recently added field, wait for auto-refresh or force it)
-parser.Configuration.MappingResolver.RefreshMapping();
+// Option 3: Refresh mappings. Recently added fields are picked up automatically within
+// UnmappedFieldRefreshInterval (default 5 seconds); invalidate a single field to pick it up immediately.
+parser.Configuration.MappingResolver.InvalidateFieldMapping("user_field");
 ```
 
 ## Elasticsearch Issues
@@ -364,14 +365,47 @@ public MyService()
 **Solution:**
 
 ```csharp
-// Mappings are cached by default (auto-refresh at most once per minute)
-// Manual refresh is typically only needed in unit tests:
+// Resolved fields are cached, and the server mapping is reloaded at most once per
+// MappingRefreshInterval (default 1 minute). Manual refresh is typically only needed in unit tests:
 parser.Configuration.MappingResolver.RefreshMapping();
 
 // For production, create resolver once and share
 var resolver = ElasticMappingResolver.Create(client, "my-index");
 var parser1 = new ElasticQueryParser(c => c.UseMappings(resolver));
 var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));
+```
+
+**Cause:** Queries reference fields that do not exist, so every one of them triggers a mapping reload.
+
+Fields that cannot be resolved reload the mapping on their own short interval
+(`UnmappedFieldRefreshInterval`, default 5 seconds) because that is how dynamically created fields become
+visible. Reloads that do not resolve the field back off exponentially up to `MappingRefreshInterval`, and
+concurrent lookups of the same unmapped field are coalesced into a single `GetMapping` call. Raise the base
+interval if a workload legitimately queries many non-existent fields:
+
+```csharp
+resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(30);
+```
+
+Look for the `Unable to resolve mapping for field {Field}` warning: it means a reload was suppressed by the
+throttle and the field is being treated as unmapped.
+
+### Recently Created Field Resolves As Unmapped
+
+**Cause:** The field was created after the resolver loaded the index mapping — for example by a dynamic
+template, which only adds the field to the mapping once the first document using it has been indexed.
+
+**Symptoms:**
+
+- A `nested` field is queried as a flat field, so the query succeeds but returns no results.
+- Sorting fails with `Fielddata is disabled on [field] in [index]`, because the resolver could not find the
+  `.keyword` / `.sort` sub-field and fell back to the analyzed field.
+
+**Solution:** the resolver reloads automatically within `UnmappedFieldRefreshInterval`. To pick the field up
+immediately after creating it, invalidate just that field:
+
+```csharp
+resolver.InvalidateFieldMapping("idx.string-000001");
 ```
 
 ## Debugging
@@ -382,7 +416,7 @@ var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));
 var parser = new ElasticQueryParser(c => c
     .SetLoggerFactory(loggerFactory));
 
-// Or for LuceneQueryParser, use ILogger directly 
+// Or for LuceneQueryParser, use ILogger directly
 var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
 ```
 

@@ -282,15 +282,61 @@ var createIndexResponse = await client.Indices.CreateAsync("my-index", c => c
 
 ## Refreshing Mappings
 
-Mappings are automatically refreshed from Elasticsearch at most once per minute. In most production scenarios, this automatic refresh is sufficient.
+Mappings are reloaded from Elasticsearch automatically. The resolver uses two independent throttles so that
+dynamically created fields become visible quickly without turning every query into a `GetMapping` call:
 
-For unit tests where you're creating or modifying indices and need immediate visibility of changes, you can force a refresh:
+| Trigger | Setting | Default | Behavior |
+| --- | --- | --- | --- |
+| The loaded mapping is stale | `MappingRefreshInterval` | 1 minute | Maximum age of the loaded mapping before an ordinary resolution reloads it. |
+| A field could not be resolved | `UnmappedFieldRefreshInterval` | 5 seconds | A resolution failure is the strongest signal the index mapping changed, so it reloads on a much shorter interval. |
+
+A field that cannot be resolved is the normal outcome for fields created at runtime — dynamic templates
+(including the `idx.*` custom field templates used by Foundatio.Repositories) only add a field to the index
+mapping after the first document that uses it is indexed. Because of that, an unresolved field reloads the
+server mapping on its own short interval and is never blocked by the mapping having been loaded at startup.
+
+Reloads that still do not resolve the field back off exponentially (5s, 10s, 20s, 40s, up to
+`MappingRefreshInterval`), so a flood of queries against fields that genuinely do not exist cannot hammer the
+cluster. The interval resets to the base value as soon as a reload does resolve a field. Concurrent lookups of
+an unmapped field are coalesced into a single `GetMapping` call.
 
 ```csharp
 var resolver = parser.Configuration.MappingResolver;
 
+// Reload sooner (or set to TimeSpan.Zero to always reload when a field cannot be resolved)
+resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(1);
+resolver.MappingRefreshInterval = TimeSpan.FromMinutes(5);
+```
+
+### Invalidating a Single Field
+
+When you know a specific field was just created, invalidate only that field instead of discarding the whole
+cache. This drops the cached resolution for the field and allows the next resolution to reload the mapping
+immediately:
+
+```csharp
+resolver.InvalidateFieldMapping("idx.string-000001");
+```
+
+### Forcing a Full Refresh
+
+`RefreshMapping()` bypasses both throttles and discards the entire field cache. It is intended for unit tests
+that create or modify indices and need immediate visibility of the change. Prefer `InvalidateFieldMapping` in
+production code — clearing the whole cache re-resolves and re-merges every field on a large mapping.
+
+```csharp
 // Force refresh from Elasticsearch (primarily for unit tests)
 resolver.RefreshMapping();
+```
+
+### Bounding Cache Memory
+
+Field names come from user supplied queries, so the resolved field cache is bounded. Once
+`MaxCachedFields` (default 10,000) is exceeded the cache is cleared and a warning is logged.
+`CachedFieldCount` reports the approximate current size.
+
+```csharp
+resolver.MaxCachedFields = 50_000;
 ```
 
 ## Custom Mapping Resolver
