@@ -59,6 +59,46 @@ public class SqlQueryParserTests : TestWithLoggingBase
         return ParseAndValidateQuery(query, expected, true);
     }
 
+    [Theory]
+    [InlineData("NOT title:Open")]
+    [InlineData("!title:Open")]
+    [InlineData("-title:Open")]
+    public async Task ToDynamicLinqAsync_WithNegatedFieldComparison_ParenthesizesComparison(string query)
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "title" }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal("""!(Title = "Open")""", result);
+    }
+
+    [Theory]
+    [InlineData("NOT salary:>100")]
+    [InlineData("!salary:>100")]
+    [InlineData("-salary:>100")]
+    public async Task ToDynamicLinqAsync_WithNegatedOneSidedRange_ParenthesizesComparison(string query)
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Salary", FullName = "salary", IsNumber = true }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal("!(Salary > 100)", result);
+    }
+
     [Fact]
     public async Task CanSearchDefaultFields()
     {

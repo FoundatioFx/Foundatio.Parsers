@@ -116,9 +116,6 @@ public static class SqlNodeExtensions
 
     public static string? ToDynamicLinqString(this TermNode node, ISqlQueryVisitorContext context)
     {
-        if (!String.IsNullOrEmpty(node.Prefix))
-            context.AddValidationError("Prefix is not supported for term range queries.");
-
         if (node.Term is null)
             return null;
 
@@ -127,6 +124,7 @@ public static class SqlNodeExtensions
             return query;
 
         var builder = new StringBuilder();
+        bool isExcluded = node.IsExcluded();
 
         if (String.IsNullOrEmpty(node.Field))
         {
@@ -160,7 +158,7 @@ public static class SqlNodeExtensions
 
             fieldTerms.Where(f => f.Value.Tokens is { Count: > 0 }).ForEach((kvp, x) =>
             {
-                if (x.IsFirst && node.IsNegated.HasValue && node.IsNegated.Value)
+                if (x.IsFirst && isExcluded)
                     builder.Append("!");
 
                 builder.Append(x.IsFirst ? "(" : " OR ");
@@ -264,8 +262,8 @@ public static class SqlNodeExtensions
         else if (node.Term.EndsWith("*"))
             searchOperator = SqlSearchOperator.StartsWith;
 
-        if (node.IsNegated.HasValue && node.IsNegated.Value)
-            builder.Append("!");
+        if (isExcluded)
+            builder.Append("!(");
 
         if (searchOperator == SqlSearchOperator.Equals)
         {
@@ -325,6 +323,9 @@ public static class SqlNodeExtensions
             builder.Append(fieldSuffix);
         }
 
+        if (isExcluded)
+            builder.Append(")");
+
         return builder.ToString();
     }
 
@@ -349,11 +350,13 @@ public static class SqlNodeExtensions
         var (scopePrefix, argumentPrefix) = SplitFieldPrefix(field, fieldPrefix);
 
         var builder = new StringBuilder();
+        bool isExcluded = node.IsExcluded();
+        bool shouldWrap = isExcluded || (node.Min != null && node.Max != null);
 
-        if (node.IsNegated.HasValue && node.IsNegated.Value)
+        if (isExcluded)
             builder.Append("!");
 
-        if (node.Min != null && node.Max != null)
+        if (shouldWrap)
             builder.Append("(");
 
         if (node.Min != null)
@@ -379,7 +382,7 @@ public static class SqlNodeExtensions
             builder.Append(fieldSuffix);
         }
 
-        if (node.Min != null && node.Max != null)
+        if (shouldWrap)
             builder.Append(")");
 
         return builder.ToString();
