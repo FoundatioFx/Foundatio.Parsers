@@ -196,7 +196,7 @@ public static class SqlNodeExtensions
 
         // support overriding the generated query
         if (node.TryGetQuery(out string? query))
-            return query;
+            return node.IsExcluded() ? $"!({query})" : query;
 
         var builder = new StringBuilder();
         bool isExcluded = node.IsExcluded();

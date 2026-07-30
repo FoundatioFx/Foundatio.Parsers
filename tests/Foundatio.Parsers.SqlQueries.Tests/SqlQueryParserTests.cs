@@ -80,6 +80,32 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Theory]
+    [InlineData("NOT datadefinitions.key:age")]
+    [InlineData("!datadefinitions.key:age")]
+    [InlineData("-datadefinitions.key:age")]
+    public async Task ToDynamicLinqAsync_WithNegatedVisitorTermQuery_NegatesOverride(string query)
+    {
+        var parser = new SqlQueryParser();
+        parser.Configuration.AddQueryVisitor(new DynamicFieldVisitor());
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo
+                {
+                    Name = "CustomField",
+                    FullName = "datadefinitions.key",
+                    Data = { { "DataDefinitionId", 1 } }
+                }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal("""!(DataValues.Any(DataDefinitionId = 1 AND StringValue = "age"))""", result);
+    }
+
+    [Theory]
     [InlineData("NOT _exists_:department", "Department == null")]
     [InlineData("!_exists_:department", "Department == null")]
     [InlineData("-_exists_:department", "Department == null")]
