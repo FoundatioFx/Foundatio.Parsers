@@ -138,6 +138,40 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Theory]
+    [InlineData("_missing_:department", "Department == null")]
+    [InlineData("NOT _missing_:department", "Department != null")]
+    [InlineData("!_missing_:department", "Department != null")]
+    [InlineData("-_missing_:department", "Department != null")]
+    [InlineData("_missing_:Companies.Name", "!(Companies.Any(Name != null))")]
+    [InlineData("NOT _missing_:Companies.Name", "Companies.Any(Name != null)")]
+    [InlineData("!_missing_:Companies.Name", "Companies.Any(Name != null)")]
+    [InlineData("-_missing_:Companies.Name", "Companies.Any(Name != null)")]
+    public async Task ToDynamicLinqAsync_WithMissingClause_AppliesExclusionToWholeClause(string query, string expected)
+    {
+        var parser = new SqlQueryParser();
+        var companiesField = new EntityFieldInfo
+        {
+            Name = "Companies",
+            FullName = "Companies",
+            IsCollection = true,
+            IsNavigation = true
+        };
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Department", FullName = "department" },
+                companiesField,
+                new EntityFieldInfo { Name = "Name", FullName = "Companies.Name", Parent = companiesField }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
     [InlineData("title:Open OR -department:Closed", "Title = \"Open\" AND !(Department = \"Closed\")")]
     [InlineData("title:Open OR status:Pending OR -department:Closed", "(Title = \"Open\" OR Status = \"Pending\") AND !(Department = \"Closed\")")]
     [InlineData("-status:Inactive OR -department:Closed", "!(Status = \"Inactive\") AND !(Department = \"Closed\")")]

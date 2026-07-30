@@ -167,24 +167,30 @@ public static class SqlNodeExtensions
         if (String.IsNullOrEmpty(node.Field))
             context.AddValidationError("Field is required for missing node queries.");
 
-        if (!String.IsNullOrEmpty(node.Prefix) && !node.IsRequired())
-            context.AddValidationError("Prefix is not supported for missing node queries.");
-
         // support overriding the generated query
         if (node.TryGetQuery(out string? query))
-            return query;
+            return node.IsExcluded() ? $"!({query})" : query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
 
         var builder = new StringBuilder();
+        bool isExcluded = node.IsExcluded();
+        bool negateExpression = !isExcluded && !String.IsNullOrEmpty(fieldSuffix);
+
+        if (negateExpression)
+            builder.Append("!(");
+
         builder.Append(fieldPrefix);
         builder.Append(field.Name);
-        if (!node.IsNegated.HasValue || !node.IsNegated.Value)
-            builder.Append(" == null");
-        else
+        if (isExcluded || negateExpression)
             builder.Append(" != null");
+        else
+            builder.Append(" == null");
         builder.Append(fieldSuffix);
+
+        if (negateExpression)
+            builder.Append(")");
 
         return builder.ToString();
     }
