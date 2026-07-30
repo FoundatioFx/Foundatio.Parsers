@@ -26,12 +26,12 @@ public static class SqlNodeExtensions
         var op = node.Operator != GroupOperator.Default ? node.Operator : defaultOperator;
         var operands = GetOperands(node, op, context);
         bool hasRequiredOperands = op == GroupOperator.Or
-            && operands.Any(n => n is IFieldQueryNode fieldNode && fieldNode.IsRequired());
+            && operands.Any(HasRequiredClause);
 
         if (hasRequiredOperands)
         {
             operands = operands
-                .Where(n => n is IFieldQueryNode fieldNode && (fieldNode.IsRequired() || fieldNode.IsExcluded()))
+                .Where(n => HasRequiredClause(n) || n.IsExcluded())
                 .ToList();
             op = GroupOperator.And;
         }
@@ -86,7 +86,7 @@ public static class SqlNodeExtensions
 
         builder.Append(fieldPrefix);
         builder.Append(field.Name);
-        if (!node.IsNegated.HasValue || !node.IsNegated.Value)
+        if (!node.IsExcluded())
             builder.Append(" != null");
         else
             builder.Append(" == null");
@@ -428,6 +428,16 @@ public static class SqlNodeExtensions
             fieldPrefix = fieldPrefix.Substring(0, fieldPrefix.Length - navigationPrefix.Length);
 
         return (fieldPrefix, navigationPrefix);
+    }
+
+    private static bool HasRequiredClause(IQueryNode node)
+    {
+        if (node is IFieldQueryNode fieldNode && fieldNode.IsRequired())
+            return true;
+
+        return node is GroupNode { HasParens: false } groupNode
+            && ((groupNode.Left is not null && HasRequiredClause(groupNode.Left))
+                || (groupNode.Right is not null && HasRequiredClause(groupNode.Right)));
     }
 
     private static List<IQueryNode> GetOperands(GroupNode node, GroupOperator op, ISqlQueryVisitorContext context)

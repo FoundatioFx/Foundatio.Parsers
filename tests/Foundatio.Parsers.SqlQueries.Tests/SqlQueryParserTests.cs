@@ -80,13 +80,37 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Theory]
+    [InlineData("NOT _exists_:department")]
+    [InlineData("!_exists_:department")]
+    [InlineData("-_exists_:department")]
+    public async Task ToDynamicLinqAsync_WithNegatedExistsClause_NegatesClause(string query)
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Department", FullName = "department" }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal("Department == null", result);
+    }
+
+    [Theory]
     [InlineData("+status:Active", "Status = \"Active\"")]
     [InlineData("title:Open AND +status:Active", "Title = \"Open\" AND Status = \"Active\"")]
     [InlineData("title:Open OR +status:Active", "Status = \"Active\"")]
+    [InlineData("title:Open OR +status:Active AND department:Support", "Status = \"Active\" AND Department = \"Support\"")]
+    [InlineData("title:Open AND +status:Active OR department:Support", "Title = \"Open\" AND Status = \"Active\"")]
+    [InlineData("title:Open OR (+status:Active AND department:Support)", "Title = \"Open\" OR (Status = \"Active\" AND Department = \"Support\")")]
     [InlineData("title:Open OR status:Pending OR +department:Support", "Department = \"Support\"")]
     [InlineData("+status:Active OR +department:Support", "Status = \"Active\" AND Department = \"Support\"")]
     [InlineData("title:Open OR +status:Active OR +department:Support", "Status = \"Active\" AND Department = \"Support\"")]
     [InlineData("title:Open OR +status:Active OR -department:Closed", "Status = \"Active\" AND !(Department = \"Closed\")")]
+    [InlineData("title:Open OR +status:Active OR -_exists_:department", "Status = \"Active\" AND Department == null")]
     [InlineData("+status:Active AND -department:Closed", "Status = \"Active\" AND !(Department = \"Closed\")")]
     [InlineData("title:Open OR +salary:>100", "Salary > 100")]
     [InlineData("title:Open OR +_exists_:department", "Department != null")]
