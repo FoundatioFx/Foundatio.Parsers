@@ -24,11 +24,23 @@ public static class SqlNodeExtensions
 
         var builder = new StringBuilder();
         var op = node.Operator != GroupOperator.Default ? node.Operator : defaultOperator;
+        var operands = GetOperands(node, op, context);
+        bool hasRequiredOperands = op == GroupOperator.Or
+            && operands.Any(n => n is IFieldQueryNode fieldNode && fieldNode.IsRequired());
+
+        if (hasRequiredOperands)
+        {
+            operands = operands
+                .Where(n => n is IFieldQueryNode fieldNode && (fieldNode.IsRequired() || fieldNode.IsExcluded()))
+                .ToList();
+            op = GroupOperator.And;
+        }
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
             builder.Append("NOT ");
 
-        builder.Append(node.Prefix);
+        if (!node.IsRequired())
+            builder.Append(node.Prefix);
 
         if (!String.IsNullOrEmpty(node.Field))
             builder.Append(node.Field).Append(':');
@@ -36,19 +48,15 @@ public static class SqlNodeExtensions
         if (node.HasParens)
             builder.Append("(");
 
-        if (node.Left != null)
-            builder.Append(node.Left is GroupNode groupNode ? groupNode.ToDynamicLinqString(context) : node.Left.ToDynamicLinqString(context));
-
-        if (node.Left != null && node.Right != null)
+        for (int i = 0; i < operands.Count; i++)
         {
-            if (op == GroupOperator.Or || (op == GroupOperator.Default && defaultOperator == GroupOperator.Or))
-                builder.Append(" OR ");
-            else if (node.Right != null)
-                builder.Append(" AND ");
-        }
+            if (i > 0)
+                builder.Append(op == GroupOperator.Or ? " OR " : " AND ");
 
-        if (node.Right != null)
-            builder.Append(node.Right is GroupNode groupNode ? groupNode.ToDynamicLinqString(context) : node.Right.ToDynamicLinqString(context));
+            builder.Append(operands[i] is GroupNode groupNode
+                ? groupNode.ToDynamicLinqString(context)
+                : operands[i].ToDynamicLinqString(context));
+        }
 
         if (node.HasParens)
             builder.Append(")");
@@ -92,8 +100,8 @@ public static class SqlNodeExtensions
         if (String.IsNullOrEmpty(node.Field))
             context.AddValidationError("Field is required for missing node queries.");
 
-        if (!String.IsNullOrEmpty(node.Prefix))
-            context.AddValidationError("Prefix is not supported for term range queries.");
+        if (!String.IsNullOrEmpty(node.Prefix) && !node.IsRequired())
+            context.AddValidationError("Prefix is not supported for missing node queries.");
 
         // support overriding the generated query
         if (node.TryGetQuery(out string? query))
@@ -420,6 +428,37 @@ public static class SqlNodeExtensions
             fieldPrefix = fieldPrefix.Substring(0, fieldPrefix.Length - navigationPrefix.Length);
 
         return (fieldPrefix, navigationPrefix);
+    }
+
+    private static List<IQueryNode> GetOperands(GroupNode node, GroupOperator op, ISqlQueryVisitorContext context)
+    {
+        var operands = new List<IQueryNode>();
+        AddOperand(node.Left);
+        AddOperand(node.Right);
+        return operands;
+
+        void AddOperand(IQueryNode? operand)
+        {
+            if (operand is null)
+                return;
+
+            if (operand is GroupNode groupNode
+                && !groupNode.HasParens
+                && String.IsNullOrEmpty(groupNode.Field)
+                && String.IsNullOrEmpty(groupNode.Prefix)
+                && groupNode.IsNegated is not true
+                && String.IsNullOrEmpty(groupNode.Boost)
+                && String.IsNullOrEmpty(groupNode.Proximity)
+                && groupNode.GetQuery() is null
+                && groupNode.GetOperator(context) == op)
+            {
+                AddOperand(groupNode.Left);
+                AddOperand(groupNode.Right);
+                return;
+            }
+
+            operands.Add(operand);
+        }
     }
 
     private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term, ISqlQueryVisitorContext context)

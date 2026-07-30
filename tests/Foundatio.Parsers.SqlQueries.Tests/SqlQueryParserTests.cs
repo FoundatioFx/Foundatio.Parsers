@@ -80,6 +80,88 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Theory]
+    [InlineData("+status:Active", "Status = \"Active\"")]
+    [InlineData("title:Open AND +status:Active", "Title = \"Open\" AND Status = \"Active\"")]
+    [InlineData("title:Open OR +status:Active", "Status = \"Active\"")]
+    [InlineData("title:Open OR status:Pending OR +department:Support", "Department = \"Support\"")]
+    [InlineData("+status:Active OR +department:Support", "Status = \"Active\" AND Department = \"Support\"")]
+    [InlineData("title:Open OR +status:Active OR +department:Support", "Status = \"Active\" AND Department = \"Support\"")]
+    [InlineData("title:Open OR +status:Active OR -department:Closed", "Status = \"Active\" AND !(Department = \"Closed\")")]
+    [InlineData("+status:Active AND -department:Closed", "Status = \"Active\" AND !(Department = \"Closed\")")]
+    [InlineData("title:Open OR +salary:>100", "Salary > 100")]
+    [InlineData("title:Open OR +_exists_:department", "Department != null")]
+    [InlineData("title:Open OR +_missing_:department", "Department == null")]
+    [InlineData("title:Open OR +(status:Active OR department:Support)", "(Status = \"Active\" OR Department = \"Support\")")]
+    [InlineData("title:Open AND (status:Pending OR +department:Support)", "Title = \"Open\" AND (Department = \"Support\")")]
+    public async Task ToDynamicLinqAsync_WithRequiredClause_RequiresClause(string query, string expected)
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "title" },
+                new EntityFieldInfo { Name = "Status", FullName = "status" },
+                new EntityFieldInfo { Name = "Department", FullName = "department" },
+                new EntityFieldInfo { Name = "Salary", FullName = "salary", IsNumber = true }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithRequiredDefaultFieldClause_RequiresClause()
+    {
+        var parser = new SqlQueryParser();
+        parser.Configuration.SetDefaultFields(["Title"], SqlSearchOperator.Equals);
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "Title" },
+                new EntityFieldInfo { Name = "Status", FullName = "status" }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync("status:Pending OR +Open", context);
+
+        Assert.Equal("""(Title in ("Open"))""", result);
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithRequiredClause_FiltersByRequiredClause()
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "title" },
+                new EntityFieldInfo { Name = "Salary", FullName = "salary", IsNumber = true }
+            ]
+        };
+
+        string query = await parser.ToDynamicLinqAsync("title:Open OR +salary:>100", context);
+        AssertRequiredSalaryFilter(parser, query);
+    }
+
+    private static void AssertRequiredSalaryFilter(SqlQueryParser parser, string query)
+    {
+        var results = new[]
+        {
+            new Employee { Title = "Open", Salary = 50 },
+            new Employee { Title = "Closed", Salary = 150 },
+            new Employee { Title = "Open", Salary = 200 }
+        }.AsQueryable().Where(parser.ParsingConfig, query).ToList();
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, employee => Assert.True(employee.Salary > 100));
+    }
+
+    [Theory]
     [InlineData("NOT salary:>100")]
     [InlineData("!salary:>100")]
     [InlineData("-salary:>100")]
