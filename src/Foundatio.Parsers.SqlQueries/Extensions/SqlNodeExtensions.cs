@@ -105,9 +105,26 @@ public static class SqlNodeExtensions
                 if (i > 0)
                     builder.Append(joinOperator == GroupOperator.Or ? " OR " : " AND ");
 
-                builder.Append(nodes[i] is GroupNode groupNode
-                    ? groupNode.ToDynamicLinqString(context)
-                    : nodes[i].ToDynamicLinqString(context));
+                if (nodes[i] is GroupNode groupNode)
+                {
+                    bool requiresParens = !groupNode.HasParens
+                        && joinOperator == GroupOperator.And
+                        && groupNode.GetOperator(context) == GroupOperator.Or
+                        && !HasRequiredClause(groupNode)
+                        && !HasProhibitedClause(groupNode);
+
+                    if (requiresParens)
+                        builder.Append("(");
+
+                    builder.Append(groupNode.ToDynamicLinqString(context));
+
+                    if (requiresParens)
+                        builder.Append(")");
+                }
+                else
+                {
+                    builder.Append(nodes[i].ToDynamicLinqString(context));
+                }
             }
         }
     }

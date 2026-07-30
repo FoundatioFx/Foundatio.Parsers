@@ -118,6 +118,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
     [InlineData("title:Open OR -_exists_:Companies.Name", "Title = \"Open\" AND !(Companies.Any(Name != null))")]
     [InlineData("title:Open OR -department:Closed AND status:Pending", "!(Department = \"Closed\") AND Status = \"Pending\"")]
     [InlineData("title:Open OR status:Pending AND -department:Closed", "Status = \"Pending\" AND !(Department = \"Closed\")")]
+    [InlineData("title:A OR -status:B AND department:C OR team:D", "!(Status = \"B\") AND (Department = \"C\" OR Team = \"D\")")]
     [InlineData("title:Open OR (-department:Closed AND status:Pending)", "Title = \"Open\" OR (!(Department = \"Closed\") AND Status = \"Pending\")")]
     public async Task ToDynamicLinqAsync_WithProhibitedOrClause_RequiresOptionalAndProhibitedClauses(string query, string expected)
     {
@@ -136,6 +137,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
                 new EntityFieldInfo { Name = "Title", FullName = "title" },
                 new EntityFieldInfo { Name = "Status", FullName = "status" },
                 new EntityFieldInfo { Name = "Department", FullName = "department" },
+                new EntityFieldInfo { Name = "Team", FullName = "team" },
                 companiesField,
                 new EntityFieldInfo { Name = "Name", FullName = "Companies.Name", Parent = companiesField }
             ]
@@ -151,6 +153,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
     [InlineData("title:Open AND +status:Active", "Title = \"Open\" AND Status = \"Active\"")]
     [InlineData("title:Open OR +status:Active", "Status = \"Active\"")]
     [InlineData("title:Open OR +status:Active AND department:Support", "Status = \"Active\" AND Department = \"Support\"")]
+    [InlineData("title:A OR +status:B AND department:C OR team:D", "Status = \"B\" AND (Department = \"C\" OR Team = \"D\")")]
     [InlineData("title:Open AND +status:Active OR department:Support", "Title = \"Open\" AND Status = \"Active\"")]
     [InlineData("title:Open OR (+status:Active AND department:Support)", "Title = \"Open\" OR (Status = \"Active\" AND Department = \"Support\")")]
     [InlineData("title:Open OR status:Pending OR +department:Support", "Department = \"Support\"")]
@@ -174,6 +177,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
                 new EntityFieldInfo { Name = "Title", FullName = "title" },
                 new EntityFieldInfo { Name = "Status", FullName = "status" },
                 new EntityFieldInfo { Name = "Department", FullName = "department" },
+                new EntityFieldInfo { Name = "Team", FullName = "team" },
                 new EntityFieldInfo { Name = "Salary", FullName = "salary", IsNumber = true }
             ]
         };
