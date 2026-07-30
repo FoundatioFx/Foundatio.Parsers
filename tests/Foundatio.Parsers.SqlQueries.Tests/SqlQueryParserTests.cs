@@ -59,6 +59,330 @@ public class SqlQueryParserTests : TestWithLoggingBase
         return ParseAndValidateQuery(query, expected, true);
     }
 
+    [Theory]
+    [InlineData("NOT title:Open")]
+    [InlineData("!title:Open")]
+    [InlineData("-title:Open")]
+    public async Task ToDynamicLinqAsync_WithNegatedFieldComparison_ParenthesizesComparison(string query)
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "title" }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal("""!(Title = "Open")""", result);
+    }
+
+    [Theory]
+    [InlineData("NOT datadefinitions.key:age")]
+    [InlineData("!datadefinitions.key:age")]
+    [InlineData("-datadefinitions.key:age")]
+    public async Task ToDynamicLinqAsync_WithNegatedVisitorTermQuery_NegatesOverride(string query)
+    {
+        var parser = new SqlQueryParser();
+        parser.Configuration.AddQueryVisitor(new DynamicFieldVisitor());
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo
+                {
+                    Name = "CustomField",
+                    FullName = "datadefinitions.key",
+                    Data = { { "DataDefinitionId", 1 } }
+                }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal("""!(DataValues.Any(DataDefinitionId = 1 AND StringValue = "age"))""", result);
+    }
+
+    [Theory]
+    [InlineData("NOT _exists_:department", "Department == null")]
+    [InlineData("!_exists_:department", "Department == null")]
+    [InlineData("-_exists_:department", "Department == null")]
+    [InlineData("NOT _exists_:Companies.Name", "!(Companies.Any(Name != null))")]
+    [InlineData("!_exists_:Companies.Name", "!(Companies.Any(Name != null))")]
+    [InlineData("-_exists_:Companies.Name", "!(Companies.Any(Name != null))")]
+    public async Task ToDynamicLinqAsync_WithNegatedExistsClause_NegatesClause(string query, string expected)
+    {
+        var parser = new SqlQueryParser();
+        var companiesField = new EntityFieldInfo
+        {
+            Name = "Companies",
+            FullName = "Companies",
+            IsCollection = true,
+            IsNavigation = true
+        };
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Department", FullName = "department" },
+                companiesField,
+                new EntityFieldInfo { Name = "Name", FullName = "Companies.Name", Parent = companiesField }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("_missing_:department", "Department == null")]
+    [InlineData("NOT _missing_:department", "Department != null")]
+    [InlineData("!_missing_:department", "Department != null")]
+    [InlineData("-_missing_:department", "Department != null")]
+    [InlineData("_missing_:Companies.Name", "!(Companies.Any(Name != null))")]
+    [InlineData("NOT _missing_:Companies.Name", "Companies.Any(Name != null)")]
+    [InlineData("!_missing_:Companies.Name", "Companies.Any(Name != null)")]
+    [InlineData("-_missing_:Companies.Name", "Companies.Any(Name != null)")]
+    public async Task ToDynamicLinqAsync_WithMissingClause_AppliesExclusionToWholeClause(string query, string expected)
+    {
+        var parser = new SqlQueryParser();
+        var companiesField = new EntityFieldInfo
+        {
+            Name = "Companies",
+            FullName = "Companies",
+            IsCollection = true,
+            IsNavigation = true
+        };
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Department", FullName = "department" },
+                companiesField,
+                new EntityFieldInfo { Name = "Name", FullName = "Companies.Name", Parent = companiesField }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("title:Open OR NOT department:Closed", "Title = \"Open\" OR !(Department = \"Closed\")")]
+    [InlineData("title:Open OR !department:Closed", "Title = \"Open\" OR !(Department = \"Closed\")")]
+    [InlineData("title:Open OR -department:Closed", "Title = \"Open\" OR !(Department = \"Closed\")")]
+    [InlineData("title:Open OR status:Pending OR -department:Closed", "Title = \"Open\" OR Status = \"Pending\" OR !(Department = \"Closed\")")]
+    [InlineData("-status:Inactive OR -department:Closed", "!(Status = \"Inactive\") OR !(Department = \"Closed\")")]
+    [InlineData("title:Open OR -_exists_:Companies.Name", "Title = \"Open\" OR !(Companies.Any(Name != null))")]
+    [InlineData("title:Open OR -department:Closed AND status:Pending", "Title = \"Open\" OR !(Department = \"Closed\") AND Status = \"Pending\"")]
+    [InlineData("title:Open OR status:Pending AND -department:Closed", "Title = \"Open\" OR Status = \"Pending\" AND !(Department = \"Closed\")")]
+    [InlineData("title:A OR -status:B AND department:C OR team:D", "Title = \"A\" OR !(Status = \"B\") AND (Department = \"C\" OR Team = \"D\")")]
+    [InlineData("title:Open OR (-department:Closed AND status:Pending)", "Title = \"Open\" OR (!(Department = \"Closed\") AND Status = \"Pending\")")]
+    public async Task ToDynamicLinqAsync_WithProhibitedOrClause_PreservesOrSemantics(string query, string expected)
+    {
+        var parser = new SqlQueryParser();
+        var companiesField = new EntityFieldInfo
+        {
+            Name = "Companies",
+            FullName = "Companies",
+            IsCollection = true,
+            IsNavigation = true
+        };
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "title" },
+                new EntityFieldInfo { Name = "Status", FullName = "status" },
+                new EntityFieldInfo { Name = "Department", FullName = "department" },
+                new EntityFieldInfo { Name = "Team", FullName = "team" },
+                companiesField,
+                new EntityFieldInfo { Name = "Name", FullName = "Companies.Name", Parent = companiesField }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("+status:Active", "Status = \"Active\"")]
+    [InlineData("title:Open AND +status:Active", "Title = \"Open\" AND Status = \"Active\"")]
+    [InlineData("title:Open OR +status:Active", "Status = \"Active\"")]
+    [InlineData("title:Open OR +status:Active AND department:Support", "Status = \"Active\" AND Department = \"Support\"")]
+    [InlineData("title:A OR +status:B AND department:C OR team:D", "Status = \"B\" AND (Department = \"C\" OR Team = \"D\")")]
+    [InlineData("title:Open AND +status:Active OR department:Support", "Title = \"Open\" AND Status = \"Active\"")]
+    [InlineData("title:Open OR (+status:Active AND department:Support)", "Title = \"Open\" OR (Status = \"Active\" AND Department = \"Support\")")]
+    [InlineData("title:Open OR status:Pending OR +department:Support", "Department = \"Support\"")]
+    [InlineData("+status:Active OR +department:Support", "Status = \"Active\" AND Department = \"Support\"")]
+    [InlineData("title:Open OR +status:Active OR +department:Support", "Status = \"Active\" AND Department = \"Support\"")]
+    [InlineData("title:Open OR +status:Active OR -department:Closed", "Status = \"Active\" AND !(Department = \"Closed\")")]
+    [InlineData("title:Open OR +status:Active OR -_exists_:department", "Status = \"Active\" AND Department == null")]
+    [InlineData("+status:Active AND -department:Closed", "Status = \"Active\" AND !(Department = \"Closed\")")]
+    [InlineData("title:Open OR +salary:>100", "Salary > 100")]
+    [InlineData("title:Open OR +_exists_:department", "Department != null")]
+    [InlineData("title:Open OR +_missing_:department", "Department == null")]
+    [InlineData("title:Open OR +(status:Active OR department:Support)", "(Status = \"Active\" OR Department = \"Support\")")]
+    [InlineData("title:Open AND (status:Pending OR +department:Support)", "Title = \"Open\" AND (Department = \"Support\")")]
+    public async Task ToDynamicLinqAsync_WithRequiredClause_RequiresClause(string query, string expected)
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "title" },
+                new EntityFieldInfo { Name = "Status", FullName = "status" },
+                new EntityFieldInfo { Name = "Department", FullName = "department" },
+                new EntityFieldInfo { Name = "Team", FullName = "team" },
+                new EntityFieldInfo { Name = "Salary", FullName = "salary", IsNumber = true }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithRequiredDefaultFieldClause_RequiresClause()
+    {
+        var parser = new SqlQueryParser();
+        parser.Configuration.SetDefaultFields(["Title"], SqlSearchOperator.Equals);
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "Title" },
+                new EntityFieldInfo { Name = "Status", FullName = "status" }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync("status:Pending OR +Open", context);
+
+        Assert.Equal("""(Title in ("Open"))""", result);
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithRequiredClause_FiltersByRequiredClause()
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "title" },
+                new EntityFieldInfo { Name = "Salary", FullName = "salary", IsNumber = true }
+            ]
+        };
+
+        string query = await parser.ToDynamicLinqAsync("title:Open OR +salary:>100", context);
+        AssertRequiredSalaryFilter(parser, query);
+    }
+
+    private static void AssertRequiredSalaryFilter(SqlQueryParser parser, string query)
+    {
+        var results = new[]
+        {
+            new Employee { Title = "Open", Salary = 50 },
+            new Employee { Title = "Closed", Salary = 150 },
+            new Employee { Title = "Open", Salary = 200 }
+        }.AsQueryable().Where(parser.ParsingConfig, query).ToList();
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, employee => Assert.True(employee.Salary > 100));
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithProhibitedOrClause_FiltersByEitherClause()
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Title", FullName = "title" },
+                new EntityFieldInfo { Name = "Department", FullName = "department" }
+            ]
+        };
+
+        string query = await parser.ToDynamicLinqAsync("title:Open OR -department:Closed", context);
+        AssertProhibitedOrFilter(parser, query);
+    }
+
+    private static void AssertProhibitedOrFilter(SqlQueryParser parser, string query)
+    {
+        var results = new[]
+        {
+            new { Title = "Open", Department = "Closed" },
+            new { Title = "Open", Department = "Support" },
+            new { Title = "Pending", Department = "Support" }
+        }.AsQueryable().Where(parser.ParsingConfig, query).ToList();
+
+        Assert.Equal(3, results.Count);
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithNegatedCollectionExists_FiltersWholeCollection()
+    {
+        var parser = new SqlQueryParser();
+        var companiesField = new EntityFieldInfo
+        {
+            Name = "Companies",
+            FullName = "Companies",
+            IsCollection = true,
+            IsNavigation = true
+        };
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                companiesField,
+                new EntityFieldInfo { Name = "Name", FullName = "Companies.Name", Parent = companiesField }
+            ]
+        };
+
+        string query = await parser.ToDynamicLinqAsync("-_exists_:Companies.Name", context);
+        AssertNegatedCollectionExistsFilter(parser, query);
+    }
+
+    private static void AssertNegatedCollectionExistsFilter(SqlQueryParser parser, string query)
+    {
+        var results = new[]
+        {
+            new { Id = 1, Companies = Array.Empty<Company>() },
+            new { Id = 2, Companies = new[] { new Company { Name = null! } } },
+            new { Id = 3, Companies = new[] { new Company { Name = null! }, new Company { Name = "Acme" } } }
+        }.AsQueryable().Where(parser.ParsingConfig, query).Select(record => record.Id).ToList();
+
+        Assert.Equal([1, 2], results);
+    }
+
+    [Theory]
+    [InlineData("NOT salary:>100")]
+    [InlineData("!salary:>100")]
+    [InlineData("-salary:>100")]
+    public async Task ToDynamicLinqAsync_WithNegatedOneSidedRange_ParenthesizesComparison(string query)
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Salary", FullName = "salary", IsNumber = true }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal("!(Salary > 100)", result);
+    }
+
     [Fact]
     public async Task CanSearchDefaultFields()
     {

@@ -24,11 +24,23 @@ public static class SqlNodeExtensions
 
         var builder = new StringBuilder();
         var op = node.Operator != GroupOperator.Default ? node.Operator : defaultOperator;
+        var operands = GetOperands(node, op, context);
+        bool hasRequiredOperands = op == GroupOperator.Or
+            && operands.Any(HasRequiredClause);
+
+        if (hasRequiredOperands)
+        {
+            operands = operands
+                .Where(n => HasRequiredClause(n) || HasProhibitedClause(n))
+                .ToList();
+            op = GroupOperator.And;
+        }
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
             builder.Append("NOT ");
 
-        builder.Append(node.Prefix);
+        if (!node.IsRequired())
+            builder.Append(node.Prefix);
 
         if (!String.IsNullOrEmpty(node.Field))
             builder.Append(node.Field).Append(':');
@@ -36,19 +48,7 @@ public static class SqlNodeExtensions
         if (node.HasParens)
             builder.Append("(");
 
-        if (node.Left != null)
-            builder.Append(node.Left is GroupNode groupNode ? groupNode.ToDynamicLinqString(context) : node.Left.ToDynamicLinqString(context));
-
-        if (node.Left != null && node.Right != null)
-        {
-            if (op == GroupOperator.Or || (op == GroupOperator.Default && defaultOperator == GroupOperator.Or))
-                builder.Append(" OR ");
-            else if (node.Right != null)
-                builder.Append(" AND ");
-        }
-
-        if (node.Right != null)
-            builder.Append(node.Right is GroupNode groupNode ? groupNode.ToDynamicLinqString(context) : node.Right.ToDynamicLinqString(context));
+        AppendOperands(operands, op);
 
         if (node.HasParens)
             builder.Append(")");
@@ -60,6 +60,35 @@ public static class SqlNodeExtensions
             builder.Append("^" + node.Boost);
 
         return builder.ToString();
+
+        void AppendOperands(IReadOnlyList<IQueryNode> nodes, GroupOperator joinOperator)
+        {
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                if (i > 0)
+                    builder.Append(joinOperator == GroupOperator.Or ? " OR " : " AND ");
+
+                if (nodes[i] is GroupNode groupNode)
+                {
+                    bool requiresParens = !groupNode.HasParens
+                        && joinOperator == GroupOperator.And
+                        && groupNode.GetOperator(context) == GroupOperator.Or
+                        && !HasRequiredClause(groupNode);
+
+                    if (requiresParens)
+                        builder.Append("(");
+
+                    builder.Append(groupNode.ToDynamicLinqString(context));
+
+                    if (requiresParens)
+                        builder.Append(")");
+                }
+                else
+                {
+                    builder.Append(nodes[i].ToDynamicLinqString(context));
+                }
+            }
+        }
     }
 
     public static string ToDynamicLinqString(this ExistsNode node, ISqlQueryVisitorContext context)
@@ -75,14 +104,22 @@ public static class SqlNodeExtensions
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
 
         var builder = new StringBuilder();
+        bool isExcluded = node.IsExcluded();
+        bool negateExpression = isExcluded && !String.IsNullOrEmpty(fieldSuffix);
+
+        if (negateExpression)
+            builder.Append("!(");
 
         builder.Append(fieldPrefix);
         builder.Append(field.Name);
-        if (!node.IsNegated.HasValue || !node.IsNegated.Value)
+        if (!isExcluded || negateExpression)
             builder.Append(" != null");
         else
             builder.Append(" == null");
         builder.Append(fieldSuffix);
+
+        if (negateExpression)
+            builder.Append(")");
 
         return builder.ToString();
     }
@@ -92,41 +129,45 @@ public static class SqlNodeExtensions
         if (String.IsNullOrEmpty(node.Field))
             context.AddValidationError("Field is required for missing node queries.");
 
-        if (!String.IsNullOrEmpty(node.Prefix))
-            context.AddValidationError("Prefix is not supported for term range queries.");
-
         // support overriding the generated query
         if (node.TryGetQuery(out string? query))
-            return query;
+            return node.IsExcluded() ? $"!({query})" : query;
 
         var field = GetFieldInfo(context.Fields, node.Field);
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
 
         var builder = new StringBuilder();
+        bool isExcluded = node.IsExcluded();
+        bool negateExpression = !isExcluded && !String.IsNullOrEmpty(fieldSuffix);
+
+        if (negateExpression)
+            builder.Append("!(");
+
         builder.Append(fieldPrefix);
         builder.Append(field.Name);
-        if (!node.IsNegated.HasValue || !node.IsNegated.Value)
-            builder.Append(" == null");
-        else
+        if (isExcluded || negateExpression)
             builder.Append(" != null");
+        else
+            builder.Append(" == null");
         builder.Append(fieldSuffix);
+
+        if (negateExpression)
+            builder.Append(")");
 
         return builder.ToString();
     }
 
     public static string? ToDynamicLinqString(this TermNode node, ISqlQueryVisitorContext context)
     {
-        if (!String.IsNullOrEmpty(node.Prefix))
-            context.AddValidationError("Prefix is not supported for term range queries.");
-
         if (node.Term is null)
             return null;
 
         // support overriding the generated query
         if (node.TryGetQuery(out string? query))
-            return query;
+            return node.IsExcluded() ? $"!({query})" : query;
 
         var builder = new StringBuilder();
+        bool isExcluded = node.IsExcluded();
 
         if (String.IsNullOrEmpty(node.Field))
         {
@@ -160,7 +201,7 @@ public static class SqlNodeExtensions
 
             fieldTerms.Where(f => f.Value.Tokens is { Count: > 0 }).ForEach((kvp, x) =>
             {
-                if (x.IsFirst && node.IsNegated.HasValue && node.IsNegated.Value)
+                if (x.IsFirst && isExcluded)
                     builder.Append("!");
 
                 builder.Append(x.IsFirst ? "(" : " OR ");
@@ -264,8 +305,8 @@ public static class SqlNodeExtensions
         else if (node.Term.EndsWith("*"))
             searchOperator = SqlSearchOperator.StartsWith;
 
-        if (node.IsNegated.HasValue && node.IsNegated.Value)
-            builder.Append("!");
+        if (isExcluded)
+            builder.Append("!(");
 
         if (searchOperator == SqlSearchOperator.Equals)
         {
@@ -325,6 +366,9 @@ public static class SqlNodeExtensions
             builder.Append(fieldSuffix);
         }
 
+        if (isExcluded)
+            builder.Append(")");
+
         return builder.ToString();
     }
 
@@ -349,11 +393,13 @@ public static class SqlNodeExtensions
         var (scopePrefix, argumentPrefix) = SplitFieldPrefix(field, fieldPrefix);
 
         var builder = new StringBuilder();
+        bool isExcluded = node.IsExcluded();
+        bool shouldWrap = isExcluded || (node.Min != null && node.Max != null);
 
-        if (node.IsNegated.HasValue && node.IsNegated.Value)
+        if (isExcluded)
             builder.Append("!");
 
-        if (node.Min != null && node.Max != null)
+        if (shouldWrap)
             builder.Append("(");
 
         if (node.Min != null)
@@ -379,7 +425,7 @@ public static class SqlNodeExtensions
             builder.Append(fieldSuffix);
         }
 
-        if (node.Min != null && node.Max != null)
+        if (shouldWrap)
             builder.Append(")");
 
         return builder.ToString();
@@ -417,6 +463,57 @@ public static class SqlNodeExtensions
             fieldPrefix = fieldPrefix.Substring(0, fieldPrefix.Length - navigationPrefix.Length);
 
         return (fieldPrefix, navigationPrefix);
+    }
+
+    private static bool HasRequiredClause(IQueryNode node)
+    {
+        if (node is IFieldQueryNode fieldNode && fieldNode.IsRequired())
+            return true;
+
+        return node is GroupNode { HasParens: false } groupNode
+            && ((groupNode.Left is not null && HasRequiredClause(groupNode.Left))
+                || (groupNode.Right is not null && HasRequiredClause(groupNode.Right)));
+    }
+
+    private static bool HasProhibitedClause(IQueryNode node)
+    {
+        if (node.IsExcluded())
+            return true;
+
+        return node is GroupNode { HasParens: false } groupNode
+            && ((groupNode.Left is not null && HasProhibitedClause(groupNode.Left))
+                || (groupNode.Right is not null && HasProhibitedClause(groupNode.Right)));
+    }
+
+    private static List<IQueryNode> GetOperands(GroupNode node, GroupOperator op, ISqlQueryVisitorContext context)
+    {
+        var operands = new List<IQueryNode>();
+        AddOperand(node.Left);
+        AddOperand(node.Right);
+        return operands;
+
+        void AddOperand(IQueryNode? operand)
+        {
+            if (operand is null)
+                return;
+
+            if (operand is GroupNode groupNode
+                && !groupNode.HasParens
+                && String.IsNullOrEmpty(groupNode.Field)
+                && String.IsNullOrEmpty(groupNode.Prefix)
+                && groupNode.IsNegated is not true
+                && String.IsNullOrEmpty(groupNode.Boost)
+                && String.IsNullOrEmpty(groupNode.Proximity)
+                && groupNode.GetQuery() is null
+                && groupNode.GetOperator(context) == op)
+            {
+                AddOperand(groupNode.Left);
+                AddOperand(groupNode.Right);
+                return;
+            }
+
+            operands.Add(operand);
+        }
     }
 
     private static void AppendField(StringBuilder builder, EntityFieldInfo field, string term, ISqlQueryVisitorContext context)
