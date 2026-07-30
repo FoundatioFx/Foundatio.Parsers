@@ -27,8 +27,6 @@ public static class SqlNodeExtensions
         var operands = GetOperands(node, op, context);
         bool hasRequiredOperands = op == GroupOperator.Or
             && operands.Any(HasRequiredClause);
-        List<IQueryNode>? optionalOperands = null;
-        List<IQueryNode>? prohibitedOperands = null;
 
         if (hasRequiredOperands)
         {
@@ -36,23 +34,6 @@ public static class SqlNodeExtensions
                 .Where(n => HasRequiredClause(n) || HasProhibitedClause(n))
                 .ToList();
             op = GroupOperator.And;
-        }
-        else if (op == GroupOperator.Or)
-        {
-            prohibitedOperands = operands.Where(HasProhibitedClause).ToList();
-            if (prohibitedOperands.Count > 0)
-            {
-                if (prohibitedOperands.Any(n => !n.IsExcluded()))
-                {
-                    operands = prohibitedOperands;
-                    prohibitedOperands = null;
-                    op = GroupOperator.And;
-                }
-                else
-                {
-                    optionalOperands = operands.Where(n => !HasProhibitedClause(n)).ToList();
-                }
-            }
         }
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
@@ -67,25 +48,7 @@ public static class SqlNodeExtensions
         if (node.HasParens)
             builder.Append("(");
 
-        if (prohibitedOperands is { Count: > 0 } && optionalOperands is not null)
-        {
-            if (optionalOperands.Count > 0)
-            {
-                if (optionalOperands.Count > 1)
-                    builder.Append("(");
-
-                AppendOperands(optionalOperands, GroupOperator.Or);
-
-                if (optionalOperands.Count > 1)
-                    builder.Append(")");
-
-                builder.Append(" AND ");
-            }
-
-            AppendOperands(prohibitedOperands, GroupOperator.And);
-        }
-        else
-            AppendOperands(operands, op);
+        AppendOperands(operands, op);
 
         if (node.HasParens)
             builder.Append(")");
@@ -110,8 +73,7 @@ public static class SqlNodeExtensions
                     bool requiresParens = !groupNode.HasParens
                         && joinOperator == GroupOperator.And
                         && groupNode.GetOperator(context) == GroupOperator.Or
-                        && !HasRequiredClause(groupNode)
-                        && !HasProhibitedClause(groupNode);
+                        && !HasRequiredClause(groupNode);
 
                     if (requiresParens)
                         builder.Append("(");

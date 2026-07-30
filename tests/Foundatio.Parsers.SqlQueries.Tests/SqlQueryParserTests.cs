@@ -172,15 +172,17 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Theory]
-    [InlineData("title:Open OR -department:Closed", "Title = \"Open\" AND !(Department = \"Closed\")")]
-    [InlineData("title:Open OR status:Pending OR -department:Closed", "(Title = \"Open\" OR Status = \"Pending\") AND !(Department = \"Closed\")")]
-    [InlineData("-status:Inactive OR -department:Closed", "!(Status = \"Inactive\") AND !(Department = \"Closed\")")]
-    [InlineData("title:Open OR -_exists_:Companies.Name", "Title = \"Open\" AND !(Companies.Any(Name != null))")]
-    [InlineData("title:Open OR -department:Closed AND status:Pending", "!(Department = \"Closed\") AND Status = \"Pending\"")]
-    [InlineData("title:Open OR status:Pending AND -department:Closed", "Status = \"Pending\" AND !(Department = \"Closed\")")]
-    [InlineData("title:A OR -status:B AND department:C OR team:D", "!(Status = \"B\") AND (Department = \"C\" OR Team = \"D\")")]
+    [InlineData("title:Open OR NOT department:Closed", "Title = \"Open\" OR !(Department = \"Closed\")")]
+    [InlineData("title:Open OR !department:Closed", "Title = \"Open\" OR !(Department = \"Closed\")")]
+    [InlineData("title:Open OR -department:Closed", "Title = \"Open\" OR !(Department = \"Closed\")")]
+    [InlineData("title:Open OR status:Pending OR -department:Closed", "Title = \"Open\" OR Status = \"Pending\" OR !(Department = \"Closed\")")]
+    [InlineData("-status:Inactive OR -department:Closed", "!(Status = \"Inactive\") OR !(Department = \"Closed\")")]
+    [InlineData("title:Open OR -_exists_:Companies.Name", "Title = \"Open\" OR !(Companies.Any(Name != null))")]
+    [InlineData("title:Open OR -department:Closed AND status:Pending", "Title = \"Open\" OR !(Department = \"Closed\") AND Status = \"Pending\"")]
+    [InlineData("title:Open OR status:Pending AND -department:Closed", "Title = \"Open\" OR Status = \"Pending\" AND !(Department = \"Closed\")")]
+    [InlineData("title:A OR -status:B AND department:C OR team:D", "Title = \"A\" OR !(Status = \"B\") AND (Department = \"C\" OR Team = \"D\")")]
     [InlineData("title:Open OR (-department:Closed AND status:Pending)", "Title = \"Open\" OR (!(Department = \"Closed\") AND Status = \"Pending\")")]
-    public async Task ToDynamicLinqAsync_WithProhibitedOrClause_RequiresOptionalAndProhibitedClauses(string query, string expected)
+    public async Task ToDynamicLinqAsync_WithProhibitedOrClause_PreservesOrSemantics(string query, string expected)
     {
         var parser = new SqlQueryParser();
         var companiesField = new EntityFieldInfo
@@ -297,7 +299,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
-    public async Task ToDynamicLinqAsync_WithProhibitedOrClause_FiltersByOptionalAndProhibitedClauses()
+    public async Task ToDynamicLinqAsync_WithProhibitedOrClause_FiltersByEitherClause()
     {
         var parser = new SqlQueryParser();
         var context = new SqlQueryVisitorContext
@@ -310,10 +312,10 @@ public class SqlQueryParserTests : TestWithLoggingBase
         };
 
         string query = await parser.ToDynamicLinqAsync("title:Open OR -department:Closed", context);
-        AssertProhibitedClauseFilter(parser, query);
+        AssertProhibitedOrFilter(parser, query);
     }
 
-    private static void AssertProhibitedClauseFilter(SqlQueryParser parser, string query)
+    private static void AssertProhibitedOrFilter(SqlQueryParser parser, string query)
     {
         var results = new[]
         {
@@ -322,9 +324,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             new { Title = "Pending", Department = "Support" }
         }.AsQueryable().Where(parser.ParsingConfig, query).ToList();
 
-        var result = Assert.Single(results);
-        Assert.Equal("Open", result.Title);
-        Assert.Equal("Support", result.Department);
+        Assert.Equal(3, results.Count);
     }
 
     [Fact]
