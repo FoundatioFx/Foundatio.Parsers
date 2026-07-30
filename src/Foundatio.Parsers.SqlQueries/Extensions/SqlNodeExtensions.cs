@@ -27,6 +27,8 @@ public static class SqlNodeExtensions
         var operands = GetOperands(node, op, context);
         bool hasRequiredOperands = op == GroupOperator.Or
             && operands.Any(HasRequiredClause);
+        List<IQueryNode>? optionalOperands = null;
+        List<IQueryNode>? prohibitedOperands = null;
 
         if (hasRequiredOperands)
         {
@@ -34,6 +36,12 @@ public static class SqlNodeExtensions
                 .Where(n => HasRequiredClause(n) || n.IsExcluded())
                 .ToList();
             op = GroupOperator.And;
+        }
+        else if (op == GroupOperator.Or)
+        {
+            prohibitedOperands = operands.Where(n => n.IsExcluded()).ToList();
+            if (prohibitedOperands.Count > 0)
+                optionalOperands = operands.Where(n => !n.IsExcluded()).ToList();
         }
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
@@ -48,15 +56,25 @@ public static class SqlNodeExtensions
         if (node.HasParens)
             builder.Append("(");
 
-        for (int i = 0; i < operands.Count; i++)
+        if (prohibitedOperands is { Count: > 0 } && optionalOperands is not null)
         {
-            if (i > 0)
-                builder.Append(op == GroupOperator.Or ? " OR " : " AND ");
+            if (optionalOperands.Count > 0)
+            {
+                if (optionalOperands.Count > 1)
+                    builder.Append("(");
 
-            builder.Append(operands[i] is GroupNode groupNode
-                ? groupNode.ToDynamicLinqString(context)
-                : operands[i].ToDynamicLinqString(context));
+                AppendOperands(optionalOperands, GroupOperator.Or);
+
+                if (optionalOperands.Count > 1)
+                    builder.Append(")");
+
+                builder.Append(" AND ");
+            }
+
+            AppendOperands(prohibitedOperands, GroupOperator.And);
         }
+        else
+            AppendOperands(operands, op);
 
         if (node.HasParens)
             builder.Append(")");
@@ -68,6 +86,19 @@ public static class SqlNodeExtensions
             builder.Append("^" + node.Boost);
 
         return builder.ToString();
+
+        void AppendOperands(IReadOnlyList<IQueryNode> nodes, GroupOperator joinOperator)
+        {
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                if (i > 0)
+                    builder.Append(joinOperator == GroupOperator.Or ? " OR " : " AND ");
+
+                builder.Append(nodes[i] is GroupNode groupNode
+                    ? groupNode.ToDynamicLinqString(context)
+                    : nodes[i].ToDynamicLinqString(context));
+            }
+        }
     }
 
     public static string ToDynamicLinqString(this ExistsNode node, ISqlQueryVisitorContext context)
@@ -83,14 +114,22 @@ public static class SqlNodeExtensions
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
 
         var builder = new StringBuilder();
+        bool isExcluded = node.IsExcluded();
+        bool negateExpression = isExcluded && !String.IsNullOrEmpty(fieldSuffix);
+
+        if (negateExpression)
+            builder.Append("!(");
 
         builder.Append(fieldPrefix);
         builder.Append(field.Name);
-        if (!node.IsExcluded())
+        if (!isExcluded || negateExpression)
             builder.Append(" != null");
         else
             builder.Append(" == null");
         builder.Append(fieldSuffix);
+
+        if (negateExpression)
+            builder.Append(")");
 
         return builder.ToString();
     }
