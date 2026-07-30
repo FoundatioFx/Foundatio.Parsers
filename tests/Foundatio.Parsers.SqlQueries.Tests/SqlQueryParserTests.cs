@@ -116,6 +116,9 @@ public class SqlQueryParserTests : TestWithLoggingBase
     [InlineData("title:Open OR status:Pending OR -department:Closed", "(Title = \"Open\" OR Status = \"Pending\") AND !(Department = \"Closed\")")]
     [InlineData("-status:Inactive OR -department:Closed", "!(Status = \"Inactive\") AND !(Department = \"Closed\")")]
     [InlineData("title:Open OR -_exists_:Companies.Name", "Title = \"Open\" AND !(Companies.Any(Name != null))")]
+    [InlineData("title:Open OR -department:Closed AND status:Pending", "!(Department = \"Closed\") AND Status = \"Pending\"")]
+    [InlineData("title:Open OR status:Pending AND -department:Closed", "Status = \"Pending\" AND !(Department = \"Closed\")")]
+    [InlineData("title:Open OR (-department:Closed AND status:Pending)", "Title = \"Open\" OR (!(Department = \"Closed\") AND Status = \"Pending\")")]
     public async Task ToDynamicLinqAsync_WithProhibitedOrClause_RequiresOptionalAndProhibitedClauses(string query, string expected)
     {
         var parser = new SqlQueryParser();

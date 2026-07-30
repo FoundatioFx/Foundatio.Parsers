@@ -33,15 +33,26 @@ public static class SqlNodeExtensions
         if (hasRequiredOperands)
         {
             operands = operands
-                .Where(n => HasRequiredClause(n) || n.IsExcluded())
+                .Where(n => HasRequiredClause(n) || HasProhibitedClause(n))
                 .ToList();
             op = GroupOperator.And;
         }
         else if (op == GroupOperator.Or)
         {
-            prohibitedOperands = operands.Where(n => n.IsExcluded()).ToList();
+            prohibitedOperands = operands.Where(HasProhibitedClause).ToList();
             if (prohibitedOperands.Count > 0)
-                optionalOperands = operands.Where(n => !n.IsExcluded()).ToList();
+            {
+                if (prohibitedOperands.Any(n => !n.IsExcluded()))
+                {
+                    operands = prohibitedOperands;
+                    prohibitedOperands = null;
+                    op = GroupOperator.And;
+                }
+                else
+                {
+                    optionalOperands = operands.Where(n => !HasProhibitedClause(n)).ToList();
+                }
+            }
         }
 
         if (node.IsNegated.HasValue && node.IsNegated.Value)
@@ -477,6 +488,16 @@ public static class SqlNodeExtensions
         return node is GroupNode { HasParens: false } groupNode
             && ((groupNode.Left is not null && HasRequiredClause(groupNode.Left))
                 || (groupNode.Right is not null && HasRequiredClause(groupNode.Right)));
+    }
+
+    private static bool HasProhibitedClause(IQueryNode node)
+    {
+        if (node.IsExcluded())
+            return true;
+
+        return node is GroupNode { HasParens: false } groupNode
+            && ((groupNode.Left is not null && HasProhibitedClause(groupNode.Left))
+                || (groupNode.Right is not null && HasProhibitedClause(groupNode.Right)));
     }
 
     private static List<IQueryNode> GetOperands(GroupNode node, GroupOperator op, ISqlQueryVisitorContext context)
