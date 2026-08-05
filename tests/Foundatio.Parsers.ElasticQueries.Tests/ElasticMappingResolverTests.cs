@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -187,6 +188,70 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     private static Expression GetObjectPath(Expression<Func<MyNestedType, object>> objectPath)
     {
         return objectPath;
+    }
+
+    private static void MapDynamicCustomFieldType(TypeMappingDescriptor<MyNestedType> m)
+    {
+        // Mirrors how Foundatio.Repositories maps custom fields: the idx.<type>-<slot> fields only exist
+        // in the index mapping after the first document that uses them has been indexed.
+        m.Dynamic(DynamicMapping.True)
+            .DynamicTemplates(dt => dt
+                .Add("idx_nested", d => d.PathMatch("idx.*").Match("nested-*").Mapping(dm => dm.Nested(o => o.Dynamic(DynamicMapping.True))))
+                .Add("idx_string", d => d.PathMatch("idx.*").Match("string-*").Mapping(dm => dm.Text(o => o.AddKeywordAndSortFields()))))
+            .Properties(p => p
+                .Text(p1 => p1.Field1, o => o.AddKeywordAndSortFields())
+            );
+    }
+
+    [Fact]
+    public async Task GetMapping_WithCustomFieldCreatedAfterMappingWasLoaded_ResolvesNewField()
+    {
+        // Arrange - resolve an existing field first so the resolver has already loaded the server mapping,
+        // exactly like a long lived per index resolver in a running process.
+        string index = await CreateRandomIndexAsync<MyNestedType>(MapDynamicCustomFieldType);
+        var resolver = ElasticMappingResolver.Create<MyNestedType>(MapDynamicCustomFieldType, Client, index, _logger);
+        Assert.Equal("field1.sort", resolver.GetSortFieldName("field1"));
+
+        // Act - index a document that materializes the custom fields through the dynamic templates
+        await Client.IndexAsync(new Dictionary<string, object>
+        {
+            { "field1", "value1" },
+            {
+                "idx", new Dictionary<string, object>
+                {
+                    { "nested-000001", new[] { new Dictionary<string, object> { { "value", "banana" } } } },
+                    { "string-000001", "apple" }
+                }
+            }
+        }, d => d.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        // Assert
+        Assert.True(resolver.IsNestedPropertyType("idx.nested-000001"));
+        Assert.Equal("idx.nested-000001.value", resolver.GetResolvedField("idx.nested-000001.value"));
+        Assert.Equal("idx.string-000001.sort", resolver.GetSortFieldName("idx.string-000001"));
+        Assert.Equal("idx.string-000001.keyword", resolver.GetAggregationsFieldName("idx.string-000001"));
+    }
+
+    [Fact]
+    public async Task GetMapping_WithCustomFieldCachedAsUnmappedBeforeItWasCreated_ResolvesNewField()
+    {
+        // Arrange - the field is queried (and cached as unmapped) before it exists in the index mapping
+        string index = await CreateRandomIndexAsync<MyNestedType>(MapDynamicCustomFieldType);
+        var resolver = ElasticMappingResolver.Create<MyNestedType>(MapDynamicCustomFieldType, Client, index, _logger);
+        resolver.UnmappedFieldRefreshInterval = TimeSpan.Zero;
+        Assert.False(resolver.IsNestedPropertyType("idx.nested-000001"));
+
+        // Act
+        await Client.IndexAsync(new Dictionary<string, object>
+        {
+            { "field1", "value1" },
+            { "idx", new Dictionary<string, object> { { "nested-000001", new[] { new Dictionary<string, object> { { "value", "banana" } } } } } }
+        }, d => d.Index(index), TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+
+        // Assert
+        Assert.True(resolver.IsNestedPropertyType("idx.nested-000001"));
     }
 
     [Fact]
