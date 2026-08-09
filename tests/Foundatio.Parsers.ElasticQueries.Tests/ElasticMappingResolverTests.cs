@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Xunit;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
@@ -226,7 +227,16 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
         }, d => d.Index(index), TestCancellationToken);
         await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
-        // Assert
+        // Act
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(resolver).UseNested());
+        var query = await parser.BuildQueryAsync("idx.nested-000001.value:banana", new ElasticQueryVisitorContext { UseScoring = true });
+        var sort = await parser.BuildSortAsync("idx.string-000001");
+        var response = await Client.SearchAsync<object>(d => d.Indices(index).Query(query).Sort(sort), TestCancellationToken);
+
+        // Assert - execute the generated nested query and dynamic text sort, rather than only inspecting
+        // resolver metadata. A stale mapping would flatten the query or sort on the analyzed text field.
+        Assert.True(response.IsValidResponse);
+        Assert.Equal(1, response.Total);
         Assert.True(resolver.IsNestedPropertyType("idx.nested-000001"));
         Assert.Equal("idx.nested-000001.value", resolver.GetResolvedField("idx.nested-000001.value"));
         Assert.Equal("idx.string-000001.sort", resolver.GetSortFieldName("idx.string-000001"));
@@ -234,12 +244,12 @@ public class ElasticMappingResolverTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public async Task GetMapping_WithCustomFieldCachedAsUnmappedBeforeItWasCreated_ResolvesNewField()
+    public async Task GetMapping_WithCustomFieldQueriedBeforeItWasCreated_ResolvesNewField()
     {
-        // Arrange - the field is queried (and cached as unmapped) before it exists in the index mapping
+        // Arrange - the field is queried before it exists in the index mapping.
         string index = await CreateRandomIndexAsync<MyNestedType>(MapDynamicCustomFieldType);
         var resolver = ElasticMappingResolver.Create<MyNestedType>(MapDynamicCustomFieldType, Client, index, _logger);
-        resolver.UnmappedFieldRefreshInterval = TimeSpan.Zero;
+        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromMilliseconds(1);
         Assert.False(resolver.IsNestedPropertyType("idx.nested-000001"));
 
         // Act

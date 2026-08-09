@@ -144,9 +144,8 @@ var parser = new ElasticQueryParser(c => c
         { "user_field", "actual.field.path" }
     }));
 
-// Option 3: Refresh mappings. Recently added fields are picked up automatically within
-// UnmappedFieldRefreshInterval (default 5 seconds); invalidate a single field to pick it up immediately.
-parser.Configuration.MappingResolver.InvalidateFieldMapping("user_field");
+// Option 3: Force the next resolution to reload the server mapping.
+parser.Configuration.MappingResolver.RefreshMapping();
 ```
 
 ## Elasticsearch Issues
@@ -365,8 +364,7 @@ public MyService()
 **Solution:**
 
 ```csharp
-// Resolved fields are cached, and the server mapping is reloaded at most once per
-// MappingRefreshInterval (default 1 minute). Manual refresh is typically only needed in unit tests:
+// Resolved fields are cached. Manual refresh is only needed after a known change to an already resolved field:
 parser.Configuration.MappingResolver.RefreshMapping();
 
 // For production, create resolver once and share
@@ -375,20 +373,22 @@ var parser1 = new ElasticQueryParser(c => c.UseMappings(resolver));
 var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));
 ```
 
-**Cause:** Queries reference fields that do not exist, so every one of them triggers a mapping reload.
+**Cause:** Queries continually reference fields that do not exist, making the resolver repeatedly eligible
+to reload the mapping.
 
 Fields that cannot be resolved reload the mapping on their own short interval
 (`UnmappedFieldRefreshInterval`, default 5 seconds) because that is how dynamically created fields become
-visible. Reloads that do not resolve the field back off exponentially up to `MappingRefreshInterval`, and
-concurrent lookups of the same unmapped field are coalesced into a single `GetMapping` call. Raise the base
+visible. Concurrent reload attempts are coalesced into a single server mapping fetch per resolver. Raise the
 interval if a workload legitimately queries many non-existent fields:
 
 ```csharp
 resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(30);
 ```
 
-Look for the `Unable to resolve mapping for field {Field}` warning: it means a reload was suppressed by the
-throttle and the field is being treated as unmapped.
+Reuse one resolver per concrete index and process. A resolver created for every request has its own cache,
+throttle, and in-flight request, so it defeats this protection. Look for the
+`Unable to resolve mapping for field {Field}` warning: it means a reload was suppressed by the throttle and
+the field is being treated as unmapped.
 
 ### Recently Created Field Resolves As Unmapped
 
@@ -401,11 +401,12 @@ template, which only adds the field to the mapping once the first document using
 - Sorting fails with `Fielddata is disabled on [field] in [index]`, because the resolver could not find the
   `.keyword` / `.sort` sub-field and fell back to the analyzed field.
 
-**Solution:** the resolver reloads automatically within `UnmappedFieldRefreshInterval`. To pick the field up
-immediately after creating it, invalidate just that field:
+**Solution:** the resolver becomes eligible to reload after `UnmappedFieldRefreshInterval`. This is a cooldown
+after a completed attempt, not a five-second correctness deadline. To pick up an application-controlled
+change immediately, call `RefreshMapping()` after Elasticsearch acknowledges it:
 
 ```csharp
-resolver.InvalidateFieldMapping("idx.string-000001");
+resolver.RefreshMapping();
 ```
 
 If the field stays unmapped for much longer than `UnmappedFieldRefreshInterval`, look for the
@@ -416,6 +417,10 @@ match how long your `GetMapping` call actually takes:
 ```csharp
 resolver.MappingRefreshWaitTimeout = TimeSpan.FromMinutes(2);
 ```
+
+The mapping callback must enforce a shorter finite timeout and must not call the same resolver. If treating
+an unresolved field as unmapped could generate an incorrect query, configure validation with
+`AllowUnresolvedFields = false` so the request fails instead.
 
 ## Debugging
 

@@ -16,14 +16,15 @@ namespace Foundatio.Parsers.ElasticQueries;
 
 public class ElasticMappingResolver : IDisposable
 {
+    private static readonly TimeSpan _suppressedRefreshWarningInterval = TimeSpan.FromMinutes(1);
+
     private readonly TypeMapping? _codeMapping;
-    private readonly Lazy<Properties?> _inferredCodeProperties;
     private readonly Inferrer? _inferrer;
     private readonly MappingCache _cache;
     private readonly ConditionalWeakTable<IProperty, ConcurrentDictionary<string, object>> _propertyMetadata = new();
-    private readonly ConditionalWeakTable<IProperty, Properties> _mergedChildProperties = new();
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
+    private long _lastSuppressedRefreshWarningTimestamp;
 
     public static readonly ElasticMappingResolver NullInstance = new(() => null);
 
@@ -32,8 +33,7 @@ public class ElasticMappingResolver : IDisposable
         _inferrer = inferrer;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger ?? NullLogger.Instance;
-        _inferredCodeProperties = new Lazy<Properties?>(() => InferCodeProperties(_codeMapping?.Properties), LazyThreadSafetyMode.ExecutionAndPublication);
-        _cache = new MappingCache(getMapping, serverMapping => MergeProperties(_inferredCodeProperties.Value, serverMapping?.Properties), _timeProvider, _logger);
+        _cache = new MappingCache(getMapping, BuildMergedProperties, _timeProvider, _logger);
     }
 
     public ElasticMappingResolver(TypeMapping codeMapping, Inferrer inferrer, Func<TypeMapping?> getMapping, TimeProvider? timeProvider = null, ILogger? logger = null)
@@ -43,39 +43,22 @@ public class ElasticMappingResolver : IDisposable
     }
 
     /// <summary>
-    /// Maximum age of the loaded server mapping before an ordinary resolution will reload it. This also acts
-    /// as the ceiling when backing off repeated reloads triggered by fields that cannot be resolved.
-    /// </summary>
-    /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
-    public TimeSpan MappingRefreshInterval
-    {
-        get => _cache.RefreshInterval;
-        set
-        {
-            ArgumentOutOfRangeException.ThrowIfLessThan(value, TimeSpan.Zero);
-            _cache.RefreshInterval = value;
-        }
-    }
-
-    /// <summary>
     /// Minimum interval between server mapping reloads that are triggered by a field which could not be
     /// resolved from the loaded mapping. A resolution failure is the strongest available signal that the
     /// index mapping changed (fields created by dynamic templates only exist after the first document that
-    /// uses them is indexed), so this is intentionally much shorter than <see cref="MappingRefreshInterval"/>.
-    /// Reloads that do not resolve the field back off exponentially up to <see cref="MappingRefreshInterval"/>.
+    /// uses them is indexed).
     /// </summary>
     /// <remarks>
     /// A reload walks and merges the whole property tree, which on a large mapping costs several milliseconds
     /// and allocates megabytes, so this trades staleness against that cost rather than against network time.
-    /// Set to <see cref="TimeSpan.Zero"/> to always reload on an unresolved field.
     /// </remarks>
-    /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative or zero.</exception>
     public TimeSpan UnmappedFieldRefreshInterval
     {
         get => _cache.UnmappedFieldRefreshInterval;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfLessThan(value, TimeSpan.Zero);
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, TimeSpan.Zero);
             _cache.UnmappedFieldRefreshInterval = value;
         }
     }
@@ -86,78 +69,35 @@ public class ElasticMappingResolver : IDisposable
     /// for that reload instead of issuing their own.
     /// </summary>
     /// <remarks>
-    /// Waiting is never more expensive than performing the reload, so this must comfortably exceed the
-    /// latency of the configured mapping fetch; giving up early resolves the field as unmapped even though a
-    /// reload that could have resolved it was already running. It is bounded rather than infinite so an
-    /// unresponsive cluster cannot pin request threads. Use <see cref="Timeout.InfiniteTimeSpan"/> to wait
-    /// indefinitely, which is safe when the fetch callback has its own timeout (the Elasticsearch client
-    /// applies one by default).
+    /// This must comfortably exceed the latency of the configured mapping fetch; giving up early resolves
+    /// the field as unmapped even though a reload that could have resolved it was already running. It is
+    /// bounded so an unresponsive cluster cannot pin request threads indefinitely. The mapping callback must
+    /// enforce a shorter timeout and must not call back into this resolver.
     /// </remarks>
-    /// <exception cref="ArgumentOutOfRangeException">
-    /// The value is negative or zero and is not <see cref="Timeout.InfiniteTimeSpan"/>.
-    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative or zero, or exceeds the maximum wait a semaphore accepts.</exception>
     public TimeSpan MappingRefreshWaitTimeout
     {
         get => _cache.RefreshWaitTimeout;
         set
         {
-            if (value != Timeout.InfiniteTimeSpan)
-                ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, TimeSpan.Zero);
-
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, TimeSpan.Zero);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(value, TimeSpan.FromMilliseconds(Int32.MaxValue));
             _cache.RefreshWaitTimeout = value;
         }
     }
 
     /// <summary>
-    /// Approximate upper bound on the number of resolved field mappings held in memory. Field names come from
-    /// user supplied queries, so this bounds memory usage when queries reference many distinct (often
-    /// non-existent) fields.
-    /// </summary>
-    /// <remarks>
-    /// When the bound is reached, cached misses are evicted first so that an abusive caller sending many
-    /// unknown field names cannot displace the resolutions real queries depend on. Set to zero or less to
-    /// disable caching entirely.
-    /// </remarks>
-    public int MaxCachedFields
-    {
-        get => _cache.MaxCachedFields;
-        set => _cache.MaxCachedFields = value;
-    }
-
-    /// <summary>
-    /// Approximate number of field names currently held in the resolved mapping cache.
-    /// </summary>
-    public long CachedFieldCount => _cache.CachedFieldCount;
-
-
-    /// <summary>
     /// Clears the cached mapping, forcing a fresh fetch from the server on the next access.
     /// </summary>
     /// <remarks>
-    /// Server mappings are reloaded automatically: at most once per <see cref="MappingRefreshInterval"/>
-    /// for ordinary resolutions and at most once per <see cref="UnmappedFieldRefreshInterval"/> when a
-    /// field cannot be resolved. This method bypasses both throttles and discards the entire field cache,
-    /// which is expensive on a large mapping. Prefer <see cref="InvalidateFieldMapping"/> when only a
-    /// specific field is known to have changed.
+    /// Unresolved fields automatically reload the server mapping at most once per
+    /// <see cref="UnmappedFieldRefreshInterval"/>. This method bypasses that throttle and discards the
+    /// current mapping snapshot so the next resolution fetches it again.
     /// </remarks>
     public void RefreshMapping()
     {
         _cache.Reset();
         _logger.LogInformation("Mapping refresh triggered");
-    }
-
-    /// <summary>
-    /// Drops the cached resolution for a single field and allows the next resolution of any unmapped field
-    /// to reload the server mapping. Use this when a specific field is known to have just been created,
-    /// instead of discarding the whole cache with <see cref="RefreshMapping"/>.
-    /// </summary>
-    public void InvalidateFieldMapping(string? field)
-    {
-        if (String.IsNullOrWhiteSpace(field))
-            return;
-
-        _cache.InvalidateField(field!);
-        _logger.LogTrace("Invalidated field mapping: {Field}", field);
     }
 
     public FieldMapping? GetMapping(string? field, bool followAlias = false)
@@ -170,185 +110,138 @@ public class ElasticMappingResolver : IDisposable
 
         var snapshot = _cache.Current;
 
-        if (_cache.TryGetField(field!, snapshot, out var cached))
+        if (snapshot.TryGetField(field!, out var cached))
         {
-            if (cached.Found)
-            {
-                if (followAlias && cached.Property is FieldAliasProperty cachedAlias)
-                {
-                    if (_logger.IsEnabled(LogLevel.Trace))
-                        _logger.LogTrace("Cached alias mapping: {Field}={FieldPath}:{FieldType}", field, cached.FullPath, cached.Property.Type);
+            if (_logger.IsEnabled(LogLevel.Trace))
+                _logger.LogTrace("Cached mapping: {Field}={FieldPath}:{FieldType}", field, cached.FullPath, cached.Property?.Type);
 
-                    return GetMapping(cachedAlias.Path?.Name);
-                }
-
-                if (_logger.IsEnabled(LogLevel.Trace))
-                    _logger.LogTrace("Cached mapping: {Field}={FieldPath}:{FieldType}", field, cached.FullPath, cached.Property?.Type);
-
-                return cached;
-            }
-
-            // A cached miss is the strongest available signal that the server mapping may have changed,
-            // so attempt a rate limited reload before trusting it.
-            if (_cache.Refresh(triggeredByUnmappedField: true) != MappingRefreshResult.Updated)
-            {
-                if (_logger.IsEnabled(LogLevel.Trace))
-                    _logger.LogTrace("Cached mapping (not found): {Field}=<null>", field);
-
-                return cached;
-            }
-
-            return ResolveMapping(field!, followAlias, _cache.Current, reloadedForUnmappedField: true);
+            return FollowAlias(cached, followAlias);
         }
 
-        return ResolveMapping(field!, followAlias, snapshot, reloadedForUnmappedField: false);
+        return ResolveMapping(field!, followAlias, snapshot);
     }
 
-    private FieldMapping ResolveMapping(string field, bool followAlias, MappingSnapshot snapshot, bool reloadedForUnmappedField)
+    private FieldMapping? ResolveMapping(string field, bool followAlias, MappingSnapshot snapshot)
     {
-        var lastRefreshResult = MappingRefreshResult.Skipped;
-        bool reloaded = reloadedForUnmappedField;
-        bool reloadedForMiss = reloadedForUnmappedField;
+        var loadResult = MappingRefreshResult.Unavailable;
 
-        // Load the server mapping the first time one is needed. This deliberately does not arm the
-        // unmapped field throttle: a cold start fetch must never suppress the first miss driven reload,
-        // otherwise fields created after startup resolve as unmapped until the throttle expires.
-        if (!snapshot.Fetched && !reloaded)
+        if (!snapshot.Fetched)
         {
-            lastRefreshResult = _cache.Refresh(triggeredByUnmappedField: false);
-            if (lastRefreshResult == MappingRefreshResult.Updated)
+            loadResult = _cache.LoadInitial(snapshot);
+            snapshot = _cache.Current;
+        }
+
+        var resolved = Resolve(field, snapshot);
+
+        // The field is unknown to the loaded mapping, which is the strongest available signal that the mapping
+        // changed, so reload once and resolve again against the new one.
+        if (!resolved.Found)
+        {
+            loadResult = _cache.ReloadForMissingField(snapshot);
+            if (loadResult == MappingRefreshResult.Updated)
             {
                 snapshot = _cache.Current;
-                reloaded = true;
+                resolved = Resolve(field, snapshot);
             }
         }
 
-        string[] fieldParts = field.Split('.');
-        var resolvedFieldName = new StringBuilder();
-        var currentProperties = snapshot.Properties;
+        snapshot.CacheField(resolved);
 
-        for (int depth = 0; depth < fieldParts.Length; depth++)
+        if (resolved.Found)
         {
-            string fieldPart = fieldParts[depth];
-            IProperty? fieldMapping = null;
-            string? resolvedName = null;
+            if (_logger.IsEnabled(LogLevel.Trace))
+                _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolved.FullPath, resolved.Property?.Type);
 
-            if (currentProperties is not null && currentProperties.TryGetProperty(fieldPart, out fieldMapping))
-            {
-                // Properties is keyed by property name, so an exact hit means the key name is the field part.
-                resolvedName = fieldPart;
-            }
-            else
-            {
-                fieldMapping = null;
-
-                // check to see if there is a name match by iterating through the dictionary keys
-                if (currentProperties is not null)
-                {
-                    foreach (var kvp in (IDictionary<PropertyName, IProperty>)currentProperties)
-                    {
-                        string? propertyName = ResolvePropertyName(kvp.Key);
-                        if (propertyName is not null && propertyName.Equals(fieldPart, StringComparison.OrdinalIgnoreCase))
-                        {
-                            fieldMapping = kvp.Value;
-                            resolvedName = propertyName;
-                            break;
-                        }
-                    }
-                }
-
-                // The field is unknown to the loaded mapping: reload once in case it was created after the
-                // mapping was loaded, then start over from the top against the new mapping.
-                if (fieldMapping is null && !reloaded)
-                {
-                    lastRefreshResult = _cache.Refresh(triggeredByUnmappedField: true);
-                    if (lastRefreshResult == MappingRefreshResult.Updated)
-                    {
-                        reloaded = true;
-                        reloadedForMiss = true;
-                        depth = -1;
-                        resolvedFieldName.Clear();
-                        snapshot = _cache.Current;
-                        currentProperties = snapshot.Properties;
-                        continue;
-                    }
-                }
-
-                if (fieldMapping is null)
-                {
-                    if (depth > 0)
-                        resolvedFieldName.Append('.');
-                    resolvedFieldName.Append(fieldPart);
-
-                    // mapping is not fully resolved, append the rest of the parts unmodified and break
-                    for (int i = depth + 1; i < fieldParts.Length; i++)
-                    {
-                        resolvedFieldName.Append('.');
-                        resolvedFieldName.Append(fieldParts[i]);
-                    }
-
-                    break;
-                }
-            }
-
-            if (depth > 0)
-                resolvedFieldName.Append('.');
-            resolvedFieldName.Append(resolvedName ?? fieldPart);
-
-            if (depth == fieldParts.Length - 1)
-            {
-                var resolvedMapping = new FieldMapping(resolvedFieldName.ToString(), fieldMapping, snapshot.CreatedUtc, snapshot.Version);
-                _cache.CacheField(field, resolvedMapping, snapshot.Version);
-
-                // A miss driven reload that resolved the field is proof the mapping really had changed:
-                // return to the fast base interval so the next schema change is picked up quickly.
-                if (reloadedForMiss)
-                    _cache.ResetUnmappedRefreshBackoff();
-
-                if (_logger.IsEnabled(LogLevel.Trace))
-                    _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolvedMapping.FullPath, resolvedMapping.Property?.Type);
-
-                if (followAlias && resolvedMapping.Property is FieldAliasProperty fieldAlias)
-                    return GetMapping(fieldAlias.Path?.Name) ?? resolvedMapping;
-
-                return resolvedMapping;
-            }
-
-            currentProperties = GetChildProperties(fieldMapping);
-
-            if (currentProperties is null)
-                break;
+            return FollowAlias(resolved, followAlias);
         }
 
-        // A freshly reloaded mapping that still does not contain the field means the field probably does not
-        // exist at all (a typo or a query against a field that was never indexed). Back off so a flood of
-        // bogus field names cannot turn every query into a mapping fetch.
-        if (reloadedForMiss)
-            _cache.RecordUnresolvedAfterRefresh(snapshot.Version);
-        else if (lastRefreshResult == MappingRefreshResult.WaitTimedOut && _cache.ShouldLogSuppressedRefresh())
-            _logger.LogWarning("Unable to resolve mapping for field {Field}. A server mapping reload was already in flight but did not complete within {WaitTimeout}, so this field is being treated as unmapped. Increase {Property} if the mapping fetch is expected to take longer than this", field,
-                MappingRefreshWaitTimeout, nameof(MappingRefreshWaitTimeout));
-        else if (lastRefreshResult == MappingRefreshResult.Throttled && snapshot.HasServerMapping && _cache.ShouldLogSuppressedRefresh())
-            _logger.LogWarning("Unable to resolve mapping for field {Field}. The loaded server mapping is {MappingAge} old and a reload was suppressed by the {RefreshInterval} unmapped field refresh throttle, so this field is being treated as unmapped", field,
-                _timeProvider.GetUtcNow().UtcDateTime - snapshot.CreatedUtc, _cache.CurrentUnmappedRefreshInterval);
-
-        if (_logger.IsEnabled(LogLevel.Trace))
-            _logger.LogTrace("Mapping not found: {Field}", field);
-
-        // A cached miss is always revalidated against an in-flight or throttled reload before it is trusted
-        // (see GetMapping), so caching this result cannot pin a stale answer.
-        var notFoundMapping = new FieldMapping(resolvedFieldName.ToString(), null, snapshot.CreatedUtc, snapshot.Version);
-        _cache.CacheField(field, notFoundMapping, snapshot.Version);
-
-        return notFoundMapping;
+        LogUnresolvedField(field, loadResult, snapshot);
+        return resolved;
     }
 
-    private string? ResolvePropertyName(PropertyName? key)
+    private FieldMapping? FollowAlias(FieldMapping mapping, bool followAlias)
     {
-        if (key?.Name is null)
-            return null;
+        if (!followAlias || mapping.Property is not FieldAliasProperty alias)
+            return mapping;
 
-        return _inferrer is not null ? _inferrer.PropertyName(key) : key.Name;
+        return GetMapping(alias.Path?.Name);
+    }
+
+    /// <summary>
+    /// Walks a dotted field name through the merged property tree, resolving each part to its canonical
+    /// mapping name. Parts past the deepest resolvable one are appended unchanged so callers still get a
+    /// usable field path for an unmapped field.
+    /// </summary>
+    private static FieldMapping Resolve(string field, MappingSnapshot snapshot)
+    {
+        var properties = snapshot.Properties;
+        int start = 0;
+        StringBuilder? resolvedName = null;
+        MergedNode? node = null;
+
+        while (true)
+        {
+            int separator = field.IndexOf('.', start);
+            string part = separator < 0 ? field[start..] : field[start..separator];
+
+            if (properties is null || !properties.TryGetNode(part, out var matched))
+            {
+                // Unresolvable from here down: keep what was resolved and append the remainder verbatim.
+                string remainder = field[start..];
+                if (resolvedName is null)
+                    return new FieldMapping(remainder, null);
+
+                return new FieldMapping(resolvedName.Append('.').Append(remainder).ToString(), null);
+            }
+
+            node = matched;
+
+            if (resolvedName is null)
+                resolvedName = new StringBuilder(matched.Name);
+            else
+                resolvedName.Append('.').Append(matched.Name);
+
+            if (separator < 0)
+                return new FieldMapping(resolvedName.ToString(), node.Property, node.Children);
+
+            properties = matched.Children;
+            start = separator + 1;
+        }
+    }
+
+    private void LogUnresolvedField(string field, MappingRefreshResult loadResult, MappingSnapshot snapshot)
+    {
+        if (loadResult == MappingRefreshResult.WaitTimedOut && ShouldLogSuppressedRefresh())
+        {
+            _logger.LogWarning("Unable to resolve mapping for field {Field}. A server mapping reload was already in flight but did not complete within {WaitTimeout}, so this field is being treated as unmapped. Increase {Property} if the mapping fetch is expected to take longer than this",
+                field, MappingRefreshWaitTimeout, nameof(MappingRefreshWaitTimeout));
+        }
+        else if (loadResult == MappingRefreshResult.Throttled && snapshot.HasServerMapping && ShouldLogSuppressedRefresh())
+        {
+            _logger.LogWarning("Unable to resolve mapping for field {Field}. The loaded server mapping is {MappingAge} old and a reload was suppressed by the {RefreshInterval} unmapped field refresh throttle, so this field is being treated as unmapped",
+                field, _timeProvider.GetUtcNow().UtcDateTime - snapshot.CreatedUtc, UnmappedFieldRefreshInterval);
+        }
+        else if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("Mapping not found: {Field}", field);
+        }
+    }
+
+    /// <summary>
+    /// Rate limits warnings about suppressed reloads so a flood of queries against non-existent fields cannot
+    /// flood the log.
+    /// </summary>
+    private bool ShouldLogSuppressedRefresh()
+    {
+        if (!_logger.IsEnabled(LogLevel.Warning))
+            return false;
+
+        long last = Interlocked.Read(ref _lastSuppressedRefreshWarningTimestamp);
+        if (last != 0 && _timeProvider.GetElapsedTime(last) < _suppressedRefreshWarningInterval)
+            return false;
+
+        long timestamp = _timeProvider.GetTimestamp();
+        return Interlocked.CompareExchange(ref _lastSuppressedRefreshWarningTimestamp, timestamp == 0 ? 1 : timestamp, last) == last;
     }
 
     public FieldMapping? GetMapping(Field field, bool followAlias = false)
@@ -418,27 +311,17 @@ public class ElasticMappingResolver : IDisposable
         if (mapping?.Property is null || !IsPropertyAnalyzed(mapping.Property))
             return field;
 
-        var multiFieldProperty = mapping.Property;
-        var fields = GetChildProperties(multiFieldProperty);
-        if (fields is null || (IDictionary<PropertyName, IProperty>)fields is not { Count: > 0 })
+        var children = mapping.Children;
+        if (children is null || children.Count == 0)
             return mapping.FullPath;
 
-        var nonAnalyzedProperty = fields.OrderByDescending(kvp => kvp.Key.Name == preferredSubField).FirstOrDefault(kvp =>
-        {
-            if (kvp.Value is KeywordProperty)
-                return true;
+        var preferred = children.Nodes.FirstOrDefault(n => n.Name == preferredSubField && IsNonAnalyzed(n.Property));
+        var nonAnalyzed = preferred ?? children.Nodes.FirstOrDefault(n => IsNonAnalyzed(n.Property));
 
-            if (!IsPropertyAnalyzed(kvp.Value))
-                return true;
-
-            return false;
-        });
-
-        if (nonAnalyzedProperty.Value is not null)
-            return mapping.FullPath + "." + nonAnalyzedProperty.Key.Name;
-
-        return mapping.FullPath;
+        return nonAnalyzed is not null ? mapping.FullPath + "." + nonAnalyzed.Name : mapping.FullPath;
     }
+
+    private bool IsNonAnalyzed(IProperty property) => property is KeywordProperty || !IsPropertyAnalyzed(property);
 
     public bool IsPropertyAnalyzed(string? field)
     {
@@ -575,126 +458,121 @@ public class ElasticMappingResolver : IDisposable
         };
     }
 
-    private Properties? InferCodeProperties(Properties? codeProperties)
+    /// <summary>
+    /// Builds the merged view of the code and server mappings as a name-keyed tree, ready for resolution.
+    /// </summary>
+    /// <remarks>
+    /// Pure with respect to both mappings: nothing is written back into the mapping the <c>getMapping</c>
+    /// callback returned, so that instance stays safe to cache and share. Keying children by name rather than
+    /// by <see cref="IProperty"/> instance is what makes merging work for every property type instead of only
+    /// the few that expose settable sub-property collections, and is also why reusing one property instance
+    /// across several fields cannot leak one field's sub-fields into another's.
+    /// </remarks>
+    private MergedProperties? BuildMergedProperties(TypeMapping? serverMapping)
     {
-        if (codeProperties is null)
+        return Merge(_codeMapping?.Properties, serverMapping?.Properties);
+    }
+
+    private MergedProperties? Merge(Properties? codeProperties, Properties? serverProperties)
+    {
+        if (codeProperties is null && serverProperties is null)
             return null;
 
-        // resolve code mapping property expressions using inferrer
-        var inferredProperties = new Properties();
+        var nodes = new List<MergedNode>();
+        var codeByName = IndexCodeProperties(codeProperties);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var kvp in codeProperties)
+        if (serverProperties is not null)
         {
-            var propertyName = kvp.Key;
-            if (_inferrer is not null && (String.IsNullOrEmpty(kvp.Key.Name) || kvp.Value is FieldAliasProperty))
-                propertyName = _inferrer.PropertyName(kvp.Key) ?? kvp.Key;
+            foreach (var kvp in serverProperties)
+            {
+                string? name = ResolvePropertyName(kvp.Key);
+                if (name is null || !seen.Add(name))
+                    continue;
 
-            inferredProperties[propertyName] = kvp.Value;
+                // The server mapping is authoritative, so a code property only contributes children when both
+                // sides agree on whether the field is a container.
+                codeByName.TryGetValue(name, out var codeProperty);
+                var codeChildren = codeProperty is not null && IsContainer(codeProperty) == IsContainer(kvp.Value)
+                    ? GetChildProperties(codeProperty)
+                    : null;
+
+                if (codeProperty is not null)
+                    CopyPropertyMetadata(codeProperty, kvp.Value);
+
+                nodes.Add(new MergedNode(name, kvp.Value, Merge(codeChildren, GetChildProperties(kvp.Value))));
+            }
         }
 
-        if (_inferrer is null)
-            return inferredProperties;
-
-        // resolve field alias
-        foreach (var kvp in codeProperties)
+        foreach (var (name, property) in codeByName)
         {
-            if (kvp.Value is not FieldAliasProperty aliasProperty)
+            if (!seen.Add(name))
                 continue;
 
-            var newAliasProperty = new FieldAliasProperty
-            {
-                Path = _inferrer.Field(aliasProperty.Path!) ?? aliasProperty.Path,
-            };
-            CopyPropertyMetadata(aliasProperty, newAliasProperty);
-            inferredProperties[_inferrer.PropertyName(kvp.Key) ?? kvp.Key] = newAliasProperty;
+            nodes.Add(new MergedNode(name, property, Merge(GetChildProperties(property), null)));
         }
 
-        return inferredProperties;
+        return nodes.Count > 0 ? new MergedProperties(nodes) : null;
     }
 
-    private Properties? MergeCodeAndServerProperties(Properties? codeProperties, Properties? serverProperties)
+    /// <summary>
+    /// Resolves code mapping property names and alias paths through the inferrer, so a mapping declared with
+    /// property expressions is keyed by the same names the server reports.
+    /// </summary>
+    private Dictionary<string, IProperty> IndexCodeProperties(Properties? codeProperties)
     {
-        return MergeProperties(InferCodeProperties(codeProperties), serverProperties);
+        var indexed = new Dictionary<string, IProperty>(StringComparer.Ordinal);
+        if (codeProperties is null)
+            return indexed;
+
+        foreach (var kvp in codeProperties)
+        {
+            string? name = ResolvePropertyName(kvp.Key);
+            if (name is null)
+                continue;
+
+            var property = kvp.Value;
+            if (_inferrer is not null && property is FieldAliasProperty alias)
+            {
+                var resolvedAlias = new FieldAliasProperty { Path = _inferrer.Field(alias.Path!) ?? alias.Path };
+                CopyPropertyMetadata(alias, resolvedAlias);
+                property = resolvedAlias;
+            }
+
+            indexed[name] = property;
+        }
+
+        return indexed;
     }
+
+    private string? ResolvePropertyName(PropertyName? key)
+    {
+        if (key is null)
+            return null;
+
+        // A property expression has no literal name until the inferrer resolves it.
+        if (_inferrer is not null)
+            return _inferrer.PropertyName(key);
+
+        return key.Name;
+    }
+
+    private static bool IsContainer(IProperty property) => property is ObjectProperty or NestedProperty;
 
     /// <summary>
     /// Returns the child properties a field name can descend into. Object and nested properties hold
     /// sub-objects in <c>Properties</c>; every other property type can only hold multi-fields. Using one
-    /// accessor for every property type keeps resolution and merging symmetric, so a multi-field on a
-    /// keyword, date or numeric property behaves exactly like one on a text property.
+    /// accessor for every property type is what makes a multi-field on a keyword, date or numeric property
+    /// behave exactly like one on a text property.
     /// </summary>
-    private static Properties? GetOwnChildProperties(IProperty property)
+    private static Properties? GetChildProperties(IProperty property)
     {
         return property switch
         {
-            ObjectProperty objectProperty => objectProperty.Properties ?? objectProperty.Fields,
-            NestedProperty nestedProperty => nestedProperty.Properties ?? nestedProperty.Fields,
+            ObjectProperty objectProperty => objectProperty.Properties,
+            NestedProperty nestedProperty => nestedProperty.Properties,
             _ => property.GetFields()
         };
-    }
-
-    /// <summary>
-    /// Returns the child properties of a property, preferring the merged view recorded while combining the
-    /// code mapping with the server mapping.
-    /// </summary>
-    private Properties? GetChildProperties(IProperty property)
-    {
-        // Merged children only exist when a code mapping was supplied, so resolvers backed purely by the
-        // server mapping never pay for the lookup.
-        if (_codeMapping is not null && _mergedChildProperties.TryGetValue(property, out var mergedChildren))
-            return mergedChildren;
-
-        return GetOwnChildProperties(property);
-    }
-
-    /// <summary>
-    /// Combines the properties declared in code with the properties reported by the server, preferring the
-    /// server definition and layering code-only properties on top.
-    /// </summary>
-    /// <remarks>
-    /// Merging never mutates the server mapping. Where a property is declared in both mappings its combined
-    /// children are recorded in a side table keyed by the server property instance, which keeps the mapping
-    /// returned by the <c>getMapping</c> callback safe to share and makes merging work identically for every
-    /// property type rather than only the handful that expose settable sub-property collections.
-    /// </remarks>
-    private Properties? MergeProperties(Properties? inferredCodeProperties, Properties? serverProperties)
-    {
-        // no need to merge
-        if (inferredCodeProperties is null || serverProperties is null)
-            return inferredCodeProperties ?? serverProperties;
-
-        var properties = new Properties();
-        foreach (var serverProperty in serverProperties)
-        {
-            var merged = serverProperty.Value;
-
-            if (inferredCodeProperties.TryGetProperty(serverProperty.Key, out var codeProperty))
-            {
-                // Copy local metadata from code property to merged property
-                CopyPropertyMetadata(codeProperty, merged);
-
-                var codeChildren = GetOwnChildProperties(codeProperty);
-                if (codeChildren is not null)
-                {
-                    var serverChildren = GetOwnChildProperties(merged);
-                    var mergedChildren = MergeCodeAndServerProperties(codeChildren, serverChildren);
-                    if (mergedChildren is not null && !ReferenceEquals(mergedChildren, serverChildren))
-                        _mergedChildProperties.AddOrUpdate(merged, mergedChildren);
-                }
-            }
-
-            properties.Add(serverProperty.Key, merged);
-        }
-
-        foreach (var codeProperty in inferredCodeProperties)
-        {
-            if (properties.TryGetProperty(codeProperty.Key, out _))
-                continue;
-
-            properties.Add(codeProperty.Key, codeProperty.Value);
-        }
-
-        return properties;
     }
 
     public static ElasticMappingResolver Create<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, ILogger? logger = null) where T : class
@@ -828,12 +706,16 @@ public class ElasticMappingResolver : IDisposable
 
 public class FieldMapping
 {
-    public FieldMapping(string path, IProperty? property, DateTime? serverMapTime, long epoch = 0)
+    public FieldMapping(string path, IProperty? property)
+        : this(path, property, null)
+    {
+    }
+
+    internal FieldMapping(string path, IProperty? property, MergedProperties? children)
     {
         FullPath = path;
         Property = property;
-        ServerMapTime = serverMapTime;
-        Epoch = epoch;
+        Children = children;
     }
 
     public bool Found => Property is not null;
@@ -841,9 +723,56 @@ public class FieldMapping
     public IProperty? Property { get; private set; }
     public DateTime Date { get; private set; } = DateTime.UtcNow;
 
-    /// <summary>When the mapping this resolution was made against was loaded.</summary>
-    internal DateTime? ServerMapTime { get; private set; }
+    /// <summary>
+    /// Merged sub-objects and multi-fields of this field, captured during resolution so sub-field lookups do
+    /// not have to walk the mapping again.
+    /// </summary>
+    internal MergedProperties? Children { get; }
+}
 
-    /// <summary>Version of the mapping snapshot this resolution was made against.</summary>
-    internal long Epoch { get; private set; }
+/// <summary>A name-indexed merged view of the code and server properties at one mapping level.</summary>
+internal sealed class MergedProperties
+{
+    private readonly IReadOnlyList<MergedNode> _nodes;
+    private readonly Dictionary<string, MergedNode> _byExactName;
+    private readonly Dictionary<string, MergedNode> _byIgnoreCaseName;
+
+    public MergedProperties(IReadOnlyList<MergedNode> nodes)
+    {
+        _nodes = nodes;
+        _byExactName = new Dictionary<string, MergedNode>(nodes.Count, StringComparer.Ordinal);
+        _byIgnoreCaseName = new Dictionary<string, MergedNode>(nodes.Count, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var node in nodes)
+        {
+            _byExactName[node.Name] = node;
+            _byIgnoreCaseName.TryAdd(node.Name, node);
+        }
+    }
+
+    public int Count => _nodes.Count;
+
+    public IReadOnlyList<MergedNode> Nodes => _nodes;
+
+    public bool TryGetNode(string name, out MergedNode node)
+    {
+        return _byExactName.TryGetValue(name, out node!) || _byIgnoreCaseName.TryGetValue(name, out node!);
+    }
+}
+
+/// <summary>A canonical property and the merged children reachable through its field name.</summary>
+internal sealed class MergedNode
+{
+    public MergedNode(string name, IProperty property, MergedProperties? children)
+    {
+        Name = name;
+        Property = property;
+        Children = children;
+    }
+
+    public string Name { get; }
+
+    public IProperty Property { get; }
+
+    public MergedProperties? Children { get; }
 }
