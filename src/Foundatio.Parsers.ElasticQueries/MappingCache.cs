@@ -60,8 +60,8 @@ internal sealed class MappingCache : IDisposable
     {
         lock (_publishLock)
         {
-            Volatile.Write(ref _snapshot, CreateSnapshot(null, fetched: false));
             ClearThrottle();
+            Volatile.Write(ref _snapshot, CreateSnapshot(null, fetched: false));
         }
     }
 
