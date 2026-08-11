@@ -124,8 +124,9 @@ public class ElasticMappingResolver : IDisposable
     private FieldMapping? ResolveMapping(string field, bool followAlias, MappingSnapshot snapshot)
     {
         var loadResult = MappingRefreshResult.Unavailable;
+        bool hadFetchedSnapshot = snapshot.Fetched;
 
-        if (!snapshot.Fetched)
+        if (!hadFetchedSnapshot)
         {
             loadResult = _cache.LoadInitial(snapshot);
             snapshot = _cache.Current;
@@ -134,8 +135,10 @@ public class ElasticMappingResolver : IDisposable
         var resolved = Resolve(field, snapshot);
 
         // The field is unknown to the loaded mapping, which is the strongest available signal that the mapping
-        // changed, so reload once and resolve again against the new one.
-        if (!resolved.Found)
+        // changed, so reload once and resolve again against the new one. Do not reload immediately after this
+        // resolution already loaded or joined the initial mapping; that would repeat the same work and can
+        // consume the join timeout twice.
+        if (!resolved.Found && hadFetchedSnapshot)
         {
             loadResult = _cache.ReloadForMissingField(snapshot);
             if (loadResult == MappingRefreshResult.Updated)
@@ -706,8 +709,13 @@ public class ElasticMappingResolver : IDisposable
 
 public class FieldMapping
 {
-    public FieldMapping(string path, IProperty? property)
-        : this(path, property, null)
+    public FieldMapping(string path, IProperty? property, DateTime? serverMapTime, long epoch = 0)
+        : this(path, property, (MergedProperties?)null)
+    {
+    }
+
+    internal FieldMapping(string path, IProperty? property)
+        : this(path, property, (MergedProperties?)null)
     {
     }
 

@@ -312,11 +312,13 @@ resolver.UnmappedFieldRefreshInterval = TimeSpan.FromMilliseconds(250);
 
 Only one mapping reload runs at a time. Other resolutions that need a fresh mapping wait for that reload
 rather than issuing their own. If the wait exceeds `MappingRefreshWaitTimeout`, the resolution gives up and
-treats the field as unmapped, and a warning is logged.
+treats the field as unmapped, and a warning is logged. A single resolution joins at most once; it does not
+repeat the same wait as both an initial load and a miss-driven reload.
 
-The mapping callback must have its own finite timeout shorter than `MappingRefreshWaitTimeout`, and it must
-not call back into the same resolver. Infinite waits are rejected because a slow or reentrant callback could
-otherwise pin request threads indefinitely.
+The mapping callback must have its own finite timeout and must not call back into the same resolver. The
+built-in client factories use the Elasticsearch client's configured request timeout. Configure that timeout
+below `MappingRefreshWaitTimeout` if every joining resolution must observe the fetch result; otherwise a
+joining resolution can time out while the single fetch continues.
 
 ```csharp
 resolver.MappingRefreshWaitTimeout = TimeSpan.FromMinutes(2);
@@ -345,6 +347,11 @@ the new mapping.
 ```csharp
 resolver.RefreshMapping();
 ```
+
+Do not call `RefreshMapping()` after every indexed document. Dynamically materialized fields already use the
+miss-driven reload path, while repeated full invalidation discards useful caches and can continually
+supersede in-flight fetches. Foundatio.Repositories should keep its long-lived per-index resolver and rely on
+that path for ordinary custom-field saves.
 
 ### Cache Memory
 
@@ -417,14 +424,14 @@ var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));
 
 ### 3. Handle Dynamic Mappings
 
-For indices with dynamic mappings:
+For correctness-sensitive indices with dynamic mappings, fail validation if a field is still unresolved
+after the bounded reload attempt rather than generating a query from incomplete mapping information:
 
 ```csharp
 var parser = new ElasticQueryParser(c => c
     .UseMappings(client, "my-index")
     .SetValidationOptions(new QueryValidationOptions {
-        // Allow fields not in current mapping
-        AllowUnresolvedFields = true
+        AllowUnresolvedFields = false
     }));
 ```
 

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -120,6 +121,20 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Assert
         Assert.Null(first);
         Assert.Null(cached);
+    }
+
+    [Fact]
+    public void FieldMapping_LegacyConstructor_RemainsAvailable()
+    {
+        // Arrange
+        var property = new KeywordProperty();
+
+        // Act
+        var mapping = new FieldMapping("name", property, DateTime.UtcNow, 1);
+
+        // Assert
+        Assert.Equal("name", mapping.FullPath);
+        Assert.Same(property, mapping.Property);
     }
 
     [Fact]
@@ -329,6 +344,25 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Assert
         Assert.Equal(1, afterColdStart);
         Assert.Equal(afterColdStart, fetchCount);
+    }
+
+    [Fact]
+    public void GetMapping_WithUnknownFieldOnColdStart_FetchesServerMappingOnce()
+    {
+        // Arrange
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+
+        // Act
+        var mapping = resolver.GetMapping("missing");
+
+        // Assert
+        Assert.False(mapping?.Found);
+        Assert.Equal(1, fetchCount);
     }
 
     [Fact]
@@ -820,6 +854,45 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Assert
         Assert.Equal(1, fetchCount);
         Assert.All(lookups, task => Assert.True(task.Result?.Found));
+    }
+
+    [Fact]
+    public async Task GetMapping_WhenInitialFetchOutlastsJoinTimeout_WaitsOnlyOnce()
+    {
+        // Arrange
+        using var fetchStarted = new ManualResetEventSlim(false);
+        using var releaseFetch = new ManualResetEventSlim(false);
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            fetchStarted.Set();
+            releaseFetch.Wait(TimeSpan.FromSeconds(30));
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger)
+        {
+            MappingRefreshWaitTimeout = TimeSpan.FromSeconds(1)
+        };
+
+        var initialLookup = Task.Run(() => resolver.GetMapping("name"));
+        Assert.True(fetchStarted.Wait(TimeSpan.FromSeconds(10), TestCancellationToken));
+
+        // Act
+        FieldMapping? timedOutLookup;
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            timedOutLookup = resolver.GetMapping("missing");
+        }
+        finally
+        {
+            stopwatch.Stop();
+            releaseFetch.Set();
+            await initialLookup;
+        }
+
+        // Assert
+        Assert.False(timedOutLookup?.Found);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromMilliseconds(1750),
+            $"Lookup waited {stopwatch.Elapsed} even though the configured join timeout was {resolver.MappingRefreshWaitTimeout}.");
     }
 
     [Fact]

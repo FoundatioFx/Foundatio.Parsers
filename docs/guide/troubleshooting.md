@@ -418,9 +418,11 @@ match how long your `GetMapping` call actually takes:
 resolver.MappingRefreshWaitTimeout = TimeSpan.FromMinutes(2);
 ```
 
-The mapping callback must enforce a shorter finite timeout and must not call the same resolver. If treating
-an unresolved field as unmapped could generate an incorrect query, configure validation with
-`AllowUnresolvedFields = false` so the request fails instead.
+The mapping callback must enforce a finite timeout and must not call the same resolver. The built-in client
+factories use the Elasticsearch client's configured request timeout; keep it below
+`MappingRefreshWaitTimeout` if joining resolutions must wait for the result. If treating an unresolved field
+as unmapped could generate an incorrect query, configure validation with `AllowUnresolvedFields = false` so
+the request fails instead.
 
 ## Debugging
 
