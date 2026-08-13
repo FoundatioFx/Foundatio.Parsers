@@ -304,8 +304,8 @@ starts and explicit refreshes.
 ```csharp
 var resolver = parser.Configuration.MappingResolver;
 
-// Reload sooner when a field cannot be resolved. The value must remain greater than zero.
-resolver.UnmappedFieldRefreshInterval = TimeSpan.FromMilliseconds(250);
+// Reduce reload pressure for typo-heavy workloads.
+resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(30);
 ```
 
 ### Waiting For An In-Flight Reload

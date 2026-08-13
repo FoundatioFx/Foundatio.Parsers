@@ -494,9 +494,9 @@ public class ElasticMappingResolver : IDisposable
                     continue;
 
                 // The server mapping is authoritative, so a code property only contributes children when both
-                // sides agree on whether the field is a container.
+                // sides describe the same field type.
                 codeByName.TryGetValue(name, out var codeProperty);
-                var codeChildren = codeProperty is not null && IsContainer(codeProperty) == IsContainer(kvp.Value)
+                var codeChildren = codeProperty is not null && codeProperty.GetType() == kvp.Value.GetType()
                     ? GetChildProperties(codeProperty)
                     : null;
 
@@ -559,8 +559,6 @@ public class ElasticMappingResolver : IDisposable
 
         return key.Name;
     }
-
-    private static bool IsContainer(IProperty property) => property is ObjectProperty or NestedProperty;
 
     /// <summary>
     /// Returns the child properties a field name can descend into. Object and nested properties hold

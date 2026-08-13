@@ -89,6 +89,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
         context.SetFieldResolver(async (field, context) =>
         {
+            var validationResult = context?.GetValidationResult();
             string? resolvedField = null;
             if (context?.Data.TryGetValue("@OriginalContextResolver", out object? data) is true && data is QueryFieldResolver resolver)
             {
@@ -107,6 +108,17 @@ public class ElasticQueryParser : LuceneQueryParser
             string? mappingResolvedField = await MappingFieldResolver(resolvedField ?? field, context).AnyContext();
             if (mappingResolvedField is not null)
                 resolvedField = mappingResolvedField;
+            // Validation also resolves configured restricted fields, so only record fields from the query itself.
+            else if (resolvedField is not null
+                && Configuration.MappingResolver is not null
+                && context?.GetValidationOptions().AllowUnresolvedFields is false
+                && validationResult is not null
+                && (validationResult.ReferencedFields.Count == 0
+                    || validationResult.ReferencedFields.Contains(field)))
+            {
+                if (context.QueryType is not QueryTypes.Aggregation || !field.StartsWith("@"))
+                    validationResult.UnresolvedFields.Add(field);
+            }
 
             return resolvedField;
         });

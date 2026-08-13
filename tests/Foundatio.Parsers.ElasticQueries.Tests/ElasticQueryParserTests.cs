@@ -1391,6 +1391,23 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.True(validationResult.IsValid);
         Assert.Single(validationResult.ReferencedFields, "field2");
         Assert.Empty(validationResult.UnresolvedFields);
+
+        aliasMap = new FieldMap { { "field3", "missing_physical" } };
+        context = new ElasticQueryVisitorContext();
+        parser = new ElasticQueryParser(c => c.UseMappings(Client, index).UseFieldMap(aliasMap).SetValidationOptions(new QueryValidationOptions { AllowUnresolvedFields = false }));
+        ex = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync("field3:value", context));
+
+        Assert.Contains("field3", ex.Result!.ReferencedFields);
+        Assert.Contains("field3", ex.Result.UnresolvedFields);
+
+        var validationOptions = new QueryValidationOptions { AllowUnresolvedFields = false };
+        validationOptions.RestrictedFields.Add("missing_restricted");
+        context = new ElasticQueryVisitorContext();
+        parser = new ElasticQueryParser(c => c.UseMappings(Client, index).UseFieldMap(new FieldMap()).SetValidationOptions(validationOptions));
+        query = await parser.BuildQueryAsync("field1:value", context);
+
+        Assert.NotNull(query);
+        Assert.Empty(context.GetValidationResult().UnresolvedFields);
     }
 
     [Fact]

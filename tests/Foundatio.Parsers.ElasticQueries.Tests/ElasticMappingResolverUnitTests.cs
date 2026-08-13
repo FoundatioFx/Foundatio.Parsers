@@ -1079,6 +1079,31 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
+    public void GetMapping_WithIncompatibleCodeAndServerScalarTypes_DoesNotFabricateChildField()
+    {
+        // Arrange - a server scalar with a different type must not inherit code-only multi-fields.
+        var codeMapping = new TypeMapping
+        {
+            Properties = CreateProperties(("value", new TextProperty
+            {
+                Fields = CreateProperties(("keyword", new KeywordProperty()))
+            }))
+        };
+        var serverMapping = new TypeMapping
+        {
+            Properties = CreateProperties(("value", new KeywordProperty()))
+        };
+        using var resolver = new ElasticMappingResolver(codeMapping, _inferrer, () => serverMapping, logger: _logger);
+
+        // Act
+        var mapping = resolver.GetMapping("value.keyword");
+
+        // Assert
+        Assert.False(mapping?.Found);
+        Assert.Equal("value.keyword", mapping?.FullPath);
+    }
+
+    [Fact]
     public void GetNonAnalyzedFieldName_WithCodeDeclaredKeywordSubField_UsesCodeDeclaredSubField()
     {
         // Arrange - sorting on an analyzed field fails unless the non analyzed sub-field is found, and the
