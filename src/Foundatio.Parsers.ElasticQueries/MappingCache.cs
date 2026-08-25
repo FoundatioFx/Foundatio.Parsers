@@ -95,16 +95,14 @@ internal sealed class MappingCache : IDisposable
         if (HasNewerMapping(observedSnapshot.Version))
             return MappingRefreshResult.Updated;
 
-        if (!IsLoadAllowed())
-            return MappingRefreshResult.Throttled;
-
         bool acquired;
         try
         {
             // Wait for an in-flight load rather than continuing with a stale mapping or issuing a second
             // fetch. That load is exactly the work this resolution needs, so waiting is never more expensive
-            // than doing it here. The wait is bounded because the callback is user supplied and does blocking
-            // network I/O, and an unresponsive cluster must not pin request threads forever.
+            // than doing it here. With no load in flight this acquires immediately. The wait is bounded
+            // because the callback is user supplied and does blocking network I/O, and an unresponsive
+            // cluster must not pin request threads forever.
             acquired = _loadSemaphore.Wait(RefreshWaitTimeout);
         }
         catch (ObjectDisposedException)
@@ -125,6 +123,8 @@ internal sealed class MappingCache : IDisposable
             if (HasNewerMapping(observedSnapshot.Version))
                 return MappingRefreshResult.Updated;
 
+            // The throttle only gates issuing a new fetch; a caller whose field is missing still joins any
+            // load that was already running above.
             if (!IsLoadAllowed())
                 return MappingRefreshResult.Throttled;
 
@@ -262,8 +262,10 @@ internal sealed class MappingSnapshot
     public bool TryGetField(string field, out FieldMapping mapping) => _fields.TryGetValue(field, out mapping!);
 
     /// <summary>
-    /// Memoizes successful resolutions by canonical path. Unknown names are caller controlled and remain
-    /// uncached so they can drive the bounded mapping-refresh path without growing process state.
+    /// Memoizes successful resolutions by canonical path. Keying by path keeps this snapshot's cache bounded
+    /// by the mapping itself no matter how many distinct spellings callers ask for. Unknown names are caller
+    /// controlled and remain uncached so they can drive the bounded mapping-refresh path without growing
+    /// process state.
     /// </summary>
     public void CacheField(FieldMapping mapping)
     {

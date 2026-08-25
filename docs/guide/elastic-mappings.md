@@ -355,9 +355,10 @@ that path for ordinary custom-field saves.
 
 ### Cache Memory
 
-Successful resolutions are cached by canonical field path for the lifetime of the mapping snapshot. Unknown
-field names are not cached, so caller-controlled misses cannot grow process state. Reloading the mapping
-publishes a new snapshot and atomically discards resolutions derived from the old one.
+Successful resolutions are cached by canonical field path for the lifetime of the mapping snapshot, which
+keeps the cache bounded by the mapping itself no matter how many distinct spellings callers ask for.
+Unknown field names are not cached, so caller-controlled misses cannot grow process state. Reloading the
+mapping publishes a new snapshot and atomically discards resolutions derived from the old one.
 
 The built-in client factories expect one concrete index, or a target whose indices have equivalent mappings.
 They do not merge heterogeneous mappings from rollover aliases or data streams.

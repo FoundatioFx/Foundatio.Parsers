@@ -700,6 +700,11 @@ public class ElasticMappingResolver : IDisposable
 
     public void Dispose()
     {
+        // The shared null instance is process wide; disposing it must not silently disable mapping loads
+        // for every other consumer.
+        if (ReferenceEquals(this, NullInstance))
+            return;
+
         _cache.Dispose();
     }
 

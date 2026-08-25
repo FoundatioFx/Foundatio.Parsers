@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -10,6 +11,7 @@ using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Xunit;
 using Microsoft.Extensions.Time.Testing;
 using Xunit;
+using MEL = Microsoft.Extensions.Logging;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
@@ -1456,6 +1458,119 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.Equal("body.keyword", resolved);
     }
 
+    [Fact]
+    public void GetMapping_WithDifferentFieldCasing_ResolvesCanonicalNameFromEverySpelling()
+    {
+        // Arrange - resolution falls back to an ordinal ignore case name comparison, so every spelling of a
+        // mapped field must resolve to the same canonical path, including repeat lookups that hit the cache.
+        var serverMapping = new TypeMapping { Properties = CreateProperties(("MixedCase", new KeywordProperty())) };
+        using var resolver = new ElasticMappingResolver(() => serverMapping, _inferrer, logger: _logger);
+
+        // Act
+        var exact = resolver.GetMapping("MixedCase");
+        var lower = resolver.GetMapping("mixedcase");
+        var upper = resolver.GetMapping("MIXEDCASE");
+
+        // Assert
+        Assert.True(exact?.Found);
+        Assert.True(lower?.Found);
+        Assert.True(upper?.Found);
+        Assert.Equal("MixedCase", exact!.FullPath);
+        Assert.Equal("MixedCase", lower!.FullPath);
+        Assert.Equal("MixedCase", upper!.FullPath);
+        Assert.IsType<KeywordProperty>(exact.Property);
+    }
+
+    [Fact]
+    public void GetMapping_WithAlias_FollowsToTargetOnFreshAndCachedLookups()
+    {
+        // Arrange
+        var serverMapping = new TypeMapping
+        {
+            Properties = CreateProperties(
+            ("alias", new FieldAliasProperty { Path = "target" }),
+            ("target", new KeywordProperty()))
+        };
+        using var resolver = new ElasticMappingResolver(() => serverMapping, _inferrer, logger: _logger);
+
+        // Act
+        var followed = resolver.GetMapping("alias", followAlias: true);
+        var cachedFollowed = resolver.GetMapping("alias", followAlias: true);
+        var unfollowed = resolver.GetMapping("alias");
+
+        // Assert
+        Assert.NotNull(followed);
+        Assert.True(followed.Found);
+        Assert.Equal("target", followed.FullPath);
+        Assert.IsType<KeywordProperty>(followed.Property);
+
+        Assert.NotNull(cachedFollowed);
+        Assert.True(cachedFollowed.Found);
+        Assert.Equal("target", cachedFollowed.FullPath);
+        Assert.IsType<KeywordProperty>(cachedFollowed.Property);
+
+        Assert.NotNull(unfollowed);
+        Assert.True(unfollowed.Found);
+        Assert.IsType<FieldAliasProperty>(unfollowed.Property);
+    }
+
+    [Fact]
+    public void Dispose_OnNullInstance_IsNoOpAndInstanceRemainsUsable()
+    {
+        // Arrange - NullInstance is shared process wide, so disposing it must not poison it for other consumers.
+        var resolver = ElasticMappingResolver.NullInstance;
+        Assert.False(resolver.GetMapping("name")?.Found);
+
+        // Act
+        resolver.Dispose();
+
+        // Assert
+        Assert.False(resolver.GetMapping("name")?.Found);
+    }
+
+    [Fact]
+    public void GetMapping_WithSuppressedReloads_LogsAtMostOneWarningPerWarningInterval()
+    {
+        // Arrange - a flood of lookups against fields missing from a current mapping is throttled; the
+        // resulting warnings must be rate limited so query traffic cannot flood the log.
+        var capturingLogger = new CapturingLogger();
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, timeProvider, capturingLogger);
+
+        // A reload interval longer than the warning rate limit window keeps every later miss suppressed,
+        // making the warning cadence deterministic.
+        resolver.UnmappedFieldRefreshInterval = TimeSpan.FromMinutes(5);
+
+        Assert.True(resolver.GetMapping("name")?.Found);
+
+        // Act - the first miss reloads and arms the throttle; every later miss is suppressed by it.
+        Assert.False(resolver.GetMapping("missing1")?.Found);
+        resolver.GetMapping("missing2");
+        int warningsAfterFirstSuppression = CountUnresolvedFieldWarnings(capturingLogger);
+
+        resolver.GetMapping("missing3");
+        timeProvider.Advance(TimeSpan.FromSeconds(45));
+        resolver.GetMapping("missing4");
+
+        timeProvider.Advance(TimeSpan.FromSeconds(16));
+        resolver.GetMapping("missing5");
+
+        // Assert
+        Assert.Equal(2, fetchCount);
+        Assert.Equal(1, warningsAfterFirstSuppression);
+        Assert.Equal(2, CountUnresolvedFieldWarnings(capturingLogger));
+    }
+
+    private static int CountUnresolvedFieldWarnings(CapturingLogger logger)
+    {
+        return logger.Entries.Count(e => e.Level == MEL.LogLevel.Warning && e.Message.Contains("Unable to resolve mapping for field"));
+    }
+
     private static Properties CreateProperties(params (string Name, IProperty Property)[] properties)
     {
         var props = new Properties();
@@ -2370,6 +2485,22 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             _releaseTimestampRead.Set();
             _timestampReadBlocked.Dispose();
             _releaseTimestampRead.Dispose();
+        }
+    }
+
+    private sealed class CapturingLogger : MEL.ILogger
+    {
+        public List<(MEL.LogLevel Level, string Message)> Entries { get; } = new();
+        private readonly object _lock = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(MEL.LogLevel logLevel) => true;
+
+        public void Log<TState>(MEL.LogLevel logLevel, MEL.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            lock (_lock)
+                Entries.Add((logLevel, formatter(state, exception)));
         }
     }
 }
