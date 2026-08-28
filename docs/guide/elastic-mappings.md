@@ -301,6 +301,11 @@ resolver per request defeats both caching and request coalescing. With the five-
 that is continuously receiving misses can make up to about 12 reload attempts per minute, excluding cold
 starts and explicit refreshes.
 
+Before this miss-specific cooldown, successful and null mapping fetches were normally limited by the
+one-minute mapping refresh interval, while a callback exception could be retried by every sequential miss.
+The five-second default therefore improves dynamic-field discovery while placing the same finite ceiling on
+successful, null, and exceptional automatic reloads.
+
 ```csharp
 var resolver = parser.Configuration.MappingResolver;
 

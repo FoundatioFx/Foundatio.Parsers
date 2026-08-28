@@ -486,6 +486,34 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
+    public void GetMapping_WithContinuousDistinctMisses_AttemptsAtMostOncePerRefreshInterval()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, timeProvider: timeProvider, logger: _logger);
+
+        Assert.True(resolver.GetMapping("name")?.Found);
+
+        // Act - twelve five-second windows model one minute of continuous attacker-controlled misses.
+        for (int interval = 0; interval < 12; interval++)
+        {
+            for (int miss = 0; miss < 25; miss++)
+                Assert.False(resolver.GetMapping($"missing_{interval}_{miss}")?.Found);
+
+            if (interval < 11)
+                timeProvider.Advance(resolver.UnmappedFieldRefreshInterval);
+        }
+
+        // Assert - one cold-start fetch plus at most twelve automatic reload attempts.
+        Assert.Equal(13, fetchCount);
+    }
+
+    [Fact]
     public void GetMapping_WhenTimeProviderTimestampStartsAtZero_ThrottlesRepeatedMisses()
     {
         // Arrange
@@ -602,6 +630,93 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
 
         // Assert - the failed cold start also arms the miss throttle, so one lookup cannot immediately retry.
         Assert.Equal(1, fetchCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GetMapping_WithContinuousFailedRefreshes_AttemptsAtMostOncePerRefreshInterval(bool throwException)
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        bool failRefresh = false;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            if (!failRefresh)
+                return CreateTextWithKeywordMapping("name");
+
+            if (throwException)
+                throw new InvalidOperationException("Elasticsearch is unavailable");
+
+            return null;
+        }, _inferrer, timeProvider, _logger);
+
+        Assert.True(resolver.GetMapping("name")?.Found);
+        failRefresh = true;
+
+        // Act
+        for (int interval = 0; interval < 12; interval++)
+        {
+            for (int miss = 0; miss < 25; miss++)
+                Assert.False(resolver.GetMapping($"missing_{interval}_{miss}")?.Found);
+
+            Assert.True(resolver.GetMapping("name")?.Found);
+            if (interval < 11)
+                timeProvider.Advance(resolver.UnmappedFieldRefreshInterval);
+        }
+
+        // Assert - failures preserve the known mapping and obey the same ceiling as successful reloads.
+        Assert.Equal(13, fetchCount);
+    }
+
+    [Fact]
+    public void RefreshMapping_WithinMissCooldown_PerformsUnthrottledHardRefresh()
+    {
+        // Arrange
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, new FakeTimeProvider(DateTimeOffset.UtcNow), _logger);
+
+        // Act
+        Assert.True(resolver.GetMapping("name")?.Found); // cold start
+        Assert.False(resolver.GetMapping("missing")?.Found); // automatic miss reload
+        resolver.RefreshMapping();
+        Assert.True(resolver.GetMapping("name")?.Found); // explicit hard refresh
+
+        // Assert
+        Assert.Equal(3, fetchCount);
+    }
+
+    [Fact]
+    public void RefreshMapping_AfterTargetRecreation_DiscardsLastKnownGoodMapping()
+    {
+        // Arrange
+        TypeMapping? serverMapping = CreateTextOnlyMapping("name");
+        using var resolver = new ElasticMappingResolver(() => serverMapping, _inferrer,
+            new FakeTimeProvider(DateTimeOffset.UtcNow), _logger);
+
+        Assert.Equal("name", resolver.GetNonAnalyzedFieldName("name", "keyword"));
+
+        // Automatic failure during the deletion gap retains mapping A.
+        serverMapping = null;
+        Assert.False(resolver.GetMapping("missing")?.Found);
+        Assert.Equal("name", resolver.GetNonAnalyzedFieldName("name", "keyword"));
+
+        // Act - deletion invalidation discards A, and recreation invalidation bypasses the failed-miss cooldown.
+        resolver.RefreshMapping();
+        Assert.False(resolver.GetMapping("name")?.Found);
+
+        serverMapping = CreateTextWithKeywordMapping("name");
+        resolver.RefreshMapping();
+        string? recreatedField = resolver.GetNonAnalyzedFieldName("name", "keyword");
+
+        // Assert
+        Assert.Equal("name.keyword", recreatedField);
     }
 
     [Fact]
@@ -729,6 +844,44 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.Equal(1, afterColdStart);
         Assert.Equal(afterColdStart + 1, fetchCount);
         Assert.All(lookups, t => Assert.False(t.Result!.Found));
+    }
+
+    [Fact]
+    public async Task GetMapping_WithCachedKnownFieldDuringBlockedRefresh_ReturnsImmediately()
+    {
+        // Arrange
+        using var fetchStarted = new ManualResetEventSlim(false);
+        using var releaseFetch = new ManualResetEventSlim(false);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(() =>
+        {
+            if (Interlocked.Increment(ref fetchCount) > 1)
+            {
+                fetchStarted.Set();
+                releaseFetch.Wait(TimeSpan.FromSeconds(30));
+            }
+
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+
+        Assert.True(resolver.GetMapping("name")?.Found);
+        var blockedMiss = Task.Run(() => resolver.GetMapping("missing"));
+        Assert.True(fetchStarted.Wait(TimeSpan.FromSeconds(10), TestCancellationToken));
+
+        // Act
+        var cachedLookup = Task.Run(() => resolver.GetMapping("name"));
+
+        // Assert
+        try
+        {
+            var cachedMapping = await cachedLookup.WaitAsync(TimeSpan.FromSeconds(1), TestCancellationToken);
+            Assert.True(cachedMapping?.Found);
+        }
+        finally
+        {
+            releaseFetch.Set();
+            await blockedMiss;
+        }
     }
 
     [Fact]
