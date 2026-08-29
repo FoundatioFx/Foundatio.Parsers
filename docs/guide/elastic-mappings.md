@@ -376,8 +376,12 @@ sort, and aggregation paths await this loader without blocking a request thread.
 lookup cancels only that caller's wait; the shared fetch continues for other callers and is bounded by the
 resolver lifetime and the loader's transport timeout.
 
+Custom asynchronous loaders use the named `CreateWithAsyncLoader` and `UseMappingsWithAsyncLoader` entry
+points. Keeping them separate from the synchronous delegate overloads preserves source compatibility for
+existing callers.
+
 ```csharp
-var customResolver = ElasticMappingResolver.Create(
+var customResolver = ElasticMappingResolver.CreateWithAsyncLoader(
     getMappingAsync: cancellationToken => LoadMappingAsync(cancellationToken),
     inferrer: client.Infer,
     logger: logger);
@@ -385,9 +389,11 @@ var customResolver = ElasticMappingResolver.Create(
 
 Synchronous loader overloads remain available for compatibility. An asynchronous parser call configured
 with a synchronous loader must invoke that loader synchronously, and an explicit synchronous resolver call
-configured with only an asynchronous loader waits synchronously for it. The built-in Elasticsearch client
-factories supply both forms: asynchronous parser paths call `Indices.GetMappingAsync`, while synchronous
-resolver calls retain `Indices.GetMapping`.
+configured with only an asynchronous loader waits synchronously for it. That compatibility path dispatches
+the single shared load to the thread pool to avoid synchronization-context deadlocks, but the caller still
+blocks; server request paths should use the asynchronous resolver and parser APIs. The built-in Elasticsearch
+client factories supply both forms: asynchronous parser paths call `Indices.GetMappingAsync`, while
+synchronous resolver calls retain `Indices.GetMapping`.
 
 The loaded mapping and its successful field memoization belong to an immutable resolver-local snapshot; an
 external cache client is neither required nor used. `RefreshMapping()` remains synchronous because it only

@@ -332,10 +332,10 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer,
+    public ElasticQueryParserConfiguration UseMappingsWithAsyncLoader<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer,
         Func<CancellationToken, Task<TypeMapping?>> getMappingAsync) where T : class
     {
-        MappingResolver = ElasticMappingResolver.Create(mappingBuilder, inferrer, getMappingAsync, logger: _logger);
+        MappingResolver = ElasticMappingResolver.CreateWithAsyncLoader(mappingBuilder, inferrer, getMappingAsync, logger: _logger);
 
         return this;
     }
@@ -361,9 +361,9 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
-    public ElasticQueryParserConfiguration UseMappings(Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, Inferrer? inferrer = null)
+    public ElasticQueryParserConfiguration UseMappingsWithAsyncLoader(Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, Inferrer? inferrer = null)
     {
-        MappingResolver = ElasticMappingResolver.Create(getMappingAsync, inferrer, logger: _logger);
+        MappingResolver = ElasticMappingResolver.CreateWithAsyncLoader(getMappingAsync, inferrer, logger: _logger);
 
         return this;
     }

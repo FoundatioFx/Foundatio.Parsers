@@ -83,7 +83,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Arrange
         var mapping = CreateTextWithKeywordAndSortMapping("title");
         mapping.Properties!.Add("created", new DateProperty());
-        using var resolver = new ElasticMappingResolver(
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(
             cancellationToken => Task.FromResult<TypeMapping?>(mapping), _inferrer, logger: _logger);
 
         // Act + Assert
@@ -110,7 +110,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var releaseLoad = new TaskCompletionSource<TypeMapping?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var parser = new ElasticQueryParser(configuration =>
         {
-            configuration.UseMappings(async cancellationToken =>
+            configuration.UseMappingsWithAsyncLoader(async cancellationToken =>
             {
                 loadStarted.TrySetResult();
                 return await releaseLoad.Task;
@@ -152,7 +152,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Arrange
         var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
         int fetchCount = 0;
-        using var resolver = new ElasticMappingResolver(cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(cancellationToken =>
         {
             Interlocked.Increment(ref fetchCount);
             return Task.FromResult<TypeMapping?>(CreateTextOnlyMapping("title"));
@@ -425,7 +425,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int fetchCount = 0;
         TypeMapping serverMapping = CreateTextWithKeywordMapping("name");
-        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
         {
             int callNumber = Interlocked.Increment(ref fetchCount);
             TypeMapping capturedMapping = serverMapping;
@@ -950,7 +950,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int fetchCount = 0;
-        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
         {
             Interlocked.Increment(ref fetchCount);
             fetchStarted.TrySetResult();
@@ -982,7 +982,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int fetchCount = 0;
-        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
         {
             if (Interlocked.Increment(ref fetchCount) > 1)
             {
@@ -1017,7 +1017,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int fetchCount = 0;
-        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
         {
             Interlocked.Increment(ref fetchCount);
             fetchStarted.TrySetResult();
@@ -1048,7 +1048,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Arrange
         var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var fetchCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var resolver = new ElasticMappingResolver(async cancellationToken =>
+        var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
         {
             fetchStarted.TrySetResult();
             try
@@ -1083,7 +1083,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
         int fetchCount = 0;
         bool failRefresh = false;
-        using var resolver = new ElasticMappingResolver(cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(cancellationToken =>
         {
             Interlocked.Increment(ref fetchCount);
             if (!failRefresh)
@@ -1117,7 +1117,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     {
         // Arrange
         int fetchCount = 0;
-        using var resolver = new ElasticMappingResolver(cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(cancellationToken =>
         {
             Interlocked.Increment(ref fetchCount);
             return Task.FromResult<TypeMapping?>(CreateTextWithKeywordMapping("name"));
@@ -1140,7 +1140,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var refreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseRefresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int fetchCount = 0;
-        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
         {
             if (Interlocked.Increment(ref fetchCount) > 1)
             {
@@ -1171,7 +1171,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int fetchCount = 0;
-        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
         {
             Interlocked.Increment(ref fetchCount);
             fetchStarted.TrySetResult();
@@ -1195,6 +1195,42 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
+    public async Task GetMapping_WithAsyncOnlyLoaderAndSynchronizationContext_DoesNotDeadlock()
+    {
+        // Arrange
+        var completion = new TaskCompletionSource<FieldMapping?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            SynchronizationContext.SetSynchronizationContext(new NonPumpingSynchronizationContext());
+
+            try
+            {
+                using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
+                {
+                    await Task.Yield();
+                    return CreateTextWithKeywordMapping("name");
+                }, _inferrer, logger: _logger);
+
+                completion.TrySetResult(resolver.GetMapping("name"));
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        })
+        {
+            IsBackground = true
+        };
+
+        // Act
+        thread.Start();
+        var mapping = await completion.Task.WaitAsync(TimeSpan.FromSeconds(2), TestCancellationToken);
+
+        // Assert
+        Assert.True(mapping?.Found);
+    }
+
+    [Fact]
     public async Task GetMappingAsync_WhenJoinTimesOut_LaterCallerStillJoinsSharedFetch()
     {
         // Arrange
@@ -1202,7 +1238,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int fetchCount = 0;
         TypeMapping serverMapping = CreateTextWithKeywordMapping("name");
-        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
         {
             if (Interlocked.Increment(ref fetchCount) > 1)
             {
@@ -1890,17 +1926,24 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
-    public void GetMapping_WithoutAnyMappingSource_ThrowsInvalidOperationException()
+    public void SynchronousMappingApis_WithNullLoader_RemainUnambiguousAndThrowInvalidOperationException()
     {
         // Arrange - a resolver constructed with neither a code mapping nor a server mapping callback is a
         // configuration error and must fail loudly rather than reporting every field as unmapped.
-        using var resolver = new ElasticMappingResolver((Func<TypeMapping?>)null!, _inferrer, logger: _logger);
+        using var constructedResolver = new ElasticMappingResolver(null!, _inferrer, logger: _logger);
+        using var createdResolver = ElasticMappingResolver.Create(null!, _inferrer, _logger);
+        var configuration = new ElasticQueryParserConfiguration().UseMappings(null!, _inferrer);
+        using var configuredResolver = configuration.MappingResolver!;
 
         // Act
-        var exception = Record.Exception(() => resolver.GetMapping("name"));
+        var constructorException = Record.Exception(() => constructedResolver.GetMapping("name"));
+        var factoryException = Record.Exception(() => createdResolver.GetMapping("name"));
+        var configurationException = Record.Exception(() => configuredResolver.GetMapping("name"));
 
         // Assert
-        Assert.IsType<InvalidOperationException>(exception);
+        Assert.IsType<InvalidOperationException>(constructorException);
+        Assert.IsType<InvalidOperationException>(factoryException);
+        Assert.IsType<InvalidOperationException>(configurationException);
     }
 
     [Theory]
@@ -3070,6 +3113,13 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             _releaseTimestampRead.Set();
             _timestampReadBlocked.Dispose();
             _releaseTimestampRead.Dispose();
+        }
+    }
+
+    private sealed class NonPumpingSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback d, object? state)
+        {
         }
     }
 

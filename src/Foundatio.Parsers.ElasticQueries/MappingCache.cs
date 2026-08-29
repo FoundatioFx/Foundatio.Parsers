@@ -250,7 +250,10 @@ internal sealed class MappingCache : IDisposable
 
         if (_getServerMappingAsync is not null)
         {
-            _ = FetchAsync(operation);
+            // A synchronous caller cannot safely block on an async callback started on its own synchronization
+            // context. Isolate only this compatibility path on the thread pool; normal async callers invoke the
+            // callback directly above.
+            _ = Task.Run(() => FetchAsync(operation));
             return;
         }
 
