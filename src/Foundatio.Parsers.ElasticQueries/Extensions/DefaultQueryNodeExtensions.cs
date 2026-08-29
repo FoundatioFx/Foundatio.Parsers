@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -18,7 +19,7 @@ public static class DefaultQueryNodeExtensions
     public static async Task<Query?> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
     {
         if (node is TermNode termNode)
-            return await termNode.GetDefaultQueryAsync(context).ConfigureAwait(false);
+            return await termNode.GetDefaultQueryAsync(context).AnyContext();
 
         if (node is TermRangeNode termRangeNode)
             return await termRangeNode.GetDefaultQueryAsync(context).AnyContext();
@@ -43,7 +44,7 @@ public static class DefaultQueryNodeExtensions
         if (String.IsNullOrEmpty(field) && defaultFields is not null)
         {
             foreach (string defaultField in defaultFields)
-                await elasticContext.MappingResolver.GetMappingAsync(defaultField).ConfigureAwait(false);
+                await elasticContext.MappingResolver.GetMappingAsync(defaultField).AnyContext();
         }
 
         // If a specific field is set, use single-field query
@@ -64,7 +65,7 @@ public static class DefaultQueryNodeExtensions
                 var filterResolver = GetNestedFilterResolver(elasticContext);
                 if (filterResolver is not null)
                 {
-                    var filter = await filterResolver(nestedPath, defaultFields[0], defaultFields[0], context).ConfigureAwait(false);
+                    var filter = await filterResolver(nestedPath, defaultFields[0], defaultFields[0], context).AnyContext();
                     if (filter is not null)
                         innerQuery = new BoolQuery { Must = [innerQuery], Filter = [filter] };
                 }
@@ -87,7 +88,7 @@ public static class DefaultQueryNodeExtensions
             }
 
             // Otherwise, split into separate queries for each group
-            return await GetSplitNestedQueryAsync(node, fieldsByNestedPath, elasticContext).ConfigureAwait(false);
+            return await GetSplitNestedQueryAsync(node, fieldsByNestedPath, elasticContext).AnyContext();
         }
 
         // Fallback for no fields
@@ -100,7 +101,10 @@ public static class DefaultQueryNodeExtensions
     [Obsolete("Use GetDefaultQueryAsync to support async nested filter resolution.")]
     public static Query? GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
     {
-        return GetDefaultQueryAsync(node, context).ConfigureAwait(false).GetAwaiter().GetResult();
+        if (SynchronizationContext.Current is not null || TaskScheduler.Current != TaskScheduler.Default)
+            return Task.Run(() => GetDefaultQueryAsync(node, context)).GetAwaiter().GetResult();
+
+        return GetDefaultQueryAsync(node, context).AnyContext().GetAwaiter().GetResult();
     }
 
     private static Query? GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
@@ -285,7 +289,7 @@ public static class DefaultQueryNodeExtensions
                             continue;
 
                         Query branch = q;
-                        var filter = await filterResolver(nestedPath, field, field, context).ConfigureAwait(false);
+                        var filter = await filterResolver(nestedPath, field, field, context).AnyContext();
                         if (filter is not null)
                             branch = new BoolQuery { Must = [branch], Filter = [filter] };
                         branches.Add(branch);

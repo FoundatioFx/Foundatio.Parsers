@@ -391,9 +391,10 @@ Synchronous loader overloads remain available for compatibility. An asynchronous
 with a synchronous loader must invoke that loader synchronously, and an explicit synchronous resolver call
 configured with only an asynchronous loader waits synchronously for it. That compatibility path dispatches
 the single shared load to the thread pool to avoid synchronization-context deadlocks, but the caller still
-blocks; server request paths should use the asynchronous resolver and parser APIs. The built-in Elasticsearch
-client factories supply both forms: asynchronous parser paths call `Indices.GetMappingAsync`, while
-synchronous resolver calls retain `Indices.GetMapping`.
+blocks. A synchronous `Parse` call made under a custom synchronization context or task scheduler similarly
+isolates the compatibility call; server request paths should use the asynchronous resolver and parser APIs.
+The built-in Elasticsearch client factories supply both forms: asynchronous parser paths call
+`Indices.GetMappingAsync`, while synchronous resolver calls retain `Indices.GetMapping`.
 
 The loaded mapping and its successful field memoization belong to an immutable resolver-local snapshot; an
 external cache client is neither required nor used. `RefreshMapping()` remains synchronous because it only

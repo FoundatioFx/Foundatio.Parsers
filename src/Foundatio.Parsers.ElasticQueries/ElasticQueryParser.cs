@@ -156,7 +156,7 @@ public class ElasticQueryParser : LuceneQueryParser
 
         if (elasticContext.MappingResolver is not null)
         {
-            var resolvedField = await elasticContext.MappingResolver.GetMappingAsync(field).ConfigureAwait(false);
+            var resolvedField = await elasticContext.MappingResolver.GetMappingAsync(field).AnyContext();
             if (resolvedField?.Found is true)
                 return resolvedField.FullPath;
         }

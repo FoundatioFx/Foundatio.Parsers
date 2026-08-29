@@ -175,8 +175,8 @@ internal sealed class MappingCache : IDisposable
         try
         {
             result = isOwner
-                ? await operation.Task.WaitAsync(cancellationToken).ConfigureAwait(false)
-                : await operation.Task.WaitAsync(RefreshWaitTimeout, cancellationToken).ConfigureAwait(false);
+                ? await operation.Task.WaitAsync(cancellationToken).AnyContext()
+                : await operation.Task.WaitAsync(RefreshWaitTimeout, cancellationToken).AnyContext();
         }
         catch (TimeoutException)
         {
@@ -190,7 +190,7 @@ internal sealed class MappingCache : IDisposable
             return MappingRefreshResult.Unavailable;
 
         var snapshot = Current;
-        return await LoadAsync(snapshot, armThrottleOnSuccess && snapshot.Fetched, cancellationToken).ConfigureAwait(false);
+        return await LoadAsync(snapshot, armThrottleOnSuccess && snapshot.Fetched, cancellationToken).AnyContext();
     }
 
     private bool TryGetOrCreateLoad(MappingSnapshot observedSnapshot, bool armThrottleOnSuccess, bool preferAsync,
@@ -287,7 +287,7 @@ internal sealed class MappingCache : IDisposable
         TypeMapping? mapping;
         try
         {
-            mapping = await _getServerMappingAsync!(_lifetimeCancellation.Token).ConfigureAwait(false);
+            mapping = await _getServerMappingAsync!(_lifetimeCancellation.Token).AnyContext();
         }
         catch (Exception ex)
         {

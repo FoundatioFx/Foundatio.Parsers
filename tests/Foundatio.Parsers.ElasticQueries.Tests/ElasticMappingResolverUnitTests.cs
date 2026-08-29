@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Xunit;
 using Microsoft.Extensions.Time.Testing;
 using Xunit;
@@ -976,6 +978,26 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
+    public async Task GetMappingAsync_WithAsyncOnlyLoader_StartsLoadInline()
+    {
+        // Arrange
+        int callerThread = Environment.CurrentManagedThreadId;
+        int loaderThread = 0;
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(cancellationToken =>
+        {
+            loaderThread = Environment.CurrentManagedThreadId;
+            return Task.FromResult<TypeMapping?>(CreateTextWithKeywordMapping("name"));
+        }, _inferrer, logger: _logger);
+
+        // Act
+        var mapping = await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken);
+
+        // Assert
+        Assert.True(mapping?.Found);
+        Assert.Equal(callerThread, loaderThread);
+    }
+
+    [Fact]
     public async Task GetMappingAsync_WithConcurrentMissingFields_SharesOneFetch()
     {
         // Arrange
@@ -1198,36 +1220,100 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     public async Task GetMapping_WithAsyncOnlyLoaderAndSynchronizationContext_DoesNotDeadlock()
     {
         // Arrange
-        var completion = new TaskCompletionSource<FieldMapping?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
+        Task<FieldMapping?> lookup = RunWithNonPumpingSynchronizationContext(() =>
         {
-            SynchronizationContext.SetSynchronizationContext(new NonPumpingSynchronizationContext());
-
-            try
+            using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
             {
-                using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
-                {
-                    await Task.Yield();
-                    return CreateTextWithKeywordMapping("name");
-                }, _inferrer, logger: _logger);
+                await Task.Yield();
+                return CreateTextWithKeywordMapping("name");
+            }, _inferrer, logger: _logger);
 
-                completion.TrySetResult(resolver.GetMapping("name"));
-            }
-            catch (Exception ex)
-            {
-                completion.TrySetException(ex);
-            }
-        })
-        {
-            IsBackground = true
-        };
+            return resolver.GetMapping("name");
+        });
 
         // Act
-        thread.Start();
-        var mapping = await completion.Task.WaitAsync(TimeSpan.FromSeconds(2), TestCancellationToken);
+        var mapping = await lookup.WaitAsync(TimeSpan.FromSeconds(2), TestCancellationToken);
 
         // Assert
         Assert.True(mapping?.Found);
+    }
+
+    [Fact]
+    public async Task GetDefaultQuery_WithAsyncOnlyMappingLoaderAndSynchronizationContext_DoesNotDeadlock()
+    {
+        // Arrange
+        Task<Query?> queryTask = RunWithNonPumpingSynchronizationContext(() =>
+        {
+            using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
+            {
+                await Task.Yield();
+                return CreateTextWithKeywordMapping("name");
+            }, _inferrer, logger: _logger);
+            var context = new ElasticQueryVisitorContext
+            {
+                DefaultFields = ["name"],
+                MappingResolver = resolver
+            };
+
+#pragma warning disable CS0618 // Exercise the synchronous compatibility API.
+            return new TermNode { Term = "value" }.GetDefaultQuery(context);
+#pragma warning restore CS0618
+        });
+
+        // Act
+        var query = await queryTask.WaitAsync(TimeSpan.FromSeconds(2), TestCancellationToken);
+
+        // Assert
+        Assert.NotNull(query);
+    }
+
+    [Fact]
+    public async Task Parse_WithAsyncOnlyMappingLoaderAndSynchronizationContext_DoesNotDeadlock()
+    {
+        // Arrange
+        Task<IQueryNode?> parseTask = RunWithNonPumpingSynchronizationContext(() =>
+        {
+            using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
+            {
+                await Task.Yield();
+                return CreateTextWithKeywordMapping("name");
+            }, _inferrer, logger: _logger);
+            var parser = new ElasticQueryParser(configuration => configuration.UseMappings(resolver));
+
+            return parser.Parse("name:value", new ElasticQueryVisitorContext());
+        });
+
+        // Act
+        var query = await parseTask.WaitAsync(TimeSpan.FromSeconds(2), TestCancellationToken);
+
+        // Assert
+        Assert.NotNull(query);
+    }
+
+    [Fact]
+    public async Task Parse_WithAsyncOnlyMappingLoaderAndSingleThreadTaskScheduler_DoesNotDeadlock()
+    {
+        // Arrange
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(async cancellationToken =>
+        {
+            await Task.Yield();
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+        var parser = new ElasticQueryParser(configuration => configuration.UseMappings(resolver));
+        var scheduler = new ConcurrentExclusiveSchedulerPair(TaskScheduler.Default, maxConcurrencyLevel: 1);
+
+        // Act
+        var parseTask = Task.Factory.StartNew(
+            () => parser.Parse("name:value", new ElasticQueryVisitorContext()),
+            CancellationToken.None,
+            TaskCreationOptions.DenyChildAttach,
+            scheduler.ExclusiveScheduler);
+        var query = await parseTask.WaitAsync(TimeSpan.FromSeconds(2), TestCancellationToken);
+        scheduler.Complete();
+
+        // Assert
+        Assert.NotNull(query);
+        await scheduler.Completion.WaitAsync(TimeSpan.FromSeconds(2), TestCancellationToken);
     }
 
     [Fact]
@@ -3121,6 +3207,30 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         public override void Post(SendOrPostCallback d, object? state)
         {
         }
+    }
+
+    private static Task<T> RunWithNonPumpingSynchronizationContext<T>(Func<T> action)
+    {
+        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            SynchronizationContext.SetSynchronizationContext(new NonPumpingSynchronizationContext());
+
+            try
+            {
+                completion.TrySetResult(action());
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        })
+        {
+            IsBackground = true
+        };
+
+        thread.Start();
+        return completion.Task;
     }
 
     private sealed class CapturingLogger : MEL.ILogger

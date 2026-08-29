@@ -218,7 +218,7 @@ public class ElasticMappingResolver : IDisposable
 
         if (!hadFetchedSnapshot)
         {
-            loadResult = await _cache.LoadInitialAsync(snapshot, cancellationToken).ConfigureAwait(false);
+            loadResult = await _cache.LoadInitialAsync(snapshot, cancellationToken).AnyContext();
             snapshot = _cache.Current;
         }
 
@@ -226,7 +226,7 @@ public class ElasticMappingResolver : IDisposable
 
         if (!resolved.Found && hadFetchedSnapshot)
         {
-            loadResult = await _cache.ReloadForMissingFieldAsync(snapshot, cancellationToken).ConfigureAwait(false);
+            loadResult = await _cache.ReloadForMissingFieldAsync(snapshot, cancellationToken).AnyContext();
             if (loadResult == MappingRefreshResult.Updated)
             {
                 snapshot = _cache.Current;
@@ -241,7 +241,7 @@ public class ElasticMappingResolver : IDisposable
             if (_logger.IsEnabled(LogLevel.Trace))
                 _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolved.FullPath, resolved.Property?.Type);
 
-            return await FollowAliasAsync(resolved, followAlias, cancellationToken).ConfigureAwait(false);
+            return await FollowAliasAsync(resolved, followAlias, cancellationToken).AnyContext();
         }
 
         LogUnresolvedField(field, loadResult, snapshot);
@@ -369,12 +369,12 @@ public class ElasticMappingResolver : IDisposable
 
     public async ValueTask<IProperty?> GetMappingPropertyAsync(string? field, bool followAlias = false, CancellationToken cancellationToken = default)
     {
-        return (await GetMappingAsync(field, followAlias, cancellationToken).ConfigureAwait(false))?.Property;
+        return (await GetMappingAsync(field, followAlias, cancellationToken).AnyContext())?.Property;
     }
 
     public async ValueTask<IProperty?> GetMappingPropertyAsync(Field field, bool followAlias = false, CancellationToken cancellationToken = default)
     {
-        return (await GetMappingAsync(field, followAlias, cancellationToken).ConfigureAwait(false))?.Property;
+        return (await GetMappingAsync(field, followAlias, cancellationToken).AnyContext())?.Property;
     }
 
     public string? GetResolvedField(string? field)
@@ -393,7 +393,7 @@ public class ElasticMappingResolver : IDisposable
 
     public async ValueTask<string?> GetResolvedFieldAsync(string? field, CancellationToken cancellationToken = default)
     {
-        var result = await GetMappingAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        var result = await GetMappingAsync(field, followAlias: true, cancellationToken).AnyContext();
         return result?.FullPath ?? field;
     }
 
@@ -402,7 +402,7 @@ public class ElasticMappingResolver : IDisposable
         if (_inferrer is null)
             throw new InvalidOperationException("Unable to resolve Field without inferrer");
 
-        return (await GetResolvedFieldAsync(_inferrer.Field(field), cancellationToken).ConfigureAwait(false))!;
+        return (await GetResolvedFieldAsync(_inferrer.Field(field), cancellationToken).AnyContext())!;
     }
 
     public string? GetSortFieldName(string? field)
@@ -422,8 +422,8 @@ public class ElasticMappingResolver : IDisposable
 
     public async ValueTask<string> GetSortFieldNameAsync(Field field, CancellationToken cancellationToken = default)
     {
-        string resolved = await GetResolvedFieldAsync(field, cancellationToken).ConfigureAwait(false);
-        return (await GetNonAnalyzedFieldNameAsync(resolved, ElasticMapping.SortFieldName, cancellationToken).ConfigureAwait(false))!;
+        string resolved = await GetResolvedFieldAsync(field, cancellationToken).AnyContext();
+        return (await GetNonAnalyzedFieldNameAsync(resolved, ElasticMapping.SortFieldName, cancellationToken).AnyContext())!;
     }
 
     public string? GetAggregationsFieldName(string? field)
@@ -443,7 +443,7 @@ public class ElasticMappingResolver : IDisposable
 
     public async ValueTask<string> GetAggregationsFieldNameAsync(Field field, CancellationToken cancellationToken = default)
     {
-        return (await GetNonAnalyzedFieldNameAsync(field, ElasticMapping.KeywordFieldName, cancellationToken).ConfigureAwait(false))!;
+        return (await GetNonAnalyzedFieldNameAsync(field, ElasticMapping.KeywordFieldName, cancellationToken).AnyContext())!;
     }
 
     public string GetNonAnalyzedFieldName(Field field, string? preferredSubField = null)
@@ -454,8 +454,8 @@ public class ElasticMappingResolver : IDisposable
     public async ValueTask<string> GetNonAnalyzedFieldNameAsync(Field field, string? preferredSubField = null,
         CancellationToken cancellationToken = default)
     {
-        string resolved = await GetResolvedFieldAsync(field, cancellationToken).ConfigureAwait(false);
-        return (await GetNonAnalyzedFieldNameAsync(resolved, preferredSubField, cancellationToken).ConfigureAwait(false))!;
+        string resolved = await GetResolvedFieldAsync(field, cancellationToken).AnyContext();
+        return (await GetNonAnalyzedFieldNameAsync(resolved, preferredSubField, cancellationToken).AnyContext())!;
     }
 
     public string? GetNonAnalyzedFieldName(string? field, string? preferredSubField = null)
@@ -473,7 +473,7 @@ public class ElasticMappingResolver : IDisposable
         if (String.IsNullOrEmpty(field))
             return field;
 
-        var mapping = await GetMappingAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        var mapping = await GetMappingAsync(field, followAlias: true, cancellationToken).AnyContext();
         return GetNonAnalyzedFieldName(field, mapping, preferredSubField);
     }
 
@@ -512,7 +512,7 @@ public class ElasticMappingResolver : IDisposable
         if (String.IsNullOrEmpty(field))
             return true;
 
-        var property = await GetMappingAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        var property = await GetMappingAsync(field, followAlias: true, cancellationToken).AnyContext();
         return property is not null && property.Found && IsPropertyAnalyzed(property.Property!);
     }
 
@@ -535,7 +535,7 @@ public class ElasticMappingResolver : IDisposable
     public async ValueTask<bool> IsNestedPropertyTypeAsync(string? field, CancellationToken cancellationToken = default)
     {
         return !String.IsNullOrEmpty(field)
-            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false) is NestedProperty;
+            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).AnyContext() is NestedProperty;
     }
 
     public bool IsGeoPropertyType(string? field)
@@ -549,7 +549,7 @@ public class ElasticMappingResolver : IDisposable
     public async ValueTask<bool> IsGeoPropertyTypeAsync(string? field, CancellationToken cancellationToken = default)
     {
         return !String.IsNullOrEmpty(field)
-            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false) is GeoPointProperty;
+            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).AnyContext() is GeoPointProperty;
     }
 
     public bool IsNumericPropertyType(string? field)
@@ -565,7 +565,7 @@ public class ElasticMappingResolver : IDisposable
         if (String.IsNullOrEmpty(field))
             return false;
 
-        var property = await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        var property = await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).AnyContext();
         return IsNumericProperty(property);
     }
 
@@ -593,7 +593,7 @@ public class ElasticMappingResolver : IDisposable
     public async ValueTask<bool> IsBooleanPropertyTypeAsync(string? field, CancellationToken cancellationToken = default)
     {
         return !String.IsNullOrEmpty(field)
-            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false) is BooleanProperty;
+            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).AnyContext() is BooleanProperty;
     }
 
     public bool IsDatePropertyType(string? field)
@@ -607,7 +607,7 @@ public class ElasticMappingResolver : IDisposable
     public async ValueTask<bool> IsDatePropertyTypeAsync(string? field, CancellationToken cancellationToken = default)
     {
         return !String.IsNullOrEmpty(field)
-            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false) is DateProperty or DateNanosProperty;
+            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).AnyContext() is DateProperty or DateNanosProperty;
     }
 
     public FieldType GetFieldType(string? field)
@@ -623,7 +623,7 @@ public class ElasticMappingResolver : IDisposable
         if (String.IsNullOrWhiteSpace(field))
             return FieldType.None;
 
-        var property = await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        var property = await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).AnyContext();
         return GetFieldType(property);
     }
 
@@ -888,7 +888,7 @@ public class ElasticMappingResolver : IDisposable
     private static async Task<TypeMapping?> GetServerMappingAsync(ElasticsearchClient client, GetMappingRequest request, ILogger logger,
         CancellationToken cancellationToken)
     {
-        var response = await client.Indices.GetMappingAsync(request, cancellationToken).ConfigureAwait(false);
+        var response = await client.Indices.GetMappingAsync(request, cancellationToken).AnyContext();
         logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
         return response.Mappings.Values.FirstOrDefault()?.Mappings;
     }
