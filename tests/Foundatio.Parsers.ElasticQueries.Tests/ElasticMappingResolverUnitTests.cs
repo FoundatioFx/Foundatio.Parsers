@@ -78,6 +78,99 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
+    public async Task AsyncResolverHelpers_WithMappedFields_ReturnExpectedValues()
+    {
+        // Arrange
+        var mapping = CreateTextWithKeywordAndSortMapping("title");
+        mapping.Properties!.Add("created", new DateProperty());
+        using var resolver = new ElasticMappingResolver(
+            cancellationToken => Task.FromResult<TypeMapping?>(mapping), _inferrer, logger: _logger);
+
+        // Act + Assert
+        Assert.Equal("title", await resolver.GetResolvedFieldAsync("title", TestCancellationToken));
+        Assert.Equal("title.sort", await resolver.GetSortFieldNameAsync("title", TestCancellationToken));
+        Assert.Equal("title.keyword", await resolver.GetAggregationsFieldNameAsync("title", TestCancellationToken));
+        Assert.True(await resolver.IsPropertyAnalyzedAsync("title", TestCancellationToken));
+        Assert.True(await resolver.IsDatePropertyTypeAsync("created", TestCancellationToken));
+        Assert.Equal(FieldType.Date, await resolver.GetFieldTypeAsync("created", TestCancellationToken));
+    }
+
+    [Theory]
+    [InlineData("query")]
+    [InlineData("sort")]
+    [InlineData("aggregation")]
+    [InlineData("nested")]
+    [InlineData("geo")]
+    [InlineData("default-field")]
+    [InlineData("included-default-field")]
+    public async Task AsyncParserPath_WithBlockedMappingFetch_ReturnsControl(string path)
+    {
+        // Arrange
+        var loadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseLoad = new TaskCompletionSource<TypeMapping?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var parser = new ElasticQueryParser(configuration =>
+        {
+            configuration.UseMappings(async cancellationToken =>
+            {
+                loadStarted.TrySetResult();
+                return await releaseLoad.Task;
+            }, _inferrer);
+            if (path == "nested")
+                configuration.UseNested();
+            if (path == "geo")
+                configuration.UseGeo(location => location);
+            if (path is "default-field" or "included-default-field")
+                configuration.SetDefaultFields(["title"]);
+            if (path == "included-default-field")
+                configuration.UseIncludes(new Dictionary<string, string> { { "value", "included" } });
+        });
+        using var resolver = parser.Configuration.MappingResolver!;
+
+        // Act
+        Task operation = path switch
+        {
+            "query" => parser.BuildQueryAsync("title:value"),
+            "sort" => parser.BuildSortAsync("title"),
+            "aggregation" => parser.BuildAggregationsAsync("terms:title"),
+            "nested" => parser.BuildQueryAsync("items.status:active"),
+            "geo" => parser.BuildQueryAsync("location:41,-87"),
+            "default-field" => parser.BuildQueryAsync("value"),
+            "included-default-field" => parser.BuildQueryAsync("@include:value"),
+            _ => throw new ArgumentOutOfRangeException(nameof(path))
+        };
+        await loadStarted.Task.WaitAsync(TimeSpan.FromSeconds(1), TestCancellationToken);
+
+        // Assert
+        Assert.False(operation.IsCompleted);
+        releaseLoad.SetResult(CreateAsyncParserMapping());
+        await operation.WaitAsync(TimeSpan.FromSeconds(1), TestCancellationToken);
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithUnusedMissingDefaultField_DoesNotRefreshMapping()
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(cancellationToken =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return Task.FromResult<TypeMapping?>(CreateTextOnlyMapping("title"));
+        }, _inferrer, timeProvider, _logger);
+        var parser = new ElasticQueryParser(configuration => configuration
+            .UseMappings(resolver)
+            .SetDefaultFields(["missing-default"]));
+
+        // Act
+        await parser.BuildQueryAsync("title:first");
+        timeProvider.Advance(resolver.UnmappedFieldRefreshInterval);
+        await parser.BuildQueryAsync("title:second");
+
+        // Assert
+        Assert.Equal(1, fetchCount);
+    }
+
+    [Fact]
     public void GetNonAnalyzedFieldName_WithKeywordProperty_ReturnsBareFieldName()
     {
         // Arrange
@@ -317,6 +410,45 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Act
         var staleResult = await staleLookup;
         var refreshedResult = resolver.GetMapping("idx.keyword-000001");
+
+        // Assert
+        Assert.False(staleResult?.Found);
+        Assert.True(refreshedResult?.Found);
+        Assert.Equal(3, fetchCount);
+    }
+
+    [Fact]
+    public async Task RefreshMapping_DuringAsyncRefresh_DiscardsSupersededResult()
+    {
+        // Arrange
+        var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int fetchCount = 0;
+        TypeMapping serverMapping = CreateTextWithKeywordMapping("name");
+        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        {
+            int callNumber = Interlocked.Increment(ref fetchCount);
+            TypeMapping capturedMapping = serverMapping;
+            if (callNumber == 2)
+            {
+                fetchStarted.TrySetResult();
+                await releaseFetch.Task.WaitAsync(cancellationToken);
+            }
+
+            return capturedMapping;
+        }, _inferrer, logger: _logger);
+
+        Assert.True((await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken))?.Found);
+        var staleLookup = resolver.GetMappingAsync("idx.keyword-000001", cancellationToken: TestCancellationToken).AsTask();
+        await fetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+
+        serverMapping = CreateDynamicCustomFieldMapping("name", "keyword-000001", new KeywordProperty());
+        resolver.RefreshMapping();
+        releaseFetch.TrySetResult();
+
+        // Act
+        var staleResult = await staleLookup;
+        var refreshedResult = await resolver.GetMappingAsync("idx.keyword-000001", cancellationToken: TestCancellationToken);
 
         // Assert
         Assert.False(staleResult?.Found);
@@ -808,6 +940,297 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
 
         // Assert
         Assert.False(mapping?.Found);
+        Assert.Equal(2, fetchCount);
+    }
+
+    [Fact]
+    public async Task GetMappingAsync_WithConcurrentInitialLookups_SharesOneFetch()
+    {
+        // Arrange
+        var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            fetchStarted.TrySetResult();
+            await releaseFetch.Task.WaitAsync(cancellationToken);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+
+        // Act
+        var lookups = Enumerable.Range(0, 100)
+            .Select(_ => resolver.GetMappingAsync("name").AsTask())
+            .ToArray();
+        await fetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+
+        // Assert
+        Assert.Equal(1, Volatile.Read(ref fetchCount));
+        Assert.All(lookups, task => Assert.False(task.IsCompleted));
+
+        releaseFetch.TrySetResult();
+        await Task.WhenAll(lookups);
+
+        Assert.Equal(1, fetchCount);
+        Assert.All(lookups, task => Assert.True(task.Result?.Found));
+    }
+
+    [Fact]
+    public async Task GetMappingAsync_WithConcurrentMissingFields_SharesOneFetch()
+    {
+        // Arrange
+        var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        {
+            if (Interlocked.Increment(ref fetchCount) > 1)
+            {
+                fetchStarted.TrySetResult();
+                await releaseFetch.Task.WaitAsync(cancellationToken);
+            }
+
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+        Assert.True((await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken))?.Found);
+
+        // Act
+        var lookups = Enumerable.Range(0, 100)
+            .Select(index => resolver.GetMappingAsync($"missing_{index}", cancellationToken: TestCancellationToken).AsTask())
+            .ToArray();
+        await fetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+
+        // Assert
+        Assert.Equal(2, Volatile.Read(ref fetchCount));
+        Assert.All(lookups, task => Assert.False(task.IsCompleted));
+        releaseFetch.TrySetResult();
+        await Task.WhenAll(lookups);
+
+        Assert.Equal(2, fetchCount);
+        Assert.All(lookups, task => Assert.False(task.Result?.Found));
+    }
+
+    [Fact]
+    public async Task GetMappingAsync_WhenCallerCancels_DoesNotCancelSharedFetch()
+    {
+        // Arrange
+        var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            fetchStarted.TrySetResult();
+            await releaseFetch.Task.WaitAsync(cancellationToken);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+        using var cancellationSource = new CancellationTokenSource();
+
+        // Act
+        var cancelledLookup = resolver.GetMappingAsync("name", cancellationToken: cancellationSource.Token).AsTask();
+        await fetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+        cancellationSource.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelledLookup);
+
+        var joiningLookup = resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken).AsTask();
+        Assert.False(joiningLookup.IsCompleted);
+        releaseFetch.TrySetResult();
+
+        // Assert
+        var mapping = await joiningLookup;
+        Assert.True(mapping?.Found);
+        Assert.Equal(1, fetchCount);
+    }
+
+    [Fact]
+    public async Task Dispose_DuringAsyncFetch_CancelsResolverLifetimeLoad()
+    {
+        // Arrange
+        var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fetchCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resolver = new ElasticMappingResolver(async cancellationToken =>
+        {
+            fetchStarted.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                fetchCancelled.TrySetResult();
+                throw;
+            }
+
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+        var lookup = resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken).AsTask();
+        await fetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+
+        // Act
+        resolver.Dispose();
+
+        // Assert
+        await fetchCancelled.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+        Assert.False((await lookup)?.Found);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetMappingAsync_WithContinuousFailedRefreshes_AttemptsAtMostOncePerRefreshInterval(bool throwException)
+    {
+        // Arrange
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        int fetchCount = 0;
+        bool failRefresh = false;
+        using var resolver = new ElasticMappingResolver(cancellationToken =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            if (!failRefresh)
+                return Task.FromResult<TypeMapping?>(CreateTextWithKeywordMapping("name"));
+
+            return throwException
+                ? Task.FromException<TypeMapping?>(new InvalidOperationException("Elasticsearch is unavailable"))
+                : Task.FromResult<TypeMapping?>(null);
+        }, _inferrer, timeProvider, _logger);
+
+        Assert.True((await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken))?.Found);
+        failRefresh = true;
+
+        // Act - twelve five-second windows model one minute of continuous attacker-controlled misses.
+        for (int interval = 0; interval < 12; interval++)
+        {
+            for (int miss = 0; miss < 25; miss++)
+                Assert.False((await resolver.GetMappingAsync($"missing_{interval}_{miss}", cancellationToken: TestCancellationToken))?.Found);
+
+            Assert.True((await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken))?.Found);
+            if (interval < 11)
+                timeProvider.Advance(resolver.UnmappedFieldRefreshInterval);
+        }
+
+        // Assert - one cold start plus at most twelve automatic attempts, including null and exceptions.
+        Assert.Equal(13, fetchCount);
+    }
+
+    [Fact]
+    public async Task GetMappingAsync_WithCachedKnownField_CompletesSynchronously()
+    {
+        // Arrange
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(cancellationToken =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            return Task.FromResult<TypeMapping?>(CreateTextWithKeywordMapping("name"));
+        }, _inferrer, logger: _logger);
+        Assert.True((await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken))?.Found);
+
+        // Act
+        var cachedLookup = resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken);
+
+        // Assert
+        Assert.True(cachedLookup.IsCompletedSuccessfully);
+        Assert.True((await cachedLookup)?.Found);
+        Assert.Equal(1, fetchCount);
+    }
+
+    [Fact]
+    public async Task GetMappingAsync_WithCachedKnownFieldDuringBlockedRefresh_CompletesSynchronously()
+    {
+        // Arrange
+        var refreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRefresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        {
+            if (Interlocked.Increment(ref fetchCount) > 1)
+            {
+                refreshStarted.TrySetResult();
+                await releaseRefresh.Task.WaitAsync(cancellationToken);
+            }
+
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+        Assert.True((await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken))?.Found);
+        var blockedMiss = resolver.GetMappingAsync("missing", cancellationToken: TestCancellationToken).AsTask();
+        await refreshStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+
+        // Act
+        var cachedLookup = resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken);
+
+        // Assert
+        Assert.True(cachedLookup.IsCompletedSuccessfully);
+        Assert.True((await cachedLookup)?.Found);
+        releaseRefresh.TrySetResult();
+        Assert.False((await blockedMiss)?.Found);
+    }
+
+    [Fact]
+    public async Task GetMapping_WithConcurrentSyncAndAsyncLookups_SharesOneFetch()
+    {
+        // Arrange
+        var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int fetchCount = 0;
+        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            fetchStarted.TrySetResult();
+            await releaseFetch.Task.WaitAsync(cancellationToken);
+            return CreateTextWithKeywordMapping("name");
+        }, _inferrer, logger: _logger);
+
+        // Act
+        var asyncLookup = resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken).AsTask();
+        await fetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+        var syncLookup = Task.Run(() => resolver.GetMapping("name"), TestCancellationToken);
+
+        Assert.False(asyncLookup.IsCompleted);
+        Assert.False(syncLookup.IsCompleted);
+        releaseFetch.TrySetResult();
+
+        // Assert
+        Assert.True((await asyncLookup)?.Found);
+        Assert.True((await syncLookup)?.Found);
+        Assert.Equal(1, fetchCount);
+    }
+
+    [Fact]
+    public async Task GetMappingAsync_WhenJoinTimesOut_LaterCallerStillJoinsSharedFetch()
+    {
+        // Arrange
+        var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int fetchCount = 0;
+        TypeMapping serverMapping = CreateTextWithKeywordMapping("name");
+        using var resolver = new ElasticMappingResolver(async cancellationToken =>
+        {
+            if (Interlocked.Increment(ref fetchCount) > 1)
+            {
+                fetchStarted.TrySetResult();
+                await releaseFetch.Task.WaitAsync(cancellationToken);
+            }
+
+            return serverMapping;
+        }, _inferrer, logger: _logger);
+        Assert.True((await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken))?.Found);
+        serverMapping = CreateDynamicCustomFieldMapping("name", "keyword-000001", new KeywordProperty());
+
+        var inFlightLookup = resolver.GetMappingAsync("idx.keyword-000001", cancellationToken: TestCancellationToken).AsTask();
+        await fetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+
+        // Act
+        resolver.MappingRefreshWaitTimeout = TimeSpan.FromMilliseconds(50);
+        var timedOut = await resolver.GetMappingAsync("idx.keyword-000001", cancellationToken: TestCancellationToken);
+
+        resolver.MappingRefreshWaitTimeout = TimeSpan.FromSeconds(30);
+        var joiningLookup = resolver.GetMappingAsync("idx.keyword-000001", cancellationToken: TestCancellationToken).AsTask();
+        Assert.False(joiningLookup.IsCompleted);
+        releaseFetch.TrySetResult();
+
+        // Assert
+        Assert.False(timedOut?.Found);
+        Assert.True((await inFlightLookup)?.Found);
+        Assert.True((await joiningLookup)?.Found);
         Assert.Equal(2, fetchCount);
     }
 
@@ -1408,7 +1831,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     }
 
     [Fact]
-    public void MappingRefreshWaitTimeout_WithValueExceedingSemaphoreLimit_ThrowsArgumentOutOfRangeException()
+    public void MappingRefreshWaitTimeout_WithValueExceedingSupportedLimit_ThrowsArgumentOutOfRangeException()
     {
         // Arrange - a value a semaphore cannot accept was previously clamped silently on every wait, so the
         // configured timeout and the effective one disagreed.
@@ -1471,7 +1894,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
     {
         // Arrange - a resolver constructed with neither a code mapping nor a server mapping callback is a
         // configuration error and must fail loudly rather than reporting every field as unmapped.
-        using var resolver = new ElasticMappingResolver(null!, _inferrer, logger: _logger);
+        using var resolver = new ElasticMappingResolver((Func<TypeMapping?>)null!, _inferrer, logger: _logger);
 
         // Act
         var exception = Record.Exception(() => resolver.GetMapping("name"));
@@ -1755,6 +2178,15 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         var mapping = CreateTextWithKeywordMapping(existingFieldName);
         mapping.Properties!.Add("idx", new ObjectProperty { Properties = CreateProperties((customFieldName, customField)) });
 
+        return mapping;
+    }
+
+    private static TypeMapping CreateAsyncParserMapping()
+    {
+        var items = new Properties { { "status", new KeywordProperty() } };
+        var mapping = CreateTextWithKeywordAndSortMapping("title");
+        mapping.Properties!.Add("items", new NestedProperty { Properties = items });
+        mapping.Properties.Add("location", new GeoPointProperty());
         return mapping;
     }
 

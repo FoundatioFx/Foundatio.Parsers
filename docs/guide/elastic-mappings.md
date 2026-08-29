@@ -299,7 +299,8 @@ Concurrent reload attempts are coalesced into a single server mapping fetch per 
 local to the resolver instance, so create one long-lived resolver per concrete index and process. Creating a
 resolver per request defeats both caching and request coalescing. With the five-second default, each resolver
 that is continuously receiving misses can make up to about 12 reload attempts per minute, excluding cold
-starts and explicit refreshes.
+starts and explicit refreshes. There is no distributed cache or cross-process coordination, so this ceiling
+applies independently to each resolver in each process.
 
 Before this miss-specific cooldown, successful and null mapping fetches were normally limited by the
 one-minute mapping refresh interval, while a callback exception could be retried by every sequential miss.
@@ -370,7 +371,29 @@ They do not merge heterogeneous mappings from rollover aliases or data streams.
 
 ## Custom Mapping Resolver
 
-Create a custom resolver for special cases:
+Use an asynchronous loader when obtaining the mapping requires network I/O. The parser's asynchronous query,
+sort, and aggregation paths await this loader without blocking a request thread. Cancelling one resolver
+lookup cancels only that caller's wait; the shared fetch continues for other callers and is bounded by the
+resolver lifetime and the loader's transport timeout.
+
+```csharp
+var customResolver = ElasticMappingResolver.Create(
+    getMappingAsync: cancellationToken => LoadMappingAsync(cancellationToken),
+    inferrer: client.Infer,
+    logger: logger);
+```
+
+Synchronous loader overloads remain available for compatibility. An asynchronous parser call configured
+with a synchronous loader must invoke that loader synchronously, and an explicit synchronous resolver call
+configured with only an asynchronous loader waits synchronously for it. The built-in Elasticsearch client
+factories supply both forms: asynchronous parser paths call `Indices.GetMappingAsync`, while synchronous
+resolver calls retain `Indices.GetMapping`.
+
+The loaded mapping and its successful field memoization belong to an immutable resolver-local snapshot; an
+external cache client is neither required nor used. `RefreshMapping()` remains synchronous because it only
+invalidates that local snapshot and performs no I/O.
+
+For an already synchronous or in-memory source, use the compatibility overload:
 
 ```csharp
 var customResolver = ElasticMappingResolver.Create(

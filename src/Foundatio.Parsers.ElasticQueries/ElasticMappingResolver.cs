@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -36,8 +37,34 @@ public class ElasticMappingResolver : IDisposable
         _cache = new MappingCache(getMapping, BuildMergedProperties, _timeProvider, _logger);
     }
 
+    public ElasticMappingResolver(Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, Inferrer? inferrer = null,
+        TimeProvider? timeProvider = null, ILogger? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(getMappingAsync);
+        _inferrer = inferrer;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _logger = logger ?? NullLogger.Instance;
+        _cache = new MappingCache(getMappingAsync, BuildMergedProperties, _timeProvider, _logger);
+    }
+
+    private ElasticMappingResolver(Func<TypeMapping?> getMapping, Func<CancellationToken, Task<TypeMapping?>> getMappingAsync,
+        Inferrer? inferrer, ILogger? logger)
+    {
+        _inferrer = inferrer;
+        _timeProvider = TimeProvider.System;
+        _logger = logger ?? NullLogger.Instance;
+        _cache = new MappingCache(getMapping, getMappingAsync, BuildMergedProperties, _timeProvider, _logger);
+    }
+
     public ElasticMappingResolver(TypeMapping codeMapping, Inferrer inferrer, Func<TypeMapping?> getMapping, TimeProvider? timeProvider = null, ILogger? logger = null)
         : this(getMapping, inferrer, timeProvider, logger)
+    {
+        _codeMapping = codeMapping;
+    }
+
+    public ElasticMappingResolver(TypeMapping codeMapping, Inferrer inferrer, Func<CancellationToken, Task<TypeMapping?>> getMappingAsync,
+        TimeProvider? timeProvider = null, ILogger? logger = null)
+        : this(getMappingAsync, inferrer, timeProvider, logger)
     {
         _codeMapping = codeMapping;
     }
@@ -74,7 +101,7 @@ public class ElasticMappingResolver : IDisposable
     /// bounded so an unresponsive cluster cannot pin request threads indefinitely. The mapping callback must
     /// enforce a shorter timeout and must not call back into this resolver.
     /// </remarks>
-    /// <exception cref="ArgumentOutOfRangeException">The value is negative or zero, or exceeds the maximum wait a semaphore accepts.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative or zero, or exceeds the supported maximum wait.</exception>
     public TimeSpan MappingRefreshWaitTimeout
     {
         get => _cache.RefreshWaitTimeout;
@@ -121,6 +148,27 @@ public class ElasticMappingResolver : IDisposable
         return ResolveMapping(field!, followAlias, snapshot);
     }
 
+    public ValueTask<FieldMapping?> GetMappingAsync(string? field, bool followAlias = false, CancellationToken cancellationToken = default)
+    {
+        if (String.IsNullOrWhiteSpace(field))
+            return ValueTask.FromResult<FieldMapping?>(null);
+
+        if (!_cache.HasServerMappingFunc && _codeMapping is null)
+            throw new InvalidOperationException("No mappings are available.");
+
+        var snapshot = _cache.Current;
+
+        if (snapshot.TryGetField(field!, out var cached))
+        {
+            if (_logger.IsEnabled(LogLevel.Trace))
+                _logger.LogTrace("Cached mapping: {Field}={FieldPath}:{FieldType}", field, cached.FullPath, cached.Property?.Type);
+
+            return FollowAliasAsync(cached, followAlias, cancellationToken);
+        }
+
+        return ResolveMappingAsync(field!, followAlias, snapshot, cancellationToken);
+    }
+
     private FieldMapping? ResolveMapping(string field, bool followAlias, MappingSnapshot snapshot)
     {
         var loadResult = MappingRefreshResult.Unavailable;
@@ -162,12 +210,58 @@ public class ElasticMappingResolver : IDisposable
         return resolved;
     }
 
+    private async ValueTask<FieldMapping?> ResolveMappingAsync(string field, bool followAlias, MappingSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        var loadResult = MappingRefreshResult.Unavailable;
+        bool hadFetchedSnapshot = snapshot.Fetched;
+
+        if (!hadFetchedSnapshot)
+        {
+            loadResult = await _cache.LoadInitialAsync(snapshot, cancellationToken).ConfigureAwait(false);
+            snapshot = _cache.Current;
+        }
+
+        var resolved = Resolve(field, snapshot);
+
+        if (!resolved.Found && hadFetchedSnapshot)
+        {
+            loadResult = await _cache.ReloadForMissingFieldAsync(snapshot, cancellationToken).ConfigureAwait(false);
+            if (loadResult == MappingRefreshResult.Updated)
+            {
+                snapshot = _cache.Current;
+                resolved = Resolve(field, snapshot);
+            }
+        }
+
+        snapshot.CacheField(resolved);
+
+        if (resolved.Found)
+        {
+            if (_logger.IsEnabled(LogLevel.Trace))
+                _logger.LogTrace("Resolved mapping: {Field}={FieldPath}:{FieldType}", field, resolved.FullPath, resolved.Property?.Type);
+
+            return await FollowAliasAsync(resolved, followAlias, cancellationToken).ConfigureAwait(false);
+        }
+
+        LogUnresolvedField(field, loadResult, snapshot);
+        return resolved;
+    }
+
     private FieldMapping? FollowAlias(FieldMapping mapping, bool followAlias)
     {
         if (!followAlias || mapping.Property is not FieldAliasProperty alias)
             return mapping;
 
         return GetMapping(alias.Path?.Name);
+    }
+
+    private ValueTask<FieldMapping?> FollowAliasAsync(FieldMapping mapping, bool followAlias, CancellationToken cancellationToken)
+    {
+        if (!followAlias || mapping.Property is not FieldAliasProperty alias)
+            return ValueTask.FromResult<FieldMapping?>(mapping);
+
+        return GetMappingAsync(alias.Path?.Name, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -255,6 +349,14 @@ public class ElasticMappingResolver : IDisposable
         return GetMapping(_inferrer.Field(field), followAlias);
     }
 
+    public ValueTask<FieldMapping?> GetMappingAsync(Field field, bool followAlias = false, CancellationToken cancellationToken = default)
+    {
+        if (_inferrer is null)
+            throw new InvalidOperationException("Unable to resolve Field without inferrer");
+
+        return GetMappingAsync(_inferrer.Field(field), followAlias, cancellationToken);
+    }
+
     public IProperty? GetMappingProperty(string? field, bool followAlias = false)
     {
         return GetMapping(field, followAlias)?.Property;
@@ -263,6 +365,16 @@ public class ElasticMappingResolver : IDisposable
     public IProperty? GetMappingProperty(Field field, bool followAlias = false)
     {
         return GetMapping(field, followAlias)?.Property;
+    }
+
+    public async ValueTask<IProperty?> GetMappingPropertyAsync(string? field, bool followAlias = false, CancellationToken cancellationToken = default)
+    {
+        return (await GetMappingAsync(field, followAlias, cancellationToken).ConfigureAwait(false))?.Property;
+    }
+
+    public async ValueTask<IProperty?> GetMappingPropertyAsync(Field field, bool followAlias = false, CancellationToken cancellationToken = default)
+    {
+        return (await GetMappingAsync(field, followAlias, cancellationToken).ConfigureAwait(false))?.Property;
     }
 
     public string? GetResolvedField(string? field)
@@ -279,6 +391,20 @@ public class ElasticMappingResolver : IDisposable
         return GetResolvedField(_inferrer.Field(field))!;
     }
 
+    public async ValueTask<string?> GetResolvedFieldAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        var result = await GetMappingAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        return result?.FullPath ?? field;
+    }
+
+    public async ValueTask<string> GetResolvedFieldAsync(Field field, CancellationToken cancellationToken = default)
+    {
+        if (_inferrer is null)
+            throw new InvalidOperationException("Unable to resolve Field without inferrer");
+
+        return (await GetResolvedFieldAsync(_inferrer.Field(field), cancellationToken).ConfigureAwait(false))!;
+    }
+
     public string? GetSortFieldName(string? field)
     {
         return GetNonAnalyzedFieldName(field, ElasticMapping.SortFieldName);
@@ -287,6 +413,17 @@ public class ElasticMappingResolver : IDisposable
     public string GetSortFieldName(Field field)
     {
         return GetNonAnalyzedFieldName(GetResolvedField(field), ElasticMapping.SortFieldName)!;
+    }
+
+    public ValueTask<string?> GetSortFieldNameAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        return GetNonAnalyzedFieldNameAsync(field, ElasticMapping.SortFieldName, cancellationToken);
+    }
+
+    public async ValueTask<string> GetSortFieldNameAsync(Field field, CancellationToken cancellationToken = default)
+    {
+        string resolved = await GetResolvedFieldAsync(field, cancellationToken).ConfigureAwait(false);
+        return (await GetNonAnalyzedFieldNameAsync(resolved, ElasticMapping.SortFieldName, cancellationToken).ConfigureAwait(false))!;
     }
 
     public string? GetAggregationsFieldName(string? field)
@@ -299,9 +436,26 @@ public class ElasticMappingResolver : IDisposable
         return GetNonAnalyzedFieldName(field, ElasticMapping.KeywordFieldName)!;
     }
 
+    public ValueTask<string?> GetAggregationsFieldNameAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        return GetNonAnalyzedFieldNameAsync(field, ElasticMapping.KeywordFieldName, cancellationToken);
+    }
+
+    public async ValueTask<string> GetAggregationsFieldNameAsync(Field field, CancellationToken cancellationToken = default)
+    {
+        return (await GetNonAnalyzedFieldNameAsync(field, ElasticMapping.KeywordFieldName, cancellationToken).ConfigureAwait(false))!;
+    }
+
     public string GetNonAnalyzedFieldName(Field field, string? preferredSubField = null)
     {
         return GetNonAnalyzedFieldName(GetResolvedField(field), preferredSubField)!;
+    }
+
+    public async ValueTask<string> GetNonAnalyzedFieldNameAsync(Field field, string? preferredSubField = null,
+        CancellationToken cancellationToken = default)
+    {
+        string resolved = await GetResolvedFieldAsync(field, cancellationToken).ConfigureAwait(false);
+        return (await GetNonAnalyzedFieldNameAsync(resolved, preferredSubField, cancellationToken).ConfigureAwait(false))!;
     }
 
     public string? GetNonAnalyzedFieldName(string? field, string? preferredSubField = null)
@@ -310,7 +464,21 @@ public class ElasticMappingResolver : IDisposable
             return field;
 
         var mapping = GetMapping(field, true);
+        return GetNonAnalyzedFieldName(field, mapping, preferredSubField);
+    }
 
+    public async ValueTask<string?> GetNonAnalyzedFieldNameAsync(string? field, string? preferredSubField = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (String.IsNullOrEmpty(field))
+            return field;
+
+        var mapping = await GetMappingAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        return GetNonAnalyzedFieldName(field, mapping, preferredSubField);
+    }
+
+    private string? GetNonAnalyzedFieldName(string? field, FieldMapping? mapping, string? preferredSubField)
+    {
         if (mapping?.Property is null || !IsPropertyAnalyzed(mapping.Property))
             return field;
 
@@ -339,6 +507,15 @@ public class ElasticMappingResolver : IDisposable
         return IsPropertyAnalyzed(property.Property!);
     }
 
+    public async ValueTask<bool> IsPropertyAnalyzedAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        if (String.IsNullOrEmpty(field))
+            return true;
+
+        var property = await GetMappingAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        return property is not null && property.Found && IsPropertyAnalyzed(property.Property!);
+    }
+
     public bool IsPropertyAnalyzed(IProperty property)
     {
         if (property is TextProperty textProperty)
@@ -355,6 +532,12 @@ public class ElasticMappingResolver : IDisposable
         return GetMappingProperty(field, true) is NestedProperty;
     }
 
+    public async ValueTask<bool> IsNestedPropertyTypeAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        return !String.IsNullOrEmpty(field)
+            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false) is NestedProperty;
+    }
+
     public bool IsGeoPropertyType(string? field)
     {
         if (String.IsNullOrEmpty(field))
@@ -363,12 +546,31 @@ public class ElasticMappingResolver : IDisposable
         return GetMappingProperty(field, true) is GeoPointProperty;
     }
 
+    public async ValueTask<bool> IsGeoPropertyTypeAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        return !String.IsNullOrEmpty(field)
+            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false) is GeoPointProperty;
+    }
+
     public bool IsNumericPropertyType(string? field)
     {
         if (String.IsNullOrEmpty(field))
             return false;
 
-        var property = GetMappingProperty(field, true);
+        return IsNumericProperty(GetMappingProperty(field, true));
+    }
+
+    public async ValueTask<bool> IsNumericPropertyTypeAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        if (String.IsNullOrEmpty(field))
+            return false;
+
+        var property = await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        return IsNumericProperty(property);
+    }
+
+    private static bool IsNumericProperty(IProperty? property)
+    {
         return property is ByteNumberProperty
             or DoubleNumberProperty
             or FloatNumberProperty
@@ -388,6 +590,12 @@ public class ElasticMappingResolver : IDisposable
         return GetMappingProperty(field, true) is BooleanProperty;
     }
 
+    public async ValueTask<bool> IsBooleanPropertyTypeAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        return !String.IsNullOrEmpty(field)
+            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false) is BooleanProperty;
+    }
+
     public bool IsDatePropertyType(string? field)
     {
         if (String.IsNullOrEmpty(field))
@@ -396,13 +604,31 @@ public class ElasticMappingResolver : IDisposable
         return GetMappingProperty(field, true) is DateProperty or DateNanosProperty;
     }
 
+    public async ValueTask<bool> IsDatePropertyTypeAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        return !String.IsNullOrEmpty(field)
+            && await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false) is DateProperty or DateNanosProperty;
+    }
+
     public FieldType GetFieldType(string? field)
     {
         if (String.IsNullOrWhiteSpace(field))
             return FieldType.None;
 
-        var property = GetMappingProperty(field, true);
+        return GetFieldType(GetMappingProperty(field, true));
+    }
 
+    public async ValueTask<FieldType> GetFieldTypeAsync(string? field, CancellationToken cancellationToken = default)
+    {
+        if (String.IsNullOrWhiteSpace(field))
+            return FieldType.None;
+
+        var property = await GetMappingPropertyAsync(field, followAlias: true, cancellationToken).ConfigureAwait(false);
+        return GetFieldType(property);
+    }
+
+    private static FieldType GetFieldType(IProperty? property)
+    {
         if (property?.Type is null)
             return FieldType.None;
 
@@ -579,31 +805,24 @@ public class ElasticMappingResolver : IDisposable
     public static ElasticMappingResolver Create<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, ILogger? logger = null) where T : class
     {
         logger ??= NullLogger.Instance;
-
-        return Create(mappingBuilder, client.Infer, () =>
-        {
-            var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
-            logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
-
-            // use first returned mapping because index could have been an index alias
-            var mapping = response.Mappings.Values.FirstOrDefault()?.Mappings;
-            return mapping;
-        }, logger);
+        var descriptor = new TypeMappingDescriptor<T>();
+        mappingBuilder(descriptor);
+        return new ElasticMappingResolver(descriptor, client.Infer,
+            () => GetServerMapping(client, new GetMappingRequest(Indices.Index<T>()), logger),
+            cancellationToken => GetServerMappingAsync(client, new GetMappingRequest(Indices.Index<T>()), logger, cancellationToken),
+            logger);
     }
 
     public static ElasticMappingResolver Create<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, string index, ILogger? logger = null) where T : class
     {
         logger ??= NullLogger.Instance;
 
-        return Create(mappingBuilder, client.Infer, () =>
-        {
-            var response = client.Indices.GetMapping(new GetMappingRequest(index));
-            logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
-
-            // use first returned mapping because index could have been an index alias
-            var mapping = response.Mappings.Values.FirstOrDefault()?.Mappings;
-            return mapping;
-        }, logger);
+        var descriptor = new TypeMappingDescriptor<T>();
+        mappingBuilder(descriptor);
+        return new ElasticMappingResolver(descriptor, client.Infer,
+            () => GetServerMapping(client, new GetMappingRequest(index), logger),
+            cancellationToken => GetServerMappingAsync(client, new GetMappingRequest(index), logger, cancellationToken),
+            logger);
     }
 
     public static ElasticMappingResolver Create<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer, Func<TypeMapping?> getMapping, ILogger? logger = null) where T : class
@@ -613,39 +832,65 @@ public class ElasticMappingResolver : IDisposable
         return new ElasticMappingResolver(descriptor, inferrer, getMapping, logger: logger);
     }
 
+    public static ElasticMappingResolver Create<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer,
+        Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, ILogger? logger = null) where T : class
+    {
+        var descriptor = new TypeMappingDescriptor<T>();
+        mappingBuilder(descriptor);
+        return new ElasticMappingResolver(descriptor, inferrer, getMappingAsync, logger: logger);
+    }
+
     public static ElasticMappingResolver Create<T>(ElasticsearchClient client, ILogger? logger = null)
     {
         logger ??= NullLogger.Instance;
 
-        return Create(() =>
-        {
-            var response = client.Indices.GetMapping(new GetMappingRequest(Indices.Index<T>()));
-            logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
-
-            // use first returned mapping because index could have been an index alias
-            var mapping = response.Mappings.Values.FirstOrDefault()?.Mappings;
-            return mapping;
-        }, client.Infer, logger);
+        return new ElasticMappingResolver(
+            () => GetServerMapping(client, new GetMappingRequest(Indices.Index<T>()), logger),
+            cancellationToken => GetServerMappingAsync(client, new GetMappingRequest(Indices.Index<T>()), logger, cancellationToken),
+            client.Infer, logger);
     }
 
     public static ElasticMappingResolver Create(ElasticsearchClient client, string index, ILogger? logger = null)
     {
         logger ??= NullLogger.Instance;
 
-        return Create(() =>
-        {
-            var response = client.Indices.GetMapping(new GetMappingRequest(index));
-            logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
-
-            // use first returned mapping because index could have been an index alias
-            var mapping = response.Mappings.Values.FirstOrDefault()?.Mappings;
-            return mapping;
-        }, client.Infer, logger);
+        return new ElasticMappingResolver(
+            () => GetServerMapping(client, new GetMappingRequest(index), logger),
+            cancellationToken => GetServerMappingAsync(client, new GetMappingRequest(index), logger, cancellationToken),
+            client.Infer, logger);
     }
 
     public static ElasticMappingResolver Create(Func<TypeMapping?> getMapping, Inferrer? inferrer, ILogger? logger = null)
     {
         return new ElasticMappingResolver(getMapping, inferrer, logger: logger);
+    }
+
+    public static ElasticMappingResolver Create(Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, Inferrer? inferrer = null,
+        ILogger? logger = null)
+    {
+        return new ElasticMappingResolver(getMappingAsync, inferrer, logger: logger);
+    }
+
+    private ElasticMappingResolver(TypeMapping codeMapping, Inferrer inferrer, Func<TypeMapping?> getMapping,
+        Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, ILogger? logger)
+        : this(getMapping, getMappingAsync, inferrer, logger)
+    {
+        _codeMapping = codeMapping;
+    }
+
+    private static TypeMapping? GetServerMapping(ElasticsearchClient client, GetMappingRequest request, ILogger logger)
+    {
+        var response = client.Indices.GetMapping(request);
+        logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
+        return response.Mappings.Values.FirstOrDefault()?.Mappings;
+    }
+
+    private static async Task<TypeMapping?> GetServerMappingAsync(ElasticsearchClient client, GetMappingRequest request, ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var response = await client.Indices.GetMappingAsync(request, cancellationToken).ConfigureAwait(false);
+        logger.LogTrace("GetMapping: {Request}", response.GetRequest(false, true));
+        return response.Mappings.Values.FirstOrDefault()?.Mappings;
     }
 
 

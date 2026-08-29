@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -331,6 +332,14 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
+    public ElasticQueryParserConfiguration UseMappings<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer,
+        Func<CancellationToken, Task<TypeMapping?>> getMappingAsync) where T : class
+    {
+        MappingResolver = ElasticMappingResolver.Create(mappingBuilder, inferrer, getMappingAsync, logger: _logger);
+
+        return this;
+    }
+
     public ElasticQueryParserConfiguration UseMappings<T>(ElasticsearchClient client)
     {
         MappingResolver = ElasticMappingResolver.Create<T>(client, logger: _logger);
@@ -348,6 +357,13 @@ public class ElasticQueryParserConfiguration
     public ElasticQueryParserConfiguration UseMappings(Func<TypeMapping?> getMapping, Inferrer? inferrer = null)
     {
         MappingResolver = ElasticMappingResolver.Create(getMapping, inferrer, logger: _logger);
+
+        return this;
+    }
+
+    public ElasticQueryParserConfiguration UseMappings(Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, Inferrer? inferrer = null)
+    {
+        MappingResolver = ElasticMappingResolver.Create(getMappingAsync, inferrer, logger: _logger);
 
         return this;
     }

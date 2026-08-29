@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
+using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Microsoft.Extensions.Logging;
 
@@ -18,21 +19,35 @@ namespace Foundatio.Parsers.ElasticQueries;
 internal sealed class MappingCache : IDisposable
 {
     private readonly Func<TypeMapping?>? _getServerMapping;
+    private readonly Func<CancellationToken, Task<TypeMapping?>>? _getServerMappingAsync;
     private readonly Func<TypeMapping?, MergedProperties?> _merge;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
-    private readonly SemaphoreSlim _loadSemaphore = new(1, 1);
-    private readonly object _publishLock = new();
+    private readonly object _stateLock = new();
+    private readonly CancellationTokenSource _lifetimeCancellation = new();
 
     private MappingSnapshot _snapshot;
+    private MappingLoadOperation? _inFlightLoad;
     private long _snapshotVersion;
     private long _lastLoadAttemptTimestamp;
     private int _hasLoadAttempt;
-    private volatile bool _disposed;
+    private bool _disposed;
 
     public MappingCache(Func<TypeMapping?>? getServerMapping, Func<TypeMapping?, MergedProperties?> merge, TimeProvider timeProvider, ILogger logger)
+        : this(getServerMapping, null, merge, timeProvider, logger)
+    {
+    }
+
+    public MappingCache(Func<CancellationToken, Task<TypeMapping?>>? getServerMappingAsync, Func<TypeMapping?, MergedProperties?> merge, TimeProvider timeProvider, ILogger logger)
+        : this(null, getServerMappingAsync, merge, timeProvider, logger)
+    {
+    }
+
+    public MappingCache(Func<TypeMapping?>? getServerMapping, Func<CancellationToken, Task<TypeMapping?>>? getServerMappingAsync,
+        Func<TypeMapping?, MergedProperties?> merge, TimeProvider timeProvider, ILogger logger)
     {
         _getServerMapping = getServerMapping;
+        _getServerMappingAsync = getServerMappingAsync;
         _merge = merge;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -43,11 +58,12 @@ internal sealed class MappingCache : IDisposable
 
     /// <summary>
     /// How long a load waits to join one already in flight. Validated by the resolver to be positive and
-    /// within the range <see cref="SemaphoreSlim"/> accepts, so it is passed through unclamped.
+    /// within the range <see cref="Task.WaitAsync(TimeSpan, CancellationToken)"/> accepts, so it is passed
+    /// through unclamped.
     /// </summary>
     public TimeSpan RefreshWaitTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
-    public bool HasServerMappingFunc => _getServerMapping is not null;
+    public bool HasServerMappingFunc => _getServerMapping is not null || _getServerMappingAsync is not null;
 
     /// <summary>The currently published mapping. Never null; read without locking.</summary>
     public MappingSnapshot Current => Volatile.Read(ref _snapshot);
@@ -58,7 +74,7 @@ internal sealed class MappingCache : IDisposable
     /// </summary>
     public void Reset()
     {
-        lock (_publishLock)
+        lock (_stateLock)
         {
             ClearThrottle();
             Volatile.Write(ref _snapshot, CreateSnapshot(null, fetched: false));
@@ -79,6 +95,9 @@ internal sealed class MappingCache : IDisposable
     /// </summary>
     public MappingRefreshResult LoadInitial(MappingSnapshot observedSnapshot) => Load(observedSnapshot, armThrottleOnSuccess: false);
 
+    public ValueTask<MappingRefreshResult> LoadInitialAsync(MappingSnapshot observedSnapshot, CancellationToken cancellationToken = default) =>
+        LoadAsync(observedSnapshot, armThrottleOnSuccess: false, cancellationToken);
+
     /// <summary>
     /// Reloads the mapping because a field could not be resolved from the loaded one. A resolution failure is
     /// the strongest available signal that the mapping changed, but it is also caller-triggered, so it is rate
@@ -86,100 +105,254 @@ internal sealed class MappingCache : IDisposable
     /// </summary>
     public MappingRefreshResult ReloadForMissingField(MappingSnapshot observedSnapshot) => Load(observedSnapshot, armThrottleOnSuccess: true);
 
+    public ValueTask<MappingRefreshResult> ReloadForMissingFieldAsync(MappingSnapshot observedSnapshot, CancellationToken cancellationToken = default) =>
+        LoadAsync(observedSnapshot, armThrottleOnSuccess: true, cancellationToken);
+
     private MappingRefreshResult Load(MappingSnapshot observedSnapshot, bool armThrottleOnSuccess)
     {
-        var getServerMapping = _getServerMapping;
-        if (getServerMapping is null || _disposed)
-            return MappingRefreshResult.Unavailable;
-
-        if (HasNewerMapping(observedSnapshot.Version))
-            return MappingRefreshResult.Updated;
-
-        bool acquired;
-        try
+        while (true)
         {
-            // Wait for an in-flight load rather than continuing with a stale mapping or issuing a second
-            // fetch. That load is exactly the work this resolution needs, so waiting is never more expensive
-            // than doing it here. With no load in flight this acquires immediately. The wait is bounded
-            // because the callback is user supplied and does blocking network I/O, and an unresponsive
-            // cluster must not pin request threads forever.
-            acquired = _loadSemaphore.Wait(RefreshWaitTimeout);
-        }
-        catch (ObjectDisposedException)
-        {
-            return MappingRefreshResult.Unavailable;
-        }
+            if (!TryGetOrCreateLoad(observedSnapshot, armThrottleOnSuccess, preferAsync: false,
+                out var operation, out bool isOwner, out var immediateResult))
+                return immediateResult;
 
-        if (!acquired)
-        {
-            // The in-flight load may have published while we were giving up, in which case adopt it.
-            return HasNewerMapping(observedSnapshot.Version) ? MappingRefreshResult.Updated : MappingRefreshResult.WaitTimedOut;
-        }
+            if (isOwner)
+                StartLoad(operation!);
 
-        try
-        {
-            // Another caller published while we waited, so adopt its result rather than refetching. A snapshot
-            // that has not been fetched means Reset() ran while we waited, so we still have to load.
-            if (HasNewerMapping(observedSnapshot.Version))
-                return MappingRefreshResult.Updated;
-
-            // The throttle only gates issuing a new fetch; a caller whose field is missing still joins any
-            // load that was already running above.
-            if (!IsLoadAllowed())
-                return MappingRefreshResult.Throttled;
-
-            return Fetch(getServerMapping, armThrottleOnSuccess, Current.Version);
-        }
-        finally
-        {
-            try
+            MappingRefreshResult result;
+            if (isOwner)
             {
-                _loadSemaphore.Release();
+                result = operation!.Task.GetAwaiter().GetResult();
             }
-            catch (ObjectDisposedException)
+            else if (!operation!.Task.Wait(RefreshWaitTimeout))
             {
-                // the resolver was disposed while the user supplied callback was running
+                return HasNewerMapping(observedSnapshot.Version) ? MappingRefreshResult.Updated : MappingRefreshResult.WaitTimedOut;
             }
+            else
+            {
+                result = operation.Task.GetAwaiter().GetResult();
+            }
+
+            if (result != MappingRefreshResult.Superseded)
+                return result;
+
+            if (observedSnapshot.Version == operation.ExpectedVersion)
+                return MappingRefreshResult.Unavailable;
+
+            observedSnapshot = Current;
+            armThrottleOnSuccess = armThrottleOnSuccess && observedSnapshot.Fetched;
         }
     }
 
-    private MappingRefreshResult Fetch(Func<TypeMapping?> getServerMapping, bool armThrottleOnSuccess, long expectedVersion)
+    private ValueTask<MappingRefreshResult> LoadAsync(MappingSnapshot observedSnapshot, bool armThrottleOnSuccess, CancellationToken cancellationToken)
     {
-        TypeMapping? newMapping;
+        if (!TryGetOrCreateLoad(observedSnapshot, armThrottleOnSuccess, preferAsync: true,
+            out var operation, out bool isOwner, out var immediateResult))
+            return ValueTask.FromResult(immediateResult);
+
+        if (isOwner)
+            StartLoad(operation!);
+
+        if (operation!.Task.IsCompletedSuccessfully)
+        {
+            if (operation.Task.Result != MappingRefreshResult.Superseded)
+                return ValueTask.FromResult(operation.Task.Result);
+
+            if (observedSnapshot.Version == operation.ExpectedVersion)
+                return ValueTask.FromResult(MappingRefreshResult.Unavailable);
+
+            var snapshot = Current;
+            return LoadAsync(snapshot, armThrottleOnSuccess && snapshot.Fetched, cancellationToken);
+        }
+
+        return AwaitLoadAsync(operation, isOwner, observedSnapshot.Version, armThrottleOnSuccess, cancellationToken);
+    }
+
+    private async ValueTask<MappingRefreshResult> AwaitLoadAsync(MappingLoadOperation operation, bool isOwner,
+        long observedVersion, bool armThrottleOnSuccess, CancellationToken cancellationToken)
+    {
+        MappingRefreshResult result;
         try
         {
-            newMapping = getServerMapping();
+            result = isOwner
+                ? await operation.Task.WaitAsync(cancellationToken).ConfigureAwait(false)
+                : await operation.Task.WaitAsync(RefreshWaitTimeout, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        catch (TimeoutException)
         {
-            // Record the attempt so a failing cluster is not retried for every unresolved field. The mapping
-            // is deliberately left unfetched so a failed cold start is retried once the interval elapses.
-            RecordAttemptUnlessSuperseded(expectedVersion);
-            _logger.LogError(ex, "Error getting server mapping: {Message}", ex.Message);
+            return HasNewerMapping(observedVersion) ? MappingRefreshResult.Updated : MappingRefreshResult.WaitTimedOut;
+        }
+
+        if (result != MappingRefreshResult.Superseded)
+            return result;
+
+        if (observedVersion == operation.ExpectedVersion)
             return MappingRefreshResult.Unavailable;
+
+        var snapshot = Current;
+        return await LoadAsync(snapshot, armThrottleOnSuccess && snapshot.Fetched, cancellationToken).ConfigureAwait(false);
+    }
+
+    private bool TryGetOrCreateLoad(MappingSnapshot observedSnapshot, bool armThrottleOnSuccess, bool preferAsync,
+        out MappingLoadOperation? operation, out bool isOwner, out MappingRefreshResult result)
+    {
+        lock (_stateLock)
+        {
+            operation = null;
+            isOwner = false;
+
+            if ((_getServerMapping is null && _getServerMappingAsync is null) || _disposed)
+            {
+                result = MappingRefreshResult.Unavailable;
+                return false;
+            }
+
+            if (HasNewerMapping(observedSnapshot.Version))
+            {
+                result = MappingRefreshResult.Updated;
+                return false;
+            }
+
+            if (_inFlightLoad is not null)
+            {
+                operation = _inFlightLoad;
+                result = default;
+                return true;
+            }
+
+            if (!IsLoadAllowed())
+            {
+                result = MappingRefreshResult.Throttled;
+                return false;
+            }
+
+            operation = new MappingLoadOperation(Current.Version, armThrottleOnSuccess, preferAsync);
+            _inFlightLoad = operation;
+            isOwner = true;
+            result = default;
+            return true;
+        }
+    }
+
+    private void StartLoad(MappingLoadOperation operation)
+    {
+        if (operation.PreferAsync && _getServerMappingAsync is not null)
+        {
+            _ = FetchAsync(operation);
+            return;
         }
 
-        if (newMapping is null)
+        if (!operation.PreferAsync && _getServerMapping is not null)
         {
-            // Keep the last known good mapping and its resolved fields rather than regressing to no mapping.
-            RecordAttemptUnlessSuperseded(expectedVersion);
-            return MappingRefreshResult.Unavailable;
+            Fetch(operation);
+            return;
         }
 
-        lock (_publishLock)
+        if (_getServerMappingAsync is not null)
         {
-            // A Reset() during the fetch means this result may predate the change the caller knows about, so
-            // discard it and let the next resolution load again.
-            if (Current.Version != expectedVersion)
-                return MappingRefreshResult.Unavailable;
+            _ = FetchAsync(operation);
+            return;
+        }
 
-            Volatile.Write(ref _snapshot, CreateSnapshot(newMapping, fetched: true));
-            if (armThrottleOnSuccess)
+        Fetch(operation);
+    }
+
+    private void Fetch(MappingLoadOperation operation)
+    {
+        TypeMapping? mapping;
+        try
+        {
+            mapping = _getServerMapping!();
+        }
+        catch (Exception ex)
+        {
+            if (ex is OutOfMemoryException or StackOverflowException)
+            {
+                CompleteFaultedLoad(operation, ex);
+                return;
+            }
+
+            CompleteFailedLoad(operation, ex);
+            return;
+        }
+
+        CompleteLoad(operation, mapping);
+    }
+
+    private async Task FetchAsync(MappingLoadOperation operation)
+    {
+        TypeMapping? mapping;
+        try
+        {
+            mapping = await _getServerMappingAsync!(_lifetimeCancellation.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            if (ex is OutOfMemoryException or StackOverflowException)
+            {
+                CompleteFaultedLoad(operation, ex);
+                return;
+            }
+
+            CompleteFailedLoad(operation, ex);
+            return;
+        }
+
+        CompleteLoad(operation, mapping);
+    }
+
+    private void CompleteFailedLoad(MappingLoadOperation operation, Exception exception)
+    {
+        FinalizeLoad(operation, null);
+        if (exception is not OperationCanceledException || !_lifetimeCancellation.IsCancellationRequested)
+            _logger.LogError(exception, "Error getting server mapping: {Message}", exception.Message);
+    }
+
+    private void CompleteLoad(MappingLoadOperation operation, TypeMapping? mapping)
+    {
+        FinalizeLoad(operation, mapping);
+    }
+
+    private void CompleteFaultedLoad(MappingLoadOperation operation, Exception exception)
+    {
+        lock (_stateLock)
+        {
+            operation.SetException(exception);
+            if (ReferenceEquals(_inFlightLoad, operation))
+                _inFlightLoad = null;
+        }
+    }
+
+    private void FinalizeLoad(MappingLoadOperation operation, TypeMapping? mapping)
+    {
+        MappingRefreshResult result;
+
+        lock (_stateLock)
+        {
+            if (_disposed || Current.Version != operation.ExpectedVersion)
+            {
+                result = MappingRefreshResult.Superseded;
+            }
+            else if (mapping is null)
+            {
                 RecordLoadAttempt();
+                result = MappingRefreshResult.Unavailable;
+            }
+            else
+            {
+                Volatile.Write(ref _snapshot, CreateSnapshot(mapping, fetched: true));
+                if (operation.ArmThrottleOnSuccess)
+                    RecordLoadAttempt();
+                result = MappingRefreshResult.Updated;
+            }
+
+            operation.SetResult(result);
+            if (ReferenceEquals(_inFlightLoad, operation))
+                _inFlightLoad = null;
         }
 
-        _logger.LogInformation("Got server mapping");
-        return MappingRefreshResult.Updated;
+        if (result == MappingRefreshResult.Updated)
+            _logger.LogInformation("Got server mapping");
     }
 
     private bool HasNewerMapping(long version)
@@ -190,29 +363,14 @@ internal sealed class MappingCache : IDisposable
 
     private bool IsLoadAllowed()
     {
-        // A separate flag rather than a timestamp sentinel: TimeProvider.GetTimestamp can legitimately return
-        // zero, and nudging the stored value off zero would shorten the very first interval.
-        return Volatile.Read(ref _hasLoadAttempt) == 0
-            || _timeProvider.GetElapsedTime(Interlocked.Read(ref _lastLoadAttemptTimestamp)) >= UnmappedFieldRefreshInterval;
-    }
-
-    /// <summary>
-    /// Arms the throttle unless an explicit refresh landed during the fetch, in which case the caller asked
-    /// for a reload after this attempt started and must not be made to wait out an interval for it.
-    /// </summary>
-    private void RecordAttemptUnlessSuperseded(long expectedVersion)
-    {
-        lock (_publishLock)
-        {
-            if (Current.Version == expectedVersion)
-                RecordLoadAttempt();
-        }
+        return _hasLoadAttempt == 0
+            || _timeProvider.GetElapsedTime(_lastLoadAttemptTimestamp) >= UnmappedFieldRefreshInterval;
     }
 
     private void RecordLoadAttempt()
     {
-        Interlocked.Exchange(ref _lastLoadAttemptTimestamp, _timeProvider.GetTimestamp());
-        Volatile.Write(ref _hasLoadAttempt, 1);
+        _lastLoadAttemptTimestamp = _timeProvider.GetTimestamp();
+        _hasLoadAttempt = 1;
     }
 
     private MappingSnapshot CreateSnapshot(TypeMapping? serverMapping, bool fetched)
@@ -223,11 +381,35 @@ internal sealed class MappingCache : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
+        lock (_stateLock)
+            _disposed = true;
 
-        _disposed = true;
-        _loadSemaphore.Dispose();
+        _lifetimeCancellation.Cancel();
+    }
+
+    private sealed class MappingLoadOperation
+    {
+        private readonly TaskCompletionSource<MappingRefreshResult> _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public MappingLoadOperation(long expectedVersion, bool armThrottleOnSuccess, bool preferAsync)
+        {
+            ExpectedVersion = expectedVersion;
+            ArmThrottleOnSuccess = armThrottleOnSuccess;
+            PreferAsync = preferAsync;
+        }
+
+        public long ExpectedVersion { get; }
+
+        public bool ArmThrottleOnSuccess { get; }
+
+        public bool PreferAsync { get; }
+
+        public Task<MappingRefreshResult> Task => _completion.Task;
+
+        public void SetResult(MappingRefreshResult result) => _completion.TrySetResult(result);
+
+        public void SetException(Exception exception) => _completion.TrySetException(exception);
     }
 }
 
@@ -279,5 +461,6 @@ internal enum MappingRefreshResult
     Unavailable,
     Throttled,
     WaitTimedOut,
+    Superseded,
     Updated
 }

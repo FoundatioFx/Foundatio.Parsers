@@ -40,6 +40,12 @@ public static class DefaultQueryNodeExtensions
         string? field = node.UnescapedField;
         string[]? defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
 
+        if (String.IsNullOrEmpty(field) && defaultFields is not null)
+        {
+            foreach (string defaultField in defaultFields)
+                await elasticContext.MappingResolver.GetMappingAsync(defaultField).ConfigureAwait(false);
+        }
+
         // If a specific field is set, use single-field query
         if (!String.IsNullOrEmpty(field))
             return GetSingleFieldQuery(node, field, elasticContext);
