@@ -378,8 +378,10 @@ to reload the mapping.
 
 Fields that cannot be resolved reload the mapping on their own short interval
 (`UnmappedFieldRefreshInterval`, default 5 seconds) because that is how dynamically created fields become
-visible. Concurrent reload attempts are coalesced into a single server mapping fetch per resolver. Raise the
-interval if a workload legitimately queries many non-existent fields:
+visible. Concurrent reload attempts are coalesced into a single server mapping fetch per resolver. Under
+continuous misses, the default permits about 12 automatic attempts per minute for each resolver in each
+process; cold starts and explicit `RefreshMapping()` calls are outside that ceiling. Raise the interval if a
+workload legitimately queries many non-existent fields:
 
 ```csharp
 resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(30);

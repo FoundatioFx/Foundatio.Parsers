@@ -18,23 +18,32 @@ public class NestedVisitor : ChainableQueryVisitor
         _filterResolver = filterResolver;
     }
 
-    public override Task VisitAsync(GroupNode node, IQueryVisitorContext context)
+    public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
         if (String.IsNullOrEmpty(node.Field))
-            return base.VisitAsync(node, context);
+        {
+            await base.VisitAsync(node, context).AnyContext();
+            return;
+        }
 
-        string? nestedProperty = GetNestedProperty(node.Field, context);
+        string? nestedProperty = await GetNestedPropertyAsync(node.Field, context).AnyContext();
         if (nestedProperty is null)
-            return base.VisitAsync(node, context);
+        {
+            await base.VisitAsync(node, context).AnyContext();
+            return;
+        }
 
         node.SetNestedPath(nestedProperty);
         if (context.QueryType is not QueryTypes.Aggregation and not QueryTypes.Sort)
             node.SetQuery(new NestedQuery { Path = nestedProperty, Query = new MatchAllQuery() });
 
         if (_filterResolver is not null)
-            return VisitGroupWithFilterAsync(node, nestedProperty, context);
+        {
+            await VisitGroupWithFilterAsync(node, nestedProperty, context).AnyContext();
+            return;
+        }
 
-        return base.VisitAsync(node, context);
+        await base.VisitAsync(node, context).AnyContext();
     }
 
     private async Task VisitGroupWithFilterAsync(GroupNode node, string nestedProperty, IQueryVisitorContext context)
@@ -75,28 +84,29 @@ public class NestedVisitor : ChainableQueryVisitor
         return HandleNestedFieldNodeAsync(node, context);
     }
 
-    private Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
+    private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
     {
-        string? nestedProperty = GetNestedProperty(node.Field, context);
+        string? nestedProperty = await GetNestedPropertyAsync(node.Field, context).AnyContext();
         if (nestedProperty is null)
-            return Task.CompletedTask;
+            return;
 
         if (IsInsideMatchingNestedGroup(node, nestedProperty))
-            return Task.CompletedTask;
+            return;
 
         if (_filterResolver is not null)
-            return HandleNestedFieldWithFilterAsync(node, nestedProperty, context);
+        {
+            await HandleNestedFieldWithFilterAsync(node, nestedProperty, context).AnyContext();
+            return;
+        }
 
         if (context.QueryType is QueryTypes.Aggregation or QueryTypes.Sort)
         {
             node.SetNestedPath(nestedProperty);
-            return Task.CompletedTask;
+            return;
         }
 
         if (context.QueryType is QueryTypes.Query)
-            return WrapInNestedQueryAsync(node, nestedProperty, context);
-
-        return Task.CompletedTask;
+            await WrapInNestedQueryAsync(node, nestedProperty, context).AnyContext();
     }
 
     private async Task HandleNestedFieldWithFilterAsync(IFieldQueryNode node, string nestedProperty, IQueryVisitorContext context)
@@ -152,11 +162,12 @@ public class NestedVisitor : ChainableQueryVisitor
         return false;
     }
 
-    private static string? GetNestedProperty(string? fullName, IQueryVisitorContext context)
+    private static async ValueTask<string?> GetNestedPropertyAsync(string? fullName, IQueryVisitorContext context)
     {
-        if (fullName is null || context is not IElasticQueryVisitorContext elasticContext)
+        if (fullName is null || context is not IElasticQueryVisitorContext)
             return null;
 
-        return NestedPathResolver.GetDeepestNestedPath(fullName, elasticContext.MappingResolver);
+        await context.GetMappingResultAsync(fullName).AnyContext();
+        return NestedPathResolver.GetDeepestNestedPath(fullName, context);
     }
 }

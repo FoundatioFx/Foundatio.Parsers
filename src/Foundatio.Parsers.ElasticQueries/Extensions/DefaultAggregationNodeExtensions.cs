@@ -56,11 +56,13 @@ public static class DefaultAggregationNodeExtensions
         if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left is not null)
             return null;
 
-        string? field = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        var mapping = await context.GetMappingResultAsync(node.UnescapedField).AnyContext();
+        string? field = elasticContext.MappingResolver.GetNonAnalyzedFieldName(
+            node.UnescapedField, mapping, ElasticMapping.KeywordFieldName);
         if (field is null)
             return null;
 
-        var property = elasticContext.MappingResolver.GetMappingProperty(field, true);
+        var property = (await context.GetMappingResultAsync(field).AnyContext())?.Property;
         string? originalField = node.GetOriginalField().Unescape();
 
         switch (node.GetOperationType())
@@ -123,11 +125,13 @@ public static class DefaultAggregationNodeExtensions
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        string? aggField = elasticContext.MappingResolver.GetAggregationsFieldName(node.UnescapedField);
+        var mapping = await context.GetMappingResultAsync(node.UnescapedField).AnyContext();
+        string? aggField = elasticContext.MappingResolver.GetNonAnalyzedFieldName(
+            node.UnescapedField, mapping, ElasticMapping.KeywordFieldName);
         if (aggField is null)
             return null;
 
-        var property = elasticContext.MappingResolver.GetMappingProperty(node.UnescapedField, true);
+        var property = mapping?.Property;
         string? timezone = !String.IsNullOrWhiteSpace(node.UnescapedBoost) ? node.UnescapedBoost : node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext());
         string? originalField = node.GetOriginalField().Unescape();
 

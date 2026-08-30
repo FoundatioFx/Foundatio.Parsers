@@ -74,11 +74,16 @@ internal sealed class MappingCache : IDisposable
     /// </summary>
     public void Reset()
     {
+        MappingLoadOperation? supersededLoad;
         lock (_stateLock)
         {
+            supersededLoad = _inFlightLoad;
+            _inFlightLoad = null;
             ClearThrottle();
             Volatile.Write(ref _snapshot, CreateSnapshot(null, fetched: false));
         }
+
+        supersededLoad?.SetResult(MappingRefreshResult.Superseded);
     }
 
     /// <summary>Clears the load throttle so the next resolution that needs a mapping can load immediately.</summary>
@@ -146,6 +151,9 @@ internal sealed class MappingCache : IDisposable
 
     private ValueTask<MappingRefreshResult> LoadAsync(MappingSnapshot observedSnapshot, bool armThrottleOnSuccess, CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return ValueTask.FromCanceled<MappingRefreshResult>(cancellationToken);
+
         if (!TryGetOrCreateLoad(observedSnapshot, armThrottleOnSuccess, preferAsync: true,
             out var operation, out bool isOwner, out var immediateResult))
             return ValueTask.FromResult(immediateResult);
@@ -238,7 +246,13 @@ internal sealed class MappingCache : IDisposable
     {
         if (operation.PreferAsync && _getServerMappingAsync is not null)
         {
-            _ = FetchAsync(operation);
+            // AnyContext protects continuations owned by this library, but an async loader can still capture the
+            // caller's context before it returns its Task. Isolate that boundary when a synchronous caller could
+            // otherwise block the only thread while joining this shared load.
+            if (SynchronizationContext.Current is not null || TaskScheduler.Current != TaskScheduler.Default)
+                _ = Task.Run(() => FetchAsync(operation));
+            else
+                _ = FetchAsync(operation);
             return;
         }
 
@@ -454,7 +468,7 @@ internal sealed class MappingSnapshot
     /// </summary>
     public void CacheField(FieldMapping mapping)
     {
-        if (mapping.Found)
+        if (Fetched && mapping.Found)
             _fields.TryAdd(mapping.FullPath, mapping);
     }
 }

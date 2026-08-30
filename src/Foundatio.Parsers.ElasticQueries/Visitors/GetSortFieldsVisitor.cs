@@ -11,6 +11,16 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<ICollection<SortOptions>>
 {
     private readonly List<SortOptions> _fields = new();
+    private readonly bool _resolveMappingsAsync;
+
+    public GetSortFieldsVisitor() : this(resolveMappingsAsync: true)
+    {
+    }
+
+    private GetSortFieldsVisitor(bool resolveMappingsAsync)
+    {
+        _resolveMappingsAsync = resolveMappingsAsync;
+    }
 
     public override void Visit(TermNode node, IQueryVisitorContext context)
     {
@@ -22,6 +32,24 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<ICollection<S
             return;
 
         // Check if the sort has a valid Field property set (discriminated union)
+        if (sort.Field is null && sort.GeoDistance is null && sort.Score is null && sort.Script is null)
+            return;
+
+        _fields.Add(sort);
+    }
+
+    public override async Task VisitAsync(TermNode node, IQueryVisitorContext context)
+    {
+        if (!_resolveMappingsAsync)
+        {
+            Visit(node, context);
+            return;
+        }
+
+        if (String.IsNullOrEmpty(node.Field))
+            return;
+
+        var sort = node.GetSort() ?? await node.GetDefaultSortAsync(context).AnyContext();
         if (sort.Field is null && sort.GeoDistance is null && sort.Score is null && sort.Script is null)
             return;
 
@@ -42,6 +70,7 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<ICollection<S
 
     public static ICollection<SortOptions> Run(IQueryNode node, IQueryVisitorContext? context = null)
     {
-        return RunAsync(node, context).GetAwaiter().GetResult();
+        context ??= new QueryVisitorContext();
+        return new GetSortFieldsVisitor(resolveMappingsAsync: false).AcceptAsync(node, context).GetAwaiter().GetResult();
     }
 }

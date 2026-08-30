@@ -7,20 +7,26 @@ namespace Foundatio.Parsers.ElasticQueries;
 public class FieldMapping
 {
     public FieldMapping(string path, IProperty? property, DateTime? serverMapTime, long epoch = 0)
-        : this(path, property, (MergedProperties?)null)
+        : this(path, property, null, null)
     {
     }
 
     internal FieldMapping(string path, IProperty? property)
-        : this(path, property, (MergedProperties?)null)
+        : this(path, property, null, null)
     {
     }
 
     internal FieldMapping(string path, IProperty? property, MergedProperties? children)
+        : this(path, property, children, null)
+    {
+    }
+
+    internal FieldMapping(string path, IProperty? property, MergedProperties? children, IReadOnlyList<string>? nestedPathChain)
     {
         FullPath = path;
         Property = property;
         Children = children;
+        NestedPathChain = nestedPathChain ?? Array.Empty<string>();
     }
 
     public bool Found => Property is not null;
@@ -33,6 +39,10 @@ public class FieldMapping
     /// not have to walk the mapping again.
     /// </summary>
     internal MergedProperties? Children { get; }
+
+    /// <summary>Nested ancestors encountered while resolving <see cref="FullPath"/>, outermost first.</summary>
+    internal IReadOnlyList<string> NestedPathChain { get; }
+
 }
 
 /// <summary>A name-indexed merged view of the code and server properties at one mapping level.</summary>

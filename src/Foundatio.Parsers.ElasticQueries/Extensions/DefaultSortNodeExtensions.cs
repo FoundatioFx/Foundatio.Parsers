@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
@@ -18,8 +19,25 @@ public static class DefaultSortNodeExtensions
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
-        string? field = elasticContext.MappingResolver.GetSortFieldName(node.UnescapedField);
-        var fieldType = elasticContext.MappingResolver.GetFieldType(field);
+        var mapping = context.GetMappingResult(node.UnescapedField);
+        return GetDefaultSort(node, context, elasticContext, mapping);
+    }
+
+    internal static async Task<SortOptions> GetDefaultSortAsync(this TermNode node, IQueryVisitorContext context)
+    {
+        if (context is not IElasticQueryVisitorContext elasticContext)
+            throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+        var mapping = await context.GetMappingResultAsync(node.UnescapedField).AnyContext();
+        return GetDefaultSort(node, context, elasticContext, mapping);
+    }
+
+    private static SortOptions GetDefaultSort(TermNode node, IQueryVisitorContext visitorContext,
+        IElasticQueryVisitorContext elasticContext, FieldMapping? mapping)
+    {
+        string? field = elasticContext.MappingResolver.GetNonAnalyzedFieldName(
+            node.UnescapedField, mapping, ElasticMapping.SortFieldName);
+        var fieldType = ElasticMappingResolver.GetFieldType(visitorContext.GetMappingResult(field)?.Property);
 
         if (fieldType == FieldType.GeoPoint && !String.IsNullOrEmpty(node.UnescapedTerm))
             return GetGeoDistanceSort(node, elasticContext, field!)!;
@@ -33,7 +51,7 @@ public static class DefaultSortNodeExtensions
         string? nestedPath = node.GetNestedPath();
         if (nestedPath is not null)
         {
-            fieldSort.Nested = BuildHierarchicalNestedSort(nestedPath, node.GetNestedFilter(), elasticContext);
+            fieldSort.Nested = BuildHierarchicalNestedSort(nestedPath, node.GetNestedFilter(), visitorContext);
         }
 
         return new SortOptions
@@ -78,9 +96,9 @@ public static class DefaultSortNodeExtensions
     }
 
     private static NestedSortValue BuildHierarchicalNestedSort(
-        string deepestPath, Query? filter, IElasticQueryVisitorContext context)
+        string deepestPath, Query? filter, IQueryVisitorContext context)
     {
-        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, context.MappingResolver);
+        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, context);
 
         if (nestedPaths.Count <= 1)
         {

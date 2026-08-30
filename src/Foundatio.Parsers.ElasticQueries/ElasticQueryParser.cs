@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -39,6 +40,7 @@ public class ElasticQueryParser : LuceneQueryParser
         query ??= String.Empty;
         context ??= new ElasticQueryVisitorContext();
 
+        context.ResetMappingResults();
         SetupQueryVisitorContextDefaults(context);
         try
         {
@@ -152,13 +154,27 @@ public class ElasticQueryParser : LuceneQueryParser
 
         // try to find Elasticsearch mapping
         // TODO: Need to test how runtime mappings defined on the server are handled
-        // TODO: Mark fields resolved so that we don't try to do lookups multiple times
 
         if (elasticContext.MappingResolver is not null)
         {
-            var resolvedField = await elasticContext.MappingResolver.GetMappingAsync(field).AnyContext();
-            if (resolvedField?.Found is true)
-                return resolvedField.FullPath;
+            string mappingField = field.Unescape() ?? field;
+            if (context.TryGetMappingResult(mappingField, out var cachedMapping))
+            {
+                if (cachedMapping?.Found is true && context.TryGetResolvedMappingField(mappingField, out string? cachedField))
+                    return cachedField;
+            }
+            else
+            {
+                var resolvedField = await elasticContext.MappingResolver.GetMappingAsync(mappingField).AnyContext();
+                var effectiveMapping = resolvedField;
+                if (resolvedField?.Property is FieldAliasProperty)
+                    effectiveMapping = await elasticContext.MappingResolver.GetMappingAsync(mappingField, followAlias: true).AnyContext();
+
+                context.SetMappingResult(mappingField, effectiveMapping, resolvedField?.FullPath);
+                context.SetMappingResult(field, effectiveMapping, resolvedField?.FullPath);
+                if (resolvedField?.Found is true)
+                    return resolvedField.FullPath;
+            }
         }
 
         // try to resolve from the list of runtime fields that are defined for this query

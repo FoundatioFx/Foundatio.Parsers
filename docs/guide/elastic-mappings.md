@@ -316,8 +316,11 @@ resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(30);
 
 ### Waiting For An In-Flight Reload
 
-Only one mapping reload runs at a time. Other resolutions that need a fresh mapping wait for that reload
-rather than issuing their own. If the wait exceeds `MappingRefreshWaitTimeout`, the resolution gives up and
+Only one automatic mapping reload runs at a time. Other resolutions that need a fresh mapping wait for that
+reload rather than issuing their own. An explicit `RefreshMapping()` supersedes an obsolete in-flight load,
+so the next resolution can fetch the replacement mapping without waiting for the old callback to drain. That
+hard-invalidation case can temporarily overlap the obsolete physical callback. If the wait exceeds
+`MappingRefreshWaitTimeout`, the resolution gives up and
 treats the field as unmapped, and a warning is logged. A single resolution joins at most once; it does not
 repeat the same wait as both an initial load and a miss-driven reload.
 
@@ -363,8 +366,10 @@ that path for ordinary custom-field saves.
 
 Successful resolutions are cached by canonical field path for the lifetime of the mapping snapshot, which
 keeps the cache bounded by the mapping itself no matter how many distinct spellings callers ask for.
-Unknown field names are not cached, so caller-controlled misses cannot grow process state. Reloading the
-mapping publishes a new snapshot and atomically discards resolutions derived from the old one.
+Unknown field names are not cached in the long-lived snapshot, so caller-controlled misses cannot grow
+process state. A parser operation remembers its own positive and negative resolutions only until that parse
+finishes, preventing downstream visitors from repeating the same network-backed lookup. Reloading the mapping
+publishes a new snapshot and atomically discards resolutions derived from the old one.
 
 The built-in client factories expect one concrete index, or a target whose indices have equivalent mappings.
 They do not merge heterogeneous mappings from rollover aliases or data streams.
@@ -395,6 +400,11 @@ blocks. A synchronous `Parse` call made under a custom synchronization context o
 isolates the compatibility call; server request paths should use the asynchronous resolver and parser APIs.
 The built-in Elasticsearch client factories supply both forms: asynchronous parser paths call
 `Indices.GetMappingAsync`, while synchronous resolver calls retain `Indices.GetMapping`.
+
+On the default task scheduler, the asynchronous loader starts inline and does not use `Task.Run`. When a
+custom synchronization context or task scheduler is active, only the loader boundary is dispatched to the
+thread pool so a synchronous caller joining the same shared fetch cannot block the loader's captured
+continuation. Library-owned awaits still use `AnyContext()`.
 
 The loaded mapping and its successful field memoization belong to an immutable resolver-local snapshot; an
 external cache client is neither required nor used. `RefreshMapping()` remains synchronous because it only

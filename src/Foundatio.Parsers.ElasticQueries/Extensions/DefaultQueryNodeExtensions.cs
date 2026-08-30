@@ -44,7 +44,7 @@ public static class DefaultQueryNodeExtensions
         if (String.IsNullOrEmpty(field) && defaultFields is not null)
         {
             foreach (string defaultField in defaultFields)
-                await elasticContext.MappingResolver.GetMappingAsync(defaultField).AnyContext();
+                await context.GetMappingResultAsync(defaultField).AnyContext();
         }
 
         // If a specific field is set, use single-field query
@@ -109,7 +109,7 @@ public static class DefaultQueryNodeExtensions
 
     private static Query? GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
     {
-        if (context.MappingResolver.IsPropertyAnalyzed(field))
+        if (IsPropertyAnalyzed(field, context))
         {
             if (node.UnescapedTerm is not { } term)
                 return null;
@@ -144,7 +144,7 @@ public static class DefaultQueryNodeExtensions
 
     private static FieldValue GetTypedFieldValue(string value, string field, IElasticQueryVisitorContext context)
     {
-        var fieldType = context.MappingResolver.GetFieldType(field);
+        var fieldType = ElasticMappingResolver.GetFieldType(context.GetMappingResult(field)?.Property);
 
         return fieldType switch
         {
@@ -177,7 +177,7 @@ public static class DefaultQueryNodeExtensions
 
         foreach (string field in fields)
         {
-            if (context.MappingResolver.IsPropertyAnalyzed(field))
+            if (IsPropertyAnalyzed(field, context))
                 analyzedFields.Add(field);
             else
                 nonAnalyzedFields.Add(field);
@@ -266,7 +266,13 @@ public static class DefaultQueryNodeExtensions
 
     private static string? GetNestedPath(string fullName, IElasticQueryVisitorContext context)
     {
-        return NestedPathResolver.GetDeepestNestedPath(fullName, context.MappingResolver);
+        return NestedPathResolver.GetDeepestNestedPath(fullName, context);
+    }
+
+    private static bool IsPropertyAnalyzed(string field, IElasticQueryVisitorContext context)
+    {
+        var mapping = context.GetMappingResult(field);
+        return mapping?.Found is true && context.MappingResolver.IsPropertyAnalyzed(mapping.Property!);
     }
 
     private static async Task<Query> GetSplitNestedQueryAsync(TermNode node, Dictionary<string, List<string>> fieldsByNestedPath, IElasticQueryVisitorContext context)
@@ -362,7 +368,8 @@ public static class DefaultQueryNodeExtensions
                 return null;
         }
 
-        if (elasticContext.MappingResolver.IsDatePropertyType(field))
+        var mapping = await context.GetMappingResultAsync(field).AnyContext();
+        if (mapping?.Property is DateProperty or DateNanosProperty)
         {
             var range = new DateRangeQuery(field) { TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext()) };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")

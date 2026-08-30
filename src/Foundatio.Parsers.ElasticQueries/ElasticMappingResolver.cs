@@ -119,7 +119,8 @@ public class ElasticMappingResolver : IDisposable
     /// <remarks>
     /// Unresolved fields automatically reload the server mapping at most once per
     /// <see cref="UnmappedFieldRefreshInterval"/>. This method bypasses that throttle and discards the
-    /// current mapping snapshot so the next resolution fetches it again.
+    /// current mapping snapshot so the next resolution fetches it again. An in-flight load is superseded;
+    /// its result cannot be published, and its physical callback may briefly overlap the replacement fetch.
     /// </remarks>
     public void RefreshMapping()
     {
@@ -274,6 +275,7 @@ public class ElasticMappingResolver : IDisposable
         var properties = snapshot.Properties;
         int start = 0;
         StringBuilder? resolvedName = null;
+        List<string>? nestedPathChain = null;
         MergedNode? node = null;
 
         while (true)
@@ -288,7 +290,7 @@ public class ElasticMappingResolver : IDisposable
                 if (resolvedName is null)
                     return new FieldMapping(remainder, null);
 
-                return new FieldMapping(resolvedName.Append('.').Append(remainder).ToString(), null);
+                return new FieldMapping(resolvedName.Append('.').Append(remainder).ToString(), null, null, nestedPathChain);
             }
 
             node = matched;
@@ -298,8 +300,14 @@ public class ElasticMappingResolver : IDisposable
             else
                 resolvedName.Append('.').Append(matched.Name);
 
+            if (matched.Property is NestedProperty)
+            {
+                nestedPathChain ??= [];
+                nestedPathChain.Add(resolvedName.ToString());
+            }
+
             if (separator < 0)
-                return new FieldMapping(resolvedName.ToString(), node.Property, node.Children);
+                return new FieldMapping(resolvedName.ToString(), node.Property, node.Children, nestedPathChain);
 
             properties = matched.Children;
             start = separator + 1;
@@ -477,7 +485,7 @@ public class ElasticMappingResolver : IDisposable
         return GetNonAnalyzedFieldName(field, mapping, preferredSubField);
     }
 
-    private string? GetNonAnalyzedFieldName(string? field, FieldMapping? mapping, string? preferredSubField)
+    internal string? GetNonAnalyzedFieldName(string? field, FieldMapping? mapping, string? preferredSubField)
     {
         if (mapping?.Property is null || !IsPropertyAnalyzed(mapping.Property))
             return field;
@@ -627,7 +635,7 @@ public class ElasticMappingResolver : IDisposable
         return GetFieldType(property);
     }
 
-    private static FieldType GetFieldType(IProperty? property)
+    internal static FieldType GetFieldType(IProperty? property)
     {
         if (property?.Type is null)
             return FieldType.None;

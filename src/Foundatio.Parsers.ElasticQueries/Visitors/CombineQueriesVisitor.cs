@@ -132,7 +132,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         var ancestorUseCounts = new Dictionary<string, int>();
         foreach (var path in originalPaths)
         {
-            var chain = NestedPathResolver.GetNestedPathChain(path, elasticContext.MappingResolver);
+            var chain = NestedPathResolver.GetNestedPathChain(path, context);
             foreach (var ancestor in chain.Take(chain.Count - 1))
                 ancestorUseCounts[ancestor] = ancestorUseCounts.GetValueOrDefault(ancestor) + 1;
         }
