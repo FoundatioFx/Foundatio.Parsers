@@ -47,12 +47,21 @@ public class GeoVisitor : ChainableQueryVisitor
 
     public override async Task VisitAsync(TermRangeNode node, IQueryVisitorContext context)
     {
+        using var mappingScope = context.BeginMappingScope();
+        if (context is IElasticQueryVisitorContext && !String.IsNullOrEmpty(node.Field))
+            await context.GetMappingResultAsync(node.Field).AnyContext();
+
+        Visit(node, context);
+    }
+
+    public override void Visit(TermRangeNode node, IQueryVisitorContext context)
+    {
         if (context is not IElasticQueryVisitorContext)
             return;
 
         string? fieldName = node.Field;
         if (String.IsNullOrEmpty(fieldName)
-            || (await context.GetMappingResultAsync(fieldName).AnyContext())?.Property is not GeoPointProperty)
+            || context.GetMappingResult(fieldName)?.Property is not GeoPointProperty)
             return;
 
         if (node.Min is null || node.Max is null)

@@ -19,17 +19,22 @@ public static class DefaultSortNodeExtensions
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
+        using var mappingScope = context.BeginMappingScope();
         var mapping = context.GetMappingResult(node.UnescapedField);
         return GetDefaultSort(node, context, elasticContext, mapping);
     }
 
-    internal static async Task<SortOptions> GetDefaultSortAsync(this TermNode node, IQueryVisitorContext context)
+    internal static async ValueTask PrepareSortMappingAsync(this TermNode node, IQueryVisitorContext context)
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
         var mapping = await context.GetMappingResultAsync(node.UnescapedField).AnyContext();
-        return GetDefaultSort(node, context, elasticContext, mapping);
+        string? field = elasticContext.MappingResolver.GetNonAnalyzedFieldName(
+            node.UnescapedField, mapping, ElasticMapping.SortFieldName);
+        await context.GetMappingResultAsync(field).AnyContext();
+        if (node.GetNestedPath() is { } nestedPath)
+            await context.GetMappingResultAsync(nestedPath).AnyContext();
     }
 
     private static SortOptions GetDefaultSort(TermNode node, IQueryVisitorContext visitorContext,

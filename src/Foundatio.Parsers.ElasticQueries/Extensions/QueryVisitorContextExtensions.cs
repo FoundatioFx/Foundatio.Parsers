@@ -14,18 +14,21 @@ public static class QueryVisitorContextExtensions
 {
     private const string MappingResultsKey = "@MappingResults";
 
-    internal static void ResetMappingResults(this IQueryVisitorContext context)
+    internal static MappingResultScope BeginMappingScope(this IQueryVisitorContext context)
     {
-        context.Data[MappingResultsKey] = new Dictionary<string, MappingResult>(StringComparer.OrdinalIgnoreCase);
+        if (GetMappingResults(context) is not null)
+            return default;
+
+        context.Data[MappingResultsKey] = new Dictionary<string, MappingResult>(StringComparer.Ordinal);
+        return new MappingResultScope(context);
     }
 
     internal static void SetMappingResult(this IQueryVisitorContext context, string requestedField, FieldMapping? mapping,
         string? resolvedField = null)
     {
-        if (mapping is null)
+        if (mapping is null || GetMappingResults(context) is not { } mappings)
             return;
 
-        var mappings = GetMappingResults(context);
         mappings[requestedField] = new MappingResult(mapping, resolvedField ?? mapping.FullPath);
         mappings[mapping.FullPath] = new MappingResult(mapping, mapping.FullPath);
         if (!String.IsNullOrEmpty(resolvedField))
@@ -35,7 +38,8 @@ public static class QueryVisitorContextExtensions
     internal static bool TryGetMappingResult(this IQueryVisitorContext context, string? field, out FieldMapping? mapping)
     {
         mapping = null;
-        if (String.IsNullOrEmpty(field) || !GetMappingResults(context).TryGetValue(field, out var result))
+        if (String.IsNullOrEmpty(field) || GetMappingResults(context) is not { } mappings
+            || !mappings.TryGetValue(field, out var result))
             return false;
 
         mapping = result.Mapping;
@@ -44,7 +48,7 @@ public static class QueryVisitorContextExtensions
 
     internal static bool TryGetResolvedMappingField(this IQueryVisitorContext context, string field, out string? resolvedField)
     {
-        if (GetMappingResults(context).TryGetValue(field, out var result))
+        if (GetMappingResults(context) is { } mappings && mappings.TryGetValue(field, out var result))
         {
             resolvedField = result.ResolvedField;
             return true;
@@ -81,7 +85,7 @@ public static class QueryVisitorContextExtensions
         return mapping;
     }
 
-    private static Dictionary<string, MappingResult> GetMappingResults(IQueryVisitorContext context)
+    private static Dictionary<string, MappingResult>? GetMappingResults(IQueryVisitorContext context)
     {
         if (context.Data.TryGetValue(MappingResultsKey, out object? value)
             && value is Dictionary<string, MappingResult> mappings)
@@ -89,9 +93,13 @@ public static class QueryVisitorContextExtensions
             return mappings;
         }
 
-        mappings = new Dictionary<string, MappingResult>(StringComparer.OrdinalIgnoreCase);
-        context.Data[MappingResultsKey] = mappings;
-        return mappings;
+        return null;
+    }
+
+    // Nested calls share results; only the operation that created the cache removes it.
+    internal readonly struct MappingResultScope(IQueryVisitorContext? context) : IDisposable
+    {
+        public void Dispose() => context?.Data.Remove(MappingResultsKey);
     }
 
     private readonly record struct MappingResult(FieldMapping Mapping, string ResolvedField);

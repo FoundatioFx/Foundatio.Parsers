@@ -56,6 +56,7 @@ public static class DefaultAggregationNodeExtensions
         if (!node.HasParens || String.IsNullOrEmpty(node.Field) || node.Left is not null)
             return null;
 
+        using var mappingScope = context.BeginMappingScope();
         var mapping = await context.GetMappingResultAsync(node.UnescapedField).AnyContext();
         string? field = elasticContext.MappingResolver.GetNonAnalyzedFieldName(
             node.UnescapedField, mapping, ElasticMapping.KeywordFieldName);

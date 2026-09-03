@@ -9,7 +9,9 @@ using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Foundatio.Xunit;
 using Microsoft.Extensions.Time.Testing;
 using Xunit;
@@ -237,6 +239,193 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Assert
         Assert.Contains("match", Serialize(query));
         Assert.Equal(2, fetchCount);
+    }
+
+    [Theory]
+    [InlineData("Name:abc AND name:42")]
+    [InlineData("name:42 AND Name:abc")]
+    public async Task BuildQueryAsync_WithDistinctExactCasedFields_PreservesNamesAndTypes(string input)
+    {
+        using var resolver = new ElasticMappingResolver(() => new TypeMapping
+        {
+            Properties = CreateProperties(("Name", new KeywordProperty()), ("name", new LongNumberProperty()))
+        });
+        var parser = new ElasticQueryParser(c => c.UseMappings(resolver));
+
+        string query = Serialize(await parser.BuildQueryAsync(input));
+
+        Assert.Contains("\"Name\":{\"value\":\"abc\"}", query);
+        Assert.Contains("\"name\":{\"value\":42}", query);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetDefaultSort_WithReusedContextAfterRefresh_UsesReplacementMapping(bool parseFirst)
+    {
+        TypeMapping mapping = CreateTextWithKeywordMapping("title");
+        using var resolver = new ElasticMappingResolver(() => mapping);
+        var context = new ElasticQueryVisitorContext { MappingResolver = resolver };
+        if (parseFirst)
+            await new ElasticQueryParser(c => c.UseMappings(resolver)).BuildSortAsync("title", context);
+
+        Assert.Equal("title.keyword", new TermNode { Field = "title" }.GetDefaultSort(context).Field!.Field!.Name);
+        mapping = CreateTextWithKeywordAndSortMapping("title");
+        resolver.RefreshMapping();
+
+        Assert.Equal("title.sort", new TermNode { Field = "title" }.GetDefaultSort(context).Field!.Field!.Name);
+    }
+
+    [Fact]
+    public async Task GetDefaultQueryAsync_WithReusedContext_DoesNotRetainMissingMapping()
+    {
+        var timeProvider = new FakeTimeProvider();
+        TypeMapping mapping = CreateTextOnlyMapping("other");
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(_ => Task.FromResult<TypeMapping?>(mapping), timeProvider: timeProvider);
+        var context = new ElasticQueryVisitorContext { MappingResolver = resolver };
+        Assert.Contains("\"term\"", Serialize(await new TermNode { Field = "title", Term = "value" }.GetDefaultQueryAsync(context)));
+
+        mapping = CreateTextOnlyMapping("title");
+        timeProvider.Advance(resolver.UnmappedFieldRefreshInterval);
+
+        Assert.Contains("\"match\"", Serialize(await new TermNode { Field = "title", Term = "value" }.GetDefaultQueryAsync(context)));
+    }
+
+    [Fact]
+    public async Task GetDefaultAggregationAsync_WithMissingField_FetchesOncePerOperation()
+    {
+        int fetchCount = 0;
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(_ =>
+        {
+            fetchCount++;
+            return Task.FromResult<TypeMapping?>(CreateTextOnlyMapping("other"));
+        });
+        var context = new ElasticQueryVisitorContext { MappingResolver = resolver };
+        var node = new GroupNode { Field = "title", HasParens = true };
+        node.SetOperationType("terms");
+
+        Assert.NotNull(await node.GetDefaultAggregationAsync(context));
+
+        Assert.Equal(1, fetchCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ParseAsync_WhenVisitorThrows_DiscardsOperationMappings(bool formatException)
+    {
+        TypeMapping mapping = CreateAsyncParserMapping();
+        using var resolver = new ElasticMappingResolver(() => mapping);
+        var context = new ElasticQueryVisitorContext();
+        var parser = new ElasticQueryParser(c => c.UseMappings(resolver).UseGeo(_ =>
+            Task.FromException<string>(formatException ? new FormatException("Invalid location") : new InvalidOperationException("Unavailable location"))));
+
+        if (formatException)
+            Assert.Null(await parser.ParseAsync("location:here", context));
+        else
+            await Assert.ThrowsAsync<InvalidOperationException>(() => parser.ParseAsync("location:here", context));
+
+        mapping = CreateTextWithKeywordMapping("location");
+        resolver.RefreshMapping();
+
+        Assert.Equal("location.keyword", new TermNode { Field = "location" }.GetDefaultSort(context).Field!.Field!.Name);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetDefaultQueryAsync_WithBlockedExplicitFieldLoader_ReturnsControl(bool mapped)
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<TypeMapping?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var returned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int fetchCount = 0;
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(_ =>
+        {
+            Interlocked.Increment(ref fetchCount);
+            started.TrySetResult();
+            return release.Task;
+        });
+        var context = new ElasticQueryVisitorContext { MappingResolver = resolver };
+        var operation = Task.Run(async () =>
+        {
+            var query = new TermNode { Field = "title", Term = "value" }.GetDefaultQueryAsync(context);
+            returned.TrySetResult();
+            return await query;
+        }, TestCancellationToken);
+
+        try
+        {
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestCancellationToken);
+            await returned.Task.WaitAsync(TimeSpan.FromSeconds(1), TestCancellationToken);
+            Assert.False(operation.IsCompleted);
+        }
+        finally
+        {
+            release.TrySetResult(CreateTextOnlyMapping(mapped ? "title" : "other"));
+            await operation.WaitAsync(TimeSpan.FromSeconds(5), TestCancellationToken);
+        }
+
+        Assert.Equal(1, fetchCount);
+    }
+
+    [Fact]
+    public async Task GeoVisitor_WithRange_PreservesSynchronousOverride()
+    {
+        using var resolver = new ElasticMappingResolver(CreateAsyncParserMapping);
+        var context = new ElasticQueryVisitorContext { MappingResolver = resolver };
+        var syncNode = new TermRangeNode { Field = "location", Min = "40,-70", Max = "30,-60" };
+        var asyncNode = new TermRangeNode { Field = "location", Min = "40,-70", Max = "30,-60" };
+        var visitor = new TrackingGeoVisitor();
+
+        visitor.Visit(syncNode, context);
+        await visitor.VisitAsync(asyncNode, context);
+
+        Assert.Equal(2, visitor.VisitCount);
+        Assert.NotNull(await syncNode.GetQueryAsync());
+        Assert.Equal(Serialize(await syncNode.GetQueryAsync()), Serialize(await asyncNode.GetQueryAsync()));
+    }
+
+    [Fact]
+    public async Task GetSortFieldsVisitor_WithDerivedOverride_DispatchesAfterAsyncMappingLoad()
+    {
+        var release = new TaskCompletionSource<TypeMapping?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(_ => release.Task);
+        var context = new ElasticQueryVisitorContext { MappingResolver = resolver };
+        var visitor = new TrackingSortVisitor();
+        var node = new TermNode { Field = "title" };
+
+        var operation = visitor.AcceptAsync(node, context);
+        Assert.False(operation.IsCompleted);
+        release.SetResult(CreateTextWithKeywordMapping("title"));
+        var sorts = await operation.WaitAsync(TimeSpan.FromSeconds(5), TestCancellationToken);
+
+        Assert.Equal(1, visitor.VisitCount);
+        Assert.Equal(SortOrder.Desc, Assert.Single(sorts).Field!.Order);
+        Assert.Null(node.GetSort());
+    }
+
+    private sealed class TrackingGeoVisitor : GeoVisitor
+    {
+        public int VisitCount { get; private set; }
+
+        public override void Visit(TermRangeNode node, IQueryVisitorContext context)
+        {
+            VisitCount++;
+            base.Visit(node, context);
+        }
+    }
+
+    private sealed class TrackingSortVisitor : GetSortFieldsVisitor
+    {
+        public int VisitCount { get; private set; }
+
+        public override void Visit(TermNode node, IQueryVisitorContext context)
+        {
+            VisitCount++;
+            node.IsNegated = true;
+            base.Visit(node, context);
+        }
     }
 
     [Fact]

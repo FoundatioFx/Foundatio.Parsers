@@ -38,18 +38,21 @@ public static class DefaultQueryNodeExtensions
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
+        using var mappingScope = context.BeginMappingScope();
         string? field = node.UnescapedField;
         string[]? defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
 
-        if (String.IsNullOrEmpty(field) && defaultFields is not null)
+        if (!String.IsNullOrEmpty(field))
+        {
+            await context.GetMappingResultAsync(field).AnyContext();
+            return GetSingleFieldQuery(node, field, elasticContext);
+        }
+
+        if (defaultFields is not null)
         {
             foreach (string defaultField in defaultFields)
                 await context.GetMappingResultAsync(defaultField).AnyContext();
         }
-
-        // If a specific field is set, use single-field query
-        if (!String.IsNullOrEmpty(field))
-            return GetSingleFieldQuery(node, field, elasticContext);
 
         // If only one default field, use single-field query (wrapped in nested if applicable)
         if (defaultFields is { Length: 1 })

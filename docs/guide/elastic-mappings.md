@@ -367,8 +367,10 @@ that path for ordinary custom-field saves.
 Successful resolutions are cached by canonical field path for the lifetime of the mapping snapshot, which
 keeps the cache bounded by the mapping itself no matter how many distinct spellings callers ask for.
 Unknown field names are not cached in the long-lived snapshot, so caller-controlled misses cannot grow
-process state. A parser operation remembers its own positive and negative resolutions only until that parse
-finishes, preventing downstream visitors from repeating the same network-backed lookup. Reloading the mapping
+process state. A parser operation remembers its own positive and negative resolutions only until that operation
+finishes, preventing downstream visitors from repeating the same network-backed lookup. Direct query, sort,
+and aggregation helpers also release their temporary results on return or failure, so reusing a visitor context
+does not retain stale mappings across operations. Cache keys preserve exact field-name casing. Reloading the mapping
 publishes a new snapshot and atomically discards resolutions derived from the old one.
 
 The built-in client factories expect one concrete index, or a target whose indices have equivalent mappings.

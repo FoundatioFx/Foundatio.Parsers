@@ -40,24 +40,16 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<ICollection<S
 
     public override async Task VisitAsync(TermNode node, IQueryVisitorContext context)
     {
-        if (!_resolveMappingsAsync)
-        {
-            Visit(node, context);
-            return;
-        }
+        using var mappingScope = context.BeginMappingScope();
+        if (_resolveMappingsAsync && !String.IsNullOrEmpty(node.Field) && node.GetSort() is null)
+            await node.PrepareSortMappingAsync(context).AnyContext();
 
-        if (String.IsNullOrEmpty(node.Field))
-            return;
-
-        var sort = node.GetSort() ?? await node.GetDefaultSortAsync(context).AnyContext();
-        if (sort.Field is null && sort.GeoDistance is null && sort.Score is null && sort.Script is null)
-            return;
-
-        _fields.Add(sort);
+        Visit(node, context);
     }
 
     public override async Task<ICollection<SortOptions>> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
+        using var mappingScope = context.BeginMappingScope();
         await node.AcceptAsync(this, context).AnyContext();
         return _fields;
     }

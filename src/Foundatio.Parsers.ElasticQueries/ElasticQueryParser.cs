@@ -40,7 +40,7 @@ public class ElasticQueryParser : LuceneQueryParser
         query ??= String.Empty;
         context ??= new ElasticQueryVisitorContext();
 
-        context.ResetMappingResults();
+        using var mappingScope = context.BeginMappingScope();
         SetupQueryVisitorContextDefaults(context);
         try
         {
@@ -290,6 +290,7 @@ public class ElasticQueryParser : LuceneQueryParser
     {
         sort ??= String.Empty;
         context ??= new ElasticQueryVisitorContext();
+        using var mappingScope = context.BeginMappingScope();
         context.QueryType = QueryTypes.Sort;
 
         var result = await ParseAsync(sort, context).AnyContext();
