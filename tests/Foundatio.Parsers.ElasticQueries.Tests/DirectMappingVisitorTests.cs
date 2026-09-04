@@ -42,7 +42,12 @@ public class DirectMappingVisitorTests
             "range" => new TermRangeNode { Field = "items.missing", Min = "1", Max = "2" },
             "exists" => new ExistsNode { Field = "items.missing" },
             "missing" => new MissingNode { Field = "items.missing" },
-            "group" => new GroupNode { Field = "items.missing", HasParens = true },
+            "group" => new GroupNode
+            {
+                Field = "items.missing",
+                HasParens = true,
+                Left = new GroupNode { Field = "items.missing", HasParens = true, Left = new TermNode { Field = "items.missing", Term = "value" } }
+            },
             _ => new TermNode { Field = "items.missing", Term = "value" }
         };
         var visitor = new NestedVisitor();
@@ -74,6 +79,11 @@ public class DirectMappingVisitorTests
         Assert.Equal(1, loads);
         if (knownParent)
             Assert.NotNull((await node.GetQueryAsync())?.Nested);
+        if (node is GroupNode { Left: GroupNode child })
+        {
+            Assert.Equal(knownParent ? "items" : null, child.GetNestedPath());
+            Assert.Null(await child.Left!.GetQueryAsync());
+        }
     }
 
     [Theory]
