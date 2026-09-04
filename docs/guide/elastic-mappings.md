@@ -340,7 +340,11 @@ that began before the field was created can extend the stale window. If an autom
 no mapping, the resolver retains its last known mapping and throttles the next attempt. During that window an
 unresolved field is still treated as unmapped. Set `AllowUnresolvedFields` to `false` when failing validation
 is safer than generating a query from incomplete mapping information. This catches unresolved query fields,
-but the resolver's boolean type checks do not expose a separate "mapping unknown" state, so use explicit
+including default fields actually used by unfielded terms and included queries. Unused default fields and
+configured restricted fields are not treated as query references. Mapping validation runs after field
+resolution and reports original query names, including aliases, even when a visitor context is reused.
+Runtime fields defined in the context or discovered by its runtime-field resolver remain valid. The
+resolver's boolean type checks do not expose a separate "mapping unknown" state, so use explicit
 refresh for application-controlled changes that require immediate correctness.
 
 Successful field resolutions do not trigger periodic reloads. New fields and sub-fields create misses and
@@ -382,6 +386,11 @@ Use an asynchronous loader when obtaining the mapping requires network I/O. The 
 sort, and aggregation paths await this loader without blocking a request thread. Cancelling one resolver
 lookup cancels only that caller's wait; the shared fetch continues for other callers and is bounded by the
 resolver lifetime and the loader's transport timeout.
+
+The application owns the resolver, including one created by `UseMappingsWithAsyncLoader`: dispose
+`parser.Configuration.MappingResolver` when the parser is no longer in use. Do not dispose it per request
+when it is shared. Configure refresh settings before sharing the resolver. Typed `Field` helpers preserve
+inferred canonical names while using the same single-load budget as string helpers.
 
 Custom asynchronous loaders use the named `CreateWithAsyncLoader` and `UseMappingsWithAsyncLoader` entry
 points. Keeping them separate from the synchronous delegate overloads preserves source compatibility for

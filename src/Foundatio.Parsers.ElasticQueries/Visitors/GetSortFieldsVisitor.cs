@@ -41,7 +41,8 @@ public class GetSortFieldsVisitor : QueryNodeVisitorWithResultBase<ICollection<S
     public override async Task VisitAsync(TermNode node, IQueryVisitorContext context)
     {
         using var mappingScope = context.BeginMappingScope();
-        if (_resolveMappingsAsync && !String.IsNullOrEmpty(node.Field) && node.GetSort() is null)
+        if (_resolveMappingsAsync && context is IElasticQueryVisitorContext
+            && !String.IsNullOrEmpty(node.Field) && node.GetSort() is null)
             await node.PrepareSortMappingAsync(context).AnyContext();
 
         Visit(node, context);

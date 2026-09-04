@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
@@ -20,6 +21,7 @@ public class NestedVisitor : ChainableQueryVisitor
 
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
+        using var mappingScope = context.BeginMappingScope();
         if (String.IsNullOrEmpty(node.Field))
         {
             await base.VisitAsync(node, context).AnyContext();
@@ -86,6 +88,7 @@ public class NestedVisitor : ChainableQueryVisitor
 
     private async Task HandleNestedFieldNodeAsync(IFieldQueryNode node, IQueryVisitorContext context)
     {
+        using var mappingScope = context.BeginMappingScope();
         string? nestedProperty = await GetNestedPropertyAsync(node.Field, context).AnyContext();
         if (nestedProperty is null)
             return;
@@ -167,7 +170,7 @@ public class NestedVisitor : ChainableQueryVisitor
         if (fullName is null || context is not IElasticQueryVisitorContext)
             return null;
 
-        await context.GetMappingResultAsync(fullName).AnyContext();
-        return NestedPathResolver.GetDeepestNestedPath(fullName, context);
+        var mapping = await context.GetMappingResultAsync(fullName).AnyContext();
+        return mapping?.NestedPathChain.LastOrDefault();
     }
 }

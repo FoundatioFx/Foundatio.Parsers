@@ -303,7 +303,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             && existingBool.MustNot is null or { Count: 0 })
         {
             existingBool.Filter = existingBool.Filter is { Count: > 0 }
-                ? [..existingBool.Filter, filter]
+                ? [.. existingBool.Filter, filter]
                 : [filter];
             return query;
         }

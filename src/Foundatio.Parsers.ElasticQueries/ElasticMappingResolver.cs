@@ -15,6 +15,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
+/// <summary>Resolves fields using cached code and server mappings.</summary>
+/// <remarks>
+/// Async lookups cancel only the caller's wait, not a shared load. Dispose the resolver to cancel its loader
+/// lifetime. Loaders must enforce their own finite timeout. Synchronous APIs block when using an async loader;
+/// async APIs also block if the configured loader is synchronous. Configure the resolver before sharing it.
+/// </remarks>
 public class ElasticMappingResolver : IDisposable
 {
     private static readonly TimeSpan _suppressedRefreshWarningInterval = TimeSpan.FromMinutes(1);
@@ -149,6 +155,8 @@ public class ElasticMappingResolver : IDisposable
         return ResolveMapping(field!, followAlias, snapshot);
     }
 
+    /// <summary>Resolves a field, optionally following its alias, using the shared mapping loader when needed.</summary>
+    /// <remarks>Cancellation stops this caller's wait. A shared load continues for other callers. Cache hits may complete synchronously.</remarks>
     public ValueTask<FieldMapping?> GetMappingAsync(string? field, bool followAlias = false, CancellationToken cancellationToken = default)
     {
         if (String.IsNullOrWhiteSpace(field))
@@ -357,6 +365,7 @@ public class ElasticMappingResolver : IDisposable
         return GetMapping(_inferrer.Field(field), followAlias);
     }
 
+    /// <inheritdoc cref="GetMappingAsync(string, bool, CancellationToken)" />
     public ValueTask<FieldMapping?> GetMappingAsync(Field field, bool followAlias = false, CancellationToken cancellationToken = default)
     {
         if (_inferrer is null)
@@ -420,7 +429,7 @@ public class ElasticMappingResolver : IDisposable
 
     public string GetSortFieldName(Field field)
     {
-        return GetNonAnalyzedFieldName(GetResolvedField(field), ElasticMapping.SortFieldName)!;
+        return GetNonAnalyzedFieldName(field, ElasticMapping.SortFieldName);
     }
 
     public ValueTask<string?> GetSortFieldNameAsync(string? field, CancellationToken cancellationToken = default)
@@ -428,10 +437,9 @@ public class ElasticMappingResolver : IDisposable
         return GetNonAnalyzedFieldNameAsync(field, ElasticMapping.SortFieldName, cancellationToken);
     }
 
-    public async ValueTask<string> GetSortFieldNameAsync(Field field, CancellationToken cancellationToken = default)
+    public ValueTask<string> GetSortFieldNameAsync(Field field, CancellationToken cancellationToken = default)
     {
-        string resolved = await GetResolvedFieldAsync(field, cancellationToken).AnyContext();
-        return (await GetNonAnalyzedFieldNameAsync(resolved, ElasticMapping.SortFieldName, cancellationToken).AnyContext())!;
+        return GetNonAnalyzedFieldNameAsync(field, ElasticMapping.SortFieldName, cancellationToken);
     }
 
     public string? GetAggregationsFieldName(string? field)
@@ -449,21 +457,30 @@ public class ElasticMappingResolver : IDisposable
         return GetNonAnalyzedFieldNameAsync(field, ElasticMapping.KeywordFieldName, cancellationToken);
     }
 
-    public async ValueTask<string> GetAggregationsFieldNameAsync(Field field, CancellationToken cancellationToken = default)
+    public ValueTask<string> GetAggregationsFieldNameAsync(Field field, CancellationToken cancellationToken = default)
     {
-        return (await GetNonAnalyzedFieldNameAsync(field, ElasticMapping.KeywordFieldName, cancellationToken).AnyContext())!;
+        return GetNonAnalyzedFieldNameAsync(field, ElasticMapping.KeywordFieldName, cancellationToken);
     }
 
     public string GetNonAnalyzedFieldName(Field field, string? preferredSubField = null)
     {
-        return GetNonAnalyzedFieldName(GetResolvedField(field), preferredSubField)!;
+        if (_inferrer is null)
+            throw new InvalidOperationException("Unable to resolve Field without inferrer");
+
+        string name = _inferrer.Field(field)!;
+        var mapping = GetMapping(name, followAlias: true);
+        return GetNonAnalyzedFieldName(mapping?.FullPath ?? name, mapping, preferredSubField)!;
     }
 
     public async ValueTask<string> GetNonAnalyzedFieldNameAsync(Field field, string? preferredSubField = null,
         CancellationToken cancellationToken = default)
     {
-        string resolved = await GetResolvedFieldAsync(field, cancellationToken).AnyContext();
-        return (await GetNonAnalyzedFieldNameAsync(resolved, preferredSubField, cancellationToken).AnyContext())!;
+        if (_inferrer is null)
+            throw new InvalidOperationException("Unable to resolve Field without inferrer");
+
+        string name = _inferrer.Field(field)!;
+        var mapping = await GetMappingAsync(name, followAlias: true, cancellationToken).AnyContext();
+        return GetNonAnalyzedFieldName(mapping?.FullPath ?? name, mapping, preferredSubField)!;
     }
 
     public string? GetNonAnalyzedFieldName(string? field, string? preferredSubField = null)
@@ -840,6 +857,8 @@ public class ElasticMappingResolver : IDisposable
         return new ElasticMappingResolver(descriptor, inferrer, getMapping, logger: logger);
     }
 
+    /// <summary>Creates a resolver that combines code mappings with an asynchronous server mapping loader.</summary>
+    /// <remarks>The loader receives the resolver lifetime token, not an individual lookup token, and must enforce its own timeout.</remarks>
     public static ElasticMappingResolver CreateWithAsyncLoader<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer,
         Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, TimeProvider? timeProvider = null, ILogger? logger = null) where T : class
     {
@@ -873,6 +892,8 @@ public class ElasticMappingResolver : IDisposable
         return new ElasticMappingResolver(getMapping, inferrer, logger: logger);
     }
 
+    /// <summary>Creates a resolver backed by an asynchronous server mapping loader.</summary>
+    /// <remarks>The caller owns this resolver. Dispose it to cancel the loader lifetime; cancelling a lookup does not cancel shared work.</remarks>
     public static ElasticMappingResolver CreateWithAsyncLoader(Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, Inferrer? inferrer = null,
         TimeProvider? timeProvider = null, ILogger? logger = null)
     {
