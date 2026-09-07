@@ -56,6 +56,8 @@ internal sealed class MappingCache : IDisposable
 
     public TimeSpan UnmappedFieldRefreshInterval { get; set; } = TimeSpan.FromSeconds(5);
 
+    public Func<TypeMapping, string?>? ServerMappingRevisionResolver { get; set; }
+
     /// <summary>
     /// How long a load waits to join one already in flight. Validated by the resolver to be positive and
     /// within the range <see cref="Task.WaitAsync(TimeSpan, CancellationToken)"/> accepts, so it is passed
@@ -277,9 +279,11 @@ internal sealed class MappingCache : IDisposable
     private void Fetch(MappingLoadOperation operation)
     {
         TypeMapping? mapping;
+        string? revision;
         try
         {
             mapping = _getServerMapping!();
+            revision = mapping is null ? null : ServerMappingRevisionResolver?.Invoke(mapping);
         }
         catch (Exception ex)
         {
@@ -293,15 +297,17 @@ internal sealed class MappingCache : IDisposable
             return;
         }
 
-        CompleteLoad(operation, mapping);
+        FinalizeLoad(operation, mapping, revision);
     }
 
     private async Task FetchAsync(MappingLoadOperation operation)
     {
         TypeMapping? mapping;
+        string? revision;
         try
         {
             mapping = await _getServerMappingAsync!(_lifetimeCancellation.Token).AnyContext();
+            revision = mapping is null ? null : ServerMappingRevisionResolver?.Invoke(mapping);
         }
         catch (Exception ex)
         {
@@ -315,7 +321,7 @@ internal sealed class MappingCache : IDisposable
             return;
         }
 
-        CompleteLoad(operation, mapping);
+        FinalizeLoad(operation, mapping, revision);
     }
 
     private void CompleteFailedLoad(MappingLoadOperation operation, Exception exception)
@@ -323,11 +329,6 @@ internal sealed class MappingCache : IDisposable
         FinalizeLoad(operation, null);
         if (exception is not OperationCanceledException || !_lifetimeCancellation.IsCancellationRequested)
             _logger.LogError(exception, "Error getting server mapping: {Message}", exception.Message);
-    }
-
-    private void CompleteLoad(MappingLoadOperation operation, TypeMapping? mapping)
-    {
-        FinalizeLoad(operation, mapping);
     }
 
     private void CompleteFaultedLoad(MappingLoadOperation operation, Exception exception)
@@ -340,7 +341,7 @@ internal sealed class MappingCache : IDisposable
         }
     }
 
-    private void FinalizeLoad(MappingLoadOperation operation, TypeMapping? mapping)
+    private void FinalizeLoad(MappingLoadOperation operation, TypeMapping? mapping, string? revision = null)
     {
         MappingRefreshResult result;
 
@@ -357,7 +358,7 @@ internal sealed class MappingCache : IDisposable
             }
             else
             {
-                Volatile.Write(ref _snapshot, CreateSnapshot(mapping, fetched: true));
+                Volatile.Write(ref _snapshot, CreateSnapshot(mapping, fetched: true, revision));
                 if (operation.ArmThrottleOnSuccess)
                     RecordLoadAttempt();
                 result = MappingRefreshResult.Updated;
@@ -390,10 +391,14 @@ internal sealed class MappingCache : IDisposable
         _hasLoadAttempt = 1;
     }
 
-    private MappingSnapshot CreateSnapshot(TypeMapping? serverMapping, bool fetched)
+    private MappingSnapshot CreateSnapshot(TypeMapping? serverMapping, bool fetched, string? revision = null)
     {
         long version = Interlocked.Increment(ref _snapshotVersion);
-        return new MappingSnapshot(version, serverMapping, fetched, _merge, _timeProvider.GetUtcNow().UtcDateTime);
+        DateTime createdUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        if (fetched && !String.IsNullOrEmpty(revision) && String.Equals(revision, Current.ServerRevision, StringComparison.Ordinal))
+            return Current.WithVersion(version, createdUtc);
+
+        return new MappingSnapshot(version, serverMapping, fetched, _merge, createdUtc, revision);
     }
 
     public void Dispose()
@@ -437,15 +442,29 @@ internal sealed class MappingCache : IDisposable
 internal sealed class MappingSnapshot
 {
     private readonly Lazy<MergedProperties?> _properties;
-    private readonly ConcurrentDictionary<string, FieldMapping> _fields = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, FieldMapping> _fields;
 
-    public MappingSnapshot(long version, TypeMapping? serverMapping, bool fetched, Func<TypeMapping?, MergedProperties?> merge, DateTime createdUtc)
+    public MappingSnapshot(long version, TypeMapping? serverMapping, bool fetched, Func<TypeMapping?, MergedProperties?> merge,
+        DateTime createdUtc, string? serverRevision)
     {
         Version = version;
         HasServerMapping = serverMapping is not null;
         Fetched = fetched;
         CreatedUtc = createdUtc;
+        ServerRevision = serverRevision;
         _properties = new Lazy<MergedProperties?>(() => merge(serverMapping), LazyThreadSafetyMode.ExecutionAndPublication);
+        _fields = new ConcurrentDictionary<string, FieldMapping>(StringComparer.Ordinal);
+    }
+
+    private MappingSnapshot(MappingSnapshot previous, long version, DateTime createdUtc)
+    {
+        Version = version;
+        HasServerMapping = previous.HasServerMapping;
+        Fetched = previous.Fetched;
+        CreatedUtc = createdUtc;
+        ServerRevision = previous.ServerRevision;
+        _properties = previous._properties;
+        _fields = previous._fields;
     }
 
     public long Version { get; }
@@ -455,6 +474,10 @@ internal sealed class MappingSnapshot
     public bool Fetched { get; }
 
     public DateTime CreatedUtc { get; }
+
+    public string? ServerRevision { get; }
+
+    public MappingSnapshot WithVersion(long version, DateTime createdUtc) => new(this, version, createdUtc);
 
     public MergedProperties? Properties => _properties.Value;
 

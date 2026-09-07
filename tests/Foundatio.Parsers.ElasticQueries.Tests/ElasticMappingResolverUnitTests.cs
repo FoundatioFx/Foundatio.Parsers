@@ -912,6 +912,110 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         Assert.Equal(1, fetchCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetMapping_WithUnchangedServerRevision_PreservesResolvedFields(bool asynchronous)
+    {
+        var timeProvider = new FakeTimeProvider();
+        int fetches = 0;
+        TypeMapping Load()
+        {
+            fetches++;
+            return CreateTextWithKeywordMapping("name");
+        }
+
+        using var resolver = asynchronous
+            ? ElasticMappingResolver.CreateWithAsyncLoader(_ => Task.FromResult<TypeMapping?>(Load()), _inferrer, timeProvider)
+            : new ElasticMappingResolver(Load, _inferrer, timeProvider);
+        resolver.ServerMappingRevisionResolver = _ => "index-uuid:1";
+
+        var original = await ResolveAsync("name.keyword");
+        Assert.True(original?.Found);
+        for (int i = 0; i < 3; i++)
+        {
+            Assert.False((await ResolveAsync("missing"))?.Found);
+            Assert.Same(original, await ResolveAsync("name.keyword"));
+            Assert.False((await ResolveAsync("another-missing"))?.Found);
+            Assert.Equal(i + 2, fetches);
+            timeProvider.Advance(resolver.UnmappedFieldRefreshInterval);
+        }
+
+        async ValueTask<FieldMapping?> ResolveAsync(string field) => asynchronous
+            ? await resolver.GetMappingAsync(field, cancellationToken: TestCancellationToken)
+            : resolver.GetMapping(field);
+    }
+
+    [Theory]
+    [InlineData("index-uuid:2", false)]
+    [InlineData("new-index-uuid:1", false)]
+    [InlineData("INDEX-UUID:1", false)]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("index-uuid:1", true)]
+    public async Task GetMapping_WithChangedOrInvalidatedServerRevision_RebuildsMapping(string? revision, bool explicitRefresh)
+    {
+        var mapping = CreateTextWithKeywordMapping("name");
+        string? currentRevision = "index-uuid:1";
+        using var resolver = ElasticMappingResolver.CreateWithAsyncLoader(_ => Task.FromResult<TypeMapping?>(mapping), _inferrer);
+        resolver.ServerMappingRevisionResolver = _ => currentRevision;
+        var original = await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken);
+
+        mapping = new TypeMapping { Properties = CreateProperties(("name", new KeywordProperty()), ("new-field", new BooleanProperty())) };
+        currentRevision = revision;
+        if (explicitRefresh)
+            resolver.RefreshMapping();
+
+        Assert.True((await resolver.GetMappingAsync("new-field", cancellationToken: TestCancellationToken))?.Found);
+        var updated = await resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken);
+        Assert.NotSame(original, updated);
+        Assert.IsType<KeywordProperty>(updated?.Property);
+    }
+
+    [Fact]
+    public void GetMapping_WithoutServerRevision_RebuildsMutatedMapping()
+    {
+        var mapping = CreateTextWithKeywordMapping("name");
+        using var resolver = new ElasticMappingResolver(() => mapping, _inferrer);
+        var original = resolver.GetMapping("name");
+
+        mapping.Properties!["name"] = new KeywordProperty();
+        mapping.Properties.Add("new-field", new BooleanProperty());
+
+        Assert.True(resolver.GetMapping("new-field")?.Found);
+        Assert.NotSame(original, resolver.GetMapping("name"));
+        Assert.IsType<KeywordProperty>(resolver.GetMappingProperty("name"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetMapping_WithFailingServerRevisionResolver_PreservesMappingAndRetries(bool asynchronous)
+    {
+        var timeProvider = new FakeTimeProvider();
+        var mapping = CreateTextWithKeywordMapping("name");
+        using var resolver = asynchronous
+            ? ElasticMappingResolver.CreateWithAsyncLoader(_ => Task.FromResult<TypeMapping?>(mapping), _inferrer, timeProvider)
+            : new ElasticMappingResolver(() => mapping, _inferrer, timeProvider);
+        bool fail = false;
+        resolver.ServerMappingRevisionResolver = _ => fail ? throw new InvalidOperationException("Revision unavailable") : "index-uuid:1";
+        var original = await ResolveAsync("name");
+
+        fail = true;
+        mapping = new TypeMapping { Properties = CreateProperties(("new-field", new BooleanProperty())) };
+        Assert.False((await ResolveAsync("new-field"))?.Found);
+        Assert.Same(original, await ResolveAsync("name"));
+
+        fail = false;
+        resolver.ServerMappingRevisionResolver = _ => "index-uuid:2";
+        timeProvider.Advance(resolver.UnmappedFieldRefreshInterval);
+        Assert.True((await ResolveAsync("new-field"))?.Found);
+
+        async ValueTask<FieldMapping?> ResolveAsync(string field) => asynchronous
+            ? await resolver.GetMappingAsync(field, cancellationToken: TestCancellationToken)
+            : resolver.GetMapping(field);
+    }
+
     [Fact]
     public void GetMapping_WithChangedResolvedField_RequiresExplicitRefresh()
     {
@@ -2086,6 +2190,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         // Arrange
         using var fetchStarted = new ManualResetEventSlim(false);
         using var releaseFetch = new ManualResetEventSlim(false);
+        using var callersStarted = new CountdownEvent(20);
         int fetchCount = 0;
         using var resolver = new ElasticMappingResolver(() =>
         {
@@ -2096,12 +2201,22 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
         }, _inferrer, logger: _logger);
 
         // Act
-        var lookups = Enumerable.Range(0, 100)
-            .Select(_ => Task.Run(() => resolver.GetMapping("name")))
+        var lookups = Enumerable.Range(0, 20)
+            .Select(_ => Task.Factory.StartNew(() =>
+            {
+                callersStarted.Signal();
+                return resolver.GetMapping("name");
+            }, TestCancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default))
             .ToArray();
-        Assert.True(fetchStarted.Wait(TimeSpan.FromSeconds(10), TestCancellationToken));
-        await Task.Delay(200, TestCancellationToken);
-        releaseFetch.Set();
+        try
+        {
+            Assert.True(fetchStarted.Wait(TimeSpan.FromSeconds(10), TestCancellationToken));
+            Assert.True(callersStarted.Wait(TimeSpan.FromSeconds(10), TestCancellationToken));
+        }
+        finally
+        {
+            releaseFetch.Set();
+        }
         await Task.WhenAll(lookups);
 
         // Assert

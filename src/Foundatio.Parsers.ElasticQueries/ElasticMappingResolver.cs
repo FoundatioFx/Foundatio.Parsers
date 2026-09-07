@@ -120,6 +120,22 @@ public class ElasticMappingResolver : IDisposable
     }
 
     /// <summary>
+    /// Optionally identifies a server mapping revision so automatic reloads of the same revision can reuse
+    /// the merged mapping and resolved fields. Null or empty revisions disable reuse for that load.
+    /// </summary>
+    /// <remarks>
+    /// Configure before sharing the resolver. The revision must identify the complete mapping, including
+    /// dynamically added fields and the concrete index identity. A schema deployment version alone is not
+    /// sufficient. The callback must be cheap, must not mutate the mapping, and must not call this resolver.
+    /// Explicit <see cref="RefreshMapping"/> always discards the cached mapping regardless of its revision.
+    /// </remarks>
+    public Func<TypeMapping, string?>? ServerMappingRevisionResolver
+    {
+        get => _cache.ServerMappingRevisionResolver;
+        set => _cache.ServerMappingRevisionResolver = value;
+    }
+
+    /// <summary>
     /// Clears the cached mapping, forcing a fresh fetch from the server on the next access.
     /// </summary>
     /// <remarks>

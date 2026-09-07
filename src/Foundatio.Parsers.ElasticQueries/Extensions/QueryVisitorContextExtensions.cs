@@ -104,8 +104,10 @@ public static class QueryVisitorContextExtensions
 
     private sealed class MappingResults
     {
+        private Dictionary<string, Task<ElasticRuntimeField?>>? _runtimeFields;
+
         public Dictionary<string, MappingResult> Fields { get; } = new(StringComparer.Ordinal);
-        public Dictionary<string, Task<ElasticRuntimeField?>> RuntimeFields { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, Task<ElasticRuntimeField?>> RuntimeFields => _runtimeFields ??= new(StringComparer.Ordinal);
     }
 
     private static MappingResults? GetMappingResults(IQueryVisitorContext context)

@@ -377,7 +377,32 @@ process state. A parser operation remembers its own positive and negative resolu
 finishes, preventing downstream visitors from repeating the same network-backed lookup. Direct query, sort,
 and aggregation helpers also release their temporary results on return or failure, so reusing a visitor context
 does not retain stale mappings across operations. Cache keys preserve exact field-name casing. Reloading the mapping
-publishes a new snapshot and atomically discards resolutions derived from the old one.
+publishes a new snapshot and atomically discards resolutions derived from the old one, unless the optional
+revision check below confirms that the mapping is unchanged. The operation's runtime-field result dictionary
+is allocated only when a runtime-field resolver is actually used.
+
+### Reusing Unchanged Mappings
+
+If your mapping owner provides a cheap, reliable revision for the complete mapping, set
+`ServerMappingRevisionResolver` before sharing the resolver:
+
+```csharp
+resolver.ServerMappingRevisionResolver = mapping =>
+    mapping.Meta?.TryGetValue("resolver_revision", out var revision) == true
+        ? revision?.ToString()
+        : null;
+```
+
+Equal, nonempty revisions allow automatic reloads to reuse the merged property tree and successful field
+resolutions. The reload still fetches the mapping and observes the normal miss cooldown; this saves local
+rebuilding and allocations, not HTTP requests or deserialization. No mapping serialization is performed
+to compare revisions. `RefreshMapping()` always discards the cached state, even if the revision is unchanged.
+
+The revision must identify the concrete index and change whenever any mapping detail changes, including
+fields added dynamically. Elasticsearch does not maintain this custom `_meta` value for you. Use it only
+when your mapping owner guarantees that contract; a deployment schema version or latest partition name
+alone is insufficient. Leave the callback unset if you do not have such a revision. Null or empty revisions
+also retain the default behavior of rebuilding after every successful reload.
 
 The built-in client factories expect one concrete index, or a target whose indices have equivalent mappings.
 They do not merge heterogeneous mappings from rollover aliases or data streams.
