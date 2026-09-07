@@ -78,6 +78,8 @@ public class ElasticQueryParserConfiguration
     {
         FieldResolver = resolver;
         ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(resolver), priority);
+        // Equal priorities preserve insertion order, so mapping validation follows the replacement resolver.
+        ReplaceVisitor<MappingValidationVisitor>(new MappingValidationVisitor(), Math.Max(20, priority));
 
         return this;
     }

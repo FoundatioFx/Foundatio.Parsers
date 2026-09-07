@@ -12,6 +12,35 @@ namespace Foundatio.Parsers.ElasticQueries.Tests;
 public class MappingValidationTests
 {
     [Theory]
+    [InlineData(20, false)]
+    [InlineData(20, true)]
+    [InlineData(21, false)]
+    [InlineData(21, true)]
+    [InlineData(29, false)]
+    [InlineData(29, true)]
+    public async Task ValidateAsync_WithCustomFieldResolverPriority_ValidatesResolvedFields(int priority, bool useFieldMap)
+    {
+        using var resolver = new ElasticMappingResolver(CreateMapping);
+        var parser = new ElasticQueryParser(c =>
+        {
+            c.UseMappings(resolver).SetValidationOptions(new QueryValidationOptions { AllowUnresolvedFields = false });
+            if (useFieldMap)
+                c.UseFieldMap(new FieldMap { { "alias", "known" } }, priority);
+            else
+                c.UseFieldResolver((field, _) => Task.FromResult<string?>(field == "alias" ? "known" : null), priority);
+        });
+
+        Assert.True((await parser.ValidateQueryAsync("alias:value")).IsValid);
+        Assert.True((await parser.ValidateSortAsync("alias")).IsValid);
+        Assert.True((await parser.ValidateAggregationsAsync("terms:alias")).IsValid);
+        Assert.NotNull(await parser.BuildQueryAsync("alias:value"));
+
+        var missing = await parser.ValidateQueryAsync("missing:value");
+        Assert.False(missing.IsValid);
+        Assert.Contains("missing", missing.UnresolvedFields);
+    }
+
+    [Theory]
     [InlineData("query")]
     [InlineData("sort")]
     [InlineData("aggregation")]
