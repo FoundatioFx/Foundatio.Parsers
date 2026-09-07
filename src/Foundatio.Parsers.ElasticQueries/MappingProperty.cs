@@ -22,8 +22,8 @@ internal static class MappingProperty
 
         var original = GetChildren(property);
         if (original is not null && original.Count() == children.Count
-            && original.All(pair => children.TryGetNode(pair.Key.Name!, out var child)
-                && child.Name == pair.Key.Name && ReferenceEquals(pair.Value, child.Property)))
+            && original.All(pair => pair.Key.Name is { } name && children.TryGetNode(name, out var child)
+                && child.Name == name && ReferenceEquals(pair.Value, child.Property)))
             return property;
 
         var properties = new Properties();

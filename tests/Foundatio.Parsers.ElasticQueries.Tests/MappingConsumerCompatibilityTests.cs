@@ -88,6 +88,25 @@ public class MappingConsumerCompatibilityTests
         Assert.Single(remote.Fields!);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GetMappingProperty_WithExpressionChild_PreservesInferredName(bool server)
+    {
+        var name = new PropertyName((System.Linq.Expressions.Expression<Func<string, object>>)(value => value.Length));
+        var child = new KeywordProperty();
+        var parent = new ObjectProperty { Properties = new Properties { { name, child } } };
+        using var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
+        var mapping = new TypeMapping { Properties = new Properties { { "parent", parent } } };
+        using var resolver = new ElasticMappingResolver(server ? new TypeMapping() : mapping, new Inferrer(settings), () => server ? mapping : null);
+
+        var merged = Assert.IsType<ObjectProperty>(resolver.GetMappingProperty("parent"));
+
+        Assert.Same(child, resolver.GetMappingProperty("parent.length"));
+        Assert.Equal("length", Assert.Single(merged.Properties!).Key.Name);
+        Assert.Same(name, Assert.Single(parent.Properties!).Key);
+    }
+
     [Fact]
     public void Parse_WithSynchronousOverride_PreservesCallerThread()
     {
