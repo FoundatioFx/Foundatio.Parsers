@@ -19,7 +19,7 @@ public static class QueryVisitorContextExtensions
         if (GetMappingResults(context) is not null)
             return default;
 
-        context.Data[MappingResultsKey] = new Dictionary<string, MappingResult>(StringComparer.Ordinal);
+        context.Data[MappingResultsKey] = new MappingResults();
         return new MappingResultScope(context);
     }
 
@@ -29,17 +29,17 @@ public static class QueryVisitorContextExtensions
         if (mapping is null || GetMappingResults(context) is not { } mappings)
             return;
 
-        mappings[requestedField] = new MappingResult(mapping, resolvedField ?? mapping.FullPath);
-        mappings[mapping.FullPath] = new MappingResult(mapping, mapping.FullPath);
+        mappings.Fields[requestedField] = new MappingResult(mapping, resolvedField ?? mapping.FullPath);
+        mappings.Fields[mapping.FullPath] = new MappingResult(mapping, mapping.FullPath);
         if (!String.IsNullOrEmpty(resolvedField))
-            mappings[resolvedField] = new MappingResult(mapping, resolvedField);
+            mappings.Fields[resolvedField] = new MappingResult(mapping, resolvedField);
     }
 
     internal static bool TryGetMappingResult(this IQueryVisitorContext context, string? field, out FieldMapping? mapping)
     {
         mapping = null;
         if (String.IsNullOrEmpty(field) || GetMappingResults(context) is not { } mappings
-            || !mappings.TryGetValue(field, out var result))
+            || !mappings.Fields.TryGetValue(field, out var result))
             return false;
 
         mapping = result.Mapping;
@@ -48,7 +48,7 @@ public static class QueryVisitorContextExtensions
 
     internal static bool TryGetResolvedMappingField(this IQueryVisitorContext context, string field, out string? resolvedField)
     {
-        if (GetMappingResults(context) is { } mappings && mappings.TryGetValue(field, out var result))
+        if (GetMappingResults(context) is { } mappings && mappings.Fields.TryGetValue(field, out var result))
         {
             resolvedField = result.ResolvedField;
             return true;
@@ -85,10 +85,33 @@ public static class QueryVisitorContextExtensions
         return mapping;
     }
 
-    private static Dictionary<string, MappingResult>? GetMappingResults(IQueryVisitorContext context)
+    internal static Task<ElasticRuntimeField?> GetRuntimeFieldAsync(this IQueryVisitorContext context, string field, RuntimeFieldResolver resolver)
+    {
+        var results = GetMappingResults(context);
+        if (results is null)
+            return ResolveAsync();
+
+        if (!results.RuntimeFields.TryGetValue(field, out var result))
+        {
+            result = ResolveAsync();
+            results.RuntimeFields[field] = result;
+        }
+
+        return result;
+
+        async Task<ElasticRuntimeField?> ResolveAsync() => await resolver(field).AnyContext();
+    }
+
+    private sealed class MappingResults
+    {
+        public Dictionary<string, MappingResult> Fields { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, Task<ElasticRuntimeField?>> RuntimeFields { get; } = new(StringComparer.Ordinal);
+    }
+
+    private static MappingResults? GetMappingResults(IQueryVisitorContext context)
     {
         if (context.Data.TryGetValue(MappingResultsKey, out object? value)
-            && value is Dictionary<string, MappingResult> mappings)
+            && value is MappingResults mappings)
         {
             return mappings;
         }

@@ -343,7 +343,9 @@ is safer than generating a query from incomplete mapping information. This catch
 including default fields actually used by unfielded terms and included queries. Unused default fields and
 configured restricted fields are not treated as query references. Mapping validation runs after field
 resolution and reports original query names, including aliases, even when a visitor context is reused.
-Runtime fields defined in the context or discovered by its runtime-field resolver remain valid. The
+Runtime fields defined in the context or discovered by its runtime-field resolver remain valid. Each
+operation reuses runtime lookup results, including misses and failures, so field resolution and validation
+do not invoke the callback twice for the same field. A later operation can retry the callback. The
 resolver's boolean type checks do not expose a separate "mapping unknown" state, so use explicit
 refresh for application-controlled changes that require immediate correctness.
 
@@ -407,8 +409,8 @@ Synchronous loader overloads remain available for compatibility. An asynchronous
 with a synchronous loader must invoke that loader synchronously, and an explicit synchronous resolver call
 configured with only an asynchronous loader waits synchronously for it. That compatibility path dispatches
 the single shared load to the thread pool to avoid synchronization-context deadlocks, but the caller still
-blocks. A synchronous `Parse` call made under a custom synchronization context or task scheduler similarly
-isolates the compatibility call; server request paths should use the asynchronous resolver and parser APIs.
+blocks. Synchronous `Parse` preserves the caller thread for synchronous visitors; server request paths
+should use the asynchronous resolver and parser APIs.
 The built-in Elasticsearch client factories supply both forms: asynchronous parser paths call
 `Indices.GetMappingAsync`, while synchronous resolver calls retain `Indices.GetMapping`.
 

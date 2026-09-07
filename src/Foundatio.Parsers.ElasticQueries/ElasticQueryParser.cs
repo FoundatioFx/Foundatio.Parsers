@@ -176,7 +176,7 @@ public class ElasticQueryParser : LuceneQueryParser
         // try to use the runtime field resolver to dynamically discover a new runtime field and, if so, add it to the list of runtime fields
         if (elasticContext.EnableRuntimeFieldResolver is not false && elasticContext.RuntimeFieldResolver is not null)
         {
-            var newRuntimeField = await elasticContext.RuntimeFieldResolver(field).AnyContext();
+            var newRuntimeField = await context.GetRuntimeFieldAsync(field, elasticContext.RuntimeFieldResolver).AnyContext();
             if (newRuntimeField is not null)
             {
                 elasticContext.RuntimeFields?.Add(newRuntimeField);

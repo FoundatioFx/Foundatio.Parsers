@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Visitors;
@@ -16,9 +15,6 @@ public partial class LuceneQueryParser : IQueryParser
 
     public IQueryNode? Parse(string query, IQueryVisitorContext? context)
     {
-        if (SynchronizationContext.Current is not null || TaskScheduler.Current != TaskScheduler.Default)
-            return Task.Run(() => ParseAsync(query, context)).GetAwaiter().GetResult();
-
         return ParseAsync(query, context).GetAwaiter().GetResult();
     }
 }

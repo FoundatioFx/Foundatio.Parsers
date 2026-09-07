@@ -748,13 +748,16 @@ public class ElasticMappingResolver : IDisposable
                 // sides describe the same field type.
                 codeByName.TryGetValue(name, out var codeProperty);
                 var codeChildren = codeProperty is not null && codeProperty.GetType() == kvp.Value.GetType()
-                    ? GetChildProperties(codeProperty)
+                    ? MappingProperty.GetChildren(codeProperty)
                     : null;
 
+                var children = Merge(codeChildren, MappingProperty.GetChildren(kvp.Value));
+                var property = MappingProperty.WithChildren(kvp.Value, children);
+                CopyPropertyMetadata(kvp.Value, property);
                 if (codeProperty is not null)
-                    CopyPropertyMetadata(codeProperty, kvp.Value);
+                    CopyPropertyMetadata(codeProperty, property);
 
-                nodes.Add(new MergedNode(name, kvp.Value, Merge(codeChildren, GetChildProperties(kvp.Value))));
+                nodes.Add(new MergedNode(name, property, children));
             }
         }
 
@@ -763,7 +766,10 @@ public class ElasticMappingResolver : IDisposable
             if (!seen.Add(name))
                 continue;
 
-            nodes.Add(new MergedNode(name, property, Merge(GetChildProperties(property), null)));
+            var children = Merge(MappingProperty.GetChildren(property), null);
+            var mergedProperty = MappingProperty.WithChildren(property, children);
+            CopyPropertyMetadata(property, mergedProperty);
+            nodes.Add(new MergedNode(name, mergedProperty, children));
         }
 
         return nodes.Count > 0 ? new MergedProperties(nodes) : null;
@@ -809,22 +815,6 @@ public class ElasticMappingResolver : IDisposable
             return _inferrer.PropertyName(key);
 
         return key.Name;
-    }
-
-    /// <summary>
-    /// Returns the child properties a field name can descend into. Object and nested properties hold
-    /// sub-objects in <c>Properties</c>; every other property type can only hold multi-fields. Using one
-    /// accessor for every property type is what makes a multi-field on a keyword, date or numeric property
-    /// behave exactly like one on a text property.
-    /// </summary>
-    private static Properties? GetChildProperties(IProperty property)
-    {
-        return property switch
-        {
-            ObjectProperty objectProperty => objectProperty.Properties,
-            NestedProperty nestedProperty => nestedProperty.Properties,
-            _ => property.GetFields()
-        };
     }
 
     public static ElasticMappingResolver Create<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, ElasticsearchClient client, ILogger? logger = null) where T : class

@@ -205,5 +205,34 @@ public class MappingValidationTests
         Assert.Empty(result.UnresolvedFields);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ValidateQueryAsync_WithRepeatedRuntimeLookup_SharesOutcomeAndReleasesScope(bool defaults, bool throws)
+    {
+        int calls = 0;
+        using var resolver = new ElasticMappingResolver(CreateMapping);
+        var parser = new ElasticQueryParser(c => c.UseMappings(resolver).SetDefaultFields(["missing"])
+            .UseIncludes(new Dictionary<string, string> { { "fragment", defaults ? "value other" : "alias:value other:second" } })
+            .UseFieldMap(new FieldMap { { "alias", "missing" }, { "other", "missing" } })
+            .UseRuntimeFieldResolver(async _ =>
+            {
+                calls++;
+                await Task.Yield();
+                if (throws)
+                    throw new InvalidOperationException("runtime lookup failed");
+                return null;
+            }));
+        var context = new ElasticQueryVisitorContext();
+        var options = new QueryValidationOptions { AllowUnresolvedFields = false };
+
+        Assert.False((await parser.ValidateQueryAsync("@include:fragment", options, context)).IsValid);
+        Assert.Equal(1, calls);
+        Assert.False((await parser.ValidateQueryAsync("alias:value", options, context)).IsValid);
+        Assert.Equal(2, calls);
+    }
+
     private static TypeMapping CreateMapping() => new() { Properties = new Properties { { "known", new KeywordProperty() } } };
 }
