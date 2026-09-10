@@ -313,8 +313,8 @@ Visitors can handle different node types:
 // Common to all field nodes
 string field = node.Field;
 string unescapedField = node.UnescapedField;
-bool isNegated = node.IsNegated;
-string prefix = node.Prefix; // +, -, or null
+bool? isNegated = node.IsNegated; // true only for the NOT keyword
+string prefix = node.Prefix; // +, -, !, or null
 
 // TermNode specific
 string term = termNode.Term;
@@ -334,6 +334,39 @@ IQueryNode left = groupNode.Left;
 IQueryNode right = groupNode.Right;
 GroupOperator op = groupNode.Operator; // And, Or, Default
 bool hasParens = groupNode.HasParens;
+```
+
+### Negation and Prefix Operators
+
+Negation is stored in two different places depending on the syntax used:
+
+| Query | `IsNegated` | `Prefix` |
+|-------|-------------|----------|
+| `NOT field:value` | `true` | `null` |
+| `-field:value` | not `true` | `"-"` |
+| `!field:value` | not `true` | `"!"` |
+| `+field:value` | not `true` | `"+"` |
+
+`IsNegated` is a `bool?` that is only ever set to `true` by the `NOT` keyword. When `NOT` is absent it is left as `null` or `false` depending on which grammar rule matched, so always compare against `true` rather than treating it as a plain boolean.
+
+The split is intentional: keeping the operator that was actually written means `GenerateQueryVisitor` and `ToString()` round-trip the original query instead of rewriting `-value` into `NOT value`. As a result, `IsNegated` alone is never a complete negation check.
+
+Use the extension methods instead of inspecting the properties directly:
+
+- `IsExcluded()` - node-local negation, covering `NOT`, `-`, and `!`
+- `IsRequired()` - the `+` prefix
+- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group, and `false` when the node is required
+
+```csharp
+// Wrong: misses the ! prefix and any negation on the enclosing group
+bool isNegated = node.IsNegated.GetValueOrDefault() || node.Prefix == "-";
+
+// Right
+bool isNegated = node.IsExcluded();
+
+// Right, when negation on the enclosing group should also apply
+// e.g. the value term in -field:(value)
+bool isNegated = node.IsNodeOrGroupNegated();
 ```
 
 ### Node Data Dictionary

@@ -237,7 +237,7 @@ graph TD
 
 Key observations about this AST:
 - **GroupNode A** (`Field=@category`, `HasParens=true`, `Operator=Or`) is the outer scoped group. The PEG grammar's `paren_exp` rule sets `HasParens=true` on the `node` result, and then the `field_exp` rule sets `Field` and `Prefix` from the fieldname on that same node. The OR operator also lives on this node since the `node` grammar rule constructs a GroupNode with `Left`, `Operator`, and `Right`.
-- **GroupNode B** (`Field=@category`, `Prefix=-`, `HasParens=true`) is the inner negated field group. It was similarly produced by `paren_exp` setting `HasParens=true`, followed by `field_exp` setting `Field=@category` and `Prefix=-`.
+- **GroupNode B** (`Field=@category`, `Prefix=-`, `HasParens=true`) is the inner negated field group. It was similarly produced by `paren_exp` setting `HasParens=true`, followed by `field_exp` setting `Field=@category` and `Prefix=-`. Note that the `-` operator lands in `Prefix`, not `IsNegated`, so use `IsExcluded()` to detect the negation -- see [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 - **TermNode `value1`** has `Field = null`. When visitors call `GetDefaultFields`, it walks up to GroupNode B (which has parens and a non-empty Field) and resolves to `"@category"`.
 - **TermNode `value2`** has `Field = null`. When visitors call `GetDefaultFields`, it walks up to GroupNode A (which has parens and a non-empty Field) and resolves to `"@category"`.
 

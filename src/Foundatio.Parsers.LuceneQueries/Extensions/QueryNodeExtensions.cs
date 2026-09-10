@@ -30,6 +30,11 @@ public static class QueryNodeExtensions
             parent.Right = null;
     }
 
+    /// <summary>
+    /// Determines whether the node is negated by the <c>NOT</c> keyword or by a <c>-</c> or <c>!</c> prefix operator.
+    /// The parser stores the <c>NOT</c> keyword in <see cref="IFieldQueryNode.IsNegated"/> and the <c>-</c> and <c>!</c>
+    /// operators in <see cref="IFieldQueryNode.Prefix"/>, so neither property alone is a complete negation check.
+    /// </summary>
     public static bool IsExcluded(this IQueryNode node)
     {
         if (node == null)
@@ -41,6 +46,9 @@ public static class QueryNodeExtensions
         return false;
     }
 
+    /// <summary>
+    /// Determines whether the node is marked as required by the <c>+</c> prefix operator.
+    /// </summary>
     public static bool IsRequired(this IFieldQueryNode node)
     {
         if (node == null)
@@ -49,6 +57,10 @@ public static class QueryNodeExtensions
         return !String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+";
     }
 
+    /// <summary>
+    /// Determines whether the node is negated. Equivalent to <see cref="IsExcluded(IQueryNode)"/>.
+    /// </summary>
+    [Obsolete("Use IsExcluded() instead; this method is easily confused with the IsNegated property, which is only set by the NOT keyword.")]
     public static bool IsNegated(this IFieldQueryNode node)
     {
         return node.IsExcluded();
@@ -118,6 +130,10 @@ public static class QueryNodeExtensions
         });
     }
 
+    /// <summary>
+    /// Determines whether the node is negated, either directly or by the nearest enclosing parenthesized group.
+    /// Returns <c>false</c> when the node is marked as required by the <c>+</c> prefix operator.
+    /// </summary>
     public static bool IsNodeOrGroupNegated(this IFieldQueryNode node)
     {
         if (node.IsRequired())

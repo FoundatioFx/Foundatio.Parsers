@@ -267,6 +267,8 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.IsType<GroupNode>(result.Left);
         Assert.True((result.Left as GroupNode)!.HasParens);
         Assert.True((result.Left as GroupNode)!.IsNegated);
+        Assert.Null((result.Left as GroupNode)!.Prefix);
+        Assert.True((result.Left as GroupNode)!.IsExcluded());
     }
 
     [Fact]
@@ -299,6 +301,72 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.Equal("Apache Lucene", right.Term);
         Assert.Equal("-", right.Prefix);
         Assert.True(right.IsExcluded());
+
+        result = sut.Parse("+field:value");
+        ast = DebugQueryVisitor.Run(result);
+
+        left = result.Left as TermNode;
+        Assert.NotNull(left);
+        Assert.Equal("+", left.Prefix);
+        Assert.Null(left.IsNegated);
+        Assert.True(left.IsRequired());
+        Assert.False(left.IsExcluded());
+        Assert.False(left.IsNodeOrGroupNegated());
+    }
+
+    [Theory]
+    [InlineData("-field:value")]
+    [InlineData("!field:value")]
+    public void PrefixOperatorsAreStoredInPrefixAndNotIsNegated(string query)
+    {
+        var sut = new LuceneQueryParser();
+
+        var result = sut.Parse(query);
+        string ast = DebugQueryVisitor.Run(result);
+
+        var term = result.Left as TermNode;
+        Assert.NotNull(term);
+        Assert.Null(term.IsNegated);
+        Assert.Equal(query[0].ToString(), term.Prefix);
+        Assert.True(term.IsExcluded());
+        Assert.True(term.IsNodeOrGroupNegated());
+    }
+
+    [Fact]
+    public void NotKeywordIsStoredInIsNegatedAndNotPrefix()
+    {
+        var sut = new LuceneQueryParser();
+
+        var result = sut.Parse("NOT field:value");
+        string ast = DebugQueryVisitor.Run(result);
+
+        var term = result.Left as TermNode;
+        Assert.NotNull(term);
+        Assert.True(term.IsNegated);
+        Assert.Null(term.Prefix);
+        Assert.True(term.IsExcluded());
+        Assert.True(term.IsNodeOrGroupNegated());
+    }
+
+    [Fact]
+    public void CanDetectNegationFromEnclosingGroup()
+    {
+        var sut = new LuceneQueryParser();
+
+        var result = sut.Parse("-field:(value)");
+        string ast = DebugQueryVisitor.Run(result);
+
+        var group = result.Left as GroupNode;
+        Assert.NotNull(group);
+        Assert.True(group.HasParens);
+        Assert.Equal("-", group.Prefix);
+        Assert.NotEqual(true, group.IsNegated);
+        Assert.True(group.IsExcluded());
+
+        var term = group.Left as TermNode;
+        Assert.NotNull(term);
+        Assert.False(term.IsExcluded());
+        Assert.True(term.IsNodeOrGroupNegated());
     }
 
     [Fact]

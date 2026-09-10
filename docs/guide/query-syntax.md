@@ -186,6 +186,7 @@ Use prefix operators for required/excluded terms:
 |--------|-------------|
 | `+` | Term must be present (required) |
 | `-` | Term must not be present (excluded) |
+| `!` | Term must not be present (excluded) |
 
 ```csharp
 // Required term
@@ -197,6 +198,8 @@ result = parser.Parse("-deleted:true");
 // Combined
 result = parser.Parse("+status:active -deleted:true type:user");
 ```
+
+`-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. Use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 
 ## Grouping
 
