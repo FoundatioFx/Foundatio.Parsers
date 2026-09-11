@@ -343,6 +343,7 @@ Negation is stored in two different places depending on the syntax used:
 | Query | `IsNegated` | `Prefix` |
 |-------|-------------|----------|
 | `NOT field:value` | `true` | `null` |
+| `NOT [1 TO 2]` | `true` | `null` |
 | `-field:value` | not `true` | `"-"` |
 | `!field:value` | not `true` | `"!"` |
 | `+field:value` | not `true` | `"+"` |

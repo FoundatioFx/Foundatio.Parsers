@@ -93,8 +93,9 @@ field_exp<IQueryNode>
   }}
   / not:not_exp? name:fieldname? range:range_operator_exp
     {{
+        range.IsNegated = not.Any();
+
         if (name.Count == 1) {
-          range.IsNegated = not.Any();
           range.Field = name[0].Field;
           range.Prefix = name[0].Prefix;
         }
