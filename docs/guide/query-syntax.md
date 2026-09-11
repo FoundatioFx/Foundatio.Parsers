@@ -199,7 +199,7 @@ result = parser.Parse("-deleted:true");
 result = parser.Parse("+status:active -deleted:true type:user");
 ```
 
-`-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. Use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
+`-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. In query contexts, use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 
 ## Grouping
 

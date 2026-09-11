@@ -567,13 +567,49 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.NotNull(groupNode);
         Assert.True(groupNode.HasParens);
         Assert.Equal("-", groupNode.Prefix);
-        Assert.NotEqual(true, groupNode.IsNegated);
+        Assert.Null(groupNode.IsNegated);
         Assert.True(groupNode.IsExcluded());
 
         var termNode = groupNode.Left as TermNode;
         Assert.NotNull(termNode);
         Assert.False(termNode.IsExcluded());
         Assert.True(termNode.IsNodeOrGroupNegated());
+    }
+
+    [Theory]
+    [InlineData("NOT field:value", true, null, true, false)]
+    [InlineData("NOT [1 TO 2]", true, null, true, false)]
+    [InlineData("NOT >1", true, null, true, false)]
+    [InlineData("NOT field:[1 TO 2]", true, null, true, false)]
+    [InlineData("NOT _exists_:field", true, null, true, false)]
+    [InlineData("NOT _missing_:field", true, null, true, false)]
+    [InlineData("-field:value", null, "-", true, false)]
+    [InlineData("!field:value", null, "!", true, false)]
+    [InlineData("-[1 TO 2]", null, "-", true, false)]
+    [InlineData("!field:[1 TO 2]", null, "!", true, false)]
+    [InlineData("+field:value", null, "+", false, true)]
+    [InlineData("field:value", null, null, false, false)]
+    [InlineData("[1 TO 2]", null, null, false, false)]
+    [InlineData("field:[1 TO 2]", null, null, false, false)]
+    [InlineData("_exists_:field", null, null, false, false)]
+    public void Parse_WithNegation_StoresNotKeywordInIsNegatedAndOperatorsInPrefix(string query, bool? expectedIsNegated, string? expectedPrefix, bool expectedExcluded, bool expectedRequired)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse(query);
+
+        // Assert
+        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
+
+        var node = result.Left as IFieldQueryNode;
+        Assert.NotNull(node);
+        Assert.Equal(expectedIsNegated, node.IsNegated);
+        Assert.Equal(expectedPrefix, node.Prefix);
+        Assert.Equal(expectedExcluded, node.IsExcluded());
+        Assert.Equal(expectedRequired, node.IsRequired());
+        Assert.Equal(query, GenerateQueryVisitor.Run(result));
     }
 
     [Theory]
@@ -594,28 +630,32 @@ public class QueryParserTests : TestWithLoggingBase
         var rangeNode = result.Left as TermRangeNode;
         Assert.NotNull(rangeNode);
         Assert.True(rangeNode.IsNegated);
+        Assert.Null(rangeNode.Prefix);
         Assert.True(rangeNode.IsExcluded());
         Assert.Equal(query, GenerateQueryVisitor.Run(result));
+        Assert.Equal(query, CleanupQueryVisitor.Run(result));
     }
 
-    [Fact]
-    public void Parse_WithNotKeyword_SetsIsNegatedAndNotPrefix()
+    [Theory]
+    [InlineData("field:NOT (value)", "NOT field:(value)")]
+    [InlineData("field:NOT (a b)", "NOT field:(a b)")]
+    public void Parse_WithNotKeywordBeforeFieldGroup_PreservesNegation(string query, string expectedQuery)
     {
         // Arrange
         var parser = new LuceneQueryParser();
 
         // Act
-        var result = parser.Parse("NOT field:value");
+        var result = parser.Parse(query);
 
         // Assert
         _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
 
-        var termNode = result.Left as TermNode;
-        Assert.NotNull(termNode);
-        Assert.True(termNode.IsNegated);
-        Assert.Null(termNode.Prefix);
-        Assert.True(termNode.IsExcluded());
-        Assert.True(termNode.IsNodeOrGroupNegated());
+        var groupNode = result.Left as GroupNode;
+        Assert.NotNull(groupNode);
+        Assert.Equal("field", groupNode.Field);
+        Assert.True(groupNode.IsNegated);
+        Assert.True(groupNode.IsExcluded());
+        Assert.Equal(expectedQuery, GenerateQueryVisitor.Run(result));
     }
 
     [Fact]
@@ -631,28 +671,6 @@ public class QueryParserTests : TestWithLoggingBase
         var termNode = result.Left as TermNode;
         Assert.NotNull(termNode);
         Assert.Null(termNode.Proximity);
-    }
-
-    [Theory]
-    [InlineData("-field:value", "-")]
-    [InlineData("!field:value", "!")]
-    public void Parse_WithPrefixOperator_SetsPrefixAndNotIsNegated(string query, string expectedPrefix)
-    {
-        // Arrange
-        var parser = new LuceneQueryParser();
-
-        // Act
-        var result = parser.Parse(query);
-
-        // Assert
-        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
-
-        var termNode = result.Left as TermNode;
-        Assert.NotNull(termNode);
-        Assert.Null(termNode.IsNegated);
-        Assert.Equal(expectedPrefix, termNode.Prefix);
-        Assert.True(termNode.IsExcluded());
-        Assert.True(termNode.IsNodeOrGroupNegated());
     }
 
     [Theory]
@@ -683,13 +701,13 @@ public class QueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
-    public void Parse_WithRequiredPrefixOperator_IsRequiredAndNotExcluded()
+    public void Parse_WithRequiredPrefixAndNotKeyword_IsNodeOrGroupNegatedIgnoresNegation()
     {
         // Arrange
         var parser = new LuceneQueryParser();
 
         // Act
-        var result = parser.Parse("+field:value");
+        var result = parser.Parse("NOT +field:value");
 
         // Assert
         _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
@@ -697,9 +715,11 @@ public class QueryParserTests : TestWithLoggingBase
         var termNode = result.Left as TermNode;
         Assert.NotNull(termNode);
         Assert.Equal("+", termNode.Prefix);
-        Assert.Null(termNode.IsNegated);
+        Assert.True(termNode.IsNegated);
         Assert.True(termNode.IsRequired());
-        Assert.False(termNode.IsExcluded());
+        Assert.True(termNode.IsExcluded());
+
+        // IsNodeOrGroupNegated returns false when the node is required, even though NOT is present
         Assert.False(termNode.IsNodeOrGroupNegated());
     }
 }

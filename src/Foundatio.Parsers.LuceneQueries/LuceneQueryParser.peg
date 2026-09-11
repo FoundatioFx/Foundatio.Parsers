@@ -85,15 +85,16 @@ paren_exp<GroupNode>
 field_exp<IQueryNode>
   = not:not_exp? op:prefix_operator_exp? '_exists_' _* ':' _* fieldname:name_term
   {{
-        return new ExistsNode { IsNegated = not.Any(), Prefix = op.SingleOrDefault(), Field = fieldname };
+        return new ExistsNode { IsNegated = not.Any() ? true : null, Prefix = op.SingleOrDefault(), Field = fieldname };
   }}
   / not:not_exp? op:prefix_operator_exp? '_missing_' _* ':' _* fieldname:name_term
   {{
-        return new MissingNode { IsNegated = not.Any(), Prefix = op.SingleOrDefault(), Field = fieldname };
+        return new MissingNode { IsNegated = not.Any() ? true : null, Prefix = op.SingleOrDefault(), Field = fieldname };
   }}
   / not:not_exp? name:fieldname? range:range_operator_exp
     {{
-        range.IsNegated = not.Any();
+        if (not.Any())
+          range.IsNegated = true;
 
         if (name.Count == 1) {
           range.Field = name[0].Field;
@@ -104,13 +105,17 @@ field_exp<IQueryNode>
     }}
   / not:not_exp? op:prefix_operator_exp? range:range_operator_exp
     {{
-        range.IsNegated = not.Any();
+        if (not.Any())
+          range.IsNegated = true;
+
         range.Prefix = op.SingleOrDefault();
         return range;
     }}
   / not:not_exp? name:fieldname node:paren_exp
     {{
-        node.IsNegated = not.Any();
+        if (not.Any())
+          node.IsNegated = true;
+
         node.Field = name.Field;
         node.Prefix = name.Prefix;
         return node;

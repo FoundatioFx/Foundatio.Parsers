@@ -344,19 +344,19 @@ Negation is stored in two different places depending on the syntax used:
 |-------|-------------|----------|
 | `NOT field:value` | `true` | `null` |
 | `NOT [1 TO 2]` | `true` | `null` |
-| `-field:value` | not `true` | `"-"` |
-| `!field:value` | not `true` | `"!"` |
-| `+field:value` | not `true` | `"+"` |
+| `-field:value` | `null` | `"-"` |
+| `!field:value` | `null` | `"!"` |
+| `+field:value` | `null` | `"+"` |
 
-`IsNegated` is a `bool?` that is only ever set to `true` by the `NOT` keyword. When `NOT` is absent it is left as `null` or `false` depending on which grammar rule matched, so always compare against `true` rather than treating it as a plain boolean.
+`IsNegated` is a `bool?` that the parser sets to `true` only for the `NOT` keyword, leaving it `null` otherwise. Visitors that rewrite the tree (`InvertNegation`, `CleanupQueryVisitor`) may also set it, including to `false`, so compare against `true` rather than treating the value as a plain boolean.
 
 The split is intentional: keeping the operator that was actually written means `GenerateQueryVisitor` and `ToString()` round-trip the original query instead of rewriting `-value` into `NOT value`. As a result, `IsNegated` alone is never a complete negation check.
 
-Use the extension methods instead of inspecting the properties directly:
+In query contexts, use the extension methods instead of inspecting the properties directly:
 
 - `IsExcluded()` - node-local negation, covering `NOT`, `-`, and `!`
 - `IsRequired()` - the `+` prefix
-- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group, and `false` when the node is required
+- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group
 
 ```csharp
 // Wrong: misses the ! prefix and any negation on the enclosing group
@@ -369,6 +369,11 @@ bool isNegated = node.IsExcluded();
 // e.g. the value term in -field:(value)
 bool isNegated = node.IsNodeOrGroupNegated();
 ```
+
+Two caveats worth knowing:
+
+- `IsNodeOrGroupNegated()` checks only the nearest parenthesized group, not the whole ancestor chain, and returns `false` when the node carries a `+` prefix even if `NOT` is also present.
+- In sort and aggregation contexts a `-` prefix means **descending**, not negation (see `DefaultSortNodeExtensions` and `CombineAggregationsVisitor`). Do not use `IsExcluded()` to interpret sort direction.
 
 ### Node Data Dictionary
 
