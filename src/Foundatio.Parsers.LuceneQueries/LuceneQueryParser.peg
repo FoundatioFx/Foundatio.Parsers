@@ -123,7 +123,12 @@ field_exp<IQueryNode>
           node.IsNegated = false;
 
         node.Field = name.Field;
-        node.Prefix = name.Prefix;
+
+        // Likewise, paren_exp may have recorded a prefix written after the colon, as in field:-(value).
+        // Only let the fieldname's prefix win when it actually has one.
+        if (name.Prefix != null || node.Prefix == null)
+          node.Prefix = name.Prefix;
+
         return node;
     }}
   / not:not_exp? name:fieldname? term:term

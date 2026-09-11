@@ -1623,6 +1623,10 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     // Regression: both of these used to silently drop the NOT and match the wrong documents.
     [InlineData("field1:NOT (value1)")]
     [InlineData("NOT field1:(value1)")]
+    // Regression: a prefix written after the colon was overwritten by the field name's null prefix,
+    // so these matched documents they were meant to exclude.
+    [InlineData("field1:-(value1)")]
+    [InlineData("field1:!(value1)")]
     public async Task BuildQueryAsync_WithNegatedTerm_ProducesMustNotClause(string query)
     {
         // Arrange

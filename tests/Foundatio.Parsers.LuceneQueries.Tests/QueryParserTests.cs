@@ -718,6 +718,32 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.Equal(expectedQuery, GenerateQueryVisitor.Run(result));
     }
 
+    [Theory]
+    [InlineData("field:-(value)", "-field:(value)", "-", true, false)]
+    [InlineData("field:!(value)", "!field:(value)", "!", true, false)]
+    [InlineData("field:+(value)", "+field:(value)", "+", false, true)]
+    public void Parse_WithPrefixInsideFieldGroup_PreservesPrefix(string query, string expectedQuery, string expectedPrefix, bool expectedExcluded, bool expectedRequired)
+    {
+        // Arrange
+        // A prefix written after the colon is captured by paren_exp, and field_exp used to overwrite it
+        // with the field name's null prefix, silently dropping the operator.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse(query);
+
+        // Assert
+        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
+
+        var groupNode = result.Left as GroupNode;
+        Assert.NotNull(groupNode);
+        Assert.Equal("field", groupNode.Field);
+        Assert.Equal(expectedPrefix, groupNode.Prefix);
+        Assert.Equal(expectedExcluded, groupNode.IsExcluded());
+        Assert.Equal(expectedRequired, groupNode.IsRequired());
+        Assert.Equal(expectedQuery, GenerateQueryVisitor.Run(result));
+    }
+
     [Fact]
     public void Parse_WithoutProximityModifier_ProximityIsNull()
     {

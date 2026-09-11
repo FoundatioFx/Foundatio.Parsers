@@ -370,7 +370,9 @@ Narrowing the property to a non-nullable `bool` would be a reasonable cleanup, b
 
 Visitors that rewrite the tree (`InvertNegation`, `CleanupQueryVisitor`) also set this value, including to `false`.
 
-The split between the two properties is intentional: keeping the operator that was actually written means `GenerateQueryVisitor` and `ToString()` round-trip the original query instead of rewriting `-value` into `NOT value`. As a result, `IsNegated` alone is never a complete negation check.
+The split between the two properties is intentional: keeping the operator that was actually written means `GenerateQueryVisitor` and `ToString()` re-emit `-value` as `-value` rather than rewriting it to `NOT value`. As a result, `IsNegated` alone is never a complete negation check.
+
+Round-tripping preserves the operator, not always its position. A prefix or `NOT` written inside a scoped field group is re-emitted in the canonical leading position, so `field:-(value)` renders as `-field:(value)` and `field:NOT (value)` as `NOT field:(value)`. These are semantically equivalent.
 
 In query contexts, use the extension methods instead of inspecting the properties directly:
 
