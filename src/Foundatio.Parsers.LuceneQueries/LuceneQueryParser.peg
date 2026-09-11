@@ -97,7 +97,8 @@ field_exp<IQueryNode>
           range.Field = name[0].Field;
           range.Prefix = name[0].Prefix;
 
-          // An unqualified range leaves IsNegated unset, which is the value it has always had.
+          // A qualified range records an explicit false. An unqualified one is left unset,
+          // which is the value it has always had.
           range.IsNegated = false;
         }
 
