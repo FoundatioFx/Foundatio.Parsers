@@ -313,7 +313,7 @@ Visitors can handle different node types:
 // Common to all field nodes
 string field = node.Field;
 string unescapedField = node.UnescapedField;
-bool? isNegated = node.IsNegated; // true only for the NOT keyword
+bool? isNegated = node.IsNegated; // the NOT keyword; also set by tree-rewriting visitors
 string prefix = node.Prefix; // +, -, !, or null
 
 // TermNode specific
@@ -347,16 +347,37 @@ Negation is stored in two different places depending on the syntax used:
 | `-field:value` | `null` | `"-"` |
 | `!field:value` | `null` | `"!"` |
 | `+field:value` | `null` | `"+"` |
+| `field:value` | `null` | `null` |
+| `field:[1 TO 2]` | `false` | `null` |
+| `_exists_:field` | `false` | `null` |
 
-`IsNegated` is a `bool?` that the parser sets to `true` only for the `NOT` keyword, leaving it `null` otherwise. Visitors that rewrite the tree (`InvertNegation`, `CleanupQueryVisitor`) may also set it, including to `false`, so compare against `true` rather than treating the value as a plain boolean.
+#### Why `IsNegated` is a `bool?` and not a `bool`
 
-The split is intentional: keeping the operator that was actually written means `GenerateQueryVisitor` and `ToString()` round-trip the original query instead of rewriting `-value` into `NOT value`. As a result, `IsNegated` alone is never a complete negation check.
+The name reads like a boolean, and the nullability does not buy any semantics: `null` and `false` behave **identically** everywhere in the library. Feeding every combination of parent and child negation states through `CleanupQueryVisitor`'s group-collapse and double-negative logic produces the same output for `null` as for `false`; only `true` changes the result. The tri-state is a historical artifact, not a meaningful distinction.
+
+What differs between the two values is only incidental:
+
+- `DebugQueryVisitor` omits the `IsNegated` line entirely when the value is `null`.
+- `CopyTo` copies the value only when it is set, which reaches the same end state either way.
+- `.Value` throws on `null`, which is a hazard rather than a feature.
+
+Which of `null` or `false` a non-negated node receives varies by grammar rule, as the table above shows, and carries no meaning. So the practical rules are:
+
+- Compare against `true` (`node.IsNegated is true`); never treat it as a plain boolean and never rely on `false` versus `null`.
+- Never call `.Value` without checking `HasValue`.
+- Better still, call `IsExcluded()`, which handles all of this along with the `-` and `!` prefixes.
+
+Narrowing the property to a non-nullable `bool` would be a reasonable cleanup, but it is a breaking change to the public `IFieldQueryNode` interface and to every node type and custom visitor implementing it, so it belongs in a major version rather than here.
+
+Visitors that rewrite the tree (`InvertNegation`, `CleanupQueryVisitor`) also set this value, including to `false`.
+
+The split between the two properties is intentional: keeping the operator that was actually written means `GenerateQueryVisitor` and `ToString()` round-trip the original query instead of rewriting `-value` into `NOT value`. As a result, `IsNegated` alone is never a complete negation check.
 
 In query contexts, use the extension methods instead of inspecting the properties directly:
 
 - `IsExcluded()` - node-local negation, covering `NOT`, `-`, and `!`
 - `IsRequired()` - the `+` prefix
-- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group
+- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group. When called on a `GroupNode` that already has parens, `GetGroupNode()` returns that same node, so only the group's own negation is considered and an excluded parent group is not inspected.
 
 ```csharp
 // Wrong: misses the ! prefix and any negation on the enclosing group
@@ -372,7 +393,7 @@ bool isNegated = node.IsNodeOrGroupNegated();
 
 Two caveats worth knowing:
 
-- `IsNodeOrGroupNegated()` checks only the nearest parenthesized group, not the whole ancestor chain, and returns `false` when the node carries a `+` prefix even if `NOT` is also present.
+- `IsNodeOrGroupNegated()` walks only up to the nearest parenthesized group, not the whole ancestor chain, so the inner group in `NOT (a:(b))` reports `false`. It also returns `false` when the node carries a `+` prefix even if `NOT` is also present.
 - Outside of query contexts these operators are interpreted as ordering, not negation, and the set of operators that is honored differs:
   - **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`, so `-field`, `!field`, and `NOT field` all sort descending. Because that helper ignores negation when `+` is present, `NOT +field` sorts **ascending**.
   - **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and only honors `-` (descending) and `+` (ascending) on a sub-aggregation. `!` and the `NOT` keyword produce no `order` at all.

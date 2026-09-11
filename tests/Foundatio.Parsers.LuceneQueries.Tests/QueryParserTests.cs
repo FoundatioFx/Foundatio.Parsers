@@ -567,13 +567,70 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.NotNull(groupNode);
         Assert.True(groupNode.HasParens);
         Assert.Equal("-", groupNode.Prefix);
-        Assert.Null(groupNode.IsNegated);
+        Assert.False(groupNode.IsNegated);
         Assert.True(groupNode.IsExcluded());
 
         var termNode = groupNode.Left as TermNode;
         Assert.NotNull(termNode);
         Assert.False(termNode.IsExcluded());
         Assert.True(termNode.IsNodeOrGroupNegated());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CleanupQuery_WithNullOrFalseIsNegated_ProducesSameOutput(bool? outerIsNegated)
+    {
+        // Arrange
+        // IsNegated is a bool? but null and false carry no distinct meaning: only true is significant.
+        // This pins that equivalence through CleanupQueryVisitor's group-collapse and double-negative
+        // logic so a future change can't quietly make the two values behave differently.
+        var parser = new LuceneQueryParser();
+
+        string RunWithInner(bool? innerIsNegated)
+        {
+            var result = parser.Parse("NOT ((value))");
+            var outerGroup = (GroupNode)result.Left!;
+            outerGroup.IsNegated = outerIsNegated;
+            if (outerGroup.Left is GroupNode innerGroup)
+                innerGroup.IsNegated = innerIsNegated;
+
+            return CleanupQueryVisitor.Run(result) ?? String.Empty;
+        }
+
+        // Act
+        string withNull = RunWithInner(null);
+        string withFalse = RunWithInner(false);
+
+        // Assert
+        Assert.Equal(withNull, withFalse);
+    }
+
+    [Fact]
+    public void Parse_WithNestedGroupInsideExcludedGroup_IsNodeOrGroupNegatedIgnoresParent()
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse("-(field:(value))");
+
+        // Assert
+        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
+
+        var outerGroup = result.Left as GroupNode;
+        Assert.NotNull(outerGroup);
+        Assert.Equal("-", outerGroup.Prefix);
+        Assert.True(outerGroup.IsExcluded());
+
+        // The inner group already has parens, so GetGroupNode() returns the inner group itself and the
+        // excluded outer group is never inspected. Pinned because sort behavior depends on this helper.
+        var innerGroup = outerGroup.Left as GroupNode;
+        Assert.NotNull(innerGroup);
+        Assert.True(innerGroup.HasParens);
+        Assert.False(innerGroup.IsExcluded());
+        Assert.False(innerGroup.IsNodeOrGroupNegated());
     }
 
     [Theory]
@@ -585,13 +642,16 @@ public class QueryParserTests : TestWithLoggingBase
     [InlineData("NOT _missing_:field", true, null, true, false)]
     [InlineData("-field:value", null, "-", true, false)]
     [InlineData("!field:value", null, "!", true, false)]
-    [InlineData("-[1 TO 2]", null, "-", true, false)]
-    [InlineData("!field:[1 TO 2]", null, "!", true, false)]
+    [InlineData("-[1 TO 2]", false, "-", true, false)]
+    [InlineData("!field:[1 TO 2]", false, "!", true, false)]
     [InlineData("+field:value", null, "+", false, true)]
     [InlineData("field:value", null, null, false, false)]
+    // Whether a non-negated node reports null or false is inconsistent by rule and is asserted
+    // here as-is to lock the existing public AST. Always compare IsNegated against true.
     [InlineData("[1 TO 2]", null, null, false, false)]
-    [InlineData("field:[1 TO 2]", null, null, false, false)]
-    [InlineData("_exists_:field", null, null, false, false)]
+    [InlineData("field:[1 TO 2]", false, null, false, false)]
+    [InlineData("_exists_:field", false, null, false, false)]
+    [InlineData("_missing_:field", false, null, false, false)]
     public void Parse_WithNegation_StoresNotKeywordInIsNegatedAndOperatorsInPrefix(string query, bool? expectedIsNegated, string? expectedPrefix, bool expectedExcluded, bool expectedRequired)
     {
         // Arrange

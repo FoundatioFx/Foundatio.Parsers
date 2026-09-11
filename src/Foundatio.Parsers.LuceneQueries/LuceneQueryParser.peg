@@ -85,36 +85,39 @@ paren_exp<GroupNode>
 field_exp<IQueryNode>
   = not:not_exp? op:prefix_operator_exp? '_exists_' _* ':' _* fieldname:name_term
   {{
-        return new ExistsNode { IsNegated = not.Any() ? true : null, Prefix = op.SingleOrDefault(), Field = fieldname };
+        return new ExistsNode { IsNegated = not.Any(), Prefix = op.SingleOrDefault(), Field = fieldname };
   }}
   / not:not_exp? op:prefix_operator_exp? '_missing_' _* ':' _* fieldname:name_term
   {{
-        return new MissingNode { IsNegated = not.Any() ? true : null, Prefix = op.SingleOrDefault(), Field = fieldname };
+        return new MissingNode { IsNegated = not.Any(), Prefix = op.SingleOrDefault(), Field = fieldname };
   }}
   / not:not_exp? name:fieldname? range:range_operator_exp
     {{
-        if (not.Any())
-          range.IsNegated = true;
-
         if (name.Count == 1) {
+          range.IsNegated = not.Any();
           range.Field = name[0].Field;
           range.Prefix = name[0].Prefix;
+        }
+        else if (not.Any()) {
+          range.IsNegated = true;
         }
 
         return range;
     }}
   / not:not_exp? op:prefix_operator_exp? range:range_operator_exp
     {{
-        if (not.Any())
-          range.IsNegated = true;
-
+        range.IsNegated = not.Any();
         range.Prefix = op.SingleOrDefault();
         return range;
     }}
   / not:not_exp? name:fieldname node:paren_exp
     {{
+        // paren_exp already set IsNegated for a NOT inside the parens, so only overwrite it
+        // when this rule has its own NOT; otherwise default an unset value to false.
         if (not.Any())
           node.IsNegated = true;
+        else if (node.IsNegated == null)
+          node.IsNegated = false;
 
         node.Field = name.Field;
         node.Prefix = name.Prefix;

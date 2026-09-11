@@ -55,6 +55,12 @@ public interface IFieldQueryNode : IQueryNode
     /// <c>IsExcluded()</c> extension method, which covers all three forms. Visitors that rewrite the query tree
     /// may also set this value.
     /// </summary>
+    /// <remarks>
+    /// The nullability carries no meaning: <c>null</c> and <c>false</c> behave identically throughout the library,
+    /// and which one a non-negated node receives varies by grammar rule. Only <c>true</c> is significant. Always
+    /// compare against <c>true</c> rather than treating this as a plain boolean, and never call <c>.Value</c>
+    /// without checking <c>HasValue</c> first.
+    /// </remarks>
     bool? IsNegated { get; set; }
 
     /// <summary>
