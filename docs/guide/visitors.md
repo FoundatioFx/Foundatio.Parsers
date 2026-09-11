@@ -373,7 +373,11 @@ bool isNegated = node.IsNodeOrGroupNegated();
 Two caveats worth knowing:
 
 - `IsNodeOrGroupNegated()` checks only the nearest parenthesized group, not the whole ancestor chain, and returns `false` when the node carries a `+` prefix even if `NOT` is also present.
-- In sort and aggregation contexts a `-` prefix means **descending**, not negation (see `DefaultSortNodeExtensions` and `CombineAggregationsVisitor`). Do not use `IsExcluded()` to interpret sort direction.
+- Outside of query contexts these operators are interpreted as ordering, not negation, and the set of operators that is honored differs:
+  - **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`, so `-field`, `!field`, and `NOT field` all sort descending. Because that helper ignores negation when `+` is present, `NOT +field` sorts **ascending**.
+  - **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and only honors `-` (descending) and `+` (ascending) on a sub-aggregation. `!` and the `NOT` keyword produce no `order` at all.
+
+  Do not use `IsExcluded()` to interpret sort or aggregation direction.
 
 ### Node Data Dictionary
 

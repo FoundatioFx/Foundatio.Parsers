@@ -1578,6 +1578,82 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
+    [Theory]
+    [InlineData("field1", SortOrder.Asc)]
+    [InlineData("+field1", SortOrder.Asc)]
+    [InlineData("-field1", SortOrder.Desc)]
+    [InlineData("!field1", SortOrder.Desc)]
+    [InlineData("NOT field1", SortOrder.Desc)]
+    [InlineData("NOT -field1", SortOrder.Desc)]
+    // A "+" prefix wins over a "NOT" keyword because IsNodeOrGroupNegated() returns false when
+    // IsRequired() is true. In a sort context that means "NOT +field1" sorts ascending. This is
+    // pre-existing behavior and is pinned here so it cannot change silently.
+    [InlineData("NOT +field1", SortOrder.Asc)]
+    public async Task BuildSortAsync_WithNegationAndPrefixOperators_MapsToSortOrder(string sort, SortOrder expectedOrder)
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<MyType>(m => m.Dynamic(DynamicMapping.True));
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
+
+        // Act
+        var actualSort = await processor.BuildSortAsync(sort);
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Sort(actualSort), TestCancellationToken);
+
+        // Assert
+        Assert.True(actualResponse.IsValidResponse);
+        string actualRequest = actualResponse.GetRequest(true);
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
+            .Sort(s => s.Field(f => f.Field1, so => so.Order(expectedOrder).UnmappedType(FieldType.Keyword))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest(true);
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+    }
+
+    [Theory]
+    [InlineData("NOT field1:value1")]
+    [InlineData("-field1:value1")]
+    [InlineData("!field1:value1")]
+    // Unlike the sort context above, the query path uses IsExcluded(), which ignores the "+"
+    // prefix, so the NOT keyword is still honored and this produces a must_not clause.
+    [InlineData("NOT +field1:value1")]
+    [InlineData("NOT -field1:value1")]
+    // Regression: both of these used to silently drop the NOT and match the wrong documents.
+    [InlineData("field1:NOT (value1)")]
+    [InlineData("NOT field1:(value1)")]
+    public async Task BuildQueryAsync_WithNegatedTerm_ProducesMustNotClause(string query)
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<MyType>();
+        await Client.IndexManyAsync([
+            new MyType { Field1 = "value1" },
+            new MyType { Field1 = "value2" }
+        ], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
+
+        // Act
+        var result = await processor.BuildQueryAsync(query);
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
+
+        // Assert
+        Assert.True(actualResponse.IsValidResponse);
+        string actualRequest = actualResponse.GetRequest(true);
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
+            .Query(q => q.Bool(b => b.Filter(f => f.Bool(b2 => b2
+                .MustNot(mn => mn.Match(m => m.Field(tf => tf.Field1).Query("value1"))))))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest(true);
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.Equal(expectedResponse.Total, actualResponse.Total);
+        Assert.Equal(1, actualResponse.Total);
+    }
+
     [Fact]
     public async Task GeoRangeQueryProcessor()
     {
