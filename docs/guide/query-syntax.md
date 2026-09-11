@@ -201,6 +201,8 @@ result = parser.Parse("+status:active -deleted:true type:user");
 
 `-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. In query contexts, use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 
+These operators may be written either before the field name or immediately after the colon, and both forms are equivalent: `-field:value` and `field:-value` parse the same, as do `-field:(value)` and `field:-(value)`. The one exception is ranges, where only the leading position is accepted -- `-field:[1 TO 2]` and `NOT field:[1 TO 2]` work, while `field:-[1 TO 2]` and `field:NOT [1 TO 2]` throw a `FormatException`.
+
 ## Grouping
 
 Use parentheses to group clauses and control precedence:

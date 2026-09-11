@@ -744,6 +744,69 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.Equal(expectedQuery, GenerateQueryVisitor.Run(result));
     }
 
+    [Theory]
+    [InlineData("field1:value1")]
+    [InlineData("NOT field1:value1")]
+    [InlineData("field1:NOT value1")]
+    [InlineData("-field1:value1")]
+    [InlineData("field1:-value1")]
+    [InlineData("!field1:value1")]
+    [InlineData("field1:!value1")]
+    [InlineData("+field1:value1")]
+    [InlineData("field1:+value1")]
+    [InlineData("field1:(value1)")]
+    [InlineData("NOT field1:(value1)")]
+    [InlineData("field1:NOT (value1)")]
+    [InlineData("-field1:(value1)")]
+    [InlineData("field1:-(value1)")]
+    [InlineData("!field1:(value1)")]
+    [InlineData("field1:!(value1)")]
+    [InlineData("+field1:(value1)")]
+    [InlineData("field1:+(value1)")]
+    [InlineData("field1:(-value1)")]
+    [InlineData("field1:(NOT value1)")]
+    [InlineData("(field1:value1)")]
+    [InlineData("NOT (field1:value1)")]
+    [InlineData("-(field1:value1)")]
+    [InlineData("!(field1:value1)")]
+    [InlineData("NOT (NOT field1:value1)")]
+    [InlineData("-(-field1:value1)")]
+    [InlineData("field4:[1 TO 2]")]
+    [InlineData("NOT field4:[1 TO 2]")]
+    [InlineData("-field4:[1 TO 2]")]
+    [InlineData("!field4:[1 TO 2]")]
+    [InlineData("[1 TO 2]")]
+    [InlineData("NOT [1 TO 2]")]
+    [InlineData("-[1 TO 2]")]
+    [InlineData("field4:<3")]
+    [InlineData("NOT field4:<3")]
+    [InlineData("-field4:<3")]
+    [InlineData("_exists_:field2")]
+    [InlineData("NOT _exists_:field2")]
+    [InlineData("-_exists_:field2")]
+    [InlineData("!_exists_:field2")]
+    [InlineData("_missing_:field2")]
+    [InlineData("NOT _missing_:field2")]
+    [InlineData("-_missing_:field2")]
+    [InlineData("field1:value1 AND NOT field2:value2")]
+    [InlineData("NOT field1:value1 OR -field2:value2")]
+    [InlineData("field1:value1 AND (NOT field2:value2 OR -field3:value3)")]
+    public void Parse_WithNegationOrPrefix_GeneratedQueryReparsesToItself(string query)
+    {
+        // Arrange
+        // Negation may be re-emitted in the canonical leading position, so the first generated query is
+        // not always the input. It must be a fixed point though: re-parsing it has to produce the same text,
+        // otherwise a prefix or NOT is being dropped or duplicated somewhere in the round trip.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        string generated = GenerateQueryVisitor.Run(parser.Parse(query));
+        string regenerated = GenerateQueryVisitor.Run(parser.Parse(generated));
+
+        // Assert
+        Assert.Equal(generated, regenerated);
+    }
+
     [Fact]
     public void Parse_WithoutProximityModifier_ProximityIsNull()
     {

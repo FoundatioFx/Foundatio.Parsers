@@ -96,14 +96,13 @@ field_exp<IQueryNode>
         if (name.Count == 1) {
           range.Field = name[0].Field;
           range.Prefix = name[0].Prefix;
+
+          // An unqualified range leaves IsNegated unset, which is the value it has always had.
+          range.IsNegated = false;
         }
 
-        // A NOT keyword always negates. Without one, only a qualified range records an explicit
-        // false; an unqualified range leaves IsNegated unset, which is the value it has always had.
         if (not.Any())
           range.IsNegated = true;
-        else if (name.Count == 1)
-          range.IsNegated = false;
 
         return range;
     }}
@@ -115,19 +114,11 @@ field_exp<IQueryNode>
     }}
   / not:not_exp? name:fieldname node:paren_exp
     {{
-        // paren_exp already recorded a NOT that appeared inside the parens, as in field:NOT (value),
-        // so only overwrite it when this rule matched its own NOT.
-        if (not.Any())
-          node.IsNegated = true;
-        else if (node.IsNegated == null)
-          node.IsNegated = false;
-
+        // paren_exp may have already recorded a NOT or a prefix that was written after the colon,
+        // as in field:NOT (value) or field:-(value), so combine with it rather than overwrite it.
+        node.IsNegated = not.Any() || node.IsNegated == true;
         node.Field = name.Field;
-
-        // Likewise, paren_exp may have recorded a prefix written after the colon, as in field:-(value).
-        // Only let the fieldname's prefix win when it actually has one.
-        if (name.Prefix != null || node.Prefix == null)
-          node.Prefix = name.Prefix;
+        node.Prefix = name.Prefix ?? node.Prefix;
 
         return node;
     }}
