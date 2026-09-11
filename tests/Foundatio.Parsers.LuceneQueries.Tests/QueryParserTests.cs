@@ -548,7 +548,7 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.NotNull(termNode);
         Assert.Equal("Wellness", termNode.Term);
         Assert.True(termNode.IsQuotedTerm);
-        Assert.Equal("", termNode.Proximity);
+        Assert.Equal(String.Empty, termNode.Proximity);
     }
 
     [Fact]

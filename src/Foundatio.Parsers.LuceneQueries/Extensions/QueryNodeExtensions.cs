@@ -54,7 +54,7 @@ public static class QueryNodeExtensions
         if (node == null)
             return false;
 
-        return !String.IsNullOrEmpty(node.Prefix) && node.Prefix == "+";
+        return !String.IsNullOrEmpty(node.Prefix) && String.Equals(node.Prefix, "+", StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -107,7 +107,7 @@ public static class QueryNodeExtensions
             {
                 fieldNode.IsNegated = null;
             }
-            else if (!String.IsNullOrEmpty(fieldNode.Prefix) && (fieldNode.Prefix == "-" || fieldNode.Prefix == "!"))
+            else if (!String.IsNullOrEmpty(fieldNode.Prefix) && (String.Equals(fieldNode.Prefix, "-", StringComparison.Ordinal) || String.Equals(fieldNode.Prefix, "!", StringComparison.Ordinal)))
             {
                 fieldNode.Prefix = null;
             }
