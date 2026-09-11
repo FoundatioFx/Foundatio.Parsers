@@ -353,17 +353,16 @@ Negation is stored in two different places depending on the syntax used:
 
 #### Why `IsNegated` is a `bool?` and not a `bool`
 
-The name reads like a boolean, and the nullability does not buy any semantics: `null` and `false` behave **identically** everywhere in the library. Feeding every combination of parent and child negation states through `CleanupQueryVisitor`'s group-collapse and double-negative logic produces the same output for `null` as for `false`; only `true` changes the result. The tri-state is a historical artifact, not a meaningful distinction.
+The name reads like a boolean, so the nullability invites the question of whether `null` means something `false` does not. For **query rendering** it does not: flipping any non-negated node between `null` and `false` across a corpus of nested, grouped and negated queries produces byte-identical output from both `CleanupQueryVisitor` and `GenerateQueryVisitor`, including through the group-collapse and double-negative folding. Only `true` changes the result. Every consumer in the repo tests `HasValue && Value` or `is true`, so none of them distinguishes the two.
 
-What differs between the two values is only incidental:
+Two places do observe the difference, so `null` and `false` are not strictly interchangeable:
 
-- `DebugQueryVisitor` omits the `IsNegated` line entirely when the value is `null`.
-- `CopyTo` copies the value only when it is set, which reaches the same end state either way.
-- `.Value` throws on `null`, which is a hazard rather than a feature.
+- `DebugQueryVisitor` prints an `IsNegated` line only when the value is set, so `false` adds a line that `null` omits.
+- `CopyTo` copies the value only when it is set, so copying a `null` source over a `true` target leaves `true`, while copying a `false` source overwrites it with `false`.
 
-Which of `null` or `false` a non-negated node receives varies by grammar rule, as the table above shows, and carries no meaning. So the practical rules are:
+Neither is a semantic distinction worth relying on, and which value a non-negated node receives varies by grammar rule (see the table above) with no meaning attached. The practical rules are:
 
-- Compare against `true` (`node.IsNegated is true`); never treat it as a plain boolean and never rely on `false` versus `null`.
+- Compare against `true` (`node.IsNegated is true`); never treat it as a plain boolean and never branch on `false` versus `null`.
 - Never call `.Value` without checking `HasValue`.
 - Better still, call `IsExcluded()`, which handles all of this along with the `-` and `!` prefixes.
 

@@ -56,8 +56,8 @@ public interface IFieldQueryNode : IQueryNode
     /// may also set this value.
     /// </summary>
     /// <remarks>
-    /// The nullability carries no meaning: <c>null</c> and <c>false</c> behave identically throughout the library,
-    /// and which one a non-negated node receives varies by grammar rule. Only <c>true</c> is significant. Always
+    /// Only <c>true</c> is significant. <c>null</c> and <c>false</c> render identically and every consumer tests for
+    /// <c>true</c>, so which one a non-negated node receives (it varies by grammar rule) carries no meaning. Always
     /// compare against <c>true</c> rather than treating this as a plain boolean, and never call <c>.Value</c>
     /// without checking <c>HasValue</c> first.
     /// </remarks>

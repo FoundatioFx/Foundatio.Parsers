@@ -94,13 +94,16 @@ field_exp<IQueryNode>
   / not:not_exp? name:fieldname? range:range_operator_exp
     {{
         if (name.Count == 1) {
-          range.IsNegated = not.Any();
           range.Field = name[0].Field;
           range.Prefix = name[0].Prefix;
         }
-        else if (not.Any()) {
+
+        // A NOT keyword always negates. Without one, only a qualified range records an explicit
+        // false; an unqualified range leaves IsNegated unset, which is the value it has always had.
+        if (not.Any())
           range.IsNegated = true;
-        }
+        else if (name.Count == 1)
+          range.IsNegated = false;
 
         return range;
     }}
@@ -112,8 +115,8 @@ field_exp<IQueryNode>
     }}
   / not:not_exp? name:fieldname node:paren_exp
     {{
-        // paren_exp already set IsNegated for a NOT inside the parens, so only overwrite it
-        // when this rule has its own NOT; otherwise default an unset value to false.
+        // paren_exp already recorded a NOT that appeared inside the parens, as in field:NOT (value),
+        // so only overwrite it when this rule matched its own NOT.
         if (not.Any())
           node.IsNegated = true;
         else if (node.IsNegated == null)
