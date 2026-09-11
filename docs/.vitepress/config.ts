@@ -42,6 +42,7 @@ export default withMermaid(defineConfig({
           text: 'Core Concepts',
           items: [
             { text: 'Query Syntax', link: '/guide/query-syntax' },
+            { text: 'Syntax Compatibility', link: '/guide/syntax-compatibility' },
             { text: 'Aggregation Syntax', link: '/guide/aggregation-syntax' },
             { text: 'Field Aliases', link: '/guide/field-aliases' },
             { text: 'Query Includes', link: '/guide/query-includes' },

@@ -107,7 +107,7 @@ var results = await db.Products
 - **Date math**: `created:[now-7d TO now]`
 - **Geo queries**: `location:75044~75mi`
 
-[Full Query Syntax Reference](https://parsers.foundatio.dev/guide/query-syntax)
+[Full Query Syntax Reference](https://parsers.foundatio.dev/guide/query-syntax) | [Syntax Compatibility with Lucene/Elasticsearch](https://parsers.foundatio.dev/guide/syntax-compatibility)
 
 ### Aggregations
 - **Metrics**: `min`, `max`, `avg`, `sum`, `stats`, `cardinality`, `percentiles`

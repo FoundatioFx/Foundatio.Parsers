@@ -1,6 +1,6 @@
 # Query Syntax
 
-The query syntax is based on [Lucene query syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and is compatible with [Elasticsearch query_string](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html).
+The query syntax is based on [Lucene query syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and is compatible with [Elasticsearch query_string](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html). This library extends both with a few of its own constructs -- see [Syntax Compatibility](./syntax-compatibility) for exactly where it deviates and how much that matters.
 
 ## Basic Queries
 
@@ -435,6 +435,7 @@ string normalized = GenerateQueryVisitor.Run(result);
 
 ## Next Steps
 
+- [Syntax Compatibility](./syntax-compatibility) - Where this syntax deviates from Lucene/Elasticsearch, and how much it matters
 - [Aggregation Syntax](./aggregation-syntax) - Dynamic aggregation expressions
 - [Field Aliases](./field-aliases) - Map field names
 - [Validation](./validation) - Validate and restrict queries
