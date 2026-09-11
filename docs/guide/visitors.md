@@ -378,7 +378,7 @@ In query contexts, use the extension methods instead of inspecting the propertie
 
 - `IsExcluded()` - node-local negation, covering `NOT`, `-`, and `!`
 - `IsRequired()` - the `+` prefix
-- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group. When called on a `GroupNode` that already has parens, `GetGroupNode()` returns that same node, so only the group's own negation is considered and an excluded parent group is not inspected.
+- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group.
 
 ```csharp
 // Wrong: misses the ! prefix and any negation on the enclosing group
@@ -394,7 +394,7 @@ bool isNegated = node.IsNodeOrGroupNegated();
 
 Two caveats worth knowing:
 
-- `IsNodeOrGroupNegated()` walks only up to the nearest parenthesized group, not the whole ancestor chain, so the inner group in `NOT (a:(b))` reports `false`. It also returns `false` when the node carries a `+` prefix even if `NOT` is also present.
+- `IsNodeOrGroupNegated()` walks up to the nearest enclosing parenthesized group, not the whole ancestor chain beyond it, so the innermost group in `NOT (a:(b:(c)))` reports `false` for `c`. It also returns `false` when the node carries a `+` prefix even if `NOT` is also present.
 - Outside of query contexts these operators are interpreted as ordering, not negation, and only `+` (ascending) and `-` (descending) are accepted:
   - **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`. For standalone fields, `-field` sorts descending and `field` / `+field` sort ascending. Unprefixed terms can inherit group direction; `-(price name +rank)` sorts `price` and `name` descending, with `rank` ascending because of its own `+`.
   - **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and honors `-` (descending) and `+` (ascending) on a sub-aggregation.

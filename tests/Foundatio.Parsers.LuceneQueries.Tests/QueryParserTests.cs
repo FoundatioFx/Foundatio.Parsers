@@ -608,7 +608,7 @@ public class QueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
-    public void Parse_WithNestedGroupInsideExcludedGroup_IsNodeOrGroupNegatedIgnoresParent()
+    public void Parse_WithNestedGroupInsideExcludedGroup_IsNodeOrGroupNegatedInspectsParent()
     {
         // Arrange
         var parser = new LuceneQueryParser();
@@ -624,13 +624,13 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.Equal("-", outerGroup.Prefix);
         Assert.True(outerGroup.IsExcluded());
 
-        // The inner group already has parens, so GetGroupNode() returns the inner group itself and the
-        // excluded outer group is never inspected. Pinned because sort behavior depends on this helper.
+        // The inner group already has parens, so the search must start at its parent rather than
+        // matching itself, or the excluded outer group would never be inspected.
         var innerGroup = outerGroup.Left as GroupNode;
         Assert.NotNull(innerGroup);
         Assert.True(innerGroup.HasParens);
         Assert.False(innerGroup.IsExcluded());
-        Assert.False(innerGroup.IsNodeOrGroupNegated());
+        Assert.True(innerGroup.IsNodeOrGroupNegated());
     }
 
     [Theory]
