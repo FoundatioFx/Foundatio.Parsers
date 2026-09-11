@@ -50,12 +50,23 @@ public interface IQueryNode
 public interface IFieldQueryNode : IQueryNode
 {
     /// <summary>
-    /// Whether this node is negated (NOT operator applied).
+    /// Whether this node is negated by the <c>NOT</c> keyword. The <c>-</c> and <c>!</c> operators are stored in
+    /// <see cref="Prefix"/> instead, so this property alone is not a complete negation check. Prefer the
+    /// <c>IsExcluded()</c> extension method, which covers all three forms. Visitors that rewrite the query tree
+    /// may also set this value.
     /// </summary>
+    /// <remarks>
+    /// Only <c>true</c> is significant. <c>null</c> and <c>false</c> render identically and every consumer tests for
+    /// <c>true</c>, so which one a non-negated node receives (it varies by grammar rule) carries no meaning. Always
+    /// compare against <c>true</c> rather than treating this as a plain boolean, and never call <c>.Value</c>
+    /// without checking <c>HasValue</c> first.
+    /// </remarks>
     bool? IsNegated { get; set; }
 
     /// <summary>
-    /// The prefix modifier (+, -, etc.) applied to this node.
+    /// The verbatim prefix operator (<c>+</c>, <c>-</c>, or <c>!</c>) as written in the query, preserved so the
+    /// original syntax round-trips. Prefer the <c>IsExcluded()</c> and <c>IsRequired()</c> extension methods over
+    /// interpreting this value directly.
     /// </summary>
     string? Prefix { get; set; }
 

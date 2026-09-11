@@ -94,10 +94,16 @@ field_exp<IQueryNode>
   / not:not_exp? name:fieldname? range:range_operator_exp
     {{
         if (name.Count == 1) {
-          range.IsNegated = not.Any();
           range.Field = name[0].Field;
           range.Prefix = name[0].Prefix;
+
+          // A qualified range records an explicit false. An unqualified one is left unset,
+          // which is the value it has always had.
+          range.IsNegated = false;
         }
+
+        if (not.Any())
+          range.IsNegated = true;
 
         return range;
     }}
@@ -109,9 +115,12 @@ field_exp<IQueryNode>
     }}
   / not:not_exp? name:fieldname node:paren_exp
     {{
-        node.IsNegated = not.Any();
+        // paren_exp may have already recorded a NOT or a prefix that was written after the colon,
+        // as in field:NOT (value) or field:-(value), so combine with it rather than overwrite it.
+        node.IsNegated = not.Any() || node.IsNegated == true;
         node.Field = name.Field;
-        node.Prefix = name.Prefix;
+        node.Prefix = name.Prefix ?? node.Prefix;
+
         return node;
     }}
   / not:not_exp? name:fieldname? term:term

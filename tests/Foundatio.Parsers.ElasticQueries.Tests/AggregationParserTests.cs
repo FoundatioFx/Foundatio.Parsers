@@ -550,6 +550,71 @@ public class AggregationParserTests : ElasticsearchTestBase
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
     }
 
+    [Theory]
+    [InlineData("-cardinality:field4", SortOrder.Desc)]
+    [InlineData("+cardinality:field4", SortOrder.Asc)]
+    public async Task BuildAggregationsAsync_WithPrefixedSubAggregation_AppliesTermsOrder(string subAggregation, SortOrder expectedOrder)
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<MyType>();
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
+
+        // Act
+        var aggregations = await processor.BuildAggregationsAsync($"terms:(field1 {subAggregation})");
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
+
+        // Assert
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
+            .Add("terms_field1", a1 => a1
+                .Terms(t => t.Field("field1.keyword").Order(new List<KeyValuePair<Field, SortOrder>> { new("cardinality_field4", expectedOrder) }))
+                    .Aggregations(a2 => a2.Add("cardinality_field4", a3 => a3.Cardinality(c => c.Field(f => f.Field4))))
+                .Meta(m => m.Add("@field_type", "keyword")))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.True(actualResponse.IsValidResponse);
+    }
+
+    [Theory]
+    [InlineData("cardinality:field4")]
+    // Aggregation ordering reads Prefix directly and only honors "-" and "+". The "!" prefix and
+    // the NOT keyword are negation operators, not ordering operators, so they produce no order.
+    [InlineData("!cardinality:field4")]
+    [InlineData("NOT cardinality:field4")]
+    public async Task BuildAggregationsAsync_WithNonOrderingSubAggregation_OmitsTermsOrder(string subAggregation)
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<MyType>();
+        await Client.IndexManyAsync([new MyType { Field1 = "value1" }], index, TestCancellationToken);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
+
+        // Act
+        var aggregations = await processor.BuildAggregationsAsync($"terms:(field1 {subAggregation})");
+        var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(aggregations), TestCancellationToken);
+
+        // Assert
+        string actualRequest = actualResponse.GetRequest();
+        _logger.LogInformation("Actual: {Request}", actualRequest);
+
+        var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Aggregations(a => a
+            .Add("terms_field1", a1 => a1
+                .Terms(t => t.Field("field1.keyword"))
+                    .Aggregations(a2 => a2.Add("cardinality_field4", a3 => a3.Cardinality(c => c.Field(f => f.Field4))))
+                .Meta(m => m.Add("@field_type", "keyword")))), TestCancellationToken);
+        string expectedRequest = expectedResponse.GetRequest();
+        _logger.LogInformation("Expected: {Request}", expectedRequest);
+
+        Assert.Equal(expectedRequest, actualRequest);
+        Assert.True(actualResponse.IsValidResponse);
+    }
+
     [Fact]
     public async Task ProcessDateHistogramAggregations()
     {
