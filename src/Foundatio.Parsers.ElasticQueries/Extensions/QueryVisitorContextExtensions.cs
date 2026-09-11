@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -10,6 +12,123 @@ namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
 public static class QueryVisitorContextExtensions
 {
+    private const string MappingResultsKey = "@MappingResults";
+
+    internal static MappingResultScope BeginMappingScope(this IQueryVisitorContext context)
+    {
+        if (GetMappingResults(context) is not null)
+            return default;
+
+        context.Data[MappingResultsKey] = new MappingResults();
+        return new MappingResultScope(context);
+    }
+
+    internal static void SetMappingResult(this IQueryVisitorContext context, string requestedField, FieldMapping? mapping,
+        string? resolvedField = null)
+    {
+        if (mapping is null || GetMappingResults(context) is not { } mappings)
+            return;
+
+        mappings.Fields[requestedField] = new MappingResult(mapping, resolvedField ?? mapping.FullPath);
+        mappings.Fields[mapping.FullPath] = new MappingResult(mapping, mapping.FullPath);
+        if (!String.IsNullOrEmpty(resolvedField))
+            mappings.Fields[resolvedField] = new MappingResult(mapping, resolvedField);
+    }
+
+    internal static bool TryGetMappingResult(this IQueryVisitorContext context, string? field, out FieldMapping? mapping)
+    {
+        mapping = null;
+        if (String.IsNullOrEmpty(field) || GetMappingResults(context) is not { } mappings
+            || !mappings.Fields.TryGetValue(field, out var result))
+            return false;
+
+        mapping = result.Mapping;
+        return true;
+    }
+
+    internal static bool TryGetResolvedMappingField(this IQueryVisitorContext context, string field, out string? resolvedField)
+    {
+        if (GetMappingResults(context) is { } mappings && mappings.Fields.TryGetValue(field, out var result))
+        {
+            resolvedField = result.ResolvedField;
+            return true;
+        }
+
+        resolvedField = null;
+        return false;
+    }
+
+    internal static FieldMapping? GetMappingResult(this IQueryVisitorContext context, string? field)
+    {
+        if (String.IsNullOrEmpty(field))
+            return null;
+
+        if (context.TryGetMappingResult(field, out var mapping))
+            return mapping;
+
+        mapping = context.GetMappingResolver().GetMapping(field, followAlias: true);
+        context.SetMappingResult(field, mapping);
+        return mapping;
+    }
+
+    internal static async ValueTask<FieldMapping?> GetMappingResultAsync(this IQueryVisitorContext context, string? field,
+        CancellationToken cancellationToken = default)
+    {
+        if (String.IsNullOrEmpty(field))
+            return null;
+
+        if (context.TryGetMappingResult(field, out var mapping))
+            return mapping;
+
+        mapping = await context.GetMappingResolver().GetMappingAsync(field, followAlias: true, cancellationToken).AnyContext();
+        context.SetMappingResult(field, mapping);
+        return mapping;
+    }
+
+    internal static Task<ElasticRuntimeField?> GetRuntimeFieldAsync(this IQueryVisitorContext context, string field, RuntimeFieldResolver resolver)
+    {
+        var results = GetMappingResults(context);
+        if (results is null)
+            return ResolveAsync();
+
+        if (!results.RuntimeFields.TryGetValue(field, out var result))
+        {
+            result = ResolveAsync();
+            results.RuntimeFields[field] = result;
+        }
+
+        return result;
+
+        async Task<ElasticRuntimeField?> ResolveAsync() => await resolver(field).AnyContext();
+    }
+
+    private sealed class MappingResults
+    {
+        private Dictionary<string, Task<ElasticRuntimeField?>>? _runtimeFields;
+
+        public Dictionary<string, MappingResult> Fields { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, Task<ElasticRuntimeField?>> RuntimeFields => _runtimeFields ??= new(StringComparer.Ordinal);
+    }
+
+    private static MappingResults? GetMappingResults(IQueryVisitorContext context)
+    {
+        if (context.Data.TryGetValue(MappingResultsKey, out object? value)
+            && value is MappingResults mappings)
+        {
+            return mappings;
+        }
+
+        return null;
+    }
+
+    // Nested calls share results; only the operation that created the cache removes it.
+    internal readonly struct MappingResultScope(IQueryVisitorContext? context) : IDisposable
+    {
+        public void Dispose() => context?.Data.Remove(MappingResultsKey);
+    }
+
+    private readonly record struct MappingResult(FieldMapping Mapping, string ResolvedField);
+
     public static bool? IsRuntimeFieldResolverEnabled<T>(this T context) where T : IQueryVisitorContext
     {
         if (context is not IElasticQueryVisitorContext elasticContext)

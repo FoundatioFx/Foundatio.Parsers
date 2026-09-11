@@ -282,20 +282,173 @@ var createIndexResponse = await client.Indices.CreateAsync("my-index", c => c
 
 ## Refreshing Mappings
 
-Mappings are automatically refreshed from Elasticsearch at most once per minute. In most production scenarios, this automatic refresh is sufficient.
+The resolver loads the server mapping on first use. After that, an unresolved field is the signal that the
+mapping may have changed, so it can trigger a rate-limited reload:
 
-For unit tests where you're creating or modifying indices and need immediate visibility of changes, you can force a refresh:
+| Trigger | Setting | Default | Behavior |
+| --- | --- | --- | --- |
+| A field could not be resolved | `UnmappedFieldRefreshInterval` | 5 seconds | Minimum time between completed miss-driven reload attempts. Must be greater than zero. |
+| A reload is already running | `MappingRefreshWaitTimeout` | 30 seconds | How long a resolution waits to join an in-flight reload instead of issuing its own. |
+
+A field that cannot be resolved is the normal outcome for fields created at runtime — dynamic templates
+(including the `idx.*` custom field templates used by Foundatio.Repositories) only add a field to the index
+mapping after the first document that uses it is indexed. Because of that, an unresolved field reloads the
+server mapping on its own short interval and is never blocked by the mapping having been loaded at startup.
+
+Concurrent reload attempts are coalesced into a single server mapping fetch per resolver. This protection is
+local to the resolver instance, so create one long-lived resolver per concrete index and process. Creating a
+resolver per request defeats both caching and request coalescing. With the five-second default, each resolver
+that is continuously receiving misses can make up to about 12 reload attempts per minute, excluding cold
+starts and explicit refreshes. There is no distributed cache or cross-process coordination, so this ceiling
+applies independently to each resolver in each process.
+
+Before this miss-specific cooldown, successful and null mapping fetches were normally limited by the
+one-minute mapping refresh interval, while a callback exception could be retried by every sequential miss.
+The five-second default therefore improves dynamic-field discovery while placing the same finite ceiling on
+successful, null, and exceptional automatic reloads.
 
 ```csharp
 var resolver = parser.Configuration.MappingResolver;
 
-// Force refresh from Elasticsearch (primarily for unit tests)
+// Reduce reload pressure for typo-heavy workloads.
+resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(30);
+```
+
+### Waiting For An In-Flight Reload
+
+Only one automatic mapping reload runs at a time. Other resolutions that need a fresh mapping wait for that
+reload rather than issuing their own. An explicit `RefreshMapping()` supersedes an obsolete in-flight load,
+so the next resolution can fetch the replacement mapping without waiting for the old callback to drain. That
+hard-invalidation case can temporarily overlap the obsolete physical callback. If the wait exceeds
+`MappingRefreshWaitTimeout`, the resolution gives up and
+treats the field as unmapped, and a warning is logged. A single resolution joins at most once; it does not
+repeat the same wait as both an initial load and a miss-driven reload.
+
+The mapping callback must have its own finite timeout and must not call back into the same resolver. The
+built-in client factories use the Elasticsearch client's configured request timeout. Configure that timeout
+below `MappingRefreshWaitTimeout` if every joining resolution must observe the fetch result; otherwise a
+joining resolution can time out while the single fetch continues.
+
+```csharp
+resolver.MappingRefreshWaitTimeout = TimeSpan.FromMinutes(2);
+```
+
+### Residual Staleness
+
+The five-second default is a cooldown, not a correctness deadline. Callback latency, failures, and a reload
+that began before the field was created can extend the stale window. If an automatic reload fails or returns
+no mapping, the resolver retains its last known mapping and throttles the next attempt. During that window an
+unresolved field is still treated as unmapped. Set `AllowUnresolvedFields` to `false` when failing validation
+is safer than generating a query from incomplete mapping information. This catches unresolved query fields,
+including default fields actually used by unfielded terms and included queries. Unused default fields and
+configured restricted fields are not treated as query references. Mapping validation runs after field
+resolution and reports original query names, including aliases, even when a visitor context is reused.
+Runtime fields defined in the context or discovered by its runtime-field resolver remain valid. Each
+operation reuses runtime lookup results, including misses and failures, so field resolution and validation
+do not invoke the callback twice for the same field. A later operation can retry the callback. The
+resolver's boolean type checks do not expose a separate "mapping unknown" state, so use explicit
+refresh for application-controlled changes that require immediate correctness.
+
+Successful field resolutions do not trigger periodic reloads. New fields and sub-fields create misses and
+are discovered automatically, but changes to an already resolved alias or runtime-field definition require
+an explicit refresh.
+
+### Forcing a Full Refresh
+
+`RefreshMapping()` bypasses the miss throttle and discards the current mapping snapshot. Call it after
+Elasticsearch acknowledges an application-controlled mapping change; the next resolution fetches or joins
+the new mapping.
+
+```csharp
 resolver.RefreshMapping();
 ```
 
+Do not call `RefreshMapping()` after every indexed document. Dynamically materialized fields already use the
+miss-driven reload path, while repeated full invalidation discards useful caches and can continually
+supersede in-flight fetches. Foundatio.Repositories should keep its long-lived per-index resolver and rely on
+that path for ordinary custom-field saves.
+
+### Cache Memory
+
+Successful resolutions are cached by canonical field path for the lifetime of the mapping snapshot, which
+keeps the cache bounded by the mapping itself no matter how many distinct spellings callers ask for.
+Unknown field names are not cached in the long-lived snapshot, so caller-controlled misses cannot grow
+process state. A parser operation remembers its own positive and negative resolutions only until that operation
+finishes, preventing downstream visitors from repeating the same network-backed lookup. Direct query, sort,
+and aggregation helpers also release their temporary results on return or failure, so reusing a visitor context
+does not retain stale mappings across operations. Cache keys preserve exact field-name casing. Reloading the mapping
+publishes a new snapshot and atomically discards resolutions derived from the old one, unless the optional
+revision check below confirms that the mapping is unchanged. The operation's runtime-field result dictionary
+is allocated only when a runtime-field resolver is actually used.
+
+### Reusing Unchanged Mappings
+
+If your mapping owner provides a cheap, reliable revision for the complete mapping, set
+`ServerMappingRevisionResolver` before sharing the resolver:
+
+```csharp
+resolver.ServerMappingRevisionResolver = mapping =>
+    mapping.Meta?.TryGetValue("resolver_revision", out var revision) == true
+        ? revision?.ToString()
+        : null;
+```
+
+Equal, nonempty revisions allow automatic reloads to reuse the merged property tree and successful field
+resolutions. The reload still fetches the mapping and observes the normal miss cooldown; this saves local
+rebuilding and allocations, not HTTP requests or deserialization. No mapping serialization is performed
+to compare revisions. `RefreshMapping()` always discards the cached state, even if the revision is unchanged.
+
+The revision must identify the concrete index and change whenever any mapping detail changes, including
+fields added dynamically. Elasticsearch does not maintain this custom `_meta` value for you. Use it only
+when your mapping owner guarantees that contract; a deployment schema version or latest partition name
+alone is insufficient. Leave the callback unset if you do not have such a revision. Null or empty revisions
+also retain the default behavior of rebuilding after every successful reload.
+
+The built-in client factories expect one concrete index, or a target whose indices have equivalent mappings.
+They do not merge heterogeneous mappings from rollover aliases or data streams.
+
 ## Custom Mapping Resolver
 
-Create a custom resolver for special cases:
+Use an asynchronous loader when obtaining the mapping requires network I/O. The parser's asynchronous query,
+sort, and aggregation paths await this loader without blocking a request thread. Cancelling one resolver
+lookup cancels only that caller's wait; the shared fetch continues for other callers and is bounded by the
+resolver lifetime and the loader's transport timeout.
+
+The application owns the resolver, including one created by `UseMappingsWithAsyncLoader`: dispose
+`parser.Configuration.MappingResolver` when the parser is no longer in use. Do not dispose it per request
+when it is shared. Configure refresh settings before sharing the resolver. Typed `Field` helpers preserve
+inferred canonical names while using the same single-load budget as string helpers.
+
+Custom asynchronous loaders use the named `CreateWithAsyncLoader` and `UseMappingsWithAsyncLoader` entry
+points. Keeping them separate from the synchronous delegate overloads preserves source compatibility for
+existing callers.
+
+```csharp
+var customResolver = ElasticMappingResolver.CreateWithAsyncLoader(
+    getMappingAsync: cancellationToken => LoadMappingAsync(cancellationToken),
+    inferrer: client.Infer,
+    logger: logger);
+```
+
+Synchronous loader overloads remain available for compatibility. An asynchronous parser call configured
+with a synchronous loader must invoke that loader synchronously, and an explicit synchronous resolver call
+configured with only an asynchronous loader waits synchronously for it. That compatibility path dispatches
+the single shared load to the thread pool to avoid synchronization-context deadlocks, but the caller still
+blocks. Synchronous `Parse` preserves the caller thread for synchronous visitors; server request paths
+should use the asynchronous resolver and parser APIs.
+The built-in Elasticsearch client factories supply both forms: asynchronous parser paths call
+`Indices.GetMappingAsync`, while synchronous resolver calls retain `Indices.GetMapping`.
+
+On the default task scheduler, the asynchronous loader starts inline and does not use `Task.Run`. When a
+custom synchronization context or task scheduler is active, only the loader boundary is dispatched to the
+thread pool so a synchronous caller joining the same shared fetch cannot block the loader's captured
+continuation. Library-owned awaits still use `AnyContext()`.
+
+The loaded mapping and its successful field memoization belong to an immutable resolver-local snapshot; an
+external cache client is neither required nor used. `RefreshMapping()` remains synchronous because it only
+invalidates that local snapshot and performs no I/O.
+
+For an already synchronous or in-memory source, use the compatibility overload:
 
 ```csharp
 var customResolver = ElasticMappingResolver.Create(
@@ -355,14 +508,14 @@ var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));
 
 ### 3. Handle Dynamic Mappings
 
-For indices with dynamic mappings:
+For correctness-sensitive indices with dynamic mappings, fail validation if a field is still unresolved
+after the bounded reload attempt rather than generating a query from incomplete mapping information:
 
 ```csharp
 var parser = new ElasticQueryParser(c => c
     .UseMappings(client, "my-index")
     .SetValidationOptions(new QueryValidationOptions {
-        // Allow fields not in current mapping
-        AllowUnresolvedFields = true
+        AllowUnresolvedFields = false
     }));
 ```
 

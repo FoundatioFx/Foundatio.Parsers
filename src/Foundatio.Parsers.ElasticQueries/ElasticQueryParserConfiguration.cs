@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -41,6 +42,7 @@ public class ElasticQueryParserConfiguration
         AddAggregationVisitor(new AssignOperationTypeVisitor(), 0);
         AddAggregationVisitor(new CombineAggregationsVisitor(), 10000);
         AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver is not null ? FieldResolver(field, context) : Task.FromResult<string?>(null)), 10);
+        AddVisitor(new MappingValidationVisitor(), 20);
         AddVisitor(new ValidationVisitor(), 30);
     }
 
@@ -76,6 +78,8 @@ public class ElasticQueryParserConfiguration
     {
         FieldResolver = resolver;
         ReplaceVisitor<FieldResolverQueryVisitor>(new FieldResolverQueryVisitor(resolver), priority);
+        // Equal priorities preserve insertion order, so mapping validation follows the replacement resolver.
+        ReplaceVisitor<MappingValidationVisitor>(new MappingValidationVisitor(), Math.Max(20, priority));
 
         return this;
     }
@@ -331,6 +335,16 @@ public class ElasticQueryParserConfiguration
         return this;
     }
 
+    /// <summary>Uses code mappings and an asynchronous server loader for field resolution.</summary>
+    /// <remarks>The application owns <see cref="MappingResolver"/> and should dispose it when no longer used. The loader must enforce a finite timeout.</remarks>
+    public ElasticQueryParserConfiguration UseMappingsWithAsyncLoader<T>(Action<TypeMappingDescriptor<T>> mappingBuilder, Inferrer inferrer,
+        Func<CancellationToken, Task<TypeMapping?>> getMappingAsync) where T : class
+    {
+        MappingResolver = ElasticMappingResolver.CreateWithAsyncLoader(mappingBuilder, inferrer, getMappingAsync, logger: _logger);
+
+        return this;
+    }
+
     public ElasticQueryParserConfiguration UseMappings<T>(ElasticsearchClient client)
     {
         MappingResolver = ElasticMappingResolver.Create<T>(client, logger: _logger);
@@ -348,6 +362,15 @@ public class ElasticQueryParserConfiguration
     public ElasticQueryParserConfiguration UseMappings(Func<TypeMapping?> getMapping, Inferrer? inferrer = null)
     {
         MappingResolver = ElasticMappingResolver.Create(getMapping, inferrer, logger: _logger);
+
+        return this;
+    }
+
+    /// <summary>Uses an asynchronous server loader for field resolution.</summary>
+    /// <remarks>The application owns <see cref="MappingResolver"/>. Its lifetime token cancels shared loads; an individual lookup's token cancels only that wait.</remarks>
+    public ElasticQueryParserConfiguration UseMappingsWithAsyncLoader(Func<CancellationToken, Task<TypeMapping?>> getMappingAsync, Inferrer? inferrer = null)
+    {
+        MappingResolver = ElasticMappingResolver.CreateWithAsyncLoader(getMappingAsync, inferrer, logger: _logger);
 
         return this;
     }

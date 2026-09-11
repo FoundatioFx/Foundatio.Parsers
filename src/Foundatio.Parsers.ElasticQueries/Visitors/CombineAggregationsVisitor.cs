@@ -210,19 +210,19 @@ public class CombineAggregationsVisitor : ChainableQueryVisitor
 
     private static IReadOnlyList<string> GetNestedPathChain(string deepestPath, IQueryVisitorContext context)
     {
-        if (context is not IElasticQueryVisitorContext elasticContext)
+        if (context is not IElasticQueryVisitorContext)
             return [deepestPath];
 
-        return NestedPathResolver.GetNestedPathChain(deepestPath, elasticContext.MappingResolver);
+        return NestedPathResolver.GetNestedPathChain(deepestPath, context);
     }
 
     private static string BuildHierarchicalBucketPathPrefix(
         string deepestPath, IQueryVisitorContext context)
     {
-        if (context is not IElasticQueryVisitorContext elasticContext)
+        if (context is not IElasticQueryVisitorContext)
             return NestedPathResolver.GetNestedAggName(deepestPath) + BucketPathSeparator;
 
-        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, elasticContext.MappingResolver);
+        var nestedPaths = NestedPathResolver.GetNestedPathChain(deepestPath, context);
 
         if (nestedPaths.Count <= 1)
             return NestedPathResolver.GetNestedAggName(deepestPath) + BucketPathSeparator;

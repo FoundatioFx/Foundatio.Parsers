@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -39,6 +40,7 @@ public class ElasticQueryParser : LuceneQueryParser
         query ??= String.Empty;
         context ??= new ElasticQueryVisitorContext();
 
+        using var mappingScope = context.BeginMappingScope();
         SetupQueryVisitorContextDefaults(context);
         try
         {
@@ -104,7 +106,7 @@ public class ElasticQueryParser : LuceneQueryParser
                     resolvedField = configResolvedField;
             }
 
-            string? mappingResolvedField = await MappingFieldResolver(resolvedField ?? field, context).AnyContext();
+            string? mappingResolvedField = await ResolveMappingFieldAsync(resolvedField ?? field, context).AnyContext();
             if (mappingResolvedField is not null)
                 resolvedField = mappingResolvedField;
 
@@ -130,7 +132,7 @@ public class ElasticQueryParser : LuceneQueryParser
         }
     }
 
-    private async Task<string?> MappingFieldResolver(string? field, IQueryVisitorContext? context)
+    internal static async Task<string?> ResolveMappingFieldAsync(string? field, IQueryVisitorContext? context)
     {
         if (field is null)
             return null;
@@ -140,13 +142,27 @@ public class ElasticQueryParser : LuceneQueryParser
 
         // try to find Elasticsearch mapping
         // TODO: Need to test how runtime mappings defined on the server are handled
-        // TODO: Mark fields resolved so that we don't try to do lookups multiple times
 
         if (elasticContext.MappingResolver is not null)
         {
-            var resolvedField = elasticContext.MappingResolver.GetMapping(field);
-            if (resolvedField?.Found is true)
-                return resolvedField.FullPath;
+            string mappingField = field.Unescape() ?? field;
+            if (context.TryGetMappingResult(mappingField, out var cachedMapping))
+            {
+                if (cachedMapping?.Found is true && context.TryGetResolvedMappingField(mappingField, out string? cachedField))
+                    return cachedField;
+            }
+            else
+            {
+                var resolvedField = await elasticContext.MappingResolver.GetMappingAsync(mappingField).AnyContext();
+                var effectiveMapping = resolvedField;
+                if (resolvedField?.Property is FieldAliasProperty)
+                    effectiveMapping = await elasticContext.MappingResolver.GetMappingAsync(mappingField, followAlias: true).AnyContext();
+
+                context.SetMappingResult(mappingField, effectiveMapping, resolvedField?.FullPath);
+                context.SetMappingResult(field, effectiveMapping, resolvedField?.FullPath);
+                if (resolvedField?.Found is true)
+                    return resolvedField.FullPath;
+            }
         }
 
         // try to resolve from the list of runtime fields that are defined for this query
@@ -160,7 +176,7 @@ public class ElasticQueryParser : LuceneQueryParser
         // try to use the runtime field resolver to dynamically discover a new runtime field and, if so, add it to the list of runtime fields
         if (elasticContext.EnableRuntimeFieldResolver is not false && elasticContext.RuntimeFieldResolver is not null)
         {
-            var newRuntimeField = await elasticContext.RuntimeFieldResolver(field).AnyContext();
+            var newRuntimeField = await context.GetRuntimeFieldAsync(field, elasticContext.RuntimeFieldResolver).AnyContext();
             if (newRuntimeField is not null)
             {
                 elasticContext.RuntimeFields?.Add(newRuntimeField);
@@ -262,6 +278,7 @@ public class ElasticQueryParser : LuceneQueryParser
     {
         sort ??= String.Empty;
         context ??= new ElasticQueryVisitorContext();
+        using var mappingScope = context.BeginMappingScope();
         context.QueryType = QueryTypes.Sort;
 
         var result = await ParseAsync(sort, context).AnyContext();

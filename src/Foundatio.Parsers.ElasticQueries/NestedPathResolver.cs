@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
+using Foundatio.Parsers.ElasticQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.ElasticQueries;
 
@@ -37,6 +40,14 @@ public static class NestedPathResolver
         return deepestNestedPath;
     }
 
+    internal static string? GetDeepestNestedPath(string fullName, IQueryVisitorContext context)
+    {
+        if (context.TryGetMappingResult(fullName, out var mapping))
+            return mapping?.NestedPathChain.LastOrDefault();
+
+        return GetDeepestNestedPath(fullName, context.GetMappingResolver());
+    }
+
     /// <summary>
     /// Returns the complete chain of nested paths from outermost to innermost
     /// for a given deepest nested path. Each entry in the returned list is a
@@ -57,5 +68,20 @@ public static class NestedPathResolver
         }
 
         return nestedPaths.Count > 0 ? nestedPaths : [deepestPath];
+    }
+
+    internal static IReadOnlyList<string> GetNestedPathChain(string deepestPath, IQueryVisitorContext context)
+    {
+        if (context.TryGetMappingResult(deepestPath, out var mapping)
+            && mapping?.NestedPathChain is { Count: > 0 } nestedPathChain)
+        {
+            for (int i = 0; i < nestedPathChain.Count; i++)
+            {
+                if (nestedPathChain[i] == deepestPath)
+                    return nestedPathChain.Take(i + 1).ToArray();
+            }
+        }
+
+        return GetNestedPathChain(deepestPath, context.GetMappingResolver());
     }
 }

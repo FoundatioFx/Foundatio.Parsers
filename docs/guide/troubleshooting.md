@@ -144,7 +144,7 @@ var parser = new ElasticQueryParser(c => c
         { "user_field", "actual.field.path" }
     }));
 
-// Option 3: Refresh mappings (if recently added field, wait for auto-refresh or force it)
+// Option 3: Force the next resolution to reload the server mapping.
 parser.Configuration.MappingResolver.RefreshMapping();
 ```
 
@@ -364,8 +364,7 @@ public MyService()
 **Solution:**
 
 ```csharp
-// Mappings are cached by default (auto-refresh at most once per minute)
-// Manual refresh is typically only needed in unit tests:
+// Resolved fields are cached. Manual refresh is only needed after a known change to an already resolved field:
 parser.Configuration.MappingResolver.RefreshMapping();
 
 // For production, create resolver once and share
@@ -373,6 +372,59 @@ var resolver = ElasticMappingResolver.Create(client, "my-index");
 var parser1 = new ElasticQueryParser(c => c.UseMappings(resolver));
 var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));
 ```
+
+**Cause:** Queries continually reference fields that do not exist, making the resolver repeatedly eligible
+to reload the mapping.
+
+Fields that cannot be resolved reload the mapping on their own short interval
+(`UnmappedFieldRefreshInterval`, default 5 seconds) because that is how dynamically created fields become
+visible. Concurrent reload attempts are coalesced into a single server mapping fetch per resolver. Under
+continuous misses, the default permits about 12 automatic attempts per minute for each resolver in each
+process; cold starts and explicit `RefreshMapping()` calls are outside that ceiling. Raise the interval if a
+workload legitimately queries many non-existent fields:
+
+```csharp
+resolver.UnmappedFieldRefreshInterval = TimeSpan.FromSeconds(30);
+```
+
+Reuse one resolver per concrete index and process. A resolver created for every request has its own cache,
+throttle, and in-flight request, so it defeats this protection. Look for the
+`Unable to resolve mapping for field {Field}` warning: it means a reload was suppressed by the throttle and
+the field is being treated as unmapped.
+
+### Recently Created Field Resolves As Unmapped
+
+**Cause:** The field was created after the resolver loaded the index mapping — for example by a dynamic
+template, which only adds the field to the mapping once the first document using it has been indexed.
+
+**Symptoms:**
+
+- A `nested` field is queried as a flat field, so the query succeeds but returns no results.
+- Sorting fails with `Fielddata is disabled on [field] in [index]`, because the resolver could not find the
+  `.keyword` / `.sort` sub-field and fell back to the analyzed field.
+
+**Solution:** the resolver becomes eligible to reload after `UnmappedFieldRefreshInterval`. This is a cooldown
+after a completed attempt, not a five-second correctness deadline. To pick up an application-controlled
+change immediately, call `RefreshMapping()` after Elasticsearch acknowledges it:
+
+```csharp
+resolver.RefreshMapping();
+```
+
+If the field stays unmapped for much longer than `UnmappedFieldRefreshInterval`, look for the
+`did not complete within` warning. It means a mapping reload was already running but took longer than
+`MappingRefreshWaitTimeout` (default 30 seconds), so resolutions gave up waiting for it. Raise `MappingRefreshWaitTimeout` to
+match how long your `GetMapping` call actually takes:
+
+```csharp
+resolver.MappingRefreshWaitTimeout = TimeSpan.FromMinutes(2);
+```
+
+The mapping callback must enforce a finite timeout and must not call the same resolver. The built-in client
+factories use the Elasticsearch client's configured request timeout; keep it below
+`MappingRefreshWaitTimeout` if joining resolutions must wait for the result. If treating an unresolved field
+as unmapped could generate an incorrect query, configure validation with `AllowUnresolvedFields = false` so
+the request fails instead.
 
 ## Debugging
 
@@ -382,7 +434,7 @@ var parser2 = new ElasticQueryParser(c => c.UseMappings(resolver));
 var parser = new ElasticQueryParser(c => c
     .SetLoggerFactory(loggerFactory));
 
-// Or for LuceneQueryParser, use ILogger directly 
+// Or for LuceneQueryParser, use ILogger directly
 var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
 ```
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -18,7 +19,7 @@ public static class DefaultQueryNodeExtensions
     public static async Task<Query?> GetDefaultQueryAsync(this IQueryNode node, IQueryVisitorContext context)
     {
         if (node is TermNode termNode)
-            return await termNode.GetDefaultQueryAsync(context).ConfigureAwait(false);
+            return await termNode.GetDefaultQueryAsync(context).AnyContext();
 
         if (node is TermRangeNode termRangeNode)
             return await termRangeNode.GetDefaultQueryAsync(context).AnyContext();
@@ -37,12 +38,21 @@ public static class DefaultQueryNodeExtensions
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
+        using var mappingScope = context.BeginMappingScope();
         string? field = node.UnescapedField;
         string[]? defaultFields = node.GetDefaultFields(elasticContext.DefaultFields);
 
-        // If a specific field is set, use single-field query
         if (!String.IsNullOrEmpty(field))
+        {
+            await context.GetMappingResultAsync(field).AnyContext();
             return GetSingleFieldQuery(node, field, elasticContext);
+        }
+
+        if (defaultFields is not null)
+        {
+            foreach (string defaultField in defaultFields)
+                await context.GetMappingResultAsync(defaultField).AnyContext();
+        }
 
         // If only one default field, use single-field query (wrapped in nested if applicable)
         if (defaultFields is { Length: 1 })
@@ -58,7 +68,7 @@ public static class DefaultQueryNodeExtensions
                 var filterResolver = GetNestedFilterResolver(elasticContext);
                 if (filterResolver is not null)
                 {
-                    var filter = await filterResolver(nestedPath, defaultFields[0], defaultFields[0], context).ConfigureAwait(false);
+                    var filter = await filterResolver(nestedPath, defaultFields[0], defaultFields[0], context).AnyContext();
                     if (filter is not null)
                         innerQuery = new BoolQuery { Must = [innerQuery], Filter = [filter] };
                 }
@@ -81,7 +91,7 @@ public static class DefaultQueryNodeExtensions
             }
 
             // Otherwise, split into separate queries for each group
-            return await GetSplitNestedQueryAsync(node, fieldsByNestedPath, elasticContext).ConfigureAwait(false);
+            return await GetSplitNestedQueryAsync(node, fieldsByNestedPath, elasticContext).AnyContext();
         }
 
         // Fallback for no fields
@@ -94,12 +104,15 @@ public static class DefaultQueryNodeExtensions
     [Obsolete("Use GetDefaultQueryAsync to support async nested filter resolution.")]
     public static Query? GetDefaultQuery(this TermNode node, IQueryVisitorContext context)
     {
-        return GetDefaultQueryAsync(node, context).ConfigureAwait(false).GetAwaiter().GetResult();
+        if (SynchronizationContext.Current is not null || TaskScheduler.Current != TaskScheduler.Default)
+            return Task.Run(() => GetDefaultQueryAsync(node, context)).GetAwaiter().GetResult();
+
+        return GetDefaultQueryAsync(node, context).AnyContext().GetAwaiter().GetResult();
     }
 
     private static Query? GetSingleFieldQuery(TermNode node, string field, IElasticQueryVisitorContext context)
     {
-        if (context.MappingResolver.IsPropertyAnalyzed(field))
+        if (IsPropertyAnalyzed(field, context))
         {
             if (node.UnescapedTerm is not { } term)
                 return null;
@@ -134,7 +147,7 @@ public static class DefaultQueryNodeExtensions
 
     private static FieldValue GetTypedFieldValue(string value, string field, IElasticQueryVisitorContext context)
     {
-        var fieldType = context.MappingResolver.GetFieldType(field);
+        var fieldType = ElasticMappingResolver.GetFieldType(context.GetMappingResult(field)?.Property);
 
         return fieldType switch
         {
@@ -167,7 +180,7 @@ public static class DefaultQueryNodeExtensions
 
         foreach (string field in fields)
         {
-            if (context.MappingResolver.IsPropertyAnalyzed(field))
+            if (IsPropertyAnalyzed(field, context))
                 analyzedFields.Add(field);
             else
                 nonAnalyzedFields.Add(field);
@@ -256,7 +269,13 @@ public static class DefaultQueryNodeExtensions
 
     private static string? GetNestedPath(string fullName, IElasticQueryVisitorContext context)
     {
-        return NestedPathResolver.GetDeepestNestedPath(fullName, context.MappingResolver);
+        return NestedPathResolver.GetDeepestNestedPath(fullName, context);
+    }
+
+    private static bool IsPropertyAnalyzed(string field, IElasticQueryVisitorContext context)
+    {
+        var mapping = context.GetMappingResult(field);
+        return mapping?.Found is true && context.MappingResolver.IsPropertyAnalyzed(mapping.Property!);
     }
 
     private static async Task<Query> GetSplitNestedQueryAsync(TermNode node, Dictionary<string, List<string>> fieldsByNestedPath, IElasticQueryVisitorContext context)
@@ -279,7 +298,7 @@ public static class DefaultQueryNodeExtensions
                             continue;
 
                         Query branch = q;
-                        var filter = await filterResolver(nestedPath, field, field, context).ConfigureAwait(false);
+                        var filter = await filterResolver(nestedPath, field, field, context).AnyContext();
                         if (filter is not null)
                             branch = new BoolQuery { Must = [branch], Filter = [filter] };
                         branches.Add(branch);
@@ -352,7 +371,8 @@ public static class DefaultQueryNodeExtensions
                 return null;
         }
 
-        if (elasticContext.MappingResolver.IsDatePropertyType(field))
+        var mapping = await context.GetMappingResultAsync(field).AnyContext();
+        if (mapping?.Property is DateProperty or DateNanosProperty)
         {
             var range = new DateRangeQuery(field) { TimeZone = node.Boost ?? node.GetTimeZone(await elasticContext.GetTimeZoneAsync().AnyContext()) };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
