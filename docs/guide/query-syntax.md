@@ -1,6 +1,6 @@
 # Query Syntax
 
-The query syntax is based on [Lucene query syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and is compatible with [Elasticsearch query_string](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html).
+The query syntax is based on [Lucene query syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and is compatible with [Elasticsearch query_string](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html). This library extends both with a few of its own constructs -- see [Syntax Compatibility](./syntax-compatibility) for exactly where it deviates and how much that matters.
 
 ## Basic Queries
 
@@ -79,6 +79,10 @@ Example:
 // Match email patterns
 var result = parser.Parse("email:/.*@example\\.com/");
 ```
+
+::: warning
+`IsRegexTerm` is set on the AST, but `ElasticQueryParser` does not emit a `regexp` query. On analyzed fields the pattern is passed through as a wildcard, and on keyword fields it becomes a `prefix` query, so `.` matches literally. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+:::
 
 ## Range Queries
 
@@ -380,6 +384,10 @@ var result = parser.Parse("title:important^2");
 result = parser.Parse("title:\"very important\"^3");
 ```
 
+::: warning
+The boost is parsed and available on the AST (`TermNode.Boost`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+:::
+
 ## Fuzzy Queries
 
 Use `~` for fuzzy matching (edit distance):
@@ -391,6 +399,10 @@ var result = parser.Parse("name:john~");
 // Fuzzy match with specific edit distance
 result = parser.Parse("name:john~2");
 ```
+
+::: warning
+The edit distance is parsed and available on the AST (`TermNode.Proximity`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query -- the term is matched exactly. The same applies to phrase proximity (`"a b"~5`) and to regex terms (`/val.*/`). See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+:::
 
 ## Escaping Special Characters
 
@@ -435,6 +447,7 @@ string normalized = GenerateQueryVisitor.Run(result);
 
 ## Next Steps
 
+- [Syntax Compatibility](./syntax-compatibility) - Where this syntax deviates from Lucene/Elasticsearch, and how much it matters
 - [Aggregation Syntax](./aggregation-syntax) - Dynamic aggregation expressions
 - [Field Aliases](./field-aliases) - Map field names
 - [Validation](./validation) - Validate and restrict queries
