@@ -6,7 +6,7 @@ export default withMermaid(defineConfig({
   title: 'Foundatio Parsers',
   description: 'Extensible Lucene-style query parser with Elasticsearch and SQL support',
   base: '/',
-  ignoreDeadLinks: true,
+  ignoreDeadLinks: false,
   vite: {
     plugins: [
       llmstxt({
