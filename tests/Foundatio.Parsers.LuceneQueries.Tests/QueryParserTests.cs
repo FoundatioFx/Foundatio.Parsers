@@ -608,7 +608,7 @@ public class QueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
-    public void Parse_WithNestedGroupInsideExcludedGroup_IsNodeOrGroupNegatedIgnoresParent()
+    public void Parse_WithNestedGroupInsideExcludedGroup_IsNodeOrGroupNegatedInspectsParent()
     {
         // Arrange
         var parser = new LuceneQueryParser();
@@ -624,13 +624,74 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.Equal("-", outerGroup.Prefix);
         Assert.True(outerGroup.IsExcluded());
 
-        // The inner group already has parens, so GetGroupNode() returns the inner group itself and the
-        // excluded outer group is never inspected. Pinned because sort behavior depends on this helper.
+        // The inner group already has parens, so the search must start at its parent rather than
+        // matching itself, or the excluded outer group would never be inspected.
         var innerGroup = outerGroup.Left as GroupNode;
         Assert.NotNull(innerGroup);
         Assert.True(innerGroup.HasParens);
         Assert.False(innerGroup.IsExcluded());
-        Assert.False(innerGroup.IsNodeOrGroupNegated());
+        Assert.True(innerGroup.IsNodeOrGroupNegated());
+    }
+
+    [Fact]
+    public void IsNodeOrGroupNegated_WithNullNode_ReturnsFalse()
+    {
+        // Arrange
+        // IsExcluded() and IsRequired() both tolerate a null receiver, so this helper must too.
+        // Suppressed because the scenario under test is a caller without nullable reference types enabled.
+        IFieldQueryNode node = null!;
+
+        // Act
+        bool result = node.IsNodeOrGroupNegated();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsNodeOrGroupNegated_WithRootNode_ReturnsFalse()
+    {
+        // Arrange
+        // The root group has no parent, so the parent walk must not throw.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse("field1:value1");
+
+        // Assert
+        Assert.False(result.IsNodeOrGroupNegated());
+    }
+
+    [Fact]
+    public void IsNodeOrGroupNegated_WithTermInsideNestedFieldGroup_StopsAtNearestParenthesizedGroup()
+    {
+        // Arrange
+        // Pins the documented depth limit: the walk stops at the nearest parenthesized group, so a term
+        // can disagree with the groups enclosing it. See https://github.com/FoundatioFx/Foundatio.Parsers/issues/279.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var nested = parser.Parse("-(field:(value))");
+        var flat = parser.Parse("-(field:value)");
+
+        // Assert
+        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(nested));
+
+        var nestedOuter = Assert.IsType<GroupNode>(nested.Left);
+        var nestedInner = Assert.IsType<GroupNode>(nestedOuter.Left);
+        var nestedTerm = Assert.IsType<TermNode>(nestedInner.Left);
+
+        Assert.True(nestedOuter.IsNodeOrGroupNegated());
+        Assert.True(nestedInner.IsNodeOrGroupNegated());
+
+        // The term's nearest group is the parenthesized "field:(...)" group, which is not itself
+        // excluded, so the excluded outer group is never reached.
+        Assert.False(nestedTerm.IsNodeOrGroupNegated());
+
+        // Without the intermediate parenthesized field group, the same term does see the negation.
+        var flatOuter = Assert.IsType<GroupNode>(flat.Left);
+        var flatTerm = Assert.IsType<TermNode>(flatOuter.Left);
+        Assert.True(flatTerm.IsNodeOrGroupNegated());
     }
 
     [Theory]

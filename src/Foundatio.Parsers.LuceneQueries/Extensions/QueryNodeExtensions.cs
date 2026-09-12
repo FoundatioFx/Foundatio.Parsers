@@ -131,20 +131,21 @@ public static class QueryNodeExtensions
     }
 
     /// <summary>
-    /// Determines whether the node is negated, either directly or by the nearest enclosing parenthesized group.
+    /// Determines whether the node is negated, either directly or by an enclosing parenthesized group.
     /// Returns <c>false</c> when the node is marked as required by the <c>+</c> prefix operator.
     /// </summary>
     /// <remarks>
-    /// Only the nearest parenthesized group is inspected, not the full ancestor chain. When called on a
-    /// <see cref="GroupNode"/> that already has parens, that same node is the nearest group, so an excluded
-    /// parent group does not affect the result.
+    /// Only the nearest parenthesized group is inspected, not the full ancestor chain beyond it, so
+    /// <c>NOT (a:(b:(c)))</c> reports <c>true</c> for <c>b</c> but not for the innermost <c>c</c>.
+    /// The search always starts at the node's parent, so calling this on a <see cref="GroupNode"/> that
+    /// already has parens still finds the nearest *enclosing* group rather than matching itself.
     /// </remarks>
     public static bool IsNodeOrGroupNegated(this IFieldQueryNode node)
     {
-        if (node.IsRequired())
+        if (node == null || node.IsRequired())
             return false;
 
-        return node.IsExcluded() || node.GetGroupNode()?.IsExcluded() is true;
+        return node.IsExcluded() || node.Parent?.GetGroupNode()?.IsExcluded() is true;
     }
 
     public static GroupNode? GetRootNode(this IQueryNode node)
