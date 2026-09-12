@@ -80,6 +80,10 @@ Example:
 var result = parser.Parse("email:/.*@example\\.com/");
 ```
 
+::: warning
+`IsRegexTerm` is set on the AST, but `ElasticQueryParser` does not emit a `regexp` query. On analyzed fields the pattern is passed through as a wildcard, and on keyword fields it becomes a `prefix` query, so `.` matches literally. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+:::
+
 ## Range Queries
 
 Range queries filter numeric or date fields within bounds.
@@ -380,6 +384,10 @@ var result = parser.Parse("title:important^2");
 result = parser.Parse("title:\"very important\"^3");
 ```
 
+::: warning
+The boost is parsed and available on the AST (`TermNode.Boost`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+:::
+
 ## Fuzzy Queries
 
 Use `~` for fuzzy matching (edit distance):
@@ -391,6 +399,10 @@ var result = parser.Parse("name:john~");
 // Fuzzy match with specific edit distance
 result = parser.Parse("name:john~2");
 ```
+
+::: warning
+The edit distance is parsed and available on the AST (`TermNode.Proximity`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query -- the term is matched exactly. The same applies to phrase proximity (`"a b"~5`) and to regex terms (`/val.*/`). See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+:::
 
 ## Escaping Special Characters
 

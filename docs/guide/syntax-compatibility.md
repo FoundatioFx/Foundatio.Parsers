@@ -6,22 +6,42 @@ Every row below was verified against a live **Elasticsearch 8.19** instance usin
 
 The deviations are grouped by consequence, not by feature area, because the risk they carry is wildly different:
 
-- **Tier 1** -- the query is accepted by `query_string`, but means something else entirely. This is the dangerous tier: nothing errors, so a query that returns real results here can silently return an empty set (or the wrong set) there.
+- **Tier 1** -- the query is accepted, but means something else entirely. This is the dangerous tier: nothing errors, so a query that looks correct can silently return the wrong set. Two separate causes land here: syntax `query_string` reinterprets, and syntax *this library* parses but then drops.
 - **Tier 2** -- the query throws a parse error in `query_string`. Annoying, but safe: it fails loudly instead of returning wrong data.
 - **Tier 3** -- behaves identically in both. Listed for completeness so you know what's safe to rely on.
 
 ## Tier 1: Silently means something different
 
-These are the ones to actually worry about. `query_string` parses them as an ordinary field name, since it has no concept of the special prefix, and then reports that field as unmapped.
+These are the ones to actually worry about. There are two distinct causes, and neither produces an error.
+
+### Special prefixes that `query_string` reads as field names
+
+`query_string` has no concept of these prefixes, so it parses them as an ordinary field name and then reports that field as unmapped.
 
 | Syntax | Our meaning | `query_string` behavior |
 |--------|-------------|--------------------------|
 | `_missing_:field` | Field is null or absent | Looks for a field literally named `_missing_`. Returns `MatchNoDocsQuery("unmapped fields [_missing_]")` -- matches **nothing**, no error. |
 | `@include:name` | Expand a stored query fragment | Looks for a field literally named `@include`. Same `MatchNoDocsQuery`, no error. |
 
-Both were confirmed with `_validate/query`: the response has `"valid": true`, and the `explanation` shows the unmapped-field constant-score-none query rather than an error. If you pass user-authored queries through to a system that also runs `query_string` directly (or if you ever compare this parser's behavior against a bare Elasticsearch client), these two are the ones that will look like they work and then quietly return wrong data.
+Both were confirmed with `_validate/query`: the response has `"valid": true`, and the `explanation` shows the unmapped-field query rather than an error. If you pass user-authored queries through to a system that also runs `query_string` directly, these two will look like they work and then quietly return an empty set.
 
 Note the asymmetry: `_exists_:field` is standard Elasticsearch syntax (see Tier 3), so `_exists_` and `_missing_` are **not** a matched pair even though they read like one here.
+
+### Term modifiers this library parses but does not translate
+
+These are accepted by the parser and recorded on the AST, but `ElasticQueryParser` does not carry them into the generated Elasticsearch query. The modifier is silently ignored, so the query still runs and still returns results -- just not the results the syntax asked for. This is a gap in this library rather than a disagreement with Elasticsearch, which supports all of these.
+
+| Syntax | What the syntax implies | What `ElasticQueryParser` actually emits |
+|--------|-------------------------|-------------------------------------------|
+| `field:value~2` | Fuzzy match, edit distance 2 | `match` with **no `fuzziness`** -- an exact match |
+| `field:"a b"~5` | Phrase proximity, slop 5 | `match_phrase` with **no `slop`** -- adjacent terms only |
+| `field:value^2` | Boosted relevance score | `match`/`term` with **no `boost`** -- unweighted |
+| `field:/val.*/` (analyzed field) | Regular expression match | `query_string` with `analyze_wildcard`, treating `val.*` as a **wildcard** |
+| `field:/val.*/` (keyword field) | Regular expression match | `prefix` query for the literal string `val.` -- the `.` matches literally |
+
+Verified by building each query through `ElasticQueryParser` against a mapped index and inspecting the request JSON actually sent to Elasticsearch. The AST does record the modifier -- `Proximity`, `Boost`, and `IsRegexTerm` are all populated, and `GenerateQueryVisitor` round-trips the query text correctly -- so the information is lost specifically during Elasticsearch query generation, not during parsing.
+
+The two regex rows are the most dangerous here, because a wildcard or prefix interpretation of a regex pattern still returns plausible-looking results rather than obviously wrong ones. If you need any of these semantics today, construct that part of the query with the Elasticsearch client directly. Tracked as a bug in [#278](https://github.com/FoundatioFx/Foundatio.Parsers/issues/278).
 
 ## Tier 2: Rejected outright by `query_string`
 
@@ -47,19 +67,22 @@ The geo-proximity collision with fuzzy search is a namespacing consequence of re
 
 ## Tier 3: Compatible
 
-Verified identical behavior in both:
+Verified to behave identically when built through `ElasticQueryParser` and when sent to `query_string`:
 
 | Syntax | Notes |
 |--------|-------|
 | `_exists_:field` | Standard `query_string` syntax; not a Foundatio.Parsers addition. |
 | `field:>10`, `>=`, `<`, `<=` | Documented directly in the [Elasticsearch ranges reference](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query). |
 | `field:[10 TO *]`, `field:{* TO 10}` | Unbounded range bounds. |
-| `field:/regex/` | Regular expression term. |
-| `field:value~2` | Fuzzy match with edit distance. |
-| `field:value^2` | Boost. |
-| `field:"multi word"~5` | Quoted-phrase proximity search. |
+| `field:val*` | Trailing wildcard. |
 | `field:(+term1 +term2)` | Field grouping with per-term modifiers. |
-| `escaped\ field\ name:value`, `field\.with\.dots:value` | Backslash-escaped reserved characters in field names. |
+| `field:"exact phrase"` | Quoted phrase (without a `~slop` modifier -- see Tier 1). |
+| `escaped\ field\ name:value` | Backslash-escaped spaces in field names. |
+| `field.with.dots:value` | Dotted (sub-object) field paths, written **unescaped**. |
+
+Note on escaping: only the characters this parser's `escape_sequence` rule recognizes can be backslash-escaped. A dot is not one of them, so `field\.with\.dots:value` throws `FormatException` here even though `query_string` accepts it. Write dotted paths unescaped.
+
+Fuzzy (`~2`), proximity (`~5`), boost (`^2`), and regex (`/.../ `) are **not** in this tier -- Elasticsearch supports them, but `ElasticQueryParser` drops them. See Tier 1.
 
 Foundatio.Parsers' aggregation expression language (`terms:`, `min:`, `date:`, and so on) and sort expressions have no `query_string` equivalent at all -- they are a separate API surface built on top of the query grammar, not a deviation within it, so they are out of scope for this page.
 
@@ -71,9 +94,11 @@ If a query needs to also work against a plain Elasticsearch `query_string` (or a
 - `[min TO max]` / `{min TO max}` for ranges, not the `..` shorthand
 - `>`, `>=`, `<`, `<=` single-sided ranges
 - `_exists_:field` (but not `_missing_:field`, which has no portable equivalent -- express it as `NOT _exists_:field` instead)
-- Standard wildcards, regex, fuzzy, boost, and quoted-phrase proximity
+- Trailing wildcards, quoted phrases, and dotted field paths written unescaped
 
 Avoid `@include:` macros, `_missing_:field`, geo proximity (`~distance`), post-colon operator placement, and the `..` range shorthand if the query needs to travel outside this parser.
+
+Fuzzy, proximity, boost, and regex are portable *as syntax* -- `query_string` handles all four -- but this parser drops them during Elasticsearch query generation (Tier 1), so a query relying on them behaves differently here than elsewhere. That is the opposite direction from the rest of this page: the query is portable, but the local behavior is not.
 
 ## Related
 
