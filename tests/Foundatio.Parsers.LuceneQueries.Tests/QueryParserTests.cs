@@ -662,6 +662,38 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.False(result.IsNodeOrGroupNegated());
     }
 
+    [Fact]
+    public void IsNodeOrGroupNegated_WithTermInsideNestedFieldGroup_StopsAtNearestParenthesizedGroup()
+    {
+        // Arrange
+        // Pins the documented depth limit: the walk stops at the nearest parenthesized group, so a term
+        // can disagree with the groups enclosing it. See https://github.com/FoundatioFx/Foundatio.Parsers/issues/279.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var nested = parser.Parse("-(field:(value))");
+        var flat = parser.Parse("-(field:value)");
+
+        // Assert
+        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(nested));
+
+        var nestedOuter = Assert.IsType<GroupNode>(nested.Left);
+        var nestedInner = Assert.IsType<GroupNode>(nestedOuter.Left);
+        var nestedTerm = Assert.IsType<TermNode>(nestedInner.Left);
+
+        Assert.True(nestedOuter.IsNodeOrGroupNegated());
+        Assert.True(nestedInner.IsNodeOrGroupNegated());
+
+        // The term's nearest group is the parenthesized "field:(...)" group, which is not itself
+        // excluded, so the excluded outer group is never reached.
+        Assert.False(nestedTerm.IsNodeOrGroupNegated());
+
+        // Without the intermediate parenthesized field group, the same term does see the negation.
+        var flatOuter = Assert.IsType<GroupNode>(flat.Left);
+        var flatTerm = Assert.IsType<TermNode>(flatOuter.Left);
+        Assert.True(flatTerm.IsNodeOrGroupNegated());
+    }
+
     [Theory]
     [InlineData("NOT field:value", true, null, true, false)]
     [InlineData("NOT [1 TO 2]", true, null, true, false)]

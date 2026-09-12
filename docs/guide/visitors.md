@@ -394,7 +394,7 @@ bool isNegated = node.IsNodeOrGroupNegated();
 
 Two caveats worth knowing:
 
-- `IsNodeOrGroupNegated()` walks up to the nearest enclosing parenthesized group, not the whole ancestor chain beyond it, so the innermost group in `NOT (a:(b:(c)))` reports `false` for `c`. It also returns `false` when the node carries a `+` prefix even if `NOT` is also present.
+- `IsNodeOrGroupNegated()` walks up to the nearest enclosing parenthesized group, not the whole ancestor chain beyond it. Because the walk stops at the first parenthesized group, **two nodes in the same query can disagree**: in `-(field:(value))` both the outer and inner groups report `true`, but the term inside `field:(value)` reports `false`, since its nearest group is parenthesized without being excluded. In the flatter `-(field:value)` that same term reports `true`. Treat this helper as a check for node-local and immediate-group negation rather than a general "is this node negated anywhere up the tree" query. Tracked in [#279](https://github.com/FoundatioFx/Foundatio.Parsers/issues/279). It also returns `false` when the node carries a `+` prefix even if `NOT` is also present.
 - Outside of query contexts these operators are interpreted as ordering, not negation, and the set of operators that is honored differs:
   - **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`, so `-field`, `!field`, and `NOT field` all sort descending. Because that helper ignores negation when `+` is present, `NOT +field` sorts **ascending**.
   - **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and only honors `-` (descending) and `+` (ascending) on a sub-aggregation. `!` and the `NOT` keyword produce no `order` at all.
