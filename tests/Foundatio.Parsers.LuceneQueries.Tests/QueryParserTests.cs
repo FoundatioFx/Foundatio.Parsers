@@ -633,6 +633,35 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.True(innerGroup.IsNodeOrGroupNegated());
     }
 
+    [Fact]
+    public void IsNodeOrGroupNegated_WithNullNode_ReturnsFalse()
+    {
+        // Arrange
+        // IsExcluded() and IsRequired() both tolerate a null receiver, so this helper must too.
+        // Suppressed because the scenario under test is a caller without nullable reference types enabled.
+        IFieldQueryNode node = null!;
+
+        // Act
+        bool result = node.IsNodeOrGroupNegated();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsNodeOrGroupNegated_WithRootNode_ReturnsFalse()
+    {
+        // Arrange
+        // The root group has no parent, so the parent walk must not throw.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse("field1:value1");
+
+        // Assert
+        Assert.False(result.IsNodeOrGroupNegated());
+    }
+
     [Theory]
     [InlineData("NOT field:value", true, null, true, false)]
     [InlineData("NOT [1 TO 2]", true, null, true, false)]
