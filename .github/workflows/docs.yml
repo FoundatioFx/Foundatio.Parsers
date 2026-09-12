@@ -7,22 +7,18 @@ on:
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  deploy-docs:
+  build-docs:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
     - name: Checkout
@@ -51,13 +47,27 @@ jobs:
       env:
         NODE_ENV: production
 
-    - name: Setup Pages
-      uses: actions/configure-pages@v5
-
     - name: Upload artifact
+      if: github.event_name == 'push'
       uses: actions/upload-pages-artifact@v4
       with:
         path: docs/.vitepress/dist
+
+  deploy-docs:
+    if: github.event_name == 'push'
+    needs: build-docs
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Setup Pages
+      uses: actions/configure-pages@v5
 
     - name: Deploy to GitHub Pages
       id: deployment
