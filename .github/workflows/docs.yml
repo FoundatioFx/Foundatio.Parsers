@@ -25,18 +25,16 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
 
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
         node-version: 24
+        cache: npm
+        cache-dependency-path: docs/package-lock.json
 
-    # Pull requests must validate the lockfile they propose to merge, so install
-    # from it with `npm ci` rather than re-resolving the dependency graph. Most
-    # Dependabot PRs here are lockfile-only, and re-resolving would test a graph
-    # the PR does not actually contain.
+    # Install from the lockfile the PR proposes to merge. Most Dependabot PRs here
+    # are lockfile-only, so re-resolving would validate a graph the PR lacks.
     - name: Install dependencies from lockfile
       run: npm ci
       working-directory: docs
