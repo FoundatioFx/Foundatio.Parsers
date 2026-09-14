@@ -694,6 +694,36 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.True(flatTerm.IsNodeOrGroupNegated());
     }
 
+    [Fact]
+    public void IsNodeOrGroupNegated_WithDoublyNestedGroups_MatchesDocumentedExample()
+    {
+        // Arrange
+        // Pins the exact example in the IsNodeOrGroupNegated XML docs, so the documented result cannot
+        // drift from the implementation. See https://github.com/FoundatioFx/Foundatio.Parsers/issues/279.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse("NOT (a:(b:(c)))");
+
+        // Assert
+        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
+
+        var notGroup = Assert.IsType<GroupNode>(result.Left);
+        var groupA = Assert.IsType<GroupNode>(notGroup.Left);
+        var groupB = Assert.IsType<GroupNode>(groupA.Left);
+        var termC = Assert.IsType<TermNode>(groupB.Left);
+
+        Assert.True(notGroup.IsExcluded());
+
+        // "a" sees the excluded NOT group, because that group is its nearest enclosing parenthesized group.
+        Assert.True(groupA.IsNodeOrGroupNegated());
+
+        // "b" does not: its nearest enclosing group is "a:(...)", which is parenthesized but not excluded,
+        // so the walk stops there and never reaches the NOT group.
+        Assert.False(groupB.IsNodeOrGroupNegated());
+        Assert.False(termC.IsNodeOrGroupNegated());
+    }
+
     [Theory]
     [InlineData("NOT field:value", true, null, true, false)]
     [InlineData("NOT [1 TO 2]", true, null, true, false)]
