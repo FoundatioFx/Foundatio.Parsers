@@ -1,6 +1,6 @@
 # Query Syntax
 
-The query syntax is based on [Lucene query syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and is compatible with [Elasticsearch query_string](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html).
+The query syntax is based on [Lucene query syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and is compatible with [Elasticsearch query_string](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html). This library extends both with a few of its own constructs -- see [Syntax Compatibility](./syntax-compatibility) for exactly where it deviates and how much that matters.
 
 ## Basic Queries
 
@@ -80,6 +80,10 @@ Example:
 var result = parser.Parse("email:/.*@example\\.com/");
 ```
 
+::: warning
+`IsRegexTerm` is set on the AST, but `ElasticQueryParser` never emits a `regexp` query. Most patterns are passed through as an ordinary term, so `/[0-9]+/` searches for the literal characters `[0-9]+`. Patterns ending in `*` take a different wrong path — a wildcard query on analyzed fields, or a `prefix` query on keyword fields where `.` matches literally. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+:::
+
 ## Range Queries
 
 Range queries filter numeric or date fields within bounds.
@@ -114,6 +118,10 @@ Use `..` as shorthand for inclusive ranges:
 // Equivalent to field:[1 TO 5]
 var result = parser.Parse("field:1..5");
 ```
+
+::: warning
+This is a Foundatio.Parsers extension. Elasticsearch `query_string` has no `..` shorthand, and it fails in two different ways depending on the field type: on a numeric field the query is rejected, and on a text or keyword field it silently parses as a search for the literal term `1..5`. Use `field:[1 TO 5]` for queries that need to be portable. See [Syntax Compatibility](./syntax-compatibility).
+:::
 
 ### Unbounded Ranges
 
@@ -380,6 +388,10 @@ var result = parser.Parse("title:important^2");
 result = parser.Parse("title:\"very important\"^3");
 ```
 
+::: warning
+The boost is parsed and available on the AST (`TermNode.Boost`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+:::
+
 ## Fuzzy Queries
 
 Use `~` for fuzzy matching (edit distance):
@@ -391,6 +403,10 @@ var result = parser.Parse("name:john~");
 // Fuzzy match with specific edit distance
 result = parser.Parse("name:john~2");
 ```
+
+::: warning
+The edit distance is parsed and available on the AST (`TermNode.Proximity`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query -- the term is matched exactly. The same applies to phrase proximity (`"a b"~5`). See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+:::
 
 ## Escaping Special Characters
 
@@ -435,6 +451,7 @@ string normalized = GenerateQueryVisitor.Run(result);
 
 ## Next Steps
 
+- [Syntax Compatibility](./syntax-compatibility) - Where this syntax deviates from Lucene/Elasticsearch, and how much it matters
 - [Aggregation Syntax](./aggregation-syntax) - Dynamic aggregation expressions
 - [Field Aliases](./field-aliases) - Map field names
 - [Validation](./validation) - Validate and restrict queries
