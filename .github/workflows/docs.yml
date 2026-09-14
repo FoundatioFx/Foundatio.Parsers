@@ -19,6 +19,8 @@ concurrency:
 jobs:
   build-docs:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout
@@ -31,14 +33,12 @@ jobs:
       with:
         node-version: 24
 
-    - name: Clean npm cache and dependencies
-      run: |
-        rm -rf node_modules package-lock.json
-        npm cache clean --force
-      working-directory: docs
-
-    - name: Install dependencies
-      run: npm install --force
+    # Pull requests must validate the lockfile they propose to merge, so install
+    # from it with `npm ci` rather than re-resolving the dependency graph. Most
+    # Dependabot PRs here are lockfile-only, and re-resolving would test a graph
+    # the PR does not actually contain.
+    - name: Install dependencies from lockfile
+      run: npm ci
       working-directory: docs
 
     - name: Build documentation
