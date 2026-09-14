@@ -81,7 +81,7 @@ var result = parser.Parse("email:/.*@example\\.com/");
 ```
 
 ::: warning
-`IsRegexTerm` is set on the AST, but `ElasticQueryParser` does not emit a `regexp` query. On analyzed fields the pattern is passed through as a wildcard, and on keyword fields it becomes a `prefix` query, so `.` matches literally. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+`IsRegexTerm` is set on the AST, but `ElasticQueryParser` never emits a `regexp` query. Most patterns are passed through as an ordinary term, so `/[0-9]+/` searches for the literal characters `[0-9]+`. Patterns ending in `*` take a different wrong path — a wildcard query on analyzed fields, or a `prefix` query on keyword fields where `.` matches literally. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
 :::
 
 ## Range Queries
@@ -118,6 +118,10 @@ Use `..` as shorthand for inclusive ranges:
 // Equivalent to field:[1 TO 5]
 var result = parser.Parse("field:1..5");
 ```
+
+::: warning
+This is a Foundatio.Parsers extension. Elasticsearch `query_string` has no `..` shorthand, and it fails in two different ways depending on the field type: on a numeric field the query is rejected, and on a text or keyword field it silently parses as a search for the literal term `1..5`. Use `field:[1 TO 5]` for queries that need to be portable. See [Syntax Compatibility](./syntax-compatibility).
+:::
 
 ### Unbounded Ranges
 
@@ -401,7 +405,7 @@ result = parser.Parse("name:john~2");
 ```
 
 ::: warning
-The edit distance is parsed and available on the AST (`TermNode.Proximity`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query -- the term is matched exactly. The same applies to phrase proximity (`"a b"~5`) and to regex terms (`/val.*/`). See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+The edit distance is parsed and available on the AST (`TermNode.Proximity`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query -- the term is matched exactly. The same applies to phrase proximity (`"a b"~5`). See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
 :::
 
 ## Escaping Special Characters
