@@ -136,9 +136,10 @@ public static class QueryNodeExtensions
     /// </summary>
     /// <remarks>
     /// Only the nearest parenthesized group is inspected, not the full ancestor chain beyond it, so
-    /// <c>NOT (a:(b:(c)))</c> reports <c>true</c> for <c>b</c> but not for the innermost <c>c</c>.
+    /// <c>NOT (a:(b:(c)))</c> reports <c>true</c> for the <c>a:(...)</c> group but <c>false</c> for the
+    /// nested <c>b:(...)</c> group, whose nearest enclosing group is <c>a:(...)</c> and is not excluded.
     /// The search always starts at the node's parent, so calling this on a <see cref="GroupNode"/> that
-    /// already has parens still finds the nearest *enclosing* group rather than matching itself.
+    /// already has parens still finds the nearest <em>enclosing</em> group rather than matching itself.
     /// </remarks>
     public static bool IsNodeOrGroupNegated(this IFieldQueryNode node)
     {
