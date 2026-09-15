@@ -7,42 +7,34 @@ on:
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  deploy-docs:
+  build-docs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
     - name: Checkout
       uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
 
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
         node-version: 24
 
-    - name: Clean npm cache and dependencies
-      run: |
-        rm -rf node_modules package-lock.json
-        npm cache clean --force
-      working-directory: docs
-
-    - name: Install dependencies
-      run: npm install --force
+    # Install from the lockfile the PR proposes to merge. Most Dependabot PRs here
+    # are lockfile-only, so re-resolving would validate a graph the PR lacks.
+    - name: Install dependencies from lockfile
+      run: npm ci
       working-directory: docs
 
     - name: Build documentation
@@ -51,13 +43,27 @@ jobs:
       env:
         NODE_ENV: production
 
-    - name: Setup Pages
-      uses: actions/configure-pages@v5
-
     - name: Upload artifact
+      if: github.event_name == 'push'
       uses: actions/upload-pages-artifact@v4
       with:
         path: docs/.vitepress/dist
+
+  deploy-docs:
+    if: github.event_name == 'push'
+    needs: build-docs
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Setup Pages
+      uses: actions/configure-pages@v5
 
     - name: Deploy to GitHub Pages
       id: deployment
