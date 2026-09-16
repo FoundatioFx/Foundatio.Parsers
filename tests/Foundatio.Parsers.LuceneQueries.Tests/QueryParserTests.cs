@@ -724,6 +724,37 @@ public class QueryParserTests : TestWithLoggingBase
         Assert.False(termC.IsNodeOrGroupNegated());
     }
 
+    [Fact]
+    public void IsNodeOrGroupNegated_WithMultipleTermsInExcludedGroup_ReportsSyntacticContextOnly()
+    {
+        // Arrange
+        // Pins the multi-term example in the IsNodeOrGroupNegated docs: a "true" here describes the term's
+        // syntactic context, not what the query excludes. See https://github.com/FoundatioFx/Foundatio.Parsers/issues/279.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse("NOT (status:active AND region:us)");
+
+        // Assert
+        _logger.LogInformation("{Result}", DebugQueryVisitor.Run(result));
+
+        var notGroup = Assert.IsType<GroupNode>(result.Left);
+        var statusTerm = Assert.IsType<TermNode>(notGroup.Left);
+        var regionTerm = Assert.IsType<TermNode>(notGroup.Right);
+
+        Assert.True(notGroup.HasParens);
+        Assert.True(notGroup.IsExcluded());
+        Assert.Equal(GroupOperator.And, notGroup.Operator);
+
+        // Both terms report negated because their nearest enclosing parenthesized group is excluded, even
+        // though the query only excludes records matching both terms - an active record outside the US
+        // still matches. Neither term is individually negated.
+        Assert.False(statusTerm.IsExcluded());
+        Assert.False(regionTerm.IsExcluded());
+        Assert.True(statusTerm.IsNodeOrGroupNegated());
+        Assert.True(regionTerm.IsNodeOrGroupNegated());
+    }
+
     [Theory]
     [InlineData("NOT field:value", true, null, true, false)]
     [InlineData("NOT [1 TO 2]", true, null, true, false)]

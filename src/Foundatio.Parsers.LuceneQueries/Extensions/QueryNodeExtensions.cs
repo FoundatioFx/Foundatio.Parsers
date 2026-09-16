@@ -140,6 +140,13 @@ public static class QueryNodeExtensions
     /// nested <c>b:(...)</c> group, whose nearest enclosing group is <c>a:(...)</c> and is not excluded.
     /// The search always starts at the node's parent, so calling this on a <see cref="GroupNode"/> that
     /// already has parens still finds the nearest <em>enclosing</em> group rather than matching itself.
+    /// <para>
+    /// This reports a node's syntactic negation context, not its effective negation. In
+    /// <c>NOT (status:active AND region:us)</c> the <c>status:active</c> term reports <c>true</c>, yet the
+    /// query only excludes records matching both terms, so an active record outside the US still matches.
+    /// Use this for node-local and immediate-group negation, such as choosing a sort direction, rather
+    /// than as a general-purpose negation check.
+    /// </para>
     /// </remarks>
     public static bool IsNodeOrGroupNegated(this IFieldQueryNode node)
     {

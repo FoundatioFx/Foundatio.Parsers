@@ -378,7 +378,7 @@ In query contexts, use the extension methods instead of inspecting the propertie
 
 - `IsExcluded()` - node-local negation, covering `NOT`, `-`, and `!`
 - `IsRequired()` - the `+` prefix
-- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group.
+- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group. Its limits are worth reading before you use it.
 
 ```csharp
 // Wrong: misses the ! prefix and any negation on the enclosing group
@@ -392,15 +392,29 @@ bool isNegated = node.IsExcluded();
 bool isNegated = node.IsNodeOrGroupNegated();
 ```
 
-Two caveats worth knowing:
+#### What `IsNodeOrGroupNegated()` checks
 
-- `IsNodeOrGroupNegated()` walks up to the nearest enclosing parenthesized group, not the whole ancestor chain beyond it. Because the walk stops at the first parenthesized group, **two nodes in the same query can disagree**: in `-(field:(value))` both the outer and inner groups report `true`, but the term inside `field:(value)` reports `false`, since its nearest group is parenthesized without being excluded. In the flatter `-(field:value)` that same term reports `true`. Treat this helper as a check for node-local and immediate-group negation rather than a general "is this node negated anywhere up the tree" query. Tracked in [#279](https://github.com/FoundatioFx/Foundatio.Parsers/issues/279). It also returns `false` when the node carries a `+` prefix even if `NOT` is also present.
-- Outside of query contexts these operators are interpreted as ordering, not negation, and only `+` (ascending) and `-` (descending) are accepted:
-  - **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`. For standalone fields, `-field` sorts descending and `field` / `+field` sort ascending. Unprefixed terms can inherit group direction; `-(price name +rank)` sorts `price` and `name` descending, with `rank` ascending because of its own `+`.
-  - **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and honors `-` (descending) and `+` (ascending) on a sub-aggregation.
-  - **Boolean negation is rejected**: the built-in string-based sort and aggregation APIs reject `!` and `NOT`, including `NOT +field`, before returning generated output. Previously, `!field` and `NOT field` sorted descending, `NOT +field` sorted ascending, and aggregation negation could be silently ignored. The lower-level AST build overloads do not rerun validation; see [Ordering Operators](./validation#ordering-operators).
+It checks exactly two things:
 
-  Do not use `IsExcluded()` to interpret sort or aggregation direction.
+- `IsExcluded()` on the node itself, covering the `NOT` keyword and the `-` and `!` prefixes.
+- `IsExcluded()` on the nearest enclosing parenthesized group.
+
+It returns `false` when the node carries a `+` prefix, even if `NOT` is also present.
+
+It does **not** look past that nearest parenthesized group, so **two nodes in the same query can disagree**. In `-(field:(value))` both the outer and inner groups report `true`, but the term inside `field:(value)` reports `false`, because its nearest group is parenthesized without being excluded. In the flatter `-(field:value)` that same term reports `true`.
+
+It is also not a check of a term's *effective* negation, even inside its own group. In `NOT (status:active AND region:us)` the `status:active` term reports `true`, but the query only excludes records that are both active and in the US, so an active record outside the US still matches. A per-node answer describes the term's syntactic context; it does not describe how that term participates in the overall condition.
+
+Use it for node-local and immediate-group negation - its one production use is choosing a sort direction - not to ask whether a node is negated anywhere up the tree, and not to reason about what a query will match. The depth limit is intentional, decided in [#279](https://github.com/FoundatioFx/Foundatio.Parsers/issues/279): making it parity-correct over the full ancestor chain would be a behavior change, since `-(-x)` would then have to cancel, and it will only be revisited if a real query consumer needs those semantics.
+
+#### Ordering contexts interpret these operators differently
+
+Outside of query contexts these operators are interpreted as ordering, not negation, and only `+` (ascending) and `-` (descending) are accepted:
+- **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`. For standalone fields, `-field` sorts descending and `field` / `+field` sort ascending. Unprefixed terms can inherit group direction; `-(price name +rank)` sorts `price` and `name` descending, with `rank` ascending because of its own `+`.
+- **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and honors `-` (descending) and `+` (ascending) on a sub-aggregation.
+- **Boolean negation is rejected**: the built-in string-based sort and aggregation APIs reject `!` and `NOT`, including `NOT +field`, before returning generated output. Previously, `!field` and `NOT field` sorted descending, `NOT +field` sorted ascending, and aggregation negation could be silently ignored. The lower-level AST build overloads do not rerun validation; see [Ordering Operators](./validation#ordering-operators).
+
+Do not use `IsExcluded()` to interpret sort or aggregation direction.
 
 ### Node Data Dictionary
 
