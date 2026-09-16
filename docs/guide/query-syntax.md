@@ -203,6 +203,13 @@ result = parser.Parse("+status:active -deleted:true type:user");
 
 These operators may be written either before the field name or immediately after the colon, and both forms are equivalent: `-field:value` and `field:-value` parse the same, as do `-field:(value)` and `field:-(value)`. The one exception is ranges, where only the leading position is accepted -- `-field:[1 TO 2]` and `NOT field:[1 TO 2]` work, while `field:-[1 TO 2]` and `field:NOT [1 TO 2]` throw a `FormatException`.
 
+::: warning
+The table above applies to query expressions only. In sort and aggregation expressions, `+` and `-`
+are ordering operators (ascending and descending) and the boolean negation operators `NOT` and `!`
+are rejected as validation errors. See [Building Sort](./elastic-query-parser#building-sort) and
+[Sorting Bucket Aggregations](./aggregation-syntax#sorting-bucket-aggregations).
+:::
+
 ## Grouping
 
 Use parentheses to group clauses and control precedence:

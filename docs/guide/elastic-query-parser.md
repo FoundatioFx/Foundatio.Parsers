@@ -172,6 +172,21 @@ var response = await client.SearchAsync<MyDocument>(s => s
     .Sort(sort));
 ```
 
+Sort direction is explicit:
+
+| Prefix | Direction |
+|--------|-----------|
+| none | Ascending |
+| `+` | Ascending |
+| `-` | Descending |
+
+::: warning
+The boolean negation operators `NOT` and `!` are [query operators](./query-syntax#boolean-operators),
+not ordering operators. `BuildSortAsync("!created")`, `BuildSortAsync("NOT created")`, and
+`BuildSortAsync("NOT +created")` throw a `QueryValidationException` rather than resolving to a
+direction. Use `-created` for descending order.
+:::
+
 ## Validation
 
 ### Validate Before Building

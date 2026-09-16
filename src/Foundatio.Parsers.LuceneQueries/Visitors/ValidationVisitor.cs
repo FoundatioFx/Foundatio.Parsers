@@ -20,6 +20,7 @@ public class ValidationVisitor : ChainableQueryVisitor
             AddField(validationResult, node, context);
 
         AddOperation(validationResult, node.GetOperationType(), node.Field);
+        ValidateOrderingOperators(node, context);
         await base.VisitAsync(node, context).AnyContext();
 
         if (node.HasParens)
@@ -31,6 +32,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         var validationResult = context.GetValidationResult();
         AddField(validationResult, node, context);
         AddOperation(validationResult, node.GetOperationType(), node.Field);
+        ValidateOrderingOperators(node, context);
 
         var validationOptions = context.GetValidationOptions();
         if (validationOptions is { AllowLeadingWildcards: false } && node.Term != null && (node.Term.StartsWith("*") || node.Term.StartsWith("?")))
@@ -42,6 +44,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         var validationResult = context.GetValidationResult();
         AddField(validationResult, node, context);
         AddOperation(validationResult, node.GetOperationType(), node.Field);
+        ValidateOrderingOperators(node, context);
     }
 
     public override void Visit(ExistsNode node, IQueryVisitorContext context)
@@ -49,6 +52,7 @@ public class ValidationVisitor : ChainableQueryVisitor
         var validationResult = context.GetValidationResult();
         AddField(validationResult, node, context);
         AddOperation(validationResult, "exists", node.Field);
+        ValidateOrderingOperators(node, context);
     }
 
     public override void Visit(MissingNode node, IQueryVisitorContext context)
@@ -56,6 +60,27 @@ public class ValidationVisitor : ChainableQueryVisitor
         var validationResult = context.GetValidationResult();
         AddField(validationResult, node, context);
         AddOperation(validationResult, "missing", node.Field);
+        ValidateOrderingOperators(node, context);
+    }
+
+    /// <summary>
+    /// Sort and aggregation ordering is explicit: only the <c>+</c> (ascending) and <c>-</c> (descending)
+    /// prefixes convey direction. Boolean negation operators (<c>NOT</c> and its <c>!</c> alias) remain query
+    /// operators and are rejected here rather than silently interpreted as a direction or silently ignored.
+    /// </summary>
+    private static void ValidateOrderingOperators(IFieldQueryNode node, IQueryVisitorContext context)
+    {
+        if (context.QueryType is not (QueryTypes.Sort or QueryTypes.Aggregation))
+            return;
+
+        if (node.IsNegated is not true && node.Prefix is not "!")
+            return;
+
+        string @operator = node.IsNegated is true ? "NOT" : "!";
+        string expression = context.QueryType == QueryTypes.Sort ? "sort" : "aggregation";
+        string field = String.IsNullOrEmpty(node.Field) ? String.Empty : $" for field ({node.Field})";
+
+        context.AddValidationError($"Boolean operator ({@operator}) is not supported in {expression} expressions{field}: use + for ascending or - for descending order.");
     }
 
     private void AddField(QueryValidationResult validationResult, IFieldQueryNode node, IQueryVisitorContext context)

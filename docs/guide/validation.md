@@ -343,6 +343,20 @@ if (!validation.IsValid)
 }
 ```
 
+Sort and aggregation ordering accept only the `+` (ascending) and `-` (descending) prefixes. The
+boolean negation operators `NOT` and `!` are query operators and are reported as validation errors in
+either position:
+
+```csharp
+var validation = await parser.ValidateSortAsync("!created");
+// validation.IsValid == false
+// validation.Message == "Boolean operator (!) is not supported in sort expressions for field (created): use + for ascending or - for descending order."
+
+validation = await parser.ValidateAggregationsAsync("terms:(category NOT max:price)");
+// validation.IsValid == false
+// validation.Message == "Boolean operator (NOT) is not supported in aggregation expressions for field (price): use + for ascending or - for descending order."
+```
+
 ## Context-Based Validation
 
 Access validation results from the context:

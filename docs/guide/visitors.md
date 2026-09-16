@@ -395,9 +395,10 @@ bool isNegated = node.IsNodeOrGroupNegated();
 Two caveats worth knowing:
 
 - `IsNodeOrGroupNegated()` walks only up to the nearest parenthesized group, not the whole ancestor chain, so the inner group in `NOT (a:(b))` reports `false`. It also returns `false` when the node carries a `+` prefix even if `NOT` is also present.
-- Outside of query contexts these operators are interpreted as ordering, not negation, and the set of operators that is honored differs:
-  - **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`, so `-field`, `!field`, and `NOT field` all sort descending. Because that helper ignores negation when `+` is present, `NOT +field` sorts **ascending**.
-  - **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and only honors `-` (descending) and `+` (ascending) on a sub-aggregation. `!` and the `NOT` keyword produce no `order` at all.
+- Outside of query contexts these operators are interpreted as ordering, not negation, and only `+` (ascending) and `-` (descending) are accepted:
+  - **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`, so `-field` sorts descending and `field` / `+field` sort ascending.
+  - **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and honors `-` (descending) and `+` (ascending) on a sub-aggregation.
+  - **Boolean negation is rejected**: `ValidationVisitor` adds a validation error for `!` and the `NOT` keyword whenever `context.QueryType` is `QueryTypes.Sort` or `QueryTypes.Aggregation`, so `!field`, `NOT field`, and `NOT +field` never reach the code above. Sort previously read all three as descending (and `NOT +field` as ascending) and aggregations silently produced no `order`.
 
   Do not use `IsExcluded()` to interpret sort or aggregation direction.
 

@@ -190,6 +190,74 @@ public class QueryValidatorTests : TestWithLoggingBase
         Assert.True(result.IsValid);
     }
 
+    [Theory]
+    [InlineData("!price", "!")]
+    [InlineData("NOT price", "NOT")]
+    [InlineData("NOT +price", "NOT")]
+    [InlineData("price !name", "!")]
+    [InlineData("!(price name)", "!")]
+    [InlineData("NOT (price)", "NOT")]
+    public async Task ValidateSortAsync_WithBooleanNegationOperator_ReturnsValidationError(string sort, string expectedOperator)
+    {
+        var info = await QueryValidator.ValidateSortAsync(sort);
+
+        Assert.False(info.IsValid);
+        Assert.NotNull(info.Message);
+        Assert.Contains($"Boolean operator ({expectedOperator}) is not supported in sort expressions", info.Message);
+        Assert.Contains("use + for ascending or - for descending order", info.Message);
+    }
+
+    [Theory]
+    [InlineData("price")]
+    [InlineData("+price")]
+    [InlineData("-price")]
+    [InlineData("-price +name")]
+    [InlineData("-(a b +c)")]
+    public async Task ValidateSortAsync_WithExplicitOrderingOperators_IsValid(string sort)
+    {
+        var info = await QueryValidator.ValidateSortAsync(sort);
+
+        Assert.True(info.IsValid, info.Message);
+    }
+
+    [Theory]
+    [InlineData("terms:(field1 !max:field4)", "!")]
+    [InlineData("terms:(field1 NOT max:field4)", "NOT")]
+    [InlineData("!max:field4", "!")]
+    [InlineData("NOT max:field4", "NOT")]
+    public async Task ValidateAggregationsAsync_WithBooleanNegationOperator_ReturnsValidationError(string aggregations, string expectedOperator)
+    {
+        var info = await QueryValidator.ValidateAggregationsAsync(aggregations);
+
+        Assert.False(info.IsValid);
+        Assert.NotNull(info.Message);
+        Assert.Contains($"Boolean operator ({expectedOperator}) is not supported in aggregation expressions", info.Message);
+        Assert.Contains("use + for ascending or - for descending order", info.Message);
+    }
+
+    [Theory]
+    [InlineData("terms:(field1 -max:field4)")]
+    [InlineData("terms:(field1 +max:field4)")]
+    [InlineData("max:field4")]
+    public async Task ValidateAggregationsAsync_WithExplicitOrderingOperators_IsValid(string aggregations)
+    {
+        var info = await QueryValidator.ValidateAggregationsAsync(aggregations);
+
+        Assert.True(info.IsValid, info.Message);
+    }
+
+    [Theory]
+    [InlineData("!field1:value1")]
+    [InlineData("NOT field1:value1")]
+    [InlineData("field1:value1 NOT field2:value2")]
+    [InlineData("-field1:value1")]
+    public async Task ValidateQueryAsync_WithBooleanNegationOperator_IsValid(string query)
+    {
+        var info = await QueryValidator.ValidateQueryAsync(query);
+
+        Assert.True(info.IsValid, info.Message);
+    }
+
     // allowed fields
     // allowed operations
     //

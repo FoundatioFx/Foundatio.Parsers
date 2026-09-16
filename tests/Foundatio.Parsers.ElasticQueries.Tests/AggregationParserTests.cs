@@ -583,10 +583,6 @@ public class AggregationParserTests : ElasticsearchTestBase
 
     [Theory]
     [InlineData("cardinality:field4")]
-    // Aggregation ordering reads Prefix directly and only honors "-" and "+". The "!" prefix and
-    // the NOT keyword are negation operators, not ordering operators, so they produce no order.
-    [InlineData("!cardinality:field4")]
-    [InlineData("NOT cardinality:field4")]
     public async Task BuildAggregationsAsync_WithNonOrderingSubAggregation_OmitsTermsOrder(string subAggregation)
     {
         // Arrange
@@ -613,6 +609,27 @@ public class AggregationParserTests : ElasticsearchTestBase
 
         Assert.Equal(expectedRequest, actualRequest);
         Assert.True(actualResponse.IsValidResponse);
+    }
+
+    [Theory]
+    [InlineData("terms:(field1 !cardinality:field4)", "!")]
+    [InlineData("terms:(field1 NOT cardinality:field4)", "NOT")]
+    [InlineData("!cardinality:field4", "!")]
+    [InlineData("NOT cardinality:field4", "NOT")]
+    public async Task BuildAggregationsAsync_WithBooleanNegationOperator_ThrowsValidationException(string aggregations, string expectedOperator)
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<MyType>();
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
+
+        // Act
+        var ex = await Assert.ThrowsAsync<QueryValidationException>(() => processor.BuildAggregationsAsync(aggregations));
+
+        // Assert
+        Assert.Contains($"Boolean operator ({expectedOperator}) is not supported in aggregation expressions", ex.Message);
+        Assert.Contains("use + for ascending or - for descending order", ex.Message);
+        Assert.NotNull(ex.Result);
+        Assert.False(ex.Result.IsValid);
     }
 
     [Fact]

@@ -417,6 +417,13 @@ aggs = await parser.BuildAggregationsAsync("terms:(category +min:price)");
 aggs = await parser.BuildAggregationsAsync("terms:(category~10)");
 ```
 
+::: warning
+`+` and `-` are the only ordering operators. The boolean negation operators `NOT` and `!` are
+[query operators](./query-syntax#boolean-operators) and are rejected in aggregation expressions, so
+`terms:(category !max:price)` and `terms:(category NOT max:price)` fail validation rather than being
+silently ignored.
+:::
+
 ## Field Aliases
 
 Aggregations support [field aliases](./field-aliases):
