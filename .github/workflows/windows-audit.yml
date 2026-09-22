@@ -1,0 +1,91 @@
+name: PR 282 Windows regression audit
+on:
+  push:
+    branches: [audit/pr-282-windows-verification]
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: pwsh
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: b7786a6ab375d8a928dbf2f4e65c4cfa4b9de995
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Record source and initialize evidence
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP 'pr282-windows-evidence'
+          New-Item -ItemType Directory -Force $path | Out-Null
+          Add-Content $env:GITHUB_ENV "EVIDENCE=$path"
+          git rev-parse HEAD | Set-Content "$path/tested-sha.txt"
+          git rev-parse 'HEAD^{tree}' | Set-Content "$path/tested-tree.txt"
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Release build
+        id: build
+        run: |
+          dotnet --info | Set-Content "$env:EVIDENCE/dotnet-info.txt"
+          dotnet build Foundatio.Parsers.slnx -c Release 2>&1 | Tee-Object "$env:EVIDENCE/build.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Prefix regressions and SQL compatibility controls
+        id: tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          dotnet tests/Foundatio.Parsers.ElasticQueries.Tests/bin/Release/net10.0/Foundatio.Parsers.ElasticQueries.Tests.dll -class Foundatio.Parsers.ElasticQueries.Tests.OrderingPrefixCollisionTests -failSkips -xml "$env:EVIDENCE/prefix.xml" 2>&1 | Tee-Object "$env:EVIDENCE/prefix.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet tests/Foundatio.Parsers.SqlQueries.Tests/bin/Release/net10.0/Foundatio.Parsers.SqlQueries.Tests.dll -class Foundatio.Parsers.SqlQueries.Tests.QueryPrefixCompatibilityTests -failSkips -xml "$env:EVIDENCE/sql-controls.xml" 2>&1 | Tee-Object "$env:EVIDENCE/sql-controls.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($case in @(@{File='prefix';Count=292},@{File='sql-controls';Count=8})) {
+            [xml]$report = Get-Content "$env:EVIDENCE/$($case.File).xml"
+            $a = $report.assemblies.assembly
+            if ([int]$a.total -ne $case.Count -or [int]$a.passed -ne $case.Count -or [int]$a.failed -ne 0 -or [int]$a.errors -ne 0 -or [int]$a.skipped -ne 0) { throw "Unexpected test report: $($case.File)" }
+          }
+      - name: Full semantic formatter verification
+        id: format
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          dotnet format Foundatio.Parsers.slnx --no-restore --verify-no-changes --verbosity diagnostic 2>&1 | Tee-Object "$env:EVIDENCE/format.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path "$env:EVIDENCE/format.log" -Pattern 'Warnings were encountered while loading the workspace' -Quiet) { throw 'Formatter workspace was not fully loaded' }
+      - name: .NET 8 ordering runtime tests
+        id: net8
+        if: ${{ !cancelled() && steps.tests.outcome == 'success' }}
+        run: |
+          $total = 0
+          foreach ($project in @('LuceneQueries','ElasticQueries')) {
+            dotnet build "tests/Foundatio.Parsers.$project.Tests/Foundatio.Parsers.$project.Tests.csproj" -c Release -p:ReferenceFoundatioSource=false -p:TargetFrameworks=net8.0 2>&1 | Tee-Object "$env:EVIDENCE/net8-build-$project.log"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            dotnet "tests/Foundatio.Parsers.$project.Tests/bin/Release/net8.0/Foundatio.Parsers.$project.Tests.dll" -class "Foundatio.Parsers.$project.Tests.Ordering*" -failSkips -xml "$env:EVIDENCE/net8-$project.xml" 2>&1 | Tee-Object "$env:EVIDENCE/net8-$project.log"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            [xml]$report = Get-Content "$env:EVIDENCE/net8-$project.xml"
+            $a = $report.assemblies.assembly
+            if ([int]$a.total -eq 0 -or [int]$a.total -ne [int]$a.passed -or [int]$a.failed -ne 0 -or [int]$a.errors -ne 0 -or [int]$a.skipped -ne 0) { throw "Unexpected .NET 8 test report: $project" }
+            $total += [int]$a.total
+          }
+          if ($total -ne 354) { throw "Expected 354 .NET 8 ordering tests, got $total" }
+      - name: Capture outcomes
+        if: always()
+        env:
+          OUTCOMES: ${{ toJSON(steps) }}
+        run: |
+          $env:OUTCOMES | Set-Content "$env:EVIDENCE/outcomes.json"
+          git status --porcelain | Set-Content "$env:EVIDENCE/worktree.txt"
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr282-windows-audit
+          path: ${{ env.EVIDENCE }}
+          if-no-files-found: error
+          retention-days: 14
