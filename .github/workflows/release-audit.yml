@@ -22,7 +22,7 @@ jobs:
       CANDIDATE: 2b01579c9f622e6bb551eb2fca96248b8e45fe45
       PR277: b62ce83b24ffbe3d5ba8d9eb11ec440ddd2610e5
       PR270: 4e37c7fe93e517575a744cecd79a6d631e80e0ac
-      EVIDENCE: ${{ runner.temp }}/evidence
+      EVIDENCE: /tmp/pr282-evidence
     steps:
       - uses: actions/checkout@v6
         with:
@@ -266,6 +266,6 @@ jobs:
         if: always()
         with:
           name: pr282-final-${{ matrix.mode }}
-          path: ${{ runner.temp }}/evidence
+          path: ${{ env.EVIDENCE }}
           if-no-files-found: error
           retention-days: 14
