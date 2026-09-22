@@ -79,20 +79,37 @@ jobs:
         if: ${{ !cancelled() }}
         run: dotnet build Foundatio.Parsers.slnx --configuration Release
       - name: Compare Foundatio and query_string matching and scoring
+        id: compare
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: >-
-          dotnet tests/Foundatio.Parsers.ElasticQueries.Tests/bin/Release/net10.0/Foundatio.Parsers.ElasticQueries.Tests.dll
-          --filter-class '*SyntaxCompatibilityIntegrationTests'
-          --report-trx
-          --results-directory "$GITHUB_WORKSPACE/compatibility-results"
+        run: |
+          dotnet tests/Foundatio.Parsers.ElasticQueries.Tests/bin/Release/net10.0/Foundatio.Parsers.ElasticQueries.Tests.dll \
+            -class Foundatio.Parsers.ElasticQueries.Tests.SyntaxCompatibilityIntegrationTests \
+            -failSkips -xml "$GITHUB_WORKSPACE/compatibility-results/foundatio.xml" \
+            | tee compatibility-results/foundatio.log
+      - name: Verify comparison report completeness
+        if: ${{ !cancelled() && steps.compare.outcome == 'success' }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          cases = [line for line in Path("tests/compatibility/cases.tsv").read_text().splitlines()
+                   if line.strip() and not line.startswith("#")]
+          tests = ET.parse("compatibility-results/foundatio.xml").findall(".//test")
+          expected = len(cases) * 2 + 11
+          if not cases or len(tests) != expected or any(test.get("result") != "Pass" for test in tests):
+              raise SystemExit(f"Incomplete comparison: expected {expected} passing tests, found {len(tests)}")
+          print(f"Verified {expected} passing live comparison tests; no skipped or missing cases.")
+          PY
       - name: Verify added C# whitespace
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: >-
-          dotnet format whitespace Foundatio.Parsers.slnx
-          --no-restore --verify-no-changes
-          --include tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityFixture.cs
-          tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityIntegrationTests.cs
-          tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityTests.cs
+        run: |
+          dotnet format whitespace Foundatio.Parsers.slnx \
+            --no-restore --verify-no-changes --verbosity diagnostic \
+            --include tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityFixture.cs \
+            tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityIntegrationTests.cs \
+            tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityTests.cs \
+            2>&1 | tee compatibility-results/format.log
       - name: Upload comparison evidence
         if: always()
         uses: actions/upload-artifact@v7
