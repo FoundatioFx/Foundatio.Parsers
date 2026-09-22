@@ -1,0 +1,150 @@
+name: PR 282 release audit
+on:
+  push:
+    branches: [audit/pr-282-release-verification]
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: Verify ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [standalone, integrated]
+    env:
+      PR282: e4311f5733e18184a7059388f051c3911fe9a892
+      MAIN: 7b7fee4f93497335296f97d62da461065875ec74
+      PR277: b62ce83b24ffbe3d5ba8d9eb11ec440ddd2610e5
+      PR270: de2dec2ec933ff5a2e13ca886c3222b5de2de998
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: e4311f5733e18184a7059388f051c3911fe9a892
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Integrate pinned related changes in runner only
+        if: matrix.variant == 'integrated'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Release verification'
+          git config user.email 'verification@users.noreply.github.com'
+          git fetch origin "$MAIN" "$PR277" "$PR270"
+          git merge --no-edit "$MAIN"
+          if ! git merge --no-commit --no-ff "$PR277"; then
+            test "$(git diff --name-only --diff-filter=U)" = 'docs/guide/visitors.md'
+            git checkout --theirs docs/guide/visitors.md
+            python3 - <<'PY'
+          from pathlib import Path
+          p = Path('docs/guide/visitors.md')
+          text = p.read_text()
+          replacements = {
+            'Outside of query contexts these operators are interpreted as ordering, not negation, and the set of operators that is honored differs:': 'Outside of query contexts, only `+` (ascending) and `-` (descending) are ordering operators:',
+            '- **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`, so `-field`, `!field`, and `NOT field` all sort descending. Because that helper ignores negation when `+` is present, `NOT +field` sorts **ascending**.': '- **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`. A standalone `field` or `+field` sorts ascending and `-field` sorts descending. Group-derived direction and the node-local `+` override remain supported.',
+            '- **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and only honors `-` (descending) and `+` (ascending) on a sub-aggregation. `!` and the `NOT` keyword produce no `order` at all.': '- **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and honors `-` (descending) and `+` (ascending) on a sub-aggregation.\n- **Boolean negation is rejected**: the string-based sort and aggregation APIs reject `NOT` and `!`, including `NOT +field`, primary-field terms, and resolved includes. See [Ordering Operators](./validation#ordering-operators).'
+          }
+          for old, new in replacements.items():
+              assert text.count(old) == 1, old
+              text = text.replace(old, new)
+          p.write_text(text)
+          PY
+            git add docs/guide/visitors.md
+          fi
+          git commit --no-edit
+          if ! git merge --no-commit --no-ff "$PR270"; then
+            test "$(git diff --name-only --diff-filter=U)" = 'docs/guide/query-syntax.md'
+            git checkout --theirs docs/guide/query-syntax.md
+            python3 - <<'PY'
+          from pathlib import Path
+          p = Path('docs/guide/query-syntax.md')
+          text = p.read_text()
+          marker = '## Grouping'
+          assert text.count(marker) == 1
+          warning = '::: warning Ordering expressions\nThe query-operator table applies to search queries. Sort and aggregation expressions accept only `+` and `-` for ordering and reject Boolean `NOT` and `!`. See [Ordering Operators](./validation#ordering-operators).\n:::\n\n'
+          p.write_text(text.replace(marker, warning + marker))
+          PY
+            git add docs/guide/query-syntax.md
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('docs/guide/syntax-compatibility.md')
+          text = p.read_text()
+          text += '\n## Sort and aggregation expressions\n\nThe query compatibility guidance above does not define ordering syntax. String-based sort and aggregation APIs reject Boolean `NOT` and `!`, including negated primary-field terms and resolved includes. Use `+` or `-` for explicit ordering. Search-query negation is unchanged. See [Ordering Operators and migration](./validation#ordering-operators).\n'
+          p.write_text(text)
+          PY
+          git add docs/guide/syntax-compatibility.md
+          git commit --no-edit
+          git diff "$PR282" HEAD -- docs > "$RUNNER_TEMP/integration-docs.patch"
+          git log -4 --oneline
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Release build
+        run: dotnet build Foundatio.Parsers.slnx --configuration Release
+      - name: Formatter verification
+        id: format
+        continue-on-error: true
+        run: dotnet format Foundatio.Parsers.slnx --verify-no-changes --no-restore --verbosity diagnostic
+      - name: Capture formatter repairs without altering test input
+        if: steps.format.outcome == 'failure'
+        run: |
+          dotnet format Foundatio.Parsers.slnx --no-restore
+          git diff > "$RUNNER_TEMP/format.patch"
+          cat "$RUNNER_TEMP/format.patch"
+          git reset --hard HEAD
+      - name: Install locked documentation dependencies
+        working-directory: docs
+        run: npm ci
+      - name: Strict documentation build
+        id: docs
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('docs/.vitepress/config.ts')
+          text = p.read_text()
+          p.write_text(text.replace('ignoreDeadLinks: true', 'ignoreDeadLinks: false'))
+          PY
+          npm run build --prefix docs
+      - name: Package without publishing
+        id: pack
+        continue-on-error: true
+        run: dotnet pack Foundatio.Parsers.slnx --configuration Release --no-build --output "$RUNNER_TEMP/packages"
+      - name: Start integration services
+        run: |
+          docker compose up -d elasticsearch sqlserver
+          docker compose run --rm ready
+      - name: Full solution tests
+        id: tests
+        continue-on-error: true
+        run: dotnet test --solution Foundatio.Parsers.slnx --configuration Release --no-build --report-github
+      - name: Capture source and integration patch
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/evidence/tested-sha.txt"
+          git archive HEAD -o "$RUNNER_TEMP/evidence/tested-source.tar.gz"
+          cp "$RUNNER_TEMP/format.patch" "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/integration-docs.patch" "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          git diff > "$RUNNER_TEMP/evidence/worktree.diff"
+          printf 'formatter=%s\ndocs=%s\npack=%s\ntests=%s\n' '${{ steps.format.outcome }}' '${{ steps.docs.outcome }}' '${{ steps.pack.outcome }}' '${{ steps.tests.outcome }}' | tee "$RUNNER_TEMP/evidence/outcomes.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-audit-${{ matrix.variant }}
+          path: ${{ runner.temp }}/evidence
+          retention-days: 7
+      - name: Enforce all verification results
+        if: always()
+        run: |
+          test '${{ steps.format.outcome }}' = success
+          test '${{ steps.docs.outcome }}' = success
+          test '${{ steps.pack.outcome }}' = success
+          test '${{ steps.tests.outcome }}' = success
