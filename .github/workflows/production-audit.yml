@@ -11,10 +11,18 @@ jobs:
   compile:
     runs-on: windows-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pr: '290'
+            sha: 14e256573fc044dcc1d985e35c24867d61716ece
+          - pr: '291'
+            sha: b5348792c6ef2b06d8d86dc22455e276bea46578
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ae0b01819ff704db803f33d9c8aa936ef5f7cf5f
+          ref: ${{ matrix.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-dotnet@v5
@@ -29,15 +37,18 @@ jobs:
           git rev-parse HEAD^{tree} > evidence/tested-tree.txt
           git archive HEAD -o evidence/tested-source.tar.gz
       - name: Release build
+        id: build
         run: dotnet build Foundatio.Parsers.slnx --configuration Release 2>&1 | tee evidence/build.log
       - name: Full formatter validation
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: dotnet format Foundatio.Parsers.slnx --verify-no-changes --no-restore --verbosity diagnostic 2>&1 | tee evidence/format.log
       - name: Service-free core regression tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: dotnet tests/Foundatio.Parsers.LuceneQueries.Tests/bin/Release/net10.0/Foundatio.Parsers.LuceneQueries.Tests.dll -failSkips -xml evidence/lucene.xml 2>&1 | tee evidence/core-tests.log
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: production-audit-compile
+          name: production-audit-compile-${{ matrix.pr }}
           path: evidence
           retention-days: 7
           if-no-files-found: error
