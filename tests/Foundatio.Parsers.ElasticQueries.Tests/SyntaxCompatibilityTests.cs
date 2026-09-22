@@ -219,6 +219,6 @@ public class SyntaxCompatibilityTests
         using var stream = new MemoryStream();
         client.RequestResponseSerializer.Serialize<Query>(result, stream);
         stream.Position = 0;
-        return JsonDocument.Parse(stream);
+        return await JsonDocument.ParseAsync(stream, cancellationToken: TestContext.Current.CancellationToken);
     }
 }
