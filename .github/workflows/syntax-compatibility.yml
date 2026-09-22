@@ -22,6 +22,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: syntax-compatibility-${{ github.ref }}
   cancel-in-progress: true
@@ -70,24 +74,28 @@ jobs:
             --class-path '/usr/share/elasticsearch/lib/*:/usr/share/elasticsearch/modules/analysis-common/*' \
             /tmp/compatibility/LuceneCompatibility.java /tmp/compatibility \
             | tee compatibility-results/lucene.log
-      - name: Compare Foundatio and query_string matching and scoring
+      - name: Build solution
+        id: build
         if: ${{ !cancelled() }}
+        run: dotnet build Foundatio.Parsers.slnx --configuration Release
+      - name: Compare Foundatio and query_string matching and scoring
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: >-
-          dotnet test --project tests/Foundatio.Parsers.ElasticQueries.Tests/Foundatio.Parsers.ElasticQueries.Tests.csproj
-          --configuration Release
+          dotnet tests/Foundatio.Parsers.ElasticQueries.Tests/bin/Release/net10.0/Foundatio.Parsers.ElasticQueries.Tests.dll
           --filter-class '*SyntaxCompatibilityIntegrationTests'
           --report-trx
           --results-directory "$GITHUB_WORKSPACE/compatibility-results"
       - name: Verify added C# whitespace
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: >-
-          dotnet format whitespace tests/Foundatio.Parsers.ElasticQueries.Tests/Foundatio.Parsers.ElasticQueries.Tests.csproj
+          dotnet format whitespace Foundatio.Parsers.slnx
           --no-restore --verify-no-changes
           --include tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityFixture.cs
           tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityIntegrationTests.cs
+          tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityTests.cs
       - name: Upload comparison evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: syntax-compatibility-${{ matrix.elasticsearch }}
           path: compatibility-results
