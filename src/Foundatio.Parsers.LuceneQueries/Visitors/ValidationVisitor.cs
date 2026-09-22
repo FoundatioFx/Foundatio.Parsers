@@ -35,7 +35,8 @@ public class ValidationVisitor : ChainableQueryVisitor
         ValidateOrderingOperators(node, context);
 
         var validationOptions = context.GetValidationOptions();
-        if (validationOptions is { AllowLeadingWildcards: false } && node.Term != null && (node.Term.StartsWith("*") || node.Term.StartsWith("?")))
+        if (validationOptions is { AllowLeadingWildcards: false } && !node.IsQuotedTerm && !node.IsRegexTerm
+            && node.Term != null && (node.Term.StartsWith("*") || node.Term.StartsWith("?")))
             context.AddValidationError("Terms must not start with a wildcard: " + node.Term);
     }
 

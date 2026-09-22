@@ -39,11 +39,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             if (nested is not null)
             {
                 nested.Query = ApplyNestedFilter(requiredQuery, node.GetNestedFilter());
-                node.SetQuery(nested);
+                node.SetQuery(QueryTerm.ApplyGroupBoost(nested, node, context));
             }
             else
             {
-                node.SetQuery(requiredQuery);
+                node.SetQuery(QueryTerm.ApplyGroupBoost(requiredQuery, node, context));
             }
 
             return;
@@ -258,11 +258,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
                 nested.Query = container;
             }
 
-            node.SetQuery(nested);
+            node.SetQuery(QueryTerm.ApplyGroupBoost(nested, node, context));
         }
         else
         {
-            node.SetQuery(container);
+            node.SetQuery(QueryTerm.ApplyGroupBoost(container, node, context));
         }
     }
 
