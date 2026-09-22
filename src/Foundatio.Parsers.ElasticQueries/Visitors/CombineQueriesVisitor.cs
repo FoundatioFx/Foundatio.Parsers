@@ -14,10 +14,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 {
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        await base.VisitAsync(node, context).AnyContext();
-
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+        var requiredClauses = await RequiredQueryBuilder.GetClausesAsync(node, elasticContext).AnyContext();
+        await base.VisitAsync(node, context).AnyContext();
 
         Query? query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
         Query? container = query;
@@ -28,7 +29,21 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (nested is not null && node.Parent is not null)
             container = null;
 
-        var op = GetEffectiveOperator(node, elasticContext);
+        var op = node.GetOperator(elasticContext);
+        if (requiredClauses is not null)
+        {
+            var requiredQuery = await RequiredQueryBuilder.BuildAsync(requiredClauses, nested is null ? container : null, elasticContext).AnyContext();
+            if (nested is not null)
+            {
+                nested.Query = ApplyNestedFilter(requiredQuery, node.GetNestedFilter());
+                node.SetQuery(nested);
+            }
+            else
+            {
+                node.SetQuery(requiredQuery);
+            }
+            return;
+        }
 
         var nestedQueries = new Dictionary<string, List<(IFieldQueryNode Node, Query InnerQuery)>>();
         var regularQueries = new List<(IFieldQueryNode Node, Query Query)>();
@@ -240,14 +255,6 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         {
             node.SetQuery(container);
         }
-    }
-
-    private static GroupOperator GetEffectiveOperator(GroupNode node, IElasticQueryVisitorContext context)
-    {
-        var op = node.GetOperator(context);
-        if (op is GroupOperator.Or && node.IsRequired())
-            op = GroupOperator.And;
-        return op;
     }
 
     private static Query? Combine(Query? left, Query? right, GroupOperator op, bool useScoring = true)

@@ -56,14 +56,34 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
                 return node;
 
             includeStack.Push(node.Term);
+            GroupNode result;
+            try
+            {
+                var parsed = await _parser.ParseAsync(includedQuery).AnyContext()
+                    ?? throw new InvalidOperationException($"Parser returned null for included query: {includedQuery}");
+                result = (GroupNode)parsed;
+                result.HasParens = true;
+                await VisitAsync(result, context).AnyContext();
+            }
+            finally
+            {
+                includeStack.Pop();
+            }
 
-            var parsed = await _parser.ParseAsync(includedQuery).AnyContext()
-                ?? throw new InvalidOperationException($"Parser returned null for included query: {includedQuery}");
-            var result = (GroupNode)parsed;
-            result.HasParens = true;
-            await VisitAsync(result, context).AnyContext();
-
-            includeStack.Pop();
+            if (context.QueryType == QueryTypes.Query && (node.Prefix is not null || node.IsNegated is true
+                || node.Boost is not null || node.Proximity is not null))
+            {
+                // Keep the outer operators separate from operators inside the include.
+                result = new GroupNode
+                {
+                    Left = result,
+                    HasParens = true,
+                    Prefix = node.Prefix,
+                    IsNegated = node.IsNegated,
+                    Boost = node.Boost,
+                    Proximity = node.Proximity
+                };
+            }
 
             // Expansion replaces this node without retaining its operators.
             ValidationVisitor.ValidateOrderingOperators(node, context);
