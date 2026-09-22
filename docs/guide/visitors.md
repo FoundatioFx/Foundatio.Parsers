@@ -378,7 +378,7 @@ In query contexts, use the extension methods instead of inspecting the propertie
 
 - `IsExcluded()` - node-local negation, covering `NOT`, `-`, and `!`
 - `IsRequired()` - the `+` prefix
-- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group. Its limits are worth reading before you use it.
+- `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group, falling back to the root group. Its limits are described below.
 
 ```csharp
 // Wrong: misses the ! prefix and any negation on the enclosing group
@@ -397,15 +397,21 @@ bool isNegated = node.IsNodeOrGroupNegated();
 It checks exactly two things:
 
 - `IsExcluded()` on the node itself, covering the `NOT` keyword and the `-` and `!` prefixes.
-- `IsExcluded()` on the nearest enclosing parenthesized group.
+- `IsExcluded()` on the nearest enclosing parenthesized group, or the root group when no enclosing parenthesized group exists.
 
-It returns `false` when the node carries a `+` prefix, even if `NOT` is also present.
+The ancestor search starts at the node's parent and skips non-parenthesized intermediate groups. A node without a parent is checked only for its own exclusion.
+
+It returns `false` for a null node or when the node carries a `+` prefix, even if `NOT` is also present. This override applies only to the node's own prefix, not an ancestor's `+`. Otherwise, the two exclusion checks are combined with logical OR: an excluded node inside an excluded group still reports `true`; double negation is not canceled.
 
 It does **not** look past that nearest parenthesized group, so **two nodes in the same query can disagree**. In `-(field:(value))` both the outer and inner groups report `true`, but the term inside `field:(value)` reports `false`, because its nearest group is parenthesized without being excluded. In the flatter `-(field:value)` that same term reports `true`.
 
 It is also not a check of a term's *effective* negation, even inside its own group. In `NOT (status:active AND region:us)` the `status:active` term reports `true`, but the query only excludes records that are both active and in the US, so an active record outside the US still matches. A per-node answer describes the term's syntactic context; it does not describe how that term participates in the overall condition.
 
 Use it for node-local and immediate-group negation - its one production use is choosing a sort direction - not to ask whether a node is negated anywhere up the tree, and not to reason about what a query will match. The depth limit is intentional, decided in [#279](https://github.com/FoundatioFx/Foundatio.Parsers/issues/279): making it parity-correct over the full ancestor chain would be a behavior change, since `-(-x)` would then have to cancel, and it will only be revisited if a real query consumer needs those semantics.
+
+::: info Compatibility
+The fix in [#277](https://github.com/FoundatioFx/Foundatio.Parsers/pull/277) changes the result for the inner parenthesized `GroupNode` in `-(field:(value))` from `false` to `true`. Custom visitors using this public helper should account for enclosing-group exclusion; its signature, null handling, `+` override, and term-node behavior are unchanged.
+:::
 
 #### Ordering contexts interpret these operators differently
 
