@@ -343,9 +343,11 @@ if (!validation.IsValid)
 }
 ```
 
+### Ordering Operators
+
 Sort and aggregation ordering accept only the `+` (ascending) and `-` (descending) prefixes. The
 boolean negation operators `NOT` and `!` are query operators and are reported as validation errors in
-either position:
+sort and aggregation expressions:
 
 ```csharp
 var validation = await parser.ValidateSortAsync("!created");
@@ -355,7 +357,40 @@ var validation = await parser.ValidateSortAsync("!created");
 validation = await parser.ValidateAggregationsAsync("terms:(category NOT max:price)");
 // validation.IsValid == false
 // validation.Message == "Boolean operator (NOT) is not supported in aggregation expressions for field (price): use + for ascending or - for descending order."
+
+validation = await parser.ValidateAggregationsAsync("terms:(!category)");
+// validation.IsValid == false
+// validation.Message == "Boolean operator (!) is not supported in aggregation expressions for field (category): use + for ascending or - for descending order."
 ```
+
+This applies to the entire expression, including aggregation primary fields, nested metrics, and
+operators combined with a direction prefix, such as `terms:(NOT +category)`. When an include resolver
+is configured for an ordering context, expansion cannot hide a negated include such as
+`!@include:ordering` or `NOT @include:ordering`.
+
+With the default `ShouldThrow = false`, the string-based `ValidateSortAsync` and
+`ValidateAggregationsAsync` methods return these errors in `QueryValidationResult`. The corresponding
+string-based `BuildSortAsync` and `BuildAggregationsAsync` methods throw `QueryValidationException`,
+whose `Result` contains the validation errors. The static `QueryValidator` methods enforce the same
+ordering rule, including their `AndThrowAsync` variants.
+
+::: warning Migrating existing ordering expressions
+This intentionally rejects syntax that older versions accepted. Replace `!created` or `NOT created`
+with `-created` when descending sort order is intended. For contradictory input such as
+`NOT +created`, choose `+created` or `-created` explicitly rather than relying on prefix precedence.
+
+Aggregation negation previously could be silently ignored. Remove it from primary fields
+(`terms:(!category)` becomes `terms:(category)`), and choose an explicit `+` or `-` on the
+sub-aggregation when ordering is intended (`terms:(category -max:price)`, for example). Do not blindly
+replace an ignored operator with descending order, since that changes the result ordering.
+
+`NOT`, `!`, and required/prohibited clauses in **search queries**, including SQL queries, are unchanged.
+:::
+
+For custom visitor pipelines, preserve operator state until it can be validated. The built-in
+`AssignOperationTypeVisitor` checks a primary field term before removing it, and `IncludeVisitor`
+checks an include node before replacing it. These narrow checks do not move field, operation, or
+nesting restrictions ahead of normalization and resolution.
 
 ## Context-Based Validation
 
