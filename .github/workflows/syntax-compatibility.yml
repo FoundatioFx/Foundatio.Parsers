@@ -104,8 +104,8 @@ jobs:
       - name: Verify added C# whitespace
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          dotnet format whitespace Foundatio.Parsers.slnx \
-            --no-restore --verify-no-changes --verbosity diagnostic \
+          dotnet format whitespace . --folder \
+            --verify-no-changes --verbosity diagnostic \
             --include tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityFixture.cs \
             tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityIntegrationTests.cs \
             tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityTests.cs \
