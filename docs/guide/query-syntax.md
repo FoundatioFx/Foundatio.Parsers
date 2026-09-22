@@ -185,6 +185,12 @@ Combine queries with boolean logic:
 | `OR` | Either condition must match | `\|\|` |
 | `NOT` | Negate the following condition | `!` |
 
+For adjacent terms, Foundatio defaults to AND, while Elasticsearch `query_string` and bare Lucene classic default to OR. Set the default operator explicitly when moving queries between consumers.
+
+::: warning Boolean syntax is not a cross-engine equivalence guarantee
+Live comparison tests show different document sets for `A OR NOT B` and unparenthesized `A OR B AND C`. Use explicit parentheses for mixed positive operators, and translate the intended Boolean structure rather than forwarding negated disjunctions unchanged. Pure-negative queries also return the complement in Foundatio/Elasticsearch but no documents in bare Lucene classic. See [Boolean Compatibility](./syntax-compatibility#boolean-defaults-and-clause-semantics).
+:::
+
 ### Examples
 
 ```csharp
@@ -203,28 +209,32 @@ result = parser.Parse("((status:active AND type:user) OR type:admin) AND NOT del
 
 ### Prefix Operators
 
-Use prefix operators for required/excluded terms:
+The AST records required/excluded clause markers:
 
-| Prefix | Description |
-|--------|-------------|
-| `+` | Term must be present (required) |
-| `-` | Term must not be present (excluded) |
-| `!` | Term must not be present (excluded) |
+| Prefix | Parsed meaning |
+|--------|----------------|
+| `+` | Required marker; see the query-builder limitation below |
+| `-` | Excluded marker |
+| `!` | Excluded marker |
 
 ```csharp
-// Required term
+// Parse a required marker; this is not a query-execution assertion
 var result = parser.Parse("+status:active");
 
-// Excluded term
+// Parse an excluded marker
 result = parser.Parse("-deleted:true");
 
-// Combined
+// Parse combined markers
 result = parser.Parse("+status:active -deleted:true type:user");
 ```
 
+::: warning Required clauses are not reliably enforced
+Under an OR default, the default Elasticsearch builder treats `+text:alpha text:gamma` as optional alternatives and can return documents without `alpha`. This is a result-set defect tracked in [#288](https://github.com/FoundatioFx/Foundatio.Parsers/issues/288), not merely a scoring difference. Until fixed, do not rely on `+` for mandatory conditions; explicitly construct the required backend clauses or reject unsupported input. A successful parse or validation does not enforce the marker.
+:::
+
 `-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. In query contexts, use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 
-Write clause operators before the field name, with symbolic prefixes attached: `-field:value`, `!field:value`, or `NOT field:value`. Legacy post-colon forms such as `field:-value` and `field:-(value)` are currently accepted for terms and groups, but not ranges: `field:-[1 TO 2]` and `field:NOT [1 TO 2]` throw `FormatException`. The decision in [#272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272#issuecomment-5701649902) is to reject post-colon operators consistently, not to extend them. Migrate to leading operators; `field:(-value)` remains a distinct, field-scoped clause form.
+Write clause operators before the field name, with symbolic prefixes attached: `-field:value`, `!field:value`, or `NOT field:value`. Legacy post-colon forms such as `field:-value` and `field:-(value)` are currently accepted for terms and groups, but not ranges: `field:-[1 TO 2]` and `field:NOT [1 TO 2]` throw `FormatException` from `LuceneQueryParser.Parse` (`QueryValidationException` from `ElasticQueryParser.BuildQueryAsync`). The decision in [#272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272#issuecomment-5701649902) is to reject post-colon operators consistently, not to extend them. Migrate to leading operators; `field:(-value)` remains a distinct, field-scoped clause form.
 
 ## Grouping
 
@@ -403,8 +413,8 @@ var result = parser.Parse("title:important^2");
 result = parser.Parse("title:\"very important\"^3");
 ```
 
-::: warning Term and phrase boosts are not applied
-The boost is available on the AST (`TermNode.Boost`), but the default `ElasticQueryParser` query builder does not apply it to term or phrase queries. Mapped date ranges are a different case: their caret suffix supplies a time zone, not a boost. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate) and [Date-range Time Zones](#date-range-time-zones).
+::: warning Term, phrase, and group boosts are not applied
+The boost is available on the AST, but the default `ElasticQueryParser` query builder does not apply it to term, phrase, or group queries. Live score/ranking controls verify this difference; identical document membership alone cannot detect it. Mapped date ranges are a different case: their caret suffix supplies a time zone, not a boost. See [Matching and Scoring](./syntax-compatibility#matching-and-scoring-are-separate-contracts) and [Date-range Time Zones](#date-range-time-zones).
 :::
 
 ## Fuzzy Queries
