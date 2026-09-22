@@ -66,7 +66,7 @@ public class OrderingValidationTests
     public async Task ValidateAsync_WithNegatedOrderingInclude_ReportsSingleError(string queryType, string expression, string includedExpression, string expectedOperator)
     {
         var context = new QueryVisitorContext();
-        context.SetIncludeResolver(_ => includedExpression);
+        context.SetIncludeResolver(_ => Task.FromResult<string?>(includedExpression));
 
         var result = queryType == QueryTypes.Sort
             ? await QueryValidator.ValidateSortAsync(expression, context: context)

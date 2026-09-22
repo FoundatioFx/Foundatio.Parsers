@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Xunit;
@@ -59,7 +60,7 @@ public class OrderingValidationTests
     {
         var parser = new ElasticQueryParser(c => c.UseIncludes(_ => "price"));
         var context = new ElasticQueryVisitorContext();
-        context.SetIncludeResolver(_ => "price");
+        context.SetIncludeResolver(_ => Task.FromResult<string?>("price"));
 
         var exception = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildSortAsync(sort, context));
 

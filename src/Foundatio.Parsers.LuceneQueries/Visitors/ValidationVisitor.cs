@@ -68,7 +68,7 @@ public class ValidationVisitor : ChainableQueryVisitor
     /// prefixes convey direction. Boolean negation operators (<c>NOT</c> and its <c>!</c> alias) remain query
     /// operators and are rejected here rather than silently interpreted as a direction or silently ignored.
     /// </summary>
-    private static void ValidateOrderingOperators(IFieldQueryNode node, IQueryVisitorContext context)
+    internal static void ValidateOrderingOperators(IFieldQueryNode node, IQueryVisitorContext context, string? fieldName = null)
     {
         if (context.QueryType is not (QueryTypes.Sort or QueryTypes.Aggregation))
             return;
@@ -78,7 +78,8 @@ public class ValidationVisitor : ChainableQueryVisitor
 
         string @operator = node.IsNegated is true ? "NOT" : "!";
         string expression = context.QueryType == QueryTypes.Sort ? "sort" : "aggregation";
-        string field = String.IsNullOrEmpty(node.Field) ? String.Empty : $" for field ({node.Field})";
+        fieldName ??= node.Field;
+        string field = String.IsNullOrEmpty(fieldName) ? String.Empty : $" for field ({fieldName})";
 
         context.AddValidationError($"Boolean operator ({@operator}) is not supported in {expression} expressions{field}: use + for ascending or - for descending order.");
     }

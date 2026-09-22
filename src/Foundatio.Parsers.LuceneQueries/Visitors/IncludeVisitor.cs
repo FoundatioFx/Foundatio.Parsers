@@ -65,6 +65,8 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
 
             includeStack.Pop();
 
+            // Expansion replaces this node without retaining its operators.
+            ValidationVisitor.ValidateOrderingOperators(node, context);
             return node.ReplaceSelf(result);
         }
         catch (Exception ex)
