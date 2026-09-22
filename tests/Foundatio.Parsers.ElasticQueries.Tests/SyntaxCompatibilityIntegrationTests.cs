@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Xunit;
 
@@ -31,12 +32,16 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
                 continue;
 
             var values = line.Split('\t');
-            if (values.Length != 7 || !ids.Add(values[0]))
+            if (values.Length != 7 || values.Any(String.IsNullOrWhiteSpace) || !ids.Add(values[0])
+                || values[2] is not ("OR" or "AND" or "DEFAULT"))
                 throw new InvalidDataException($"Invalid or duplicate compatibility case: {line}");
 
             foreach (bool scoring in new[] { false, true })
                 yield return [values[0], values[1], values[2], values[3], values[4], scoring];
         }
+
+        if (ids.Count == 0)
+            throw new InvalidDataException("The compatibility corpus must not be empty.");
     }
 
     [Theory]
@@ -46,31 +51,34 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
     {
         using var resolver = new ElasticMappingResolver(() => SyntaxCompatibilityFixture.Mapping);
         var parser = CreateParser(resolver);
-        var context = new ElasticQueryVisitorContext
-        {
-            UseScoring = scoring,
-            DefaultOperator = defaultOperator == "OR" ? GroupOperator.Or : GroupOperator.And
-        };
+        var context = new ElasticQueryVisitorContext { UseScoring = scoring };
+        if (defaultOperator != "DEFAULT")
+            context.DefaultOperator = defaultOperator == "OR" ? GroupOperator.Or : GroupOperator.And;
 
-        string native;
+        Query? query = null;
         try
         {
-            native = await GetMatchesAsync(await parser.BuildQueryAsync(text, context));
+            query = await parser.BuildQueryAsync(text, context);
+            Assert.NotNull(query);
         }
-        catch (FormatException exception)
+        catch (QueryValidationException exception)
         {
-            _output.WriteLine($"Foundatio parse rejection: {exception.Message}");
-            native = "ERROR";
+            // BuildQueryAsync reports grammar failures through its public validation API.
+            // Do not turn transport or result-deserialization exceptions into expected rejection.
+            _output.WriteLine($"Foundatio query rejection: {exception.Message}");
         }
 
-        string external = await GetMatchesAsync(new QueryStringQuery
+        string native = query is null ? "ERROR" : await GetMatchesAsync(query);
+        var reference = new QueryStringQuery
         {
             Query = text,
             DefaultField = "text",
-            DefaultOperator = defaultOperator == "AND" ? Operator.And : Operator.Or,
             AnalyzeWildcard = true,
             AllowLeadingWildcard = true
-        });
+        };
+        if (defaultOperator != "DEFAULT")
+            reference.DefaultOperator = defaultOperator == "AND" ? Operator.And : Operator.Or;
+        string external = await GetMatchesAsync(reference);
 
         _output.WriteLine($"{id}: {text}; scoring={scoring}; Foundatio={native}; query_string={external}");
         Assert.True(native == expectedNative && external == expectedExternal,
