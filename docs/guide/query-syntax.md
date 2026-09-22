@@ -1,6 +1,6 @@
 # Query Syntax
 
-The query syntax is based on [Lucene query syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html) and is compatible with [Elasticsearch query_string](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html). This library extends both with a few of its own constructs -- see [Syntax Compatibility](./syntax-compatibility) for exactly where it deviates and how much that matters.
+The query syntax is inspired by [Lucene classic QueryParser](https://lucene.apache.org/core/10_3_1/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html) and [Elasticsearch query_string](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query), but it is not a drop-in implementation of either. Examples using `LuceneQueryParser.Parse` demonstrate AST parsing, not backend execution. See [Syntax Compatibility](./syntax-compatibility) for extensions, query-generation limitations, and migration guidance.
 
 ## Basic Queries
 
@@ -10,8 +10,8 @@ Match documents where a field contains a specific value:
 
 | Syntax | Description | Example |
 |--------|-------------|---------|
-| `field:value` | Exact match | `status:active` |
-| `field:"quoted value"` | Exact phrase match | `name:"John Smith"` |
+| `field:value` | Field term; matching depends on mapping and analyzer | `status:active` |
+| `field:"quoted value"` | Quoted value; a phrase on analyzed text fields | `name:"John Smith"` |
 | `value` | Search default fields | `error` |
 
 ```csharp
@@ -29,64 +29,64 @@ result = parser.Parse("error");
 
 ### Existence Queries
 
-Check if a field has any value or is missing:
+With the Elasticsearch query builder, check whether a field has an indexed value:
 
 | Syntax | Description |
 |--------|-------------|
-| `_exists_:field` | Field has any value |
-| `_missing_:field` | Field has no value (null or missing) |
+| `_exists_:field` | Field has an indexed value |
+| `_missing_:field` | Field has no indexed value; implemented as negated `exists` |
+
+This is not simply a check for a non-null property in `_source`: mappings can affect which values are indexed. `_missing_` is a Foundatio extension, while `_exists_` is supported by Elasticsearch but is not existence syntax in bare Lucene classic.
 
 ```csharp
-// Find documents with a title
+// Find documents with an indexed title
 var result = parser.Parse("_exists_:title");
 
-// Find documents without a description
+// Find documents without an indexed description
 result = parser.Parse("_missing_:description");
 ```
 
 ### Wildcard Queries
 
-Use wildcards for partial matching:
+The parser accepts wildcard characters in terms, but backend support is more limited than the Lucene syntax suggests:
 
-| Wildcard | Description | Example |
-|----------|-------------|---------|
-| `*` | Matches zero or more characters | `name:john*` |
-| `?` | Matches exactly one character | `name:jo?n` |
+| Pattern | Default Elasticsearch query builder |
+|---------|-------------------------------------|
+| `name:john*` | Prefix query on keyword fields; `query_string` on analyzed fields |
+| `name:jo?n` | Ordinary `match` or `term`, not a single-character wildcard |
+| `name:jo*n`, `name:*john` | Ordinary `match` or `term`, not wildcard queries |
 
 ```csharp
-// Prefix match
+// Parse a trailing-star prefix expression
 var result = parser.Parse("name:john*");
-
-// Single character wildcard
-result = parser.Parse("code:A?123");
 ```
 
-::: warning Leading Wildcards
-Leading wildcards (`*value`) can be expensive. Use [validation options](./validation) to disable them if needed.
+::: warning Wildcard translation limitations
+Only an unquoted term ending in `*` takes the default builder's special trailing-star path. On analyzed fields that path sets `analyze_wildcard: true` and `allow_leading_wildcard: false`, unlike Elasticsearch's defaults. On keyword fields, embedded wildcard characters are literal parts of the prefix. Escaping a trailing `*` also loses its literal distinction after unescaping. Fieldless queries depend on configured default fields. See [Wildcard Compatibility](./syntax-compatibility#wildcards-depend-on-the-generated-query-path).
 :::
+
+[Validation options](./validation) can reject leading wildcard input; enabling such input does not add missing wildcard translation support.
 
 ### Regex Queries
 
-Use regular expressions enclosed in forward slashes:
+The parser recognizes regular expressions enclosed in forward slashes:
 
 ```
 field:/regex/
 ```
 
-Example:
-
 ```csharp
-// Match email patterns
+// Parse a regex expression into the AST; this does not execute it
 var result = parser.Parse("email:/.*@example\\.com/");
 ```
 
-::: warning
-`IsRegexTerm` is set on the AST, but `ElasticQueryParser` never emits a `regexp` query. Most patterns are passed through as an ordinary term, so `/[0-9]+/` searches for the literal characters `[0-9]+`. Patterns ending in `*` take a different wrong path — a wildcard query on analyzed fields, or a `prefix` query on keyword fields where `.` matches literally. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+::: warning Regex query generation is not implemented
+The AST stores `IsRegexTerm`, but the default `ElasticQueryParser` query builder does not emit a `regexp` query. A pattern such as `/foo.bar/` becomes an analyzed `match` on a text field or a literal `term` on a keyword field. A pattern ending in `*` instead takes the trailing-star path: `query_string` on analyzed fields or `prefix` on keyword fields. For example, `/val.*/` becomes the literal prefix `val.` on a keyword field. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
 :::
 
 ## Range Queries
 
-Range queries filter numeric or date fields within bounds.
+Range queries express bounds; field mappings determine how the backend interprets the values.
 
 ### Bracket Syntax
 
@@ -112,15 +112,18 @@ result = parser.Parse("field:[1 TO 5}");
 
 ### Shorthand Syntax
 
-Use `..` as shorthand for inclusive ranges:
+Inside brackets or braces, use `..` instead of `TO`. The brackets still determine inclusivity:
 
 ```csharp
 // Equivalent to field:[1 TO 5]
-var result = parser.Parse("field:1..5");
+var result = parser.Parse("field:[1 .. 5]");
+
+// Equivalent to field:{1 TO 5}
+result = parser.Parse("field:{1 .. 5}");
 ```
 
-::: warning
-This is a Foundatio.Parsers extension. Elasticsearch `query_string` has no `..` shorthand, and it fails in two different ways depending on the field type: on a numeric field the query is rejected, and on a text or keyword field it silently parses as a search for the literal term `1..5`. Use `field:[1 TO 5]` for queries that need to be portable. See [Syntax Compatibility](./syntax-compatibility).
+::: warning Brackets are required
+Bare `field:1..5` is an ordinary term in Foundatio, not a range. Only the bracketed `..` delimiter is a Foundatio extension. Use `field:[1 TO 5]` for an inclusive range that also uses Lucene classic and Elasticsearch `query_string` syntax. See [Syntax Compatibility](./syntax-compatibility#bare-dots-do-not-make-a-range).
 :::
 
 ### Unbounded Ranges
@@ -159,6 +162,18 @@ result = parser.Parse("price:<100");
 // Less than or equal to 100
 result = parser.Parse("price:<=100");
 ```
+
+These comparison forms are supported by Elasticsearch `query_string`, but are not classic Lucene range syntax. Use the bracketed equivalents for a bare Lucene classic consumer.
+
+### Date-range Time Zones
+
+On a mapped Elasticsearch `date` or `date_nanos` field, a caret suffix supplies a range time zone:
+
+```csharp
+var result = parser.Parse("created:[2024-01-01 TO *]^\"America/Chicago\"");
+```
+
+The default Elasticsearch range builder assigns that value to `time_zone`, not `boost`. Do not use `^2` to boost a date range: it is interpreted as a time-zone value instead. The caret time-zone form is a Foundatio extension; for an external `query_string` request, configure its `time_zone` option separately. See [Date-range Compatibility](./syntax-compatibility#date-range-caret-values-are-time-zones-not-boosts).
 
 ## Boolean Operators
 
@@ -209,7 +224,7 @@ result = parser.Parse("+status:active -deleted:true type:user");
 
 `-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. In query contexts, use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 
-These operators may be written either before the field name or immediately after the colon, and both forms are equivalent: `-field:value` and `field:-value` parse the same, as do `-field:(value)` and `field:-(value)`. The one exception is ranges, where only the leading position is accepted -- `-field:[1 TO 2]` and `NOT field:[1 TO 2]` work, while `field:-[1 TO 2]` and `field:NOT [1 TO 2]` throw a `FormatException`.
+Write clause operators before the field name, with symbolic prefixes attached: `-field:value`, `!field:value`, or `NOT field:value`. Legacy post-colon forms such as `field:-value` and `field:-(value)` are currently accepted for terms and groups, but not ranges: `field:-[1 TO 2]` and `field:NOT [1 TO 2]` throw `FormatException`. The decision in [#272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272#issuecomment-5701649902) is to reject post-colon operators consistently, not to extend them. Migrate to leading operators; `field:(-value)` remains a distinct, field-scoped clause form.
 
 ## Grouping
 
@@ -304,7 +319,7 @@ Where:
 
 ```csharp
 // Within 75 miles of a geohash
-var result = parser.Parse("location:abc123~75mi");
+var result = parser.Parse("location:u4pruydqqv~75mi");
 
 // Within 75 miles of a zip code (requires geo resolver)
 result = parser.Parse("location:75044~75mi");
@@ -371,56 +386,58 @@ query = await parser.BuildQueryAsync("_missing_:comments");
 ```
 
 ::: info Elasticsearch Limitation
-Standard Elasticsearch `query_string` does not support nested documents. Foundatio.Parsers automatically detects nested fields and wraps queries appropriately, including support for negation, exists/missing, wildcards, and sorting.
+Standard Elasticsearch `query_string` does not support nested documents. With the mappings and nested visitor configured, Foundatio.Parsers can detect nested fields and wrap queries appropriately. This does not add support for the missing term modifiers or wildcard forms described above.
 :::
 
 For a full explanation of how the AST is structured and traversed for nested queries, see [Nested Queries and Visitor Traversal](./nested-queries).
 
 ## Boosting
 
-Boost the relevance of specific terms:
+The parser recognizes relevance-boost syntax:
 
 ```csharp
-// Boost a term
+// Parse a term boost into the AST
 var result = parser.Parse("title:important^2");
 
-// Boost a phrase
+// Parse a phrase boost into the AST
 result = parser.Parse("title:\"very important\"^3");
 ```
 
-::: warning
-The boost is parsed and available on the AST (`TermNode.Boost`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+::: warning Term and phrase boosts are not applied
+The boost is available on the AST (`TermNode.Boost`), but the default `ElasticQueryParser` query builder does not apply it to term or phrase queries. Mapped date ranges are a different case: their caret suffix supplies a time zone, not a boost. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate) and [Date-range Time Zones](#date-range-time-zones).
 :::
 
 ## Fuzzy Queries
 
-Use `~` for fuzzy matching (edit distance):
+The parser recognizes `~` as fuzzy matching syntax (edit distance):
 
 ```csharp
-// Fuzzy match with default edit distance
+// Parse fuzzy syntax with the distance omitted
 var result = parser.Parse("name:john~");
 
-// Fuzzy match with specific edit distance
+// Parse fuzzy syntax with a specific edit distance
 result = parser.Parse("name:john~2");
 ```
 
-::: warning
-The edit distance is parsed and available on the AST (`TermNode.Proximity`), but `ElasticQueryParser` does not currently apply it to the generated Elasticsearch query -- the term is matched exactly. The same applies to phrase proximity (`"a b"~5`). See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
+::: warning Fuzziness and phrase proximity are not applied
+The edit distance is available on the AST (`TermNode.Proximity`), but the default `ElasticQueryParser` query builder does not set `fuzziness`. On an analyzed text field it emits an ordinary `match`, not an exact keyword match. Similarly, `"a b"~5` becomes `match_phrase` without `slop`. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
 :::
 
 ## Escaping Special Characters
 
-Escape special characters with backslash:
+The ordinary term/field escape rule accepts a literal space and these characters after a backslash:
 
 ```
-+ - = && || > < ! ( ) { } [ ] ^ " ~ * ? : \ /
++ - ! ( ) { } [ ] ^ " ~ * ? : \ /
 ```
+
+Do not copy Elasticsearch's entire reserved-character list into an escaping function for this parser. For example, `field\.with\.dots:value` fails because `.` is not an allowed escape; write `field.with.dots:value`. A supported grammar escape also does not guarantee that a query builder preserves literal wildcard semantics; see [Wildcard Queries](#wildcard-queries).
 
 ```csharp
-// Escape colon in value
+// Escape colon in value (the C# string needs a second backslash)
 var result = parser.Parse("url:https\\://example.com");
 
-// Escape parentheses
+// Escape parentheses and a space
 result = parser.Parse("name:John\\ \\(Jr\\)");
 ```
 
@@ -432,12 +449,12 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 
 var parser = new LuceneQueryParser();
 
-// Complex query
+// Parse and inspect the AST; backend behavior depends on configuration
 string query = @"
     (status:active OR status:pending)
     AND created:[now-30d TO now]
     AND NOT deleted:true
-    AND (name:john* OR email:*@example.com)
+    AND (name:john* OR email:john*)
 ";
 
 var result = parser.Parse(query);
@@ -451,7 +468,7 @@ string normalized = GenerateQueryVisitor.Run(result);
 
 ## Next Steps
 
-- [Syntax Compatibility](./syntax-compatibility) - Where this syntax deviates from Lucene/Elasticsearch, and how much it matters
+- [Syntax Compatibility](./syntax-compatibility) - Known syntax and query-generation differences
 - [Aggregation Syntax](./aggregation-syntax) - Dynamic aggregation expressions
 - [Field Aliases](./field-aliases) - Map field names
 - [Validation](./validation) - Validate and restrict queries

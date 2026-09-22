@@ -1,127 +1,120 @@
-# Syntax Compatibility with Lucene and Elasticsearch
+# Syntax Compatibility
 
-Foundatio.Parsers is a deliberate **superset** of the [Lucene classic query syntax](https://lucene.apache.org/core/10_5_1/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html) and [Elasticsearch's `query_string`](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query), not a strict clone. Most syntax round-trips cleanly between the two. This page catalogues where it does not, so you can tell which constructs are safe to hand to a plain Lucene/`query_string` consumer and which are Foundatio.Parsers extensions.
+Foundatio.Parsers accepts a Lucene-style language, but it is not a drop-in implementation of either Lucene's classic `QueryParser` or Elasticsearch's `query_string`. Some constructs are extensions; others are parsed into the abstract syntax tree (AST) but are not implemented by the default Elasticsearch query builder.
 
-Rows were verified against live Elasticsearch instances (**8.19** and **9.5**) using the read-only `_validate/query` endpoint, which reports whether `query_string` accepts a given query without executing a search, and by indexing documents and asserting which ones come back where accepting-versus-rejecting was not the whole story. Rows describing what this library generates were verified by building the query through `ElasticQueryParser` and inspecting the request JSON. Behavior can shift between Elasticsearch major versions; treat this as a snapshot, not a guarantee.
+This page describes known differences in the default `ElasticQueryParser` query pipeline. The examples assume explicit `text`, `keyword`, and `date` mappings and no custom query-building visitors. SQL translation, aggregation modifiers, custom visitors, and other configurations need separate verification. Successful parsing does not establish equivalent matching or scoring.
 
-The deviations are grouped by consequence, not by feature area, because the risk they carry is wildly different:
+## Tier 1 — Accepted syntax with different behavior
 
-- **Tier 1** -- the query is accepted, but means something else entirely. This is the dangerous tier: nothing errors, so a query that looks correct can silently return the wrong set. Two separate causes land here: syntax `query_string` reinterprets, and syntax *this library* parses but then drops.
-- **Tier 2** -- the query throws a parse error in `query_string`. Annoying, but safe: it fails loudly instead of returning wrong data.
-- **Tier 3** -- behaves identically in both. Listed for completeness so you know what's safe to rely on.
+### Library extensions that query_string interprets as fields
 
-## Tier 1: Silently means something different
+| Syntax | Foundatio behavior | Elasticsearch `query_string` behavior |
+|--------|--------------------|---------------------------------------|
+| `_missing_:name` | Builds a negated `exists` query for `name` | Treats `_missing_` as a field name, not a missing-field operator |
+| `@include:active` | Expands a query include when `UseIncludes` is configured | Treats `@include` as a field name, not a macro |
 
-These are the ones to actually worry about. There are two distinct causes, and neither produces an error.
+If those external field names are unmapped, the query may simply match no documents; if they exist, it searches them. Neither outcome implements the intended extension. For Elasticsearch, express missing indexed values as `NOT _exists_:name`, and expand includes before sending a query to another parser. `_exists_` is itself an Elasticsearch extension, not an existence operator in bare Lucene classic syntax.
 
-### Special prefixes that `query_string` reads as field names
-
-`query_string` has no concept of these prefixes, so it parses them as an ordinary field name and then reports that field as unmapped.
-
-| Syntax | Our meaning | `query_string` behavior |
-|--------|-------------|--------------------------|
-| `_missing_:field` | Field is null or absent | Looks for a field literally named `_missing_`. Returns `MatchNoDocsQuery("unmapped fields [_missing_]")` -- matches **nothing**, no error. |
-| `@include:name` | Expand a stored query fragment | Looks for a field literally named `@include`. Same `MatchNoDocsQuery`, no error. |
-
-Both were confirmed with `_validate/query`: the response has `"valid": true`, and the `explanation` shows the unmapped-field query rather than an error. If you pass user-authored queries through to a system that also runs `query_string` directly, these two will look like they work and then quietly return an empty set.
-
-Note the asymmetry: `_exists_:field` is standard Elasticsearch syntax (see Tier 3), so `_exists_` and `_missing_` are **not** a matched pair even though they read like one here.
-
-### Range shorthand that `query_string` reads as a term
-
-| Syntax | Our meaning | `query_string` behavior |
-|--------|-------------|--------------------------|
-| `field:1..5` on a **text or keyword** field | Range, same as `field:[1 TO 5]` | Parses as a search for the **literal term `1..5`** |
-
-With no opening bracket, `..` never reaches Lucene's range lexer, and dots are ordinary term characters -- so the whole thing is just a term. Confirmed by indexing a document whose keyword value is literally `1..5` alongside numeric documents: `kw:1..5` returned only the literal-valued document and ignored the intended range entirely.
-
-This is field-type dependent, which is what makes it easy to miss. The *same* query on a numeric field is rejected outright (`failed to create query: multiple points`) and so appears in Tier 2. The bracketed `field:[1 .. 5]` form is rejected on every field type, also Tier 2.
+Existence concerns an **indexed value**, not merely whether a property occurs in `_source`. Mapping options such as `null_value`, `index`, and `ignore_above` can affect the result. See the [Elasticsearch exists query reference](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-exists-query).
 
 ### Term modifiers this library parses but does not translate
 
-These are accepted by the parser and recorded on the AST, but `ElasticQueryParser` does not carry them into the generated Elasticsearch query. The modifier is silently ignored, so the query still runs and still returns results -- just not the results the syntax asked for. This is a gap in this library rather than a disagreement with Elasticsearch, which supports all of these.
+The parser preserves modifier metadata, but the default Elasticsearch query builder does not apply term fuzziness, phrase slop, or term/phrase boosts. Regex metadata is also ignored. These limitations are tracked in [#278](https://github.com/FoundatioFx/Foundatio.Parsers/issues/278).
 
-| Syntax | What the syntax implies | What `ElasticQueryParser` actually emits |
-|--------|-------------------------|-------------------------------------------|
-| `field:value~2` | Fuzzy match, edit distance 2 | `match` with **no `fuzziness`** -- an exact match |
-| `field:"a b"~5` | Phrase proximity, slop 5 | `match_phrase` with **no `slop`** -- adjacent terms only |
-| `field:value^2` | Boosted relevance score | `match`/`term` with **no `boost`** -- unweighted |
-| `field:/foo.bar/` (analyzed) | Regular expression match | `match` on the **literal pattern text** `foo.bar` |
-| `field:/[0-9]+/` (keyword) | Regular expression match | `term` for the **literal string** `[0-9]+` |
-| `field:/val.*/` (analyzed) | Regular expression match | `query_string` with `analyze_wildcard`, treating `val.*` as a **wildcard** |
-| `field:/val.*/` (keyword) | Regular expression match | `prefix` query for the literal string `val.` -- the `.` matches literally |
+| Input | Generated Elasticsearch query |
+|-------|-------------------------------|
+| `text:value~2` | `match` for `value`, without `fuzziness` |
+| `text:"a b"~5` | `match_phrase` for `a b`, without `slop` |
+| `text:value^2` | `match` for `value`, without `boost` |
+| `text:"a b"^2` | `match_phrase` for `a b`, without `boost` |
+| `text:/foo.bar/` | `match` for `foo.bar`, not `regexp` |
+| `keyword:/[0-9]+/` | `term` for the literal value `[0-9]+`, not `regexp` |
+| `text:/val.*/` | `query_string` for `val.*`, not a regex query |
+| `keyword:/val.*/` | `prefix` for the literal prefix `val.`, not a regex query |
 
-Verified by building each query through `ElasticQueryParser` against a mapped index and inspecting the request JSON actually sent to Elasticsearch. The AST does record the modifier -- `Proximity`, `Boost`, and `IsRegexTerm` are all populated, and `GenerateQueryVisitor` round-trips the query text correctly -- so the information is lost specifically during Elasticsearch query generation, not during parsing.
+A `match` query still analyzes its input; absence of fuzziness does **not** make it an exact keyword match. Regex delimiters are removed, and normal term unescaping is applied to the payload. The default builder never selects `regexp` from `IsRegexTerm`: a payload ending in `*` takes the trailing-star path described below, while other payloads take ordinary term paths.
 
-No `regexp` query is ever emitted. Which wrong query you get depends on whether the pattern happens to end in `*`: only then does the wildcard/prefix path apply, because `GetSingleFieldQuery` selects it on `term.EndsWith("*")` alone and has no notion of regex syntax. Every other pattern is passed through as an ordinary term, so `/[0-9]+/` searches for the literal characters `[0-9]+`.
+These are query-generation limitations, not recommendations to remove support from the AST. Use an explicitly constructed Elasticsearch query or a tested custom visitor when the application requires these features. Do not assume that successful validation means the modifiers were applied.
 
-The regex rows are the most dangerous of the group. A wildcard or prefix interpretation still returns plausible-looking results, and a literal-text match usually returns nothing at all while looking like a legitimately empty result set. If you need any of these semantics today, construct that part of the query with the Elasticsearch client directly. Tracked as a bug in [#278](https://github.com/FoundatioFx/Foundatio.Parsers/issues/278).
+### Wildcards depend on the generated query path
 
-## Tier 2: Rejected outright by `query_string`
+The default builder tests whether the **unescaped, unquoted term ends in `*`**. It does not implement a general wildcard translator.
 
-These fail with a parse error in Elasticsearch, which is a much safer failure mode than Tier 1 -- you find out immediately rather than shipping wrong results.
+| Input | Mapped text field | Mapped keyword field |
+|-------|-------------------|----------------------|
+| `field:jo?n` | `match` for `jo?n` | `term` for `jo?n` |
+| `field:jo*n` | `match` for `jo*n` | `term` for `jo*n` |
+| `field:*john` | `match` for `*john` | `term` for `*john` |
+| `field:john*` | `query_string` for `john*` | `prefix` for `john` |
+| `field:jo?n*` | `query_string` for `jo?n*` | `prefix` for the literal prefix `jo?n` |
+| `field:john\*` | Also takes the trailing-star path after unescaping | Also builds a `prefix` for `john` |
 
-| Syntax | Our meaning | `query_string` error |
-|--------|-------------|------------------------|
-| `field:-value`, `field:!value`, `field:+value` | Same as `-field:value` / `!field:value` / `+field:value` | `org.apache.lucene.queryparser.classic.ParseException: Cannot parse 'field:-value': Encountered "-" ...` |
-| `field:-(value)` | Same as `-field:(value)` | Same `ParseException` family |
-| `field:[1 .. 5]` | Same as `field:[1 TO 5]` | `ParseException: Encountered " <RANGE_GOOP> ".. ""`. Rejected on every field type, because the brackets put `..` inside Lucene's range lexer. |
-| `field:1..5` on a **numeric** field | Same as `field:[1 TO 5]` | `query_shard_exception: failed to create query: multiple points`. See Tier 1 for the text/keyword case, which is **not** rejected. |
-| `field:location~distance` (geo proximity, e.g. `location:abc123~75mi`) | Geo-distance filter | `QueryShardException: failed to create query: fuzziness cannot be [75mi]`. Elasticsearch's `~` is always fuzzy-search edit distance, so `~75mi` is parsed as an (invalid) fuzziness value, not a geo radius. |
+Thus `?` alone is not a single-character wildcard in generated queries. Embedded or leading wildcards without a final `*` are not wildcard queries either. Escaping a trailing star does not reliably preserve literal-star semantics through this builder.
 
-The post-colon and `..` cases are pre-existing behavior, not something introduced recently; the [Lucene grammar](https://lucene.apache.org/core/10_5_1/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html) explains why they are structurally unreachable there:
+For the analyzed trailing-star path, Foundatio sets `analyze_wildcard: true` and `allow_leading_wildcard: false`. Elasticsearch `query_string` defaults are `false` and `true`, respectively. Analyzer tokenization can therefore change results even for a trailing-star input. Align those options, mappings, analyzers, and default fields before comparing results; matching the spelling alone is insufficient. See [query_string wildcard options](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query#query-string-wildcard).
 
+The fieldless case also depends on configuration: with configured analyzed default fields, `john*` takes the analyzed `query_string` path; with no default fields configured, it falls back to `multi_match`, not that wildcard path.
+
+### Date-range caret values are time zones, not boosts
+
+On a mapped `date` or `date_nanos` field, the default range builder uses the range's caret value as `time_zone`:
+
+```text
+date:[2024-01-01 TO *]^"America/Chicago"
 ```
-Query  ::= ( Clause )*
-Clause ::= ["+", "-"] [<TERM> ":"] ( <TERM> | "(" Query ")" )
-```
 
-The `+`/`-` modifier is positioned **before** the optional field in the grammar, so there is no production that reaches a modifier immediately after `field:`. Whether Foundatio.Parsers should extend this further (e.g. to ranges, where `field:-[1 TO 2]` currently throws `FormatException` here too) or hold the line is an open design question -- see the linked issues below.
+This sets `time_zone` to `America/Chicago`; it does not boost the range. By contrast, Elasticsearch `query_string` expects a numeric boost after `^`, so the quoted time-zone suffix is not portable. Set the external query's `time_zone` option separately instead.
 
-The geo-proximity collision with fuzzy search is a namespacing consequence of reusing `~`, not a bug in either system; it just means a geo query can never be expressed through a bare `query_string`.
+A numeric caret value such as `^2` is also assigned to `time_zone` on this path, rather than applied as a boost, and may be rejected by Elasticsearch as an invalid time zone. This exception is why a blanket statement that all boosts are simply ignored is incorrect. On other query paths, a parsed caret value does not establish that a scoring boost is generated.
 
-## Tier 3: Compatible
+## Tier 2 — Syntax rejected by one of the parsers
 
-Verified to behave identically when built through `ElasticQueryParser` and when sent to `query_string`:
+| Input | Foundatio behavior | External syntax / migration |
+|-------|--------------------|-----------------------------|
+| `field:[1 .. 5]` or `field:[1..5]` | A range; brackets determine inclusivity | Use `field:[1 TO 5]` for Lucene classic or Elasticsearch `query_string` |
+| `field:-value`, `field:NOT value`, `field:-(a OR b)` | Legacy post-colon operator forms accepted by this grammar | Write `-field:value`, `NOT field:value`, or `-field:(a OR b)` instead |
+| `field:-[1 TO 5]`, `field:NOT [1 TO 5]` | `FormatException` | Put the operator before the field: `-field:[1 TO 5]` |
+| `field\.with\.dots:value` | `FormatException`; dot is not an allowed backslash escape | Write `field.with.dots:value` |
+| `location:75044~75mi` | Geographic distance syntax when the geo visitor and resolver are configured | Use an explicit Elasticsearch geo query, not a fuzzy `query_string` expression |
 
-| Syntax | Notes |
-|--------|-------|
-| `_exists_:field` | Standard `query_string` syntax; not a Foundatio.Parsers addition. Note it is an *Elasticsearch* extension, so it is not portable to a bare Lucene `QueryParser` -- see "Writing portable queries" below. |
-| `field:>10`, `>=`, `<`, `<=` | Documented directly in the [Elasticsearch ranges reference](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query). |
-| `field:[10 TO *]`, `field:{* TO 10}` | Unbounded range bounds. |
-| `field:val*` | Trailing wildcard. |
-| `field:(+term1 +term2)` | Field grouping with per-term modifiers. |
-| `field:"exact phrase"` | Quoted phrase (without a `~slop` modifier -- see Tier 1). |
-| `escaped\ field\ name:value` | Backslash-escaped spaces in field names. |
-| `field.with.dots:value` | Dotted (sub-object) field paths, written **unescaped**. |
+The post-colon inconsistency is not a syntax pattern to adopt. [#272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272#issuecomment-5701649902) records the decision to reject post-colon operators consistently rather than extend them to ranges. Use leading operators now. An operator inside a field-scoped group, such as `field:(-value)`, is a different case.
 
-Note on escaping: only the characters this parser's `escape_sequence` rule recognizes can be backslash-escaped. A dot is not one of them, so `field\.with\.dots:value` throws `FormatException` here even though `query_string` accepts it. Write dotted paths unescaped.
+### Bare dots do not make a range
 
-Fuzzy (`~2`), proximity (`~5`), boost (`^2`), and regex (`/.../ `) are **not** in this tier -- Elasticsearch supports them, but `ElasticQueryParser` drops them. See Tier 1.
+`field:1..5` and `1..5` are ordinary terms in Foundatio, **not ranges**. The grammar only recognizes `..` as a range delimiter inside brackets or braces. Elasticsearch also treats the bare form as a term; backend conversion can then fail on a numeric mapping. That is not evidence that Foundatio interprets it as a numeric interval.
 
-Foundatio.Parsers' aggregation expression language (`terms:`, `min:`, `date:`, and so on) and sort expressions have no `query_string` equivalent at all -- they are a separate API surface built on top of the query grammar, not a deviation within it, so they are out of scope for this page.
+Use `field:[1 TO 5]` when an inclusive interval is intended. The local shorthand is `field:[1 .. 5]`; `{1 .. 5}`, `[1 .. 5}`, and `{1 .. 5]` retain their respective endpoint inclusivity.
 
-## Writing portable queries
+## Tier 3 — Shared syntax, not an equivalence guarantee
 
-Portability depends on *which* consumer you mean, and the two are not the same. Elasticsearch `query_string` is itself a superset of Lucene: it subclasses Lucene's `QueryParser` and adds mapping-aware extensions. So a query can be portable to `query_string` and still be wrong in bare Lucene.
+| Form | Scope and caveats |
+|------|-------------------|
+| `field:value`, `field:"a b"` | Shared syntax; field mappings and analyzers determine matching |
+| `NOT field:value`, `-field:value`, `!field:value` | Use leading operators; parenthesize combinations explicitly |
+| `field:(a OR b)` | Shared field-group syntax; do not assume identical required/optional clause or scoring behavior |
+| `field:[1 TO 5]`, `field:{1 TO 5}`, `field:[1 TO *]` | Shared range forms; value interpretation depends on field type |
+| `field.with.dots:value`, `first\ name:Alice` | Dotted paths remain unescaped; a literal field-name space is escaped |
+| `_exists_:field`, `NOT _exists_:field` | Supported by Foundatio and Elasticsearch; not existence syntax in bare Lucene classic |
+| `field:>10`, `field:>=10`, `field:<10`, `field:<=10` | Foundatio and Elasticsearch comparison syntax; use bracketed ranges for bare Lucene classic |
 
-Safe for **both** a bare Lucene `QueryParser` and Elasticsearch `query_string`:
+`!` is a Boolean NOT token in Lucene's classic grammar and is documented as a NOT alias by Elasticsearch. It should not be classified as a Foundatio-only extension merely because the separate `+`/`-` modifier production does not list it. In Foundatio, attach symbolic prefixes to their clause; use `NOT field:value` when whitespace is desired.
 
-- `+`/`-`/`NOT`/`!` and `AND`/`OR` immediately **before** the field name, never after the colon
-- `[min TO max]` / `{min TO max}` for ranges, not the `..` shorthand
-- Trailing wildcards, quoted phrases, and dotted field paths written unescaped
+Escaping is not interchangeable either: Foundatio's ordinary escape rule accepts a literal space and `+ - ! ( ) { } [ ] ^ " ~ * ? : \ /`. It does not accept backslash-escaped dots or the full reserved-character list from Elasticsearch. See [Escaping Special Characters](./query-syntax#escaping-special-characters).
 
-Safe for Elasticsearch `query_string` **only** -- not for bare Lucene:
+## Choosing a portable query
 
-- `_exists_:field`, and `NOT _exists_:field` for the missing-field case. These are Elasticsearch [syntax extensions](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query), implemented by Elasticsearch's own query parser rather than Lucene's. Bare Lucene parses `_exists_` as an ordinary **field name** and `field` as its term, so it silently queries a field called `_exists_` instead of testing existence. Verified against Elasticsearch: `_exists_:name` lowers to `ConstantScore(FieldExistsQuery [field=name])`, which is an Elasticsearch construct with no Lucene classic-syntax equivalent.
-- `>`, `>=`, `<`, `<=` single-sided ranges, which are likewise a `query_string` addition rather than classic Lucene syntax.
+Start with explicit fields, explicit Boolean operators and parentheses, leading negation, and `TO` ranges. For a bare Lucene classic consumer, do not send Elasticsearch-specific existence or comparison syntax. For an Elasticsearch consumer, replace `_missing_` with `NOT _exists_` and expand configured includes first.
 
-Avoid everywhere if the query needs to travel: `@include:` macros, `_missing_:field`, geo proximity (`~distance`), post-colon operator placement, and the `..` range shorthand.
+Do not forward fuzzy, proximity, regex, boost, or general wildcard expressions under an assumption of equivalent query generation. Prefix searches still require aligned wildcard options and field configuration. Date-range time zones must be configured for each consumer rather than forwarded as caret suffixes.
 
-Fuzzy, proximity, boost, and regex are portable *as syntax* -- `query_string` handles all four -- but this parser drops them during Elasticsearch query generation (Tier 1), so a query relying on them behaves differently here than elsewhere. That is the opposite direction from the rest of this page: the query is portable, but the local behavior is not.
+Finally, compare **both the generated query and returned documents** under the application's actual mappings. Include positive and negative fixtures, analyzed and keyword fields, and scoring assertions when ranking matters. Default fields, default operators, filter/scoring context, nested queries, aliases, and visitors can all change behavior without changing whether the input parses.
 
-## Related
+## Verification and maintenance
 
-- [Query Syntax](./query-syntax) -- the full syntax reference for what this parser accepts
-- [Negation and Prefix Operators](./visitors#negation-and-prefix-operators) -- how `NOT`, `-`, and `!` are represented internally
-- Open design questions on extending or restricting the Tier 2 behaviors are tracked in the linked GitHub issues on post-colon range operators and aggregation `!` handling
+`SyntaxCompatibilityTests` in `tests/Foundatio.Parsers.ElasticQueries.Tests` characterizes the AST and serialized query shapes described here using in-memory mappings; these tests do not contact Elasticsearch. They cover bare versus bracketed ranges, escaping, modifier metadata, wildcard branches, regex fallbacks, date-range time zones, and default-field behavior. The tests intentionally record existing limitations and must be updated together with these docs when the underlying behavior changes.
+
+That coverage is not a live-server compatibility certification or an exhaustive catalogue of every accepted expression. External semantics should be checked against the target engine version and realistic indexed documents, not inferred solely from `_validate/query` success.
+
+Primary references: [Elasticsearch query_string](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query), [Lucene classic QueryParser](https://lucene.apache.org/core/10_3_1/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html), and [Lucene's classic grammar](https://github.com/apache/lucene/blob/main/lucene/queryparser/src/java/org/apache/lucene/queryparser/classic/QueryParser.jj). The local implementation is in `LuceneQueryParser.peg` and `Extensions/DefaultQueryNodeExtensions.cs`.
+
+Related work: [#271](https://github.com/FoundatioFx/Foundatio.Parsers/issues/271) tracks this documentation, [#278](https://github.com/FoundatioFx/Foundatio.Parsers/issues/278) tracks missing query modifiers, and [#272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272) tracks post-colon syntax. Sorting and aggregation operator behavior is a separate concern tracked in [#273](https://github.com/FoundatioFx/Foundatio.Parsers/issues/273).
