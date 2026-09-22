@@ -6,5 +6,7 @@
     <Content Include="..\..\docker-compose.yml">
       <Link>docker-compose.yml</Link>
     </Content>
+    <Content Include="..\compatibility\production-*.tsv" Link="Compatibility\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\compatibility\production-profile.json" Link="Compatibility\production-profile.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
