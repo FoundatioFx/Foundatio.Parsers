@@ -117,7 +117,7 @@ public static class DefaultQueryNodeExtensions
                 return term.ToQueryString([field], context);
             if (term.IsPrefix)
                 return new PrefixQuery(field, term.Value[..^1]) { Boost = term.Boost };
-            return new WildcardQuery(field, term.Wildcard) { Boost = term.Boost };
+            return new WildcardQuery(field) { Value = term.Wildcard, Boost = term.Boost };
         }
 
         if (term.Quoted && (analyzed || term.Slop is not null))
