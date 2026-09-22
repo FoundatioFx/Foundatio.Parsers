@@ -52,7 +52,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         {
             var childQuery = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).AnyContext();
             if (childQuery is null)
+            {
+                if (child.IsRequired() && !child.IsExcluded())
+                    context.AddValidationError("A required clause did not produce a query: " + child);
                 continue;
+            }
 
             // Explicit nested groups (e.g., nested:(...)) were already combined by a recursive
             // visit, so treat them as atomic queries rather than coalescing their inner queries.
