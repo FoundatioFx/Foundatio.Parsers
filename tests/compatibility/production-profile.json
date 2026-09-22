@@ -6,7 +6,7 @@
       "repository": "exceptionless/Exceptionless",
       "commit": "deffcf18550f38813823e0ed9be4e83d04ad3f66",
       "path": "src/Exceptionless.Core/Repositories/Configuration/Indexes/EventIndex.cs",
-      "scope": "Selected scalar mappings, mapping aliases, lowerkeyword/standardplus/whitespace_lower analysis and a seven-field projection of the default search fields. Not the complete EventIndex or its custom visitors."
+      "scope": "Selected scalar mappings, mapping aliases, lowerkeyword/standardplus/whitespace_lower analysis and a six-field projection of the default search fields. Not the complete EventIndex or its custom visitors."
     },
     {
       "repository": "FoundatioFx/Foundatio.Repositories",
