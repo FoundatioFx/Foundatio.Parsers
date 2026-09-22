@@ -14,16 +14,17 @@ jobs:
       matrix:
         variant: [standalone, integrated]
     env:
-      PR282: e4311f5733e18184a7059388f051c3911fe9a892
-      MAIN: 7b7fee4f93497335296f97d62da461065875ec74
+      PR282: 69d385f51b4af7e5d6c90e23c09e9ed6589620a5
       PR277: b62ce83b24ffbe3d5ba8d9eb11ec440ddd2610e5
       PR270: de2dec2ec933ff5a2e13ca886c3222b5de2de998
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: e4311f5733e18184a7059388f051c3911fe9a892
+          ref: 69d385f51b4af7e5d6c90e23c09e9ed6589620a5
           fetch-depth: 0
           persist-credentials: false
+      - name: Initialize evidence
+        run: mkdir -p "$RUNNER_TEMP/evidence"
       - name: Integrate pinned related changes in runner only
         if: matrix.variant == 'integrated'
         shell: bash
@@ -31,24 +32,24 @@ jobs:
           set -euo pipefail
           git config user.name 'Release verification'
           git config user.email 'verification@users.noreply.github.com'
-          git fetch origin "$MAIN" "$PR277" "$PR270"
-          git merge --no-edit "$MAIN"
+          git fetch origin "$PR277" "$PR270"
           if ! git merge --no-commit --no-ff "$PR277"; then
             test "$(git diff --name-only --diff-filter=U)" = 'docs/guide/visitors.md'
             git checkout --theirs docs/guide/visitors.md
             python3 - <<'PY'
+          import os, subprocess
           from pathlib import Path
           p = Path('docs/guide/visitors.md')
           text = p.read_text()
-          replacements = {
-            'Outside of query contexts these operators are interpreted as ordering, not negation, and the set of operators that is honored differs:': 'Outside of query contexts, only `+` (ascending) and `-` (descending) are ordering operators:',
-            '- **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`, so `-field`, `!field`, and `NOT field` all sort descending. Because that helper ignores negation when `+` is present, `NOT +field` sorts **ascending**.': '- **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`. A standalone `field` or `+field` sorts ascending and `-field` sorts descending. Group-derived direction and the node-local `+` override remain supported.',
-            '- **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and only honors `-` (descending) and `+` (ascending) on a sub-aggregation. `!` and the `NOT` keyword produce no `order` at all.': '- **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and honors `-` (descending) and `+` (ascending) on a sub-aggregation.\n- **Boolean negation is rejected**: the string-based sort and aggregation APIs reject `NOT` and `!`, including `NOT +field`, primary-field terms, and resolved includes. See [Ordering Operators](./validation#ordering-operators).'
-          }
-          for old, new in replacements.items():
-              assert text.count(old) == 1, old
-              text = text.replace(old, new)
-          p.write_text(text)
+          original = subprocess.check_output(['git', 'show', os.environ['PR282'] + ':' + str(p)], text=True)
+          start = original.index('- Outside of query contexts')
+          end = original.index('\n### Node Data Dictionary', start)
+          ordering = original[start:end].replace('- Outside of query contexts', 'Outside of query contexts', 1)
+          ordering = '\n'.join(line[2:] if line.startswith('  ') else line for line in ordering.splitlines())
+          heading = '#### Ordering contexts interpret these operators differently\n'
+          start = text.index(heading) + len(heading)
+          end = text.index('\n### Node Data Dictionary', start)
+          p.write_text(text[:start] + '\n' + ordering.rstrip() + '\n' + text[end:])
           PY
             git add docs/guide/visitors.md
           fi
@@ -71,13 +72,14 @@ jobs:
           from pathlib import Path
           p = Path('docs/guide/syntax-compatibility.md')
           text = p.read_text()
-          text += '\n## Sort and aggregation expressions\n\nThe query compatibility guidance above does not define ordering syntax. String-based sort and aggregation APIs reject Boolean `NOT` and `!`, including negated primary-field terms and resolved includes. Use `+` or `-` for explicit ordering. Search-query negation is unchanged. See [Ordering Operators and migration](./validation#ordering-operators).\n'
+          heading = '\n## Sort and aggregation expressions\n'
+          assert heading not in text
+          text += heading + '\nThe query compatibility guidance above does not define ordering syntax. The built-in string-based sort and aggregation APIs reject Boolean `NOT` and `!`, including negated primary-field terms and resolved includes. Use `+` or `-` for explicit ordering. Search-query negation is unchanged. See [Ordering Operators and migration](./validation#ordering-operators).\n'
           p.write_text(text)
           PY
           git add docs/guide/syntax-compatibility.md
           git commit --no-edit
-          git diff "$PR282" HEAD -- docs > "$RUNNER_TEMP/integration-docs.patch"
-          git log -4 --oneline
+          git diff "$PR282" HEAD -- docs > "$RUNNER_TEMP/evidence/integration-docs.patch"
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
@@ -87,18 +89,13 @@ jobs:
         with:
           node-version: '22'
       - name: Release build
-        run: dotnet build Foundatio.Parsers.slnx --configuration Release
+        id: build
+        continue-on-error: true
+        run: dotnet build Foundatio.Parsers.slnx --configuration Release | tee "$RUNNER_TEMP/evidence/build.log"
       - name: Formatter verification
         id: format
         continue-on-error: true
-        run: dotnet format Foundatio.Parsers.slnx --verify-no-changes --no-restore --verbosity diagnostic
-      - name: Capture formatter repairs without altering test input
-        if: steps.format.outcome == 'failure'
-        run: |
-          dotnet format Foundatio.Parsers.slnx --no-restore
-          git diff > "$RUNNER_TEMP/format.patch"
-          cat "$RUNNER_TEMP/format.patch"
-          git reset --hard HEAD
+        run: dotnet format Foundatio.Parsers.slnx --verify-no-changes --no-restore --verbosity diagnostic 2>&1 | tee "$RUNNER_TEMP/evidence/format.log"
       - name: Install locked documentation dependencies
         working-directory: docs
         run: npm ci
@@ -112,11 +109,29 @@ jobs:
           text = p.read_text()
           p.write_text(text.replace('ignoreDeadLinks: true', 'ignoreDeadLinks: false'))
           PY
-          npm run build --prefix docs
+          npm run build --prefix docs 2>&1 | tee "$RUNNER_TEMP/evidence/docs.log"
       - name: Package without publishing
         id: pack
         continue-on-error: true
-        run: dotnet pack Foundatio.Parsers.slnx --configuration Release --no-build --output "$RUNNER_TEMP/packages"
+        run: |
+          dotnet pack Foundatio.Parsers.slnx --configuration Release --no-build --output "$RUNNER_TEMP/packages" | tee "$RUNNER_TEMP/evidence/pack.log"
+          python3 - <<'PY' | tee "$RUNNER_TEMP/evidence/package-contents.txt"
+          import os, zipfile
+          from pathlib import Path
+          packages = list((Path(os.environ['RUNNER_TEMP']) / 'packages').glob('*.nupkg'))
+          assert len(packages) == 3, packages
+          for p in sorted(packages):
+              with zipfile.ZipFile(p) as z:
+                  names = z.namelist()
+                  assert 'README.md' in names
+                  assert 'foundatio-icon.png' in names
+                  assert any(n.endswith('.nuspec') for n in names)
+                  assert any(n.startswith('lib/net10.0/') and n.endswith('.dll') for n in names)
+                  if 'SqlQueries' not in p.name:
+                      assert any(n.startswith('lib/net8.0/') and n.endswith('.dll') for n in names)
+                  print(p.name)
+                  print('\n'.join('  ' + n for n in names if n.startswith('lib/')))
+          PY
       - name: Start integration services
         run: |
           docker compose up -d elasticsearch sqlserver
@@ -124,17 +139,16 @@ jobs:
       - name: Full solution tests
         id: tests
         continue-on-error: true
-        run: dotnet test --solution Foundatio.Parsers.slnx --configuration Release --no-build --report-github
-      - name: Capture source and integration patch
+        run: dotnet test --solution Foundatio.Parsers.slnx --configuration Release --no-build --report-github 2>&1 | tee "$RUNNER_TEMP/evidence/tests.log"
+      - name: Capture final evidence
         if: always()
         run: |
-          mkdir -p "$RUNNER_TEMP/evidence"
           git rev-parse HEAD > "$RUNNER_TEMP/evidence/tested-sha.txt"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/evidence/tested-tree.txt"
+          git log -5 --oneline > "$RUNNER_TEMP/evidence/commits.txt"
           git archive HEAD -o "$RUNNER_TEMP/evidence/tested-source.tar.gz"
-          cp "$RUNNER_TEMP/format.patch" "$RUNNER_TEMP/evidence/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/integration-docs.patch" "$RUNNER_TEMP/evidence/" 2>/dev/null || true
           git diff > "$RUNNER_TEMP/evidence/worktree.diff"
-          printf 'formatter=%s\ndocs=%s\npack=%s\ntests=%s\n' '${{ steps.format.outcome }}' '${{ steps.docs.outcome }}' '${{ steps.pack.outcome }}' '${{ steps.tests.outcome }}' | tee "$RUNNER_TEMP/evidence/outcomes.txt"
+          printf 'build=%s\nformatter=%s\ndocs=%s\npack=%s\ntests=%s\n' '${{ steps.build.outcome }}' '${{ steps.format.outcome }}' '${{ steps.docs.outcome }}' '${{ steps.pack.outcome }}' '${{ steps.tests.outcome }}' | tee "$RUNNER_TEMP/evidence/outcomes.txt"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -144,6 +158,7 @@ jobs:
       - name: Enforce all verification results
         if: always()
         run: |
+          test '${{ steps.build.outcome }}' = success
           test '${{ steps.format.outcome }}' = success
           test '${{ steps.docs.outcome }}' = success
           test '${{ steps.pack.outcome }}' = success
