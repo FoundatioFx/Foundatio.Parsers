@@ -8,24 +8,36 @@ defaults:
   run:
     shell: bash
 jobs:
-  snapshot:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  compile:
+    runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: 4e37c7fe93e517575a744cecd79a6d631e80e0ac
+          ref: ae0b01819ff704db803f33d9c8aa936ef5f7cf5f
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: Capture pinned source
         run: |
-          mkdir -p "$RUNNER_TEMP/evidence"
-          git rev-parse HEAD > "$RUNNER_TEMP/evidence/tested-sha.txt"
-          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/evidence/tested-tree.txt"
-          git archive HEAD -o "$RUNNER_TEMP/evidence/tested-source.tar.gz"
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/tested-sha.txt
+          git rev-parse HEAD^{tree} > evidence/tested-tree.txt
+          git archive HEAD -o evidence/tested-source.tar.gz
+      - name: Release build
+        run: dotnet build Foundatio.Parsers.slnx --configuration Release 2>&1 | tee evidence/build.log
+      - name: Full formatter validation
+        run: dotnet format Foundatio.Parsers.slnx --verify-no-changes --no-restore --verbosity diagnostic 2>&1 | tee evidence/format.log
+      - name: Service-free core regression tests
+        run: dotnet tests/Foundatio.Parsers.LuceneQueries.Tests/bin/Release/net10.0/Foundatio.Parsers.LuceneQueries.Tests.dll -failSkips -xml evidence/lucene.xml 2>&1 | tee evidence/core-tests.log
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: production-audit-source
-          path: ${{ runner.temp }}/evidence
+          name: production-audit-compile
+          path: evidence
           retention-days: 7
           if-no-files-found: error
