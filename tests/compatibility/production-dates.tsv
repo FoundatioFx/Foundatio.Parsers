@@ -1,0 +1,12 @@
+# id	query	independent expected IDs	Elasticsearch native reference JSON
+spring-half-open	date:[2024-03-10T00:00:00 TO 2024-03-11T00:00:00}^"America/Chicago"	s1,s2,s3,s4	{"range":{"date":{"gte":"2024-03-10T06:00:00Z","lt":"2024-03-11T05:00:00Z"}}}
+fall-half-open	date:[2024-11-03T00:00:00 TO 2024-11-04T00:00:00}^"America/Chicago"	f1,f2,f3,f4	{"range":{"date":{"gte":"2024-11-03T05:00:00Z","lt":"2024-11-04T06:00:00Z"}}}
+spring-inclusive-day	date:[2024-03-10 TO 2024-03-10]^"America/Chicago"	s1,s2,s3,s4	{"range":{"date":{"gte":"2024-03-10T06:00:00Z","lt":"2024-03-11T05:00:00Z"}}}
+fall-inclusive-day	date:[2024-11-03 TO 2024-11-03]^"America/Chicago"	f1,f2,f3,f4	{"range":{"date":{"gte":"2024-11-03T05:00:00Z","lt":"2024-11-04T06:00:00Z"}}}
+spring-nanos	date_nanos:[2024-03-10T00:00:00 TO 2024-03-11T00:00:00}^"America/Chicago"	s1,s2,s3,s4	{"range":{"date_nanos":{"gte":"2024-03-10T06:00:00Z","lt":"2024-03-11T05:00:00Z"}}}
+fall-nanos	date_nanos:[2024-11-03T00:00:00 TO 2024-11-04T00:00:00}^"America/Chicago"	f1,f2,f3,f4	{"range":{"date_nanos":{"gte":"2024-11-03T05:00:00Z","lt":"2024-11-04T06:00:00Z"}}}
+leap-day	date:[2024-02-29T00:00:00Z TO 2024-03-01T00:00:00Z}	l1	{"range":{"date":{"gte":"2024-02-29T00:00:00Z","lt":"2024-03-01T00:00:00Z"}}}
+fixed-date-math	date:[2024-02-28||+1d/d TO 2024-03-01||/d}	l1	{"range":{"date":{"gte":"2024-02-29T00:00:00Z","lt":"2024-03-01T00:00:00Z"}}}
+year-boundary	date:[2024-12-31T00:00:00Z TO 2025-01-01T00:00:00Z}	y0	{"range":{"date":{"gte":"2024-12-31T00:00:00Z","lt":"2025-01-01T00:00:00Z"}}}
+one-nanosecond	date_nanos:[2024-01-01T00:00:00.000000001Z TO 2024-01-01T00:00:00.000000002Z}	n1	{"range":{"date_nanos":{"gte":"2024-01-01T00:00:00.000000001Z","lt":"2024-01-01T00:00:00.000000002Z"}}}
+exclusive-nanos	date_nanos:{2024-01-01T00:00:00.000000000Z TO 2024-01-01T00:00:00.000000001Z]	n1	{"range":{"date_nanos":{"gt":"2024-01-01T00:00:00.000000000Z","lte":"2024-01-01T00:00:00.000000001Z"}}}
