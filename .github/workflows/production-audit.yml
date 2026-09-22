@@ -1,0 +1,31 @@
+name: Parser production audit
+on:
+  push:
+    branches: [audit/pr270-production-verification]
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 4e37c7fe93e517575a744cecd79a6d631e80e0ac
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Capture pinned source
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/evidence/tested-sha.txt"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/evidence/tested-tree.txt"
+          git archive HEAD -o "$RUNNER_TEMP/evidence/tested-source.tar.gz"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: production-audit-source
+          path: ${{ runner.temp }}/evidence
+          retention-days: 7
+          if-no-files-found: error
