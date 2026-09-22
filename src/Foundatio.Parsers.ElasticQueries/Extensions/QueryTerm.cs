@@ -84,7 +84,7 @@ internal readonly record struct QueryTerm
         {
             Value = node.UnescapedTerm!,
             Quoted = node.IsQuotedTerm,
-            Regex = node.IsRegexTerm ? raw.Replace("\\/", "/", StringComparison.Ordinal) : null,
+            Regex = node.IsRegexTerm ? raw : null,
             Wildcard = wildcard,
             Expression = node.IsRegexTerm ? "/" + raw + "/" : expression,
             IsPrefix = prefix,
@@ -117,7 +117,7 @@ internal readonly record struct QueryTerm
             context.AddValidationError("Group proximity is not supported: " + node);
             return new MatchNoneQuery();
         }
-        if (!TryReadBoost(node.UnescapedBoost, context, out var boost))
+        if (!TryReadBoost(node.Boost, context, out var boost))
             return new MatchNoneQuery();
         return query is null || boost is null ? query : new BoolQuery { Must = [query], Boost = boost };
     }
@@ -152,7 +152,7 @@ internal readonly record struct QueryTerm
         {
             char value = raw[i];
             bool literal = value == '\\';
-            if (literal)
+            if (literal && i + 1 < raw.Length)
                 value = raw[++i];
 
             if (!literal && value is '*' or '?')
@@ -168,8 +168,7 @@ internal readonly record struct QueryTerm
                 pattern.Append('\\');
             pattern.Append(value);
 
-            // The analyzed-prefix path parses only this escaped term, never an unescaped
-            // field/operator expression supplied by a user.
+            // Parse only this escaped term, never an unescaped field/operator expression.
             if (Char.IsWhiteSpace(value) || "+-=!(){}[]^\"~*?:\\/|&<>".Contains(value))
                 escaped.Append('\\');
             escaped.Append(value);
