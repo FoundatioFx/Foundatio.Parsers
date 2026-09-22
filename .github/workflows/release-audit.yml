@@ -1,165 +1,38 @@
-name: PR 282 release audit
+name: PR 282 prefix regression audit
 on:
   push:
     branches: [audit/pr-282-release-verification]
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 jobs:
-  verify:
-    name: Verify ${{ matrix.variant }}
+  reproduce:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        variant: [standalone, integrated]
-    env:
-      PR282: 69d385f51b4af7e5d6c90e23c09e9ed6589620a5
-      PR277: b62ce83b24ffbe3d5ba8d9eb11ec440ddd2610e5
-      PR270: de2dec2ec933ff5a2e13ca886c3222b5de2de998
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: 69d385f51b4af7e5d6c90e23c09e9ed6589620a5
+          ref: a8806641a57859c50108433be81eddb40386d76f
           fetch-depth: 0
           persist-credentials: false
-      - name: Initialize evidence
-        run: mkdir -p "$RUNNER_TEMP/evidence"
-      - name: Integrate pinned related changes in runner only
-        if: matrix.variant == 'integrated'
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'Release verification'
-          git config user.email 'verification@users.noreply.github.com'
-          git fetch origin "$PR277" "$PR270"
-          if ! git merge --no-commit --no-ff "$PR277"; then
-            test "$(git diff --name-only --diff-filter=U)" = 'docs/guide/visitors.md'
-            git checkout --theirs docs/guide/visitors.md
-            python3 - <<'PY'
-          import os, subprocess
-          from pathlib import Path
-          p = Path('docs/guide/visitors.md')
-          text = p.read_text()
-          original = subprocess.check_output(['git', 'show', os.environ['PR282'] + ':' + str(p)], text=True)
-          start = original.index('- Outside of query contexts')
-          end = original.index('\n### Node Data Dictionary', start)
-          ordering = original[start:end].replace('- Outside of query contexts', 'Outside of query contexts', 1)
-          ordering = '\n'.join(line[2:] if line.startswith('  ') else line for line in ordering.splitlines())
-          heading = '#### Ordering contexts interpret these operators differently\n'
-          start = text.index(heading) + len(heading)
-          end = text.index('\n### Node Data Dictionary', start)
-          p.write_text(text[:start] + '\n' + ordering.rstrip() + '\n' + text[end:])
-          PY
-            git add docs/guide/visitors.md
-          fi
-          git commit --no-edit
-          if ! git merge --no-commit --no-ff "$PR270"; then
-            test "$(git diff --name-only --diff-filter=U)" = 'docs/guide/query-syntax.md'
-            git checkout --theirs docs/guide/query-syntax.md
-            python3 - <<'PY'
-          from pathlib import Path
-          p = Path('docs/guide/query-syntax.md')
-          text = p.read_text()
-          marker = '## Grouping'
-          assert text.count(marker) == 1
-          warning = '::: warning Ordering expressions\nThe query-operator table applies to search queries. Sort and aggregation expressions accept only `+` and `-` for ordering and reject Boolean `NOT` and `!`. See [Ordering Operators](./validation#ordering-operators).\n:::\n\n'
-          p.write_text(text.replace(marker, warning + marker))
-          PY
-            git add docs/guide/query-syntax.md
-          fi
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('docs/guide/syntax-compatibility.md')
-          text = p.read_text()
-          heading = '\n## Sort and aggregation expressions\n'
-          assert heading not in text
-          text += heading + '\nThe query compatibility guidance above does not define ordering syntax. The built-in string-based sort and aggregation APIs reject Boolean `NOT` and `!`, including negated primary-field terms and resolved includes. Use `+` or `-` for explicit ordering. Search-query negation is unchanged. See [Ordering Operators and migration](./validation#ordering-operators).\n'
-          p.write_text(text)
-          PY
-          git add docs/guide/syntax-compatibility.md
-          git commit --no-edit
-          git diff "$PR282" HEAD -- docs > "$RUNNER_TEMP/evidence/integration-docs.patch"
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
             10.0.x
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Release build
-        id: build
-        continue-on-error: true
-        run: dotnet build Foundatio.Parsers.slnx --configuration Release | tee "$RUNNER_TEMP/evidence/build.log"
-      - name: Formatter verification
-        id: format
-        continue-on-error: true
-        run: dotnet format Foundatio.Parsers.slnx --verify-no-changes --no-restore --verbosity diagnostic 2>&1 | tee "$RUNNER_TEMP/evidence/format.log"
-      - name: Install locked documentation dependencies
-        working-directory: docs
-        run: npm ci
-      - name: Strict documentation build
-        id: docs
-        continue-on-error: true
+      - name: Build regression candidate
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('docs/.vitepress/config.ts')
-          text = p.read_text()
-          p.write_text(text.replace('ignoreDeadLinks: true', 'ignoreDeadLinks: false'))
-          PY
-          npm run build --prefix docs 2>&1 | tee "$RUNNER_TEMP/evidence/docs.log"
-      - name: Package without publishing
-        id: pack
-        continue-on-error: true
+          mkdir -p "$RUNNER_TEMP/evidence"
+          dotnet build Foundatio.Parsers.slnx -c Release 2>&1 | tee "$RUNNER_TEMP/evidence/build.log"
+      - name: Reproduce prefix collision
         run: |
-          dotnet pack Foundatio.Parsers.slnx --configuration Release --no-build --output "$RUNNER_TEMP/packages" | tee "$RUNNER_TEMP/evidence/pack.log"
-          python3 - <<'PY' | tee "$RUNNER_TEMP/evidence/package-contents.txt"
-          import os, zipfile
-          from pathlib import Path
-          packages = list((Path(os.environ['RUNNER_TEMP']) / 'packages').glob('*.nupkg'))
-          assert len(packages) == 3, packages
-          for p in sorted(packages):
-              with zipfile.ZipFile(p) as z:
-                  names = z.namelist()
-                  assert 'README.md' in names
-                  assert 'foundatio-icon.png' in names
-                  assert any(n.endswith('.nuspec') for n in names)
-                  assert any(n.startswith('lib/net10.0/') and n.endswith('.dll') for n in names)
-                  if 'SqlQueries' not in p.name:
-                      assert any(n.startswith('lib/net8.0/') and n.endswith('.dll') for n in names)
-                  print(p.name)
-                  print('\n'.join('  ' + n for n in names if n.startswith('lib/')))
-          PY
-      - name: Start integration services
-        run: |
-          docker compose up -d elasticsearch sqlserver
-          docker compose run --rm ready
-      - name: Full solution tests
-        id: tests
-        continue-on-error: true
-        run: dotnet test --solution Foundatio.Parsers.slnx --configuration Release --no-build --report-github 2>&1 | tee "$RUNNER_TEMP/evidence/tests.log"
-      - name: Capture final evidence
-        if: always()
-        run: |
-          git rev-parse HEAD > "$RUNNER_TEMP/evidence/tested-sha.txt"
-          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/evidence/tested-tree.txt"
-          git log -5 --oneline > "$RUNNER_TEMP/evidence/commits.txt"
-          git archive HEAD -o "$RUNNER_TEMP/evidence/tested-source.tar.gz"
-          git diff > "$RUNNER_TEMP/evidence/worktree.diff"
-          printf 'build=%s\nformatter=%s\ndocs=%s\npack=%s\ntests=%s\n' '${{ steps.build.outcome }}' '${{ steps.format.outcome }}' '${{ steps.docs.outcome }}' '${{ steps.pack.outcome }}' '${{ steps.tests.outcome }}' | tee "$RUNNER_TEMP/evidence/outcomes.txt"
+          dotnet tests/Foundatio.Parsers.ElasticQueries.Tests/bin/Release/net10.0/Foundatio.Parsers.ElasticQueries.Tests.dll -class Foundatio.Parsers.ElasticQueries.Tests.OrderingPrefixCollisionTests -failSkips -xml "$RUNNER_TEMP/evidence/tests.xml" 2>&1 | tee "$RUNNER_TEMP/evidence/tests.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: release-audit-${{ matrix.variant }}
+          name: prefix-regressions-before-fix
           path: ${{ runner.temp }}/evidence
+          if-no-files-found: error
           retention-days: 7
-      - name: Enforce all verification results
-        if: always()
-        run: |
-          test '${{ steps.build.outcome }}' = success
-          test '${{ steps.format.outcome }}' = success
-          test '${{ steps.docs.outcome }}' = success
-          test '${{ steps.pack.outcome }}' = success
-          test '${{ steps.tests.outcome }}' = success
