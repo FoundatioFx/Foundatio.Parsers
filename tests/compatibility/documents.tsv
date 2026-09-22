@@ -1,0 +1,13 @@
+# id	text	otherText	keyword	number	date (UTC); - means null
+a	alpha beta	gamma	john	1	2024-01-01T00:00:00Z
+b	alpha gamma beta	beta	joan	3	2024-01-01T05:59:59Z
+c	beta gamma	alpha	jo?n	5	2024-01-01T06:00:00Z
+d	alphabet soup	beta	johnny	9	2024-01-02T06:00:00Z
+e	foo bar	delta	1..5	7	-
+f	foobar	delta	val.test	2	2023-12-31T00:00:00Z
+g	brown fox	delta	value	4	2024-01-03T00:00:00Z
+h	quick brown fox	alpha	[0-9]+	6	2024-01-04T00:00:00Z
+i	-	-	-	8	-
+j	literal	gamma	john*	10	2024-01-05T00:00:00Z
+k	value	gamma	jo?nny	0	2024-01-06T00:00:00Z
+l	alpha	gamma	ALPHA	-1	2024-01-07T00:00:00Z

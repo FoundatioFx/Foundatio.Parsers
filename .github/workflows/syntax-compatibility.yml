@@ -1,0 +1,95 @@
+name: Syntax compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'build/**'
+      - 'global.json'
+      - 'docs/guide/*syntax*'
+      - '.github/workflows/syntax-compatibility.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'build/**'
+      - 'global.json'
+      - 'docs/guide/*syntax*'
+      - '.github/workflows/syntax-compatibility.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: syntax-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    name: Elasticsearch ${{ matrix.elasticsearch }} and bundled Lucene
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        elasticsearch: ['8.19.0', '9.5.0']
+    services:
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:${{ matrix.elasticsearch }}
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fsS http://localhost:9200/_cluster/health?wait_for_status=yellow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Record engine versions
+        run: |
+          mkdir -p compatibility-results
+          curl --fail --silent --show-error http://localhost:9200/ | tee compatibility-results/elasticsearch.json
+      - name: Compare bare Lucene classic
+        env:
+          ES_CONTAINER: ${{ job.services.elasticsearch.id }}
+        run: |
+          docker cp tests/compatibility "$ES_CONTAINER:/tmp/compatibility"
+          docker exec "$ES_CONTAINER" /usr/share/elasticsearch/jdk/bin/java \
+            --class-path '/usr/share/elasticsearch/lib/*:/usr/share/elasticsearch/modules/analysis-common/*' \
+            /tmp/compatibility/LuceneCompatibility.java /tmp/compatibility \
+            | tee compatibility-results/lucene.log
+      - name: Compare Foundatio and query_string matching and scoring
+        if: ${{ !cancelled() }}
+        run: >-
+          dotnet test --project tests/Foundatio.Parsers.ElasticQueries.Tests/Foundatio.Parsers.ElasticQueries.Tests.csproj
+          --configuration Release
+          --filter-class '*SyntaxCompatibilityIntegrationTests'
+          --report-trx
+          --results-directory "$GITHUB_WORKSPACE/compatibility-results"
+      - name: Verify added C# whitespace
+        if: ${{ !cancelled() }}
+        run: >-
+          dotnet format whitespace tests/Foundatio.Parsers.ElasticQueries.Tests/Foundatio.Parsers.ElasticQueries.Tests.csproj
+          --no-restore --verify-no-changes
+          --include tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityFixture.cs
+          tests/Foundatio.Parsers.ElasticQueries.Tests/SyntaxCompatibilityIntegrationTests.cs
+      - name: Upload comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: syntax-compatibility-${{ matrix.elasticsearch }}
+          path: compatibility-results
+          retention-days: 7
+          if-no-files-found: error
