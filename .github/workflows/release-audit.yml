@@ -6,7 +6,7 @@ permissions:
   contents: read
 concurrency:
   group: pr282-final-audit
-  cancel-in-progress: false
+  cancel-in-progress: true
 defaults:
   run:
     shell: bash
@@ -19,14 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      CANDIDATE: 2b01579c9f622e6bb551eb2fca96248b8e45fe45
+      CANDIDATE: b7786a6ab375d8a928dbf2f4e65c4cfa4b9de995
       PR277: b62ce83b24ffbe3d5ba8d9eb11ec440ddd2610e5
       PR270: 4e37c7fe93e517575a744cecd79a6d631e80e0ac
       EVIDENCE: /tmp/pr282-evidence
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: 2b01579c9f622e6bb551eb2fca96248b8e45fe45
+          ref: b7786a6ab375d8a928dbf2f4e65c4cfa4b9de995
           fetch-depth: 0
           persist-credentials: false
       - name: Initialize evidence
