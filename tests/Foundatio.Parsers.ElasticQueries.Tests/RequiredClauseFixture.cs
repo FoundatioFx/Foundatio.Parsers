@@ -49,7 +49,7 @@ public sealed class RequiredClauseFixture : ElasticsearchFixture
         var documents = Enumerable.Range(0, 8).Select(bits => new Document
         {
             Id = bits.ToString(CultureInfo.InvariantCulture),
-            Tags = new[] { "a", "b", "c" }.Where((_, bit) => (bits & (1 << bit)) != 0).ToArray(),
+            Tags = new[] { "a", "b", "c" }.Where((_, bit) => (bits & (1 << bit)) is not 0).ToArray(),
             Children = children[bits]
         }).ToArray();
 
@@ -58,15 +58,16 @@ public sealed class RequiredClauseFixture : ElasticsearchFixture
             .Mappings(Mapping));
         var bulk = await Client.IndexManyAsync(documents, Index, timeout.Token);
         Assert.True(bulk.IsValidResponse && !bulk.Errors, bulk.DebugInformation);
+
         var refresh = await Client.Indices.RefreshAsync(Index, cancellationToken: timeout.Token);
         Assert.True(refresh.IsValidResponse, refresh.DebugInformation);
     }
 
-    public sealed class Document
+    public sealed record Document
     {
-        public string Id { get; set; } = String.Empty;
-        public string[] Tags { get; set; } = [];
-        public Child[] Children { get; set; } = [];
+        public required string Id { get; init; }
+        public string[] Tags { get; init; } = [];
+        public Child[] Children { get; init; } = [];
     }
 
     public sealed record Child(string Name, string Value);

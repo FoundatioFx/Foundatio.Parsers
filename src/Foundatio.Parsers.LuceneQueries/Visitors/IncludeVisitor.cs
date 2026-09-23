@@ -70,7 +70,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
                 includeStack.Pop();
             }
 
-            if (context.QueryType == QueryTypes.Query && (node.Prefix is not null || node.IsNegated is true
+            if (context.QueryType is QueryTypes.Query && (node.Prefix is not null || node.IsNegated is true
                 || node.Boost is not null || node.Proximity is not null))
             {
                 // Keep the outer operators separate from operators inside the include.

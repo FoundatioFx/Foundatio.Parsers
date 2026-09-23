@@ -16,6 +16,54 @@ public class IncludeQueryVisitorTests : TestWithLoggingBase
         Log.DefaultLogLevel = Microsoft.Extensions.Logging.LogLevel.Trace;
     }
 
+    [Theory]
+    [InlineData("+@include:inner", "+", null)]
+    [InlineData("-@include:inner", "-", null)]
+    [InlineData("NOT @include:inner", null, true)]
+    public async Task IncludeVisitor_WithOuterOperator_PreservesInnerOperatorAndParentLinks(string query, string? prefix, bool? negated)
+    {
+        // Arrange
+        var root = new LuceneQueryParser().Parse(query);
+        var includes = new Dictionary<string, string> { { "inner", "NOT field:value" } };
+
+        // Act
+        var resolved = await IncludeVisitor.RunAsync(root, includes);
+
+        // Assert
+        Assert.Same(root, resolved);
+        var outer = Assert.IsType<GroupNode>(root.Left);
+        var inner = Assert.IsType<GroupNode>(outer.Left);
+        Assert.Equal(prefix, outer.Prefix);
+        Assert.Equal(negated, outer.IsNegated);
+        Assert.Equal("(NOT field:value)", inner.ToString());
+        Assert.Same(root, outer.Parent);
+        Assert.Same(outer, inner.Parent);
+    }
+
+    [Theory]
+    [InlineData("(")]
+    [InlineData("@include:broken")]
+    [InlineData("@include:outer")]
+    public async Task IncludeVisitor_AfterFailedExpansion_AllowsRetry(string expression)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+        var context = new QueryVisitorContext();
+        var includes = new Dictionary<string, string> { { "outer", expression }, { "broken", "(" } };
+
+        await IncludeVisitor.RunAsync(parser.Parse("@include:outer"), includes, context);
+        Assert.False(context.IsValid());
+        context.ValidationResult = null;
+        includes["outer"] = "field:value";
+
+        // Act
+        var resolved = await IncludeVisitor.RunAsync(parser.Parse("@include:outer"), includes, context);
+
+        // Assert
+        Assert.True(context.IsValid(), context.GetValidationResult().Message);
+        Assert.Equal("(field:value)", resolved!.ToString());
+    }
+
     [Fact]
     public async Task CanExpandIncludesAsync()
     {

@@ -19,17 +19,17 @@ The C# integration tests include these standard-analyzed documents:
 | `c` | `beta gamma` |
 | `l` | `alpha` |
 
-With an explicit OR default, the following queries differ even though both parsers accept them. The IDs in this table refer only to these four documents:
+With an explicit OR default, the following queries illustrate matching behavior and remaining differences. The IDs in this table refer only to these four documents:
 
 | Query | Foundatio | Elasticsearch `query_string` |
 |-------|-----------|----------------------------------------------|
-| `+text:alpha text:gamma` | `a,b,c,l` | `a,b,l` |
+| `+text:alpha text:gamma` | `a,b,l` | `a,b,l` |
 | `text:alpha OR NOT text:beta` | `a,b,l` | `l` |
 | `text:alpha OR text:beta AND text:gamma` | `a,b,c,l` | `b,c` |
 | `(text:alpha OR text:beta) AND text:gamma` | `b,c` | `b,c` |
 | `text:alpha OR (text:beta AND text:gamma)` | `a,b,c,l` | `a,b,c,l` |
 
-The first row is a required-clause defect: Foundatio returns `c` despite its missing `alpha` term. Do not rely on `+` to enforce mandatory conditions in this query path. The fix and regression requirements are tracked in [#288](https://github.com/FoundatioFx/Foundatio.Parsers/issues/288).
+The first row enforces `alpha` as required in both consumers; `gamma` remains optional for matching and contributes to scoring. Required groups preserve their internal Boolean operator: `+(text:alpha OR text:beta)` requires either term. These guarantees apply to the default Elasticsearch query pipeline.
 
 The next two rows expose Boolean interpretation differences, not analyzer or scoring differences. Foundatio's `OR NOT` combines a positive condition with a complement; the classic prohibited-clause interpretation excludes `beta` from the whole query at that level. Mixed `AND`/`OR` syntax also needs explicit grouping. Parentheses make the two positive-group examples unambiguous, but are not a universal conversion recipe for required clauses or negated disjunctions. Translate the intended Boolean structure explicitly when moving between consumers, and assert returned document IDs.
 
@@ -150,7 +150,7 @@ This is a behavioral breaking change for previously accepted ordering input. Cho
 
 Start with explicit fields, explicit Boolean operators and parentheses, leading negation, and `TO` ranges. For a bare Lucene classic consumer, do not send Elasticsearch-specific existence or comparison syntax, and explicitly account for pure-negative queries. For an Elasticsearch consumer, replace `_missing_` with `NOT _exists_` and expand configured includes first.
 
-Do not forward required-clause, negated-disjunction, fuzzy, proximity, regex, boost, or general wildcard expressions under an assumption of equivalent query generation. Prefix searches still require aligned wildcard options and field configuration. Date-range time zones must be configured for each consumer rather than forwarded as caret suffixes.
+Do not forward negated-disjunction, fuzzy, proximity, regex, boost, or general wildcard expressions under an assumption of equivalent query generation. Prefix searches still require aligned wildcard options and field configuration. Date-range time zones must be configured for each consumer rather than forwarded as caret suffixes.
 
 Finally, compare **both the generated query and returned documents** under the application's actual mappings. Include positive and negative fixtures, analyzed and keyword fields, and scoring assertions when ranking matters. Default fields, default operators, filter/scoring context, nested queries, aliases, and visitors can all change behavior without changing whether the input parses. For production inputs, enforce the supported subset explicitly; documenting an ignored modifier does not make it safe to accept when the application requires its semantics.
 

@@ -101,6 +101,65 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BuildQueryAsync_WithRequiredCustomGroup_PreservesCustomQuery(bool scoring)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(configuration => configuration
+            .UseMappings(_resolver)
+            .AddQueryVisitor(new CustomFilterVisitor()));
+        var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring };
+
+        // Act
+        var query = await parser.BuildQueryAsync("+@custom:(one) keyword:b", context);
+
+        // Assert
+        var clauses = scoring ? query.Bool : Assert.Single(query.Bool!.Filter!).Bool;
+        Assert.NotNull(clauses);
+        var required = Assert.Single(scoring ? clauses.Must! : clauses.Filter!).Terms;
+        Assert.NotNull(required);
+        Assert.Equal("id", required.Field!.ToString());
+        Assert.Equal("b", Assert.Single(clauses.Should!).Term!.Value.ToString());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BuildQueryAsync_WithRequiredAndOptionalClauses_PreservesBooleanScope(bool scoring)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(configuration => configuration.UseMappings(_resolver));
+        var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring };
+
+        // Act
+        var query = await parser.BuildQueryAsync("+(keyword:a OR keyword:b) keyword:c", context);
+
+        // Assert
+        var clauses = scoring ? query.Bool : Assert.Single(query.Bool!.Filter!).Bool;
+        Assert.NotNull(clauses);
+        var required = Assert.Single(scoring ? clauses.Must! : clauses.Filter!).Bool;
+        Assert.NotNull(required);
+        Assert.Equal(2, required.Should!.Count);
+        Assert.Null(required.Must);
+        Assert.Null(required.Filter);
+        Assert.Equal("c", Assert.Single(clauses.Should!).Term!.Value.ToString());
+    }
+
+    [Theory]
+    [InlineData(GroupOperator.And)]
+    [InlineData(GroupOperator.Or)]
+    public Task BuildQueryAsync_WithUntranslatableRequiredClause_ThrowsValidationException(GroupOperator op)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(configuration => configuration.UseMappings(_resolver));
+        var context = new ElasticQueryVisitorContext { DefaultOperator = op };
+
+        // Act & Assert
+        return Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync("+[1 TO 5] keyword:a", context));
+    }
+
+    [Theory]
     [InlineData("field:1..5", "field", "1..5")]
     [InlineData("1..5", null, "1..5")]
     [InlineData("field:jo?n", "field", "jo?n")]

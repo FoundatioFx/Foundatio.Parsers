@@ -7,6 +7,7 @@ using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
@@ -1942,9 +1943,13 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         Assert.Equal(2, response.Total);
     }
 
-    [Fact]
-    public async Task NestedSiblingPaths_PositiveCorrelation_MatchesOnlySameParent()
+    [Theory]
+    [InlineData("parent.childA.name:Alice AND parent.childB.name:Bob", true)]
+    [InlineData("+parent.childA.name:Alice +parent.childB.name:Bob", true)]
+    [InlineData("+parent.childA.name:Alice +parent.childB.name:Bob", false)]
+    public async Task NestedSiblingPaths_PositiveCorrelation_MatchesOnlySameParent(string query, bool scoring)
     {
+        // Arrange
         string index = await CreateRandomIndexAsync<SiblingNestedDoc>(d => d.Properties(p => p
             .Text("title")
             .Nested("parent", o => o.Properties(p1 => p1
@@ -1995,18 +2000,24 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .UseMappings<SiblingNestedDoc>(Client)
             .UseNested());
 
-        var result = await processor.BuildQueryAsync("parent.childA.name:Alice AND parent.childB.name:Bob", new ElasticQueryVisitorContext().UseScoring());
+        // Act
+        var result = await processor.BuildQueryAsync(query, new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring });
         var response = await Client.SearchAsync<SiblingNestedDoc>(d => d.Indices(index).Query(result), TestCancellationToken);
         _logger.LogInformation("Request: {Request}", response.GetRequest());
 
+        // Assert
         Assert.True(response.IsValidResponse, response.GetRequest());
         Assert.Equal(1, response.Total);
-        Assert.Contains(response.Documents, d => d.Title == "docB");
+        Assert.Contains(response.Documents, d => d.Title is "docB");
     }
 
-    [Fact]
-    public async Task NestedSiblingPaths_NegatedCorrelation_MatchesOnlyParentWithoutSibling()
+    [Theory]
+    [InlineData("parent.childA.name:Alice AND NOT parent.childB.name:Bob", true)]
+    [InlineData("+parent.childA.name:Alice -parent.childB.name:Bob", true)]
+    [InlineData("+parent.childA.name:Alice -parent.childB.name:Bob", false)]
+    public async Task NestedSiblingPaths_NegatedCorrelation_MatchesOnlyParentWithoutSibling(string query, bool scoring)
     {
+        // Arrange
         string index = await CreateRandomIndexAsync<SiblingNestedDoc>(d => d.Properties(p => p
             .Text("title")
             .Nested("parent", o => o.Properties(p1 => p1
@@ -2057,13 +2068,15 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             .UseMappings<SiblingNestedDoc>(Client)
             .UseNested());
 
-        var result = await processor.BuildQueryAsync("parent.childA.name:Alice AND NOT parent.childB.name:Bob", new ElasticQueryVisitorContext().UseScoring());
+        // Act
+        var result = await processor.BuildQueryAsync(query, new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring });
         var response = await Client.SearchAsync<SiblingNestedDoc>(d => d.Indices(index).Query(result), TestCancellationToken);
         _logger.LogInformation("Request: {Request}", response.GetRequest());
 
+        // Assert
         Assert.True(response.IsValidResponse, response.GetRequest());
         Assert.Equal(1, response.Total);
-        Assert.Contains(response.Documents, d => d.Title == "docA");
+        Assert.Contains(response.Documents, d => d.Title is "docA");
     }
 
     public class FilteredItemsDoc

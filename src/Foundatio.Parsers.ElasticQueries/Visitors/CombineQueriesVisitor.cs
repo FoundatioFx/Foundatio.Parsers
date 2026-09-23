@@ -129,9 +129,9 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
             if (filteredChildren is { Count: > 0 })
             {
-                Query filteredQuery = filteredChildren.Count == 1
+                Query filteredQuery = filteredChildren.Count is 1
                     ? filteredChildren[0]
-                    : op == GroupOperator.Or
+                    : op is GroupOperator.Or
                         ? new BoolQuery { Should = filteredChildren }
                         : new BoolQuery { Must = filteredChildren };
                 combinedInner = Combine(combinedInner, filteredQuery, op, useScoring);
@@ -216,10 +216,10 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         // If we have OR clauses and the container is a BoolQuery with only should clauses,
         // set minimum_should_match = 1 so at least one clause must match.
-        if (op == GroupOperator.Or && container?.Bool is { } boolQuery)
+        if (op is GroupOperator.Or && container?.Bool is { } boolQuery)
         {
             bool isRootQuery = node.Parent is null;
-            bool parentUsesAndOperator = node.Parent is GroupNode parentGroup && parentGroup.GetOperator(elasticContext) == GroupOperator.And;
+            bool parentUsesAndOperator = node.Parent is GroupNode parentGroup && parentGroup.GetOperator(elasticContext) is GroupOperator.And;
             bool shouldSetMinimumShouldMatch = isRootQuery || (node.HasParens && parentUsesAndOperator);
 
             if (shouldSetMinimumShouldMatch)
@@ -268,7 +268,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (right is null)
             return left;
 
-        if (op == GroupOperator.And)
+        if (op is GroupOperator.And)
         {
             if (!useScoring)
             {

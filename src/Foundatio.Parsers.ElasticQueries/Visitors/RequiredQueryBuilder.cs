@@ -13,34 +13,45 @@ internal static class RequiredQueryBuilder
 {
     public static async Task<List<IFieldQueryNode>?> GetClausesAsync(GroupNode node, IElasticQueryVisitorContext context)
     {
-        if (node.GetOperator(context) != GroupOperator.Or)
+        if (node.GetOperator(context) is not GroupOperator.Or)
             return null;
 
         // Transparent groups belong to the enclosing OR scope. Inspect only its outer boundary,
         // before recursive combination populates the query cache, to preserve custom query nodes.
-        if (IsTransparent(node) && node.Parent is GroupNode parent && parent.GetOperator(context) == GroupOperator.Or
+        if (IsTransparent(node) && node.Parent is GroupNode parent && parent.GetOperator(context) is GroupOperator.Or
             && await node.GetQueryAsync().AnyContext() is null)
         {
             return null;
         }
 
         var clauses = new List<IFieldQueryNode>();
-        var pending = new Stack<IQueryNode>(node.Children.Reverse());
+        var pending = new Stack<IQueryNode>();
+        PushChildren(node);
+        bool hasRequired = false;
         while (pending.TryPop(out var child))
         {
-            if (child is GroupNode group && IsTransparent(group) && group.GetOperator(context) == GroupOperator.Or
+            if (child is GroupNode group && IsTransparent(group) && group.GetOperator(context) is GroupOperator.Or
                 && await group.GetQueryAsync().AnyContext() is null)
             {
-                foreach (var descendant in group.Children.Reverse())
-                    pending.Push(descendant);
+                PushChildren(group);
             }
             else if (child is IFieldQueryNode fieldNode)
             {
                 clauses.Add(fieldNode);
+                hasRequired |= fieldNode.IsRequired() && !fieldNode.IsExcluded();
             }
         }
 
-        return clauses.Any(clause => clause.IsRequired() && !clause.IsExcluded()) ? clauses : null;
+        return hasRequired ? clauses : null;
+
+        void PushChildren(GroupNode group)
+        {
+            // Push right first so clauses retain their source order without materializing Children.
+            if (group.Right is { } right)
+                pending.Push(right);
+            if (group.Left is { } left)
+                pending.Push(left);
+        }
     }
 
     private static bool IsTransparent(GroupNode node) => !node.HasParens && String.IsNullOrEmpty(node.Field)
@@ -129,34 +140,34 @@ internal static class RequiredQueryBuilder
 
     private sealed class ClauseSet(bool useScoring)
     {
-        private readonly List<Query> _required = [];
-        private readonly List<Query> _optional = [];
-        private readonly List<Query> _excluded = [];
+        private List<Query>? _required;
+        private List<Query>? _optional;
+        private List<Query>? _excluded;
 
-        public bool HasRequired => _required.Count > 0;
+        public bool HasRequired => _required is { Count: > 0 };
 
         public void Add(Query query, bool required = false, bool excluded = false)
         {
             if (excluded)
-                _excluded.Add(query);
+                (_excluded ??= []).Add(query);
             else if (required)
-                _required.Add(query);
+                (_required ??= []).Add(query);
             else
-                _optional.Add(query);
+                (_optional ??= []).Add(query);
         }
 
         public Query? Build()
         {
-            if (_required.Count == 0 && _optional.Count == 0 && _excluded.Count == 0)
+            if (_required is null && _optional is null && _excluded is null)
                 return null;
 
             return new BoolQuery
             {
                 Must = useScoring && HasRequired ? _required : null,
                 Filter = !useScoring && HasRequired ? _required : null,
-                Should = _optional.Count > 0 ? _optional : null,
-                MustNot = _excluded.Count > 0 ? _excluded : null,
-                MinimumShouldMatch = _optional.Count > 0 ? (HasRequired ? 0 : 1) : null
+                Should = _optional is { Count: > 0 } ? _optional : null,
+                MustNot = _excluded is { Count: > 0 } ? _excluded : null,
+                MinimumShouldMatch = _optional is { Count: > 0 } ? (HasRequired ? 0 : 1) : null
             };
         }
     }
