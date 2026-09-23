@@ -36,10 +36,9 @@ public static class SqlNodeExtensions
             op = GroupOperator.And;
         }
 
-        if (node.IsNegated.HasValue && node.IsNegated.Value)
+        if (node.IsExcluded())
             builder.Append("NOT ");
-
-        if (!node.IsRequired())
+        else if (!node.IsRequired())
             builder.Append(node.Prefix);
 
         if (!String.IsNullOrEmpty(node.Field))

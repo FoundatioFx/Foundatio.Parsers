@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Linq.Dynamic.Core;
@@ -56,6 +57,42 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.False(validation.IsValid);
         Assert.Contains("before the field name", validation.Message);
         await Assert.ThrowsAsync<ValidationException>(() => parser.ToDynamicLinqAsync(query, new SqlQueryVisitorContext()));
+    }
+
+    [Theory]
+    [InlineData("+@include:one Id:2", 1)]
+    [InlineData("NOT @include:one", 2)]
+    [InlineData("-@include:one", 2)]
+    [InlineData("!@include:one", 2)]
+    [InlineData("NOT @include:not-one", 1)]
+    [InlineData("-@include:not-one", 1)]
+    [InlineData("!@include:not-one", 1)]
+    public async Task ToDynamicLinqAsync_WithPrefixedInclude_PreservesMatchingEmployees(string query, int expectedId)
+    {
+        // Arrange
+        var parser = new SqlQueryParser(configuration => configuration.UseIncludes(new Dictionary<string, string>
+        {
+            { "one", "Id:1" },
+            { "not-one", "NOT Id:1" }
+        }));
+        var context = new SqlQueryVisitorContext
+        {
+            DefaultOperator = GroupOperator.Or,
+            Fields = [new EntityFieldInfo { Name = "Id", FullName = "Id", IsNumber = true }]
+        };
+        Employee[] employees = [new() { Id = 1 }, new() { Id = 2 }];
+        using var db = new SampleContext(new DbContextOptionsBuilder<SampleContext>()
+            .UseSqlServer("Server=localhost;Database=QueryTranslation;Integrated Security=True")
+            .Options);
+
+        // Act
+        string expression = await parser.ToDynamicLinqAsync(query, context);
+        var matches = employees.AsQueryable().Where(expression).AsEnumerable().ToArray();
+        string sql = db.Employees.Where(expression).ToQueryString();
+
+        // Assert
+        Assert.Equal(expectedId, Assert.Single(matches).Id);
+        Assert.Contains("WHERE", sql, StringComparison.Ordinal);
     }
 
     [Theory]
