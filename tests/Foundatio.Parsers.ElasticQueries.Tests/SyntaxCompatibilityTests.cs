@@ -35,6 +35,38 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     public SyntaxCompatibilityTests(ITestOutputHelper output) : base(output) { }
 
     [Theory]
+    [InlineData("date:(date~1d @offset:\"-6h\")", "-6h")]
+    [InlineData("date:(date~1d @offset:\"+6h\")", "+6h")]
+    [InlineData("date:(date~1d @offset:6h)", "6h")]
+    public async Task BuildAggregationsAsync_WithLiteralOffset_PreservesSignedValue(string expression, string expected)
+    {
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var aggregations = await parser.BuildAggregationsAsync(expression);
+
+        // Assert
+        Assert.NotNull(aggregations);
+        var histogram = Assert.Single(aggregations.ToDictionary()).Value.DateHistogram;
+        Assert.NotNull(histogram);
+        Assert.Equal(expected, histogram.Offset);
+    }
+
+    [Theory]
+    [InlineData("date:(date~1d @offset:-6h)")]
+    [InlineData("date:(date~1d @offset:+6h)")]
+    public async Task BuildAggregationsAsync_WithPostColonOffsetOperator_ReportsMigrationError(string expression)
+    {
+        // Arrange
+        var parser = CreateParser();
+
+        // Act & Assert
+        var error = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildAggregationsAsync(expression));
+        Assert.Contains("before the field name", error.Message);
+    }
+
+    [Theory]
     [InlineData("field:+term")]
     [InlineData("field:-term")]
     [InlineData("field:!term")]

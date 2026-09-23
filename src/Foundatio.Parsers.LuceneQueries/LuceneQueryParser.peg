@@ -115,6 +115,7 @@ field_exp<IQueryNode>
     }}
   / not:not_exp? name:fieldname node:paren_exp
     {{
+        // fieldname rejects post-colon operators. Inner clause operators belong to child nodes.
         node.IsNegated = not.Any();
         node.Field = name.Field;
         node.Prefix = name.Prefix;

@@ -255,6 +255,8 @@ Following [the decision in issue #272](https://github.com/FoundatioFx/Foundatio.
 
 For literal values, preserve the value by quoting or escaping it: `field:"-value"`, `field:\-value`, or `field:"NOT value"`. Do not move a literal sign before the field. Signed range endpoints remain valid, for example `field:[-5 TO -1]` and `field:>=-5`. Signed aggregation option values also need quotes, for example `@offset:"-6h"`.
 
+The grammar is shared by queries, sorts, aggregations, and parsed include expressions. Audit stored expressions and custom query generators in each context; the number of affected consumer expressions cannot be inferred from this repository. This does not require grouping every value: `-field:value` remains valid. Use `field:(-value)` only when the operator should apply to an inner clause. For numeric equality with a literal negative value, quote it (`price:"-5"`); moving the sign to `-price:5` instead means exclusion, not negative five.
+
 `LuceneQueryParser.Parse` throws `FormatException` with a cursor and a message directing callers to put the operator before the field name. Elasticsearch and SQL `ParseAsync` return `null` and record that diagnostic in the supplied context. `ElasticQueryParser.BuildQueryAsync` throws `QueryValidationException`; `SqlQueryParser.ToDynamicLinqAsync` throws `ValidationException`. These are syntax errors, not empty result sets.
 
 ## Grouping

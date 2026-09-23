@@ -49,6 +49,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("parenthesized-or", "text:alpha OR (text:beta AND text:gamma)", GroupOperator.Or, "a,b,c,l", "a,b,c,l"),
             ("field-group", "text:(alpha OR beta)", GroupOperator.Or, "a,b,c,l", "a,b,c,l"),
             ("negative-group", "-text:(alpha OR beta)", GroupOperator.Or, "d,e,f,g,h,i,j,k", "d,e,f,g,h,i,j,k"),
+            // Both expected result columns are null: both parsers must reject, regardless of the OR default.
             ("post-colon-minus", "text:-alpha", GroupOperator.Or, null, null),
             ("post-colon-not", "text:NOT alpha", GroupOperator.Or, null, null),
             ("post-colon-range", "number:-[1 TO 5]", GroupOperator.Or, null, null),
