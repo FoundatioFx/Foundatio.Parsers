@@ -9,6 +9,7 @@ using Foundatio.Parsers.LuceneQueries.Nodes;
 
 namespace Foundatio.Parsers.ElasticQueries.Visitors;
 
+/// <summary>Builds OR groups containing + clauses without making their optional clauses mandatory.</summary>
 internal static class RequiredQueryBuilder
 {
     public static async Task<List<IFieldQueryNode>?> GetClausesAsync(GroupNode node, IElasticQueryVisitorContext context)
@@ -16,9 +17,10 @@ internal static class RequiredQueryBuilder
         if (node.GetOperator(context) is not GroupOperator.Or)
             return null;
 
-        // Transparent groups belong to the enclosing OR scope. Inspect only its outer boundary,
-        // before recursive combination populates the query cache, to preserve custom query nodes.
-        if (IsTransparent(node) && node.Parent is GroupNode parent && parent.GetOperator(context) is GroupOperator.Or
+        // The parser uses binary groups even for a OR b OR c without parentheses.
+        // Unmodified groups with the same OR operator belong to one list of clauses;
+        // parentheses, field scopes, modifiers and custom queries keep their own boundaries.
+        if (IsImplicitGroup(node) && node.Parent is GroupNode parent && parent.GetOperator(context) is GroupOperator.Or
             && await node.GetQueryAsync().AnyContext() is null)
         {
             return null;
@@ -30,7 +32,7 @@ internal static class RequiredQueryBuilder
         bool hasRequired = false;
         while (pending.TryPop(out var child))
         {
-            if (child is GroupNode group && IsTransparent(group) && group.GetOperator(context) is GroupOperator.Or
+            if (child is GroupNode group && IsImplicitGroup(group) && group.GetOperator(context) is GroupOperator.Or
                 && await group.GetQueryAsync().AnyContext() is null)
             {
                 PushChildren(group);
@@ -54,7 +56,7 @@ internal static class RequiredQueryBuilder
         }
     }
 
-    private static bool IsTransparent(GroupNode node) => !node.HasParens && String.IsNullOrEmpty(node.Field)
+    private static bool IsImplicitGroup(GroupNode node) => !node.HasParens && String.IsNullOrEmpty(node.Field)
         && node.Prefix is null && node.IsNegated is not true && node.Boost is null && node.Proximity is null;
 
     public static async Task<Query> BuildAsync(List<IFieldQueryNode> clauses, Query? initial, IElasticQueryVisitorContext context)
@@ -71,7 +73,8 @@ internal static class RequiredQueryBuilder
             if (query is null)
             {
                 if (child.IsRequired() && !child.IsExcluded())
-                    context.AddValidationError("A required clause did not produce a query: " + child);
+                    context.AddValidationError($"A required clause did not produce a query: {child}");
+
                 continue;
             }
 
@@ -79,6 +82,7 @@ internal static class RequiredQueryBuilder
             if (query.Nested is not { Path: not null } nested || explicitNestedGroup)
             {
                 root.Add(query, child.IsRequired(), child.IsExcluded());
+
                 continue;
             }
 

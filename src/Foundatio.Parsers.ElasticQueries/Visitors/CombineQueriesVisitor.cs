@@ -17,6 +17,8 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
 
+        // Capture the original OR operands before base visits children and caches their queries.
+        // Otherwise generated group queries would be indistinguishable from custom visitor queries.
         var requiredClauses = await RequiredQueryBuilder.GetClausesAsync(node, elasticContext).AnyContext();
         await base.VisitAsync(node, context).AnyContext();
 
@@ -29,6 +31,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (nested is not null && node.Parent is not null)
             container = null;
 
+        // + requires this group in its parent; it must not turn +(a OR b) into +(a AND b).
         var op = node.GetOperator(elasticContext);
         if (requiredClauses is not null)
         {
@@ -54,7 +57,8 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             if (childQuery is null)
             {
                 if (child.IsRequired() && !child.IsExcluded())
-                    context.AddValidationError("A required clause did not produce a query: " + child);
+                    context.AddValidationError($"A required clause did not produce a query: {child}");
+
                 continue;
             }
 

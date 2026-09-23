@@ -232,7 +232,9 @@ result = parser.Parse("-deleted:true");
 result = parser.Parse("+status:active -deleted:true type:user");
 ```
 
-In the default Elasticsearch query builder, `+` requires a clause at its enclosing Boolean scope. With an OR default, `+text:alpha text:gamma` requires `alpha`; `gamma` is optional for matching and contributes to scoring when scoring is enabled. With an AND default, both terms must match. A required group keeps its internal operator: `+(text:alpha OR text:beta)` requires either term, not both. Include expansion preserves the outer required or excluded marker. These execution guarantees apply to Elasticsearch; the AST markers alone do not establish equivalent behavior in other consumers.
+A **clause** is one search condition, such as `status:active`, or a parenthesized group of conditions. **Required** means a returned document must satisfy that condition. For example, with an OR default, `+status:active category:premium` means “show active records; matching premium can improve their ranking.” It must not return an inactive record just because it is premium.
+
+In the default Elasticsearch query builder, `+` requires a clause at its enclosing Boolean scope. With an OR default, `+text:alpha text:gamma` requires `alpha`; `gamma` is optional for matching and contributes to scoring when scoring is enabled. With an AND default, both terms must match. A required group keeps its internal operator: `+(text:alpha OR text:beta)` requires either term, not both. Include expansion preserves the outer required or excluded marker. These execution guarantees apply to Elasticsearch; the AST markers alone do not establish equivalent behavior in other consumers. See the [upgrade guidance](./syntax-compatibility#upgrading-queries-that-use-required-clauses-or-includes) for the changed result sets.
 
 `-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. In query contexts, use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 

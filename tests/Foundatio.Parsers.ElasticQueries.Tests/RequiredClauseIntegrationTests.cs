@@ -187,14 +187,14 @@ public sealed class RequiredClauseIntegrationTests : ElasticsearchTestBase<Requi
         .UseIncludes(new Dictionary<string, string> { { "a", "tags:a" }, { "not-a", "NOT tags:a" } })
         .UseNested());
 
-    private Task<SearchResponse<RequiredClauseFixture.Document>> SearchAsync(Query query) => Client.SearchAsync<RequiredClauseFixture.Document>(descriptor => descriptor
+    private Task<SearchResponse<RequiredClauseFixture.RequiredClauseDocument>> SearchAsync(Query query) => Client.SearchAsync<RequiredClauseFixture.RequiredClauseDocument>(descriptor => descriptor
         .Indices(_fixture.Index)
         .Query(query)
         .Size(100)
         .TrackTotalHits(true)
         .AllowPartialSearchResults(false), TestCancellationToken);
 
-    private void AssertComplete(SearchResponse<RequiredClauseFixture.Document> response)
+    private void AssertComplete(SearchResponse<RequiredClauseFixture.RequiredClauseDocument> response)
     {
         Assert.True(response.IsValidResponse, response.DebugInformation);
         Assert.False(response.TimedOut);

@@ -29,7 +29,7 @@ With an explicit OR default, the following queries illustrate matching behavior 
 | `(text:alpha OR text:beta) AND text:gamma` | `b,c` | `b,c` |
 | `text:alpha OR (text:beta AND text:gamma)` | `a,b,c,l` | `a,b,c,l` |
 
-The first row enforces `alpha` as required in both consumers; `gamma` remains optional for matching and contributes to scoring. Required groups preserve their internal Boolean operator: `+(text:alpha OR text:beta)` requires either term. These guarantees apply to the default Elasticsearch query pipeline.
+In the first row, `+text:alpha` means “the document must contain alpha.” The letters `a`, `b`, `c`, and `l` are document IDs, not query operators. Document `c` contains only `beta gamma`, so it must not appear in the results. Earlier versions incorrectly returned it; [#288](https://github.com/FoundatioFx/Foundatio.Parsers/issues/288) records that defect. The corrected query enforces `alpha` in both consumers; `gamma` remains optional for matching and contributes to scoring. Required groups preserve their internal Boolean operator: `+(text:alpha OR text:beta)` requires either term. These guarantees apply to the default Elasticsearch query pipeline.
 
 The next two rows expose Boolean interpretation differences, not analyzer or scoring differences. Foundatio's `OR NOT` combines a positive condition with a complement; the classic prohibited-clause interpretation excludes `beta` from the whole query at that level. Mixed `AND`/`OR` syntax also needs explicit grouping. Parentheses make the two positive-group examples unambiguous, but are not a universal conversion recipe for required clauses or negated disjunctions. Translate the intended Boolean structure explicitly when moving between consumers, and assert returned document IDs.
 
@@ -146,6 +146,21 @@ Ordering has a separate contract from search queries: `price`, `+price`, and `-p
 
 This is a behavioral breaking change for previously accepted ordering input. Choose an explicit direction when migrating; do not automatically turn ignored aggregation negation into descending order. See [Ordering Operators](./validation#ordering-operators) for validation errors, migration examples, and the limits of raw AST build overloads.
 
+## Upgrading queries that use required clauses or includes
+
+The required-clause fix changes search results without changing public method signatures. Treat it as a behavioral compatibility change when upgrading applications with saved queries:
+
+| Query or condition | Previous behavior | Corrected behavior |
+|---|---|---|
+| `+status:active category:premium` with an OR default | Could return premium records that were not active | Only active records match; premium can increase their score |
+| `+(status:active OR status:pending)` | Could require both alternatives | Either status satisfies the required group |
+| `+@include:active` or `NOT @include:active` | The outer include operator was discarded | The expanded fragment is required or negated as requested |
+| A required clause that produces no Elasticsearch query | Could be silently omitted | Query building reports a validation error |
+
+Replay affected saved queries and compare document IDs and ranking before upgrading. Ordinary queries without these markers retain their existing behavior; the default operator remains AND. Include expansion is shared with other query consumers, including SQL, so review prefixed includes there too. Custom visitors see an extra outer group carrying the include operator; review assumptions about the exact AST shape and configured depth limits. This fix does not establish general equivalence with Lucene or implement the unsupported modifiers listed above.
+
+The required/optional distinction follows [Elasticsearch's Boolean operators](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query) and [bool query](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query): mandatory conditions control which documents match, while optional conditions can improve the score of documents that already qualify.
+
 ## Choosing a portable query
 
 Start with explicit fields, explicit Boolean operators and parentheses, leading negation, and `TO` ranges. For a bare Lucene classic consumer, do not send Elasticsearch-specific existence or comparison syntax, and explicitly account for pure-negative queries. For an Elasticsearch consumer, replace `_missing_` with `NOT _exists_` and expand configured includes first.
@@ -160,6 +175,8 @@ The C# tests in `tests/Foundatio.Parsers.ElasticQueries.Tests` cover these contr
 
 - `SyntaxCompatibilityTests` checks AST values and generated Elasticsearch query objects with in-memory mappings, including escaping, ranges, modifiers, wildcard paths, date-range time zones, and city/ZIP-code resolution.
 - `SyntaxCompatibilityIntegrationTests` runs fixed C# documents and query cases against Elasticsearch. It checks independent expected document IDs for Foundatio and `query_string` in filter and scoring contexts, plus score relationships, ranking, and date boundaries. The fixture explicitly uses standard-analyzed text, keyword, integer, `date`, and `date_nanos` fields.
+
+`RequiredClauseIntegrationTests` uses a separate eight-document fixture containing every combination of three keyword tags. It checks required/optional/excluded combinations against independent expected results, with additional group, include, nested and scoring cases. The small overlap with compatibility examples is intentional: readable examples explain regressions, while the generated permutations check modifier position and Boolean combinations. Existing visitor and SQL test classes cover include parent links, failure recovery, concurrent contexts, and Dynamic LINQ execution and translation.
 
 These tests record both agreements and known limitations. When a runtime fix changes a result, update its expected behavior and this guide together. A passing suite does not establish universal parity across mappings, analyzers, nested queries, aliases, custom visitors, engine versions, or scoring configurations. The C# suite does not execute a standalone Lucene classic parser; Lucene-specific statements rely on the primary references below.
 

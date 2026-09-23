@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -8,6 +9,7 @@ using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Xunit;
 using Xunit;
 
@@ -34,6 +36,45 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     });
 
     public SyntaxCompatibilityTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public async Task ParseAsync_WithConcurrentRequiredIncludes_KeepsContextsIndependent()
+    {
+        // Arrange
+        const int requestCount = 32;
+        int arrived = 0;
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var parser = new ElasticQueryParser(configuration => configuration
+            .UseMappings(_resolver)
+            .UseIncludes(async name =>
+            {
+                if (Interlocked.Increment(ref arrived) is requestCount)
+                    ready.SetResult();
+
+                await ready.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+                return $"keyword:{name}";
+            }));
+
+        // Act
+        var results = await Task.WhenAll(Enumerable.Range(0, requestCount).Select(index => Task.Run(async () =>
+        {
+            var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = index % 2 is 0 };
+            var node = await parser.ParseAsync($"+@include:value{index} keyword:optional", context);
+            return (Index: index, Node: node, Context: context);
+        }, TestCancellationToken)));
+
+        // Assert
+        foreach (var result in results)
+        {
+            Assert.True(result.Context.IsValid(), result.Context.GetValidationResult().Message);
+            Assert.Equal($"value{result.Index}", Assert.Single(result.Context.GetValidationResult().ReferencedIncludes));
+            var root = Assert.IsType<GroupNode>(result.Node);
+            var required = Assert.IsType<GroupNode>(root.Left);
+            Assert.Equal("+", required.Prefix);
+            var included = Assert.IsType<GroupNode>(required.Left);
+            Assert.Equal($"value{result.Index}", Assert.IsType<TermNode>(included.Left).Term);
+        }
+    }
 
     [Theory]
     [InlineData("date:(date~1d @offset:\"-6h\")", "-6h")]

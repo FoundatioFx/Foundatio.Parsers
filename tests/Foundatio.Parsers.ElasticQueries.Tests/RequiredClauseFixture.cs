@@ -9,6 +9,8 @@ using Xunit;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
+// Eight documents cover every combination of three tags; nested values distinguish
+// matches within one child from matches spread across different children.
 public sealed class RequiredClauseFixture : ElasticsearchFixture
 {
     public string Index { get; } = $"required_{Guid.NewGuid():N}";
@@ -35,7 +37,7 @@ public sealed class RequiredClauseFixture : ElasticsearchFixture
     public override async ValueTask InitializeAsync()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        Child[][] children =
+        NestedClauseValue[][] children =
         [
             [],
             [new("a", "x"), new("b", "y")],
@@ -46,7 +48,7 @@ public sealed class RequiredClauseFixture : ElasticsearchFixture
             [new("b", "y")],
             [new("a", "y")]
         ];
-        var documents = Enumerable.Range(0, 8).Select(bits => new Document
+        var documents = Enumerable.Range(0, 8).Select(bits => new RequiredClauseDocument
         {
             Id = bits.ToString(CultureInfo.InvariantCulture),
             Tags = new[] { "a", "b", "c" }.Where((_, bit) => (bits & (1 << bit)) is not 0).ToArray(),
@@ -63,12 +65,12 @@ public sealed class RequiredClauseFixture : ElasticsearchFixture
         Assert.True(refresh.IsValidResponse, refresh.DebugInformation);
     }
 
-    public sealed record Document
+    public sealed record RequiredClauseDocument
     {
         public required string Id { get; init; }
         public string[] Tags { get; init; } = [];
-        public Child[] Children { get; init; } = [];
+        public NestedClauseValue[] Children { get; init; } = [];
     }
 
-    public sealed record Child(string Name, string Value);
+    public sealed record NestedClauseValue(string Name, string Value);
 }

@@ -7,6 +7,8 @@ Query includes (also called macros) allow you to define reusable query fragments
 - Building complex queries from simple building blocks
 - Providing shortcuts for frequently used conditions
 
+In search queries, an operator before an include applies to its entire expanded fragment. For example, if `active` expands to `status:active`, `+@include:active category:premium` requires an active record under an OR default; `NOT @include:active` excludes active records. The outer operator stays separate from operators inside the saved fragment, so negating an already negated include preserves double-negation behavior. See the [upgrade guidance](./syntax-compatibility#upgrading-queries-that-use-required-clauses-or-includes) for the change from previously discarded operators.
+
 ## Basic Usage
 
 ### Syntax
