@@ -159,9 +159,12 @@ public sealed class RequiredClauseIntegrationTests : ElasticsearchTestBase<Requi
         using var resolver = new ElasticMappingResolver(() => RequiredClauseFixture.Mapping);
         var parser = new ElasticQueryParser(configuration => configuration.UseMappings(resolver));
 
+        var referenceClause = new QueryStringQuery(text) { DefaultOperator = op is GroupOperator.And ? Operator.And : Operator.Or };
+        Query referenceQuery = scoring ? referenceClause : new BoolQuery { Filter = [referenceClause] };
+
         // Act
         var native = await SearchAsync(await parser.BuildQueryAsync(text, new ElasticQueryVisitorContext { DefaultOperator = op, UseScoring = scoring }));
-        var reference = await SearchAsync(new QueryStringQuery(text) { DefaultOperator = op is GroupOperator.And ? Operator.And : Operator.Or });
+        var reference = await SearchAsync(referenceQuery);
         string actual = String.Join(',', native.Hits.Select(hit => hit.Id).Order(StringComparer.Ordinal));
         string external = String.Join(',', reference.Hits.Select(hit => hit.Id).Order(StringComparer.Ordinal));
 
@@ -171,7 +174,10 @@ public sealed class RequiredClauseIntegrationTests : ElasticsearchTestBase<Requi
         Assert.Equal(expected, actual);
         Assert.Equal(expected, external);
         if (!scoring)
+        {
             Assert.All(native.Hits, hit => Assert.Equal(0, hit.Score));
+            Assert.All(reference.Hits, hit => Assert.Equal(0, hit.Score));
+        }
     }
 
     private static ElasticQueryParser CreateParser(ElasticMappingResolver resolver) => new(configuration => configuration
