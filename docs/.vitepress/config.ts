@@ -73,7 +73,7 @@ export default withMermaid(defineConfig({
       { icon: 'discord', link: 'https://discord.gg/6HxgFCx' }
     ],
     footer: {
-      message: 'Released under the MIT License.',
+      message: 'Released under the Apache 2.0 License.',
       copyright: 'Copyright © 2026 Foundatio'
     },
     editLink: {

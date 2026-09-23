@@ -102,12 +102,12 @@ var results = await db.Products
 - **Term queries**: `field:value`, `field:"quoted phrase"`
 - **Range queries**: `field:[1 TO 10]`, `field:>100`, `field:>=2024-01-01`
 - **Boolean operators**: `AND`, `OR`, `NOT`, `+`, `-`
-- **Prefix expressions**: `field:val*` (Elasticsearch translation depends on mappings and wildcard options)
+- **Wildcard prefix expressions**: `field:val*` (Elasticsearch translation depends on mappings and wildcard options)
 - **Existence**: `_exists_:field`, `_missing_:field`
 - **Date math**: `created:[now-7d TO now]`
-- **Geo queries**: `location:75044~75mi`
+- **Geo queries**: `location:"New York, NY"~75mi` (with a configured location resolver)
 
-Parsing a syntax form does not guarantee that every backend implements it. In particular, the default Elasticsearch query builder does not implement standalone `?` wildcards, regex queries, fuzzy matching, phrase proximity, or term/phrase boosts. See the compatibility guide before migrating `query_string` expressions.
+Parsing a syntax form does not guarantee that every backend implements it. In particular, the default Elasticsearch query builder does not implement general wildcard matching, regex queries, fuzzy matching, phrase proximity, or term/phrase/group boosts. Required `+` clauses are also not reliably enforced under OR. See the compatibility guide before migrating `query_string` expressions.
 
 [Full Query Syntax Reference](https://parsers.foundatio.dev/guide/query-syntax) | [Syntax Compatibility with Lucene/Elasticsearch](https://parsers.foundatio.dev/guide/syntax-compatibility)
 

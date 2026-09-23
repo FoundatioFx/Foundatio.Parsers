@@ -8,6 +8,7 @@ using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Xunit;
 using Xunit;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
@@ -15,8 +16,24 @@ namespace Foundatio.Parsers.ElasticQueries.Tests;
 // Characterizes the default query pipeline for docs/guide/syntax-compatibility.md.
 // The unsupported modifier cases describe the current limitations tracked in #278,
 // not desired behavior. Update these assertions and the documentation when fixing them.
-public class SyntaxCompatibilityTests
+public class SyntaxCompatibilityTests : TestWithLoggingBase
 {
+    private readonly ElasticMappingResolver _resolver = new(() => new TypeMapping
+    {
+        Properties = new Properties
+            {
+                { "text", new TextProperty() },
+                { "otherText", new TextProperty() },
+                { "keyword", new KeywordProperty() },
+                { "date", new DateProperty() },
+                { "dateNanos", new DateNanosProperty() },
+                { "location", new GeoPointProperty() },
+                { "city", new TextProperty() }
+            }
+    });
+
+    public SyntaxCompatibilityTests(ITestOutputHelper output) : base(output) { }
+
     [Theory]
     [InlineData("field:1..5", "field", "1..5")]
     [InlineData("1..5", null, "1..5")]
@@ -25,8 +42,13 @@ public class SyntaxCompatibilityTests
     [InlineData("first\\ name:Alice", "first name", "Alice")]
     public void Parse_WithOrdinaryTerm_PreservesFieldAndValue(string query, string? field, string value)
     {
+        // Arrange
         var parser = new LuceneQueryParser();
+
+        // Act
         var root = parser.Parse(query);
+
+        // Assert
         var term = Assert.IsType<TermNode>(root.Left);
 
         Assert.Equal(field, term.UnescapedField);
@@ -43,7 +65,13 @@ public class SyntaxCompatibilityTests
     [InlineData("field:{1 .. 5]", false, true)]
     public void Parse_WithBracketedRange_PreservesBounds(string query, bool minInclusive, bool maxInclusive)
     {
-        var root = new LuceneQueryParser().Parse(query);
+        // Arrange
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var root = parser.Parse(query);
+
+        // Assert
         var range = Assert.IsType<TermRangeNode>(root.Left);
 
         Assert.Equal("field", range.Field);
@@ -60,7 +88,14 @@ public class SyntaxCompatibilityTests
     [InlineData("field:NOT [1 TO 5]")]
     public void Parse_WithUnsupportedSyntax_ThrowsFormatException(string query)
     {
-        Assert.Throws<FormatException>(() => new LuceneQueryParser().Parse(query));
+        // Arrange
+        var parser = new LuceneQueryParser();
+
+        // Act
+        Action parse = () => parser.Parse(query);
+
+        // Assert
+        Assert.Throws<FormatException>(parse);
     }
 
     [Theory]
@@ -70,7 +105,13 @@ public class SyntaxCompatibilityTests
     [InlineData("text:/foo.bar/", null, null, false, true)]
     public void Parse_WithModifier_PreservesAstMetadata(string query, string? proximity, string? boost, bool quoted, bool regex)
     {
-        var root = new LuceneQueryParser().Parse(query);
+        // Arrange
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var root = parser.Parse(query);
+
+        // Assert
         var term = Assert.IsType<TermNode>(root.Left);
 
         Assert.Equal(proximity, term.Proximity);
@@ -89,7 +130,13 @@ public class SyntaxCompatibilityTests
     [InlineData("text:value^2", "text", "value")]
     public async Task BuildQueryAsync_WithTextTerm_EmitsMatchWithoutModifiers(string query, string field, string value)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, query);
+
+        // Assert
         var match = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("match", match.Name);
@@ -109,7 +156,13 @@ public class SyntaxCompatibilityTests
     [InlineData("keyword:value^2", "value")]
     public async Task BuildQueryAsync_WithKeywordTerm_EmitsTermWithoutModifiers(string query, string value)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, query);
+
+        // Assert
         var term = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("term", term.Name);
@@ -123,7 +176,13 @@ public class SyntaxCompatibilityTests
     [InlineData("text:\"a b\"^2")]
     public async Task BuildQueryAsync_WithPhraseModifier_EmitsMatchPhraseWithoutSlopOrBoost(string query)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, query);
+
+        // Assert
         var phrase = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("match_phrase", phrase.Name);
@@ -141,7 +200,13 @@ public class SyntaxCompatibilityTests
     [InlineData("john*", "john*")]
     public async Task BuildQueryAsync_WithAnalyzedTrailingStar_EmitsExplicitWildcardOptions(string query, string value)
     {
-        using var json = await BuildQueryJsonAsync(query, ["text", "otherText"]);
+        // Arrange
+        var parser = CreateParser(["text", "otherText"]);
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, query);
+
+        // Assert
         var queryString = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("query_string", queryString.Name);
@@ -159,7 +224,13 @@ public class SyntaxCompatibilityTests
     [InlineData("keyword:john\\*", "john")]
     public async Task BuildQueryAsync_WithKeywordTrailingStar_EmitsLiteralPrefix(string query, string value)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, query);
+
+        // Assert
         var prefix = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("prefix", prefix.Name);
@@ -172,7 +243,14 @@ public class SyntaxCompatibilityTests
     [InlineData("date", "2")]
     public async Task BuildQueryAsync_WithDateRangeCaret_EmitsTimeZoneNotBoost(string field, string timeZone)
     {
-        using var json = await BuildQueryJsonAsync($"{field}:[2024-01-01 TO *]^\"{timeZone}\"");
+        // Arrange
+        var parser = CreateParser();
+        string query = $"{field}:[2024-01-01 TO *]^\"{timeZone}\"";
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, query);
+
+        // Assert
         var range = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("range", range.Name);
@@ -185,33 +263,147 @@ public class SyntaxCompatibilityTests
     [Fact]
     public async Task BuildQueryAsync_WithoutDefaultFields_DoesNotUseTrailingStarQueryStringPath()
     {
-        using var json = await BuildQueryJsonAsync("john*");
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, "john*");
+
+        // Assert
         var multiMatch = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("multi_match", multiMatch.Name);
         Assert.Equal("john*", multiMatch.Value.GetProperty("query").GetString());
     }
 
-    private static async Task<JsonDocument> BuildQueryJsonAsync(string query, string[]? defaultFields = null)
+    [Fact]
+    public async Task BuildQueryAsync_WithQuotedCity_ResolvesWholeNameAndBuildsGeoDistance()
     {
-        using var resolver = new ElasticMappingResolver(() => new TypeMapping
+        // Arrange
+        string? resolvedLocation = null;
+        var parser = new ElasticQueryParser(c => c.UseMappings(_resolver).UseGeo(location =>
         {
-            Properties = new Properties
-            {
-                { "text", new TextProperty() },
-                { "otherText", new TextProperty() },
-                { "keyword", new KeywordProperty() },
-                { "date", new DateProperty() },
-                { "dateNanos", new DateNanosProperty() }
-            }
-        });
-        var parser = new ElasticQueryParser(c =>
+            resolvedLocation = location;
+            return "40.7128,-74.0060";
+        }));
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, "location:\"New York, NY\"~75mi");
+
+        // Assert
+        Assert.Equal("New York, NY", resolvedLocation);
+        var geo = json.RootElement.GetProperty("geo_distance");
+        Assert.Equal("75mi", geo.GetProperty("distance").GetString());
+        Assert.Equal("40.7128,-74.0060", geo.GetProperty("location").GetString());
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithQuotedFieldGroup_PreservesPhraseAndFieldScope()
+    {
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, "city:(\"New York\" OR Madison)");
+
+        // Assert
+        var clauses = json.RootElement.GetProperty("bool").GetProperty("should");
+        Assert.Equal(2, clauses.GetArrayLength());
+        Assert.Equal("New York", clauses[0].GetProperty("match_phrase").GetProperty("city").GetProperty("query").GetString());
+        Assert.Equal("Madison", clauses[1].GetProperty("match").GetProperty("city").GetProperty("query").GetString());
+    }
+
+    [Fact]
+    public async Task BuildQueryAsync_WithCoordinateBounds_DoesNotInvokeCityResolver()
+    {
+        // Arrange
+        bool resolverCalled = false;
+        var parser = new ElasticQueryParser(c => c.UseMappings(_resolver).UseGeo(location =>
         {
-            c.UseMappings(resolver);
+            resolverCalled = true;
+            return location;
+        }));
+
+        // Act
+        using var json = await BuildQueryJsonAsync(parser, "location:[40.92,-74.26 TO 40.49,-73.70]");
+
+        // Assert
+        Assert.False(resolverCalled);
+        var bounds = json.RootElement.GetProperty("geo_bounding_box").GetProperty("location");
+        Assert.Equal("40.92,-74.26", bounds.GetProperty("top_left").GetString());
+        Assert.Equal("40.49,-73.70", bounds.GetProperty("bottom_right").GetString());
+    }
+
+    [Theory]
+    [InlineData(' ')]
+    [InlineData('+')]
+    [InlineData('-')]
+    [InlineData('!')]
+    [InlineData('(')]
+    [InlineData(')')]
+    [InlineData('{')]
+    [InlineData('}')]
+    [InlineData('[')]
+    [InlineData(']')]
+    [InlineData('^')]
+    [InlineData('"')]
+    [InlineData('~')]
+    [InlineData('*')]
+    [InlineData('?')]
+    [InlineData(':')]
+    [InlineData('\\')]
+    [InlineData('/')]
+    public void Parse_WithDocumentedEscape_PreservesLiteralFieldAndTerm(char character)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+        string query = $"before\\{character}after:before\\{character}after";
+
+        // Act
+        var root = parser.Parse(query);
+
+        // Assert
+        var term = Assert.IsType<TermNode>(root.Left);
+        Assert.Equal($"before{character}after", term.UnescapedField);
+        Assert.Equal($"before{character}after", term.UnescapedTerm);
+        Assert.Null(root.Right);
+    }
+
+    [Theory]
+    [InlineData('.')]
+    [InlineData('&')]
+    [InlineData('|')]
+    [InlineData('=')]
+    [InlineData('<')]
+    [InlineData('>')]
+    public void Parse_WithUnsupportedEscape_ThrowsFormatException(char character)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+        string query = $"field:before\\{character}after";
+
+        // Act
+        Action parse = () => parser.Parse(query);
+
+        // Assert
+        Assert.Throws<FormatException>(parse);
+    }
+
+    private ElasticQueryParser CreateParser(string[]? defaultFields = null) => new(c =>
+        {
+            c.UseMappings(_resolver);
             if (defaultFields is not null)
                 c.SetDefaultFields(defaultFields);
         });
 
+    public override ValueTask DisposeAsync()
+    {
+        _resolver.Dispose();
+        return base.DisposeAsync();
+    }
+
+    private static async Task<JsonDocument> BuildQueryJsonAsync(ElasticQueryParser parser, string query)
+    {
         // Scoring mode prevents a filter wrapper from hiding missing score modifiers.
         var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
         using var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));

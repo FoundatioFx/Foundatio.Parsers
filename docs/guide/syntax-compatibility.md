@@ -10,7 +10,7 @@ This page describes known differences in the default `ElasticQueryParser` query 
 
 Foundatio's default query operator is **AND**; Elasticsearch `query_string` and bare Lucene classic default to **OR**. Configure the operator explicitly when migrating fieldless or adjacent terms. Matching that setting does not remove the other differences below.
 
-The live comparison corpus includes these standard-analyzed documents:
+The C# integration tests include these standard-analyzed documents:
 
 | ID | `text` |
 |----|--------|
@@ -19,9 +19,9 @@ The live comparison corpus includes these standard-analyzed documents:
 | `c` | `beta gamma` |
 | `l` | `alpha` |
 
-With an explicit OR default, the following queries differ even though all three parsers accept them. The IDs in this table refer only to these four documents:
+With an explicit OR default, the following queries differ even though both parsers accept them. The IDs in this table refer only to these four documents:
 
-| Query | Foundatio | Elasticsearch `query_string` / Lucene classic |
+| Query | Foundatio | Elasticsearch `query_string` |
 |-------|-----------|----------------------------------------------|
 | `+text:alpha text:gamma` | `a,b,c,l` | `a,b,l` |
 | `text:alpha OR NOT text:beta` | `a,b,l` | `l` |
@@ -67,11 +67,11 @@ These are query-generation limitations, not recommendations to remove support fr
 
 ### Matching and scoring are separate contracts
 
-The live scoring controls show that `^8` on a term, phrase, or parenthesized disjunction leaves Foundatio's scores unchanged. Elasticsearch `query_string` and bare Lucene classic apply an eightfold multiplier in the corresponding controls. In the full corpus, `text:alpha^8 OR text:gamma` reverses the relative ranking of documents `a` and `c` in the reference parsers, but not in Foundatio. Group boosts therefore need the same caution as term and phrase boosts.
+The live scoring controls show that `^8` on a term, phrase, or parenthesized disjunction leaves Foundatio's scores unchanged. Elasticsearch `query_string` applies an eightfold multiplier in these controls. In the full corpus, `text:alpha^8 OR text:gamma` reverses the relative ranking of documents `a` and `c` in Elasticsearch `query_string`, but not in Foundatio. Group boosts therefore need the same caution as term and phrase boosts.
 
 `UseScoring = false` intentionally builds filter-context queries. Compare their document sets with a reference query in filter context; do not expect relevance scores to equal a scoring query. The integration tests separately check zero filter scores, matching document IDs, score equivalence for selected unmodified queries on the same Elasticsearch index, and the boost/ranking differences above.
 
-Raw score equality across independently built Lucene and Elasticsearch indexes is not the compatibility contract of this suite. The Java runner checks its own boost and ranking invariants. Cross-engine raw scores may depend on similarity implementation, indexed statistics, and query rewriting; applications needing ranking equivalence must specify and test that contract explicitly.
+The score comparisons use the same Elasticsearch index. They do not establish raw-score equality with a separately built Lucene index: similarity, indexed statistics, and query rewriting can affect scores.
 
 ### Wildcards depend on the generated query path
 
@@ -86,7 +86,7 @@ The default builder tests whether the **unescaped, unquoted term ends in `*`**. 
 | `field:jo?n*` | `query_string` for `jo?n*` | `prefix` for the literal prefix `jo?n` |
 | `field:john\*` | Also takes the trailing-star path after unescaping | Also builds a `prefix` for `john` |
 
-Thus `?` alone is not a single-character wildcard in generated queries. Embedded or leading wildcards without a final `*` are not wildcard queries either. Escaping a trailing star does not reliably preserve literal-star semantics through this builder.
+Thus `?` alone is not a single-character wildcard in generated queries. Embedded or leading wildcards without a final `*` are not wildcard queries either. Escaping a trailing star does not reliably preserve literal-star semantics through this builder. [Issue #289](https://github.com/FoundatioFx/Foundatio.Parsers/issues/289) tracks wildcard and escaped-literal translation.
 
 For the analyzed trailing-star path, Foundatio sets `analyze_wildcard: true` and `allow_leading_wildcard: false`. Elasticsearch `query_string` defaults are `false` and `true`, respectively. Analyzer tokenization can therefore change results even for a trailing-star input. Align those options, mappings, analyzers, and default fields before comparing results; matching the spelling alone is insufficient. See [query_string wildcard options](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query#query-string-wildcard).
 
@@ -112,11 +112,11 @@ A numeric caret value such as `^2` is also assigned to `time_zone` on this path,
 | `field:-value`, `field:NOT value`, `field:-(a OR b)` | Legacy post-colon operator forms accepted by this grammar | Write `-field:value`, `NOT field:value`, or `-field:(a OR b)` instead |
 | `field:-[1 TO 5]`, `field:NOT [1 TO 5]` | Parse rejection | Put the operator before the field: `-field:[1 TO 5]` |
 | `field\.with\.dots:value` | Parse rejection; dot is not an allowed backslash escape | Write `field.with.dots:value` |
-| `location:75044~75mi` | Geographic distance syntax when the geo visitor and resolver are configured | Use an explicit Elasticsearch geo query, not a fuzzy `query_string` expression |
+| `location:"New York, NY"~75mi` | Geographic distance syntax with a `geo_point` mapping, geo visitor, and city resolver | Use an explicit Elasticsearch geo query, not a fuzzy `query_string` expression |
 
 `LuceneQueryParser.Parse` reports the rejected grammar examples as `FormatException`; the public `ElasticQueryParser.BuildQueryAsync` API reports query validation failures as `QueryValidationException`. A backend request rejection is a third, separate outcome. Do not conflate these with transport or service failures.
 
-The post-colon inconsistency is not a syntax pattern to adopt. [#272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272#issuecomment-5701649902) records the decision to reject post-colon operators consistently rather than extend them to ranges. Use leading operators now. An operator inside a field-scoped group, such as `field:(-value)`, is a different case.
+Use leading operators for consistent syntax. The current grammar accepts post-colon operators for terms and groups but rejects them before ranges. [Issue #272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272) tracks removing those legacy forms. An operator inside a field-scoped group, such as `field:(-value)`, is a different case.
 
 ### Bare dots do not make a range
 
@@ -150,14 +150,11 @@ Finally, compare **both the generated query and returned documents** under the a
 
 ## Verification and maintenance
 
-`SyntaxCompatibilityTests` in `tests/Foundatio.Parsers.ElasticQueries.Tests` provides 47 AST and serialized-query characterization cases using in-memory mappings. `SyntaxCompatibilityIntegrationTests` adds live document and scoring checks over the shared corpus in `tests/compatibility`: 59 query cases in both filter and scoring modes, plus 11 score/ranking/time-zone checks. Each case has independent expected document IDs rather than merely asserting that two engines agree.
+The C# tests in `tests/Foundatio.Parsers.ElasticQueries.Tests` cover these contracts at two levels:
 
-The `Syntax compatibility` workflow targets Elasticsearch **8.19.0** and **9.5.0**. `LuceneCompatibility.java` runs against the exact Lucene jars and JDK bundled with each server. It checks 46 applicable query cases and four boost/ranking controls. Thirteen numeric/date cases are explicitly mapping-specific: bare Lucene classic has no Elasticsearch mapping layer, so the runner does not substitute a lexical comparison and call it numeric/date compatibility.
+- `SyntaxCompatibilityTests` checks AST values and generated Elasticsearch query JSON with in-memory mappings, including escaping, ranges, modifiers, wildcard paths, date-range time zones, and quoted city resolution.
+- `SyntaxCompatibilityIntegrationTests` runs fixed C# documents and query cases against Elasticsearch. It checks independent expected document IDs for Foundatio and `query_string` in filter and scoring contexts, plus score relationships, ranking, and date boundaries. The fixture explicitly uses standard-analyzed text, keyword, integer, `date`, and `date_nanos` fields.
 
-Engine versions, Lucene outcomes, and live C# test results are retained as workflow artifacts. The workflow verifies that every expected C# case executed and passed, rather than accepting an empty filtered run. See the [corpus README](https://github.com/FoundatioFx/Foundatio.Parsers/blob/main/tests/compatibility/README.md) for configuration, reproduction, and maintenance instructions.
+These tests record both agreements and known limitations. When a runtime fix changes a result, update its expected behavior and this guide together. A passing suite does not establish universal parity across mappings, analyzers, nested queries, aliases, custom visitors, engine versions, or scoring configurations. The C# suite does not execute a standalone Lucene classic parser; Lucene-specific statements rely on the primary references below.
 
-These are **characterization tests**, including known defects and intentional differences, not a universal parity certification. A green run means the recorded contracts still hold; it does not mean every row has the same result across engines. When fixing a defect, update its expectations and these docs together. Additional analyzers, nested mappings, aliases, visitors, distributed scoring, date-math/DST boundaries, performance limits, and newly supported engine versions require their own coverage.
-
-Primary references: [Elasticsearch query_string](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query), [Lucene classic QueryParser](https://lucene.apache.org/core/10_3_1/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html), and [Lucene's classic grammar](https://github.com/apache/lucene/blob/main/lucene/queryparser/src/java/org/apache/lucene/queryparser/classic/QueryParser.jj). The local implementation is in `LuceneQueryParser.peg`, `Visitors/CombineQueriesVisitor.cs`, and `Extensions/DefaultQueryNodeExtensions.cs`.
-
-Related work: [#271](https://github.com/FoundatioFx/Foundatio.Parsers/issues/271) tracks this documentation, [#278](https://github.com/FoundatioFx/Foundatio.Parsers/issues/278) tracks missing query modifiers, [#288](https://github.com/FoundatioFx/Foundatio.Parsers/issues/288) tracks required clauses, and [#272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272) tracks post-colon syntax. Sorting and aggregation operator behavior is a separate concern tracked in [#273](https://github.com/FoundatioFx/Foundatio.Parsers/issues/273).
+Primary references: [Elasticsearch query_string](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query), [Elasticsearch exists](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-exists-query), [Lucene classic QueryParser](https://lucene.apache.org/core/10_3_1/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html), and [Lucene's classic grammar](https://github.com/apache/lucene/blob/main/lucene/queryparser/src/java/org/apache/lucene/queryparser/classic/QueryParser.jj). Foundatio's behavior is defined by `LuceneQueryParser.peg`, `Visitors/CombineQueriesVisitor.cs`, and `Extensions/DefaultQueryNodeExtensions.cs`.

@@ -229,12 +229,12 @@ result = parser.Parse("+status:active -deleted:true type:user");
 ```
 
 ::: warning Required clauses are not reliably enforced
-Under an OR default, the default Elasticsearch builder treats `+text:alpha text:gamma` as optional alternatives and can return documents without `alpha`. This is a result-set defect tracked in [#288](https://github.com/FoundatioFx/Foundatio.Parsers/issues/288), not merely a scoring difference. Until fixed, do not rely on `+` for mandatory conditions; explicitly construct the required backend clauses or reject unsupported input. A successful parse or validation does not enforce the marker.
+Under an OR default, the default Elasticsearch builder treats `+text:alpha text:gamma` as optional alternatives and can return documents without `alpha`. This changes which documents match. [Issue #288](https://github.com/FoundatioFx/Foundatio.Parsers/issues/288) tracks the fix. Until fixed, do not rely on `+` for mandatory conditions; explicitly construct the required backend clauses or reject unsupported input. A successful parse or validation does not enforce the marker.
 :::
 
 `-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. In query contexts, use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 
-Write clause operators before the field name, with symbolic prefixes attached: `-field:value`, `!field:value`, or `NOT field:value`. Legacy post-colon forms such as `field:-value` and `field:-(value)` are currently accepted for terms and groups, but not ranges: `field:-[1 TO 2]` and `field:NOT [1 TO 2]` throw `FormatException` from `LuceneQueryParser.Parse` (`QueryValidationException` from `ElasticQueryParser.BuildQueryAsync`). The decision in [#272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272#issuecomment-5701649902) is to reject post-colon operators consistently, not to extend them. Migrate to leading operators; `field:(-value)` remains a distinct, field-scoped clause form.
+Write clause operators before the field name, with symbolic prefixes attached: `-field:value`, `!field:value`, or `NOT field:value`. Legacy post-colon forms such as `field:-value` and `field:-(value)` are currently accepted for terms and groups, but not ranges: `field:-[1 TO 2]` and `field:NOT [1 TO 2]` throw `FormatException` from `LuceneQueryParser.Parse` (`QueryValidationException` from `ElasticQueryParser.BuildQueryAsync`). Use leading operators for consistent syntax. [Issue #272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272) tracks removing the legacy post-colon forms; `field:(-value)` remains a distinct, field-scoped clause form.
 
 ## Grouping
 
@@ -255,7 +255,12 @@ Apply a field to multiple values:
 ```csharp
 // Field applies to all terms in group
 var result = parser.Parse("status:(active OR pending OR review)");
+
+// A quoted multiword value remains one clause in the group
+result = parser.Parse("city:(\"New York\" OR Madison)");
 ```
+
+On an analyzed text field, `"New York"` is a phrase; on a keyword field it is a single literal value. This ordinary field grouping does not perform geographic resolution.
 
 ## Date Math
 
@@ -327,50 +332,64 @@ Where:
 
 ### Examples
 
+Quote a location containing spaces so it remains one value:
+
+```text
+location:"New York, NY"~75mi
+```
+
+This means within 75 miles of the point returned by the application's resolver for `New York, NY`. It does not search the city's administrative boundary or geocode the name automatically.
+
 ```csharp
-// Within 75 miles of a geohash
-var result = parser.Parse("location:u4pruydqqv~75mi");
+// Parse a quoted city name; the quotes are escaped inside a C# string
+var result = parser.Parse("location:\"New York, NY\"~75mi");
 
-// Within 75 miles of a zip code (requires geo resolver)
-result = parser.Parse("location:75044~75mi");
-
-// Within 10 kilometers
-result = parser.Parse("location:51.5,-0.1~10km");
+// Coordinates can be supplied directly (latitude, longitude)
+result = parser.Parse("location:40.7128,-74.0060~10km");
 ```
 
 ### Configuration
 
-Geo queries require a location resolver:
+Elasticsearch geo-distance queries require a field mapped as `geo_point` and the geo visitor enabled through `UseGeo`. Place names also need an application-provided resolver. This example supplies an in-memory mapping and a deterministic city lookup:
 
 ```csharp
+using System;
+using Elastic.Clients.Elasticsearch.Mapping;
+using Foundatio.Parsers.ElasticQueries;
+
+using var mappings = new ElasticMappingResolver(() => new TypeMapping
+{
+    Properties = new Properties
+    {
+        { "location", new GeoPointProperty() }
+    }
+});
+
 var parser = new ElasticQueryParser(c => c
-    .UseGeo(location => {
-        // Resolve location string to coordinates
-        if (location == "75044")
-            return "32.9,-96.8";
-        return location;
-    }));
+    .UseMappings(mappings)
+    .UseGeo(location => location == "New York, NY"
+        ? "40.7128,-74.0060"
+        : throw new ArgumentException("Unknown location", nameof(location))));
+
+var query = await parser.BuildQueryAsync("location:\"New York, NY\"~75mi");
 ```
+
+The resolver receives `New York, NY` without the surrounding quotes. In an application, use the actual index mappings and a resolver that handles the inputs you support, including coordinates or geohashes if offered. The example's in-memory mapping informs query generation; it does not create an Elasticsearch index.
 
 ## Geo Range Queries
 
-Filter documents within a geographic bounding box.
+Filter documents within a geographic bounding box using the top-left and bottom-right coordinates:
 
-### Syntax
-
-```
+```text
 geofield:[topLeft TO bottomRight]
 ```
 
-### Examples
-
 ```csharp
-// Bounding box with geohashes
-var result = parser.Parse("location:[u4pruydqqv TO u4pruydr2n]");
-
-// Bounding box with coordinates
-result = parser.Parse("location:[51.5,-0.2 TO 51.4,-0.1]");
+// Approximate rectangle around New York City, in latitude,longitude order
+var result = parser.Parse("location:[40.92,-74.26 TO 40.49,-73.70]");
 ```
+
+The field must be mapped as `geo_point` and the geo visitor enabled to generate an Elasticsearch bounding-box query. Bounds accept coordinates or geohashes directly; the range visitor does not resolve city names. The rectangle is illustrative, not an exact city boundary.
 
 ## Nested Document Queries
 
@@ -441,7 +460,7 @@ The ordinary term/field escape rule accepts a literal space and these characters
 + - ! ( ) { } [ ] ^ " ~ * ? : \ /
 ```
 
-Do not copy Elasticsearch's entire reserved-character list into an escaping function for this parser. For example, `field\.with\.dots:value` fails because `.` is not an allowed escape; write `field.with.dots:value`. A supported grammar escape also does not guarantee that a query builder preserves literal wildcard semantics; see [Wildcard Queries](#wildcard-queries).
+Do not copy Elasticsearch's entire reserved-character list into an escaping function for this parser. For example, `field\.with\.dots:value` fails because `.` is not an allowed escape; write `field.with.dots:value`. Backslash escapes for `&`, `|`, `=`, `<`, and `>` are also unsupported by this ordinary escape rule. Quoted strings and regex bodies have their own grammar rules. A supported grammar escape also does not guarantee that a query builder preserves literal wildcard semantics; see [Wildcard Queries](#wildcard-queries).
 
 ```csharp
 // Escape colon in value (the C# string needs a second backslash)

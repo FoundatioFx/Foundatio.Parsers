@@ -1,7 +1,4 @@
 using System;
-using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
@@ -32,26 +29,21 @@ public sealed class SyntaxCompatibilityFixture : ElasticsearchFixture
     public override async ValueTask InitializeAsync()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        var lines = await File.ReadAllLinesAsync(CorpusPath("documents.tsv"), timeout.Token);
-        var documents = lines.Where(line => !line.StartsWith('#') && !String.IsNullOrWhiteSpace(line))
-            .Select(line =>
-            {
-                var values = line.Split('\t');
-                Assert.Equal(6, values.Length);
-                DateTimeOffset? date = values[5] == "-" ? null : DateTimeOffset.Parse(values[5], CultureInfo.InvariantCulture);
-                return new Document
-                {
-                    Id = values[0].Trim(),
-                    Text = values[1] == "-" ? null : values[1],
-                    OtherText = values[2] == "-" ? null : values[2],
-                    Keyword = values[3] == "-" ? null : values[3],
-                    Number = Int32.Parse(values[4], CultureInfo.InvariantCulture),
-                    Date = date,
-                    DateNanos = date
-                };
-            }).ToArray();
-        Assert.Equal(12, documents.Length);
-        Assert.Equal(documents.Length, documents.Select(document => document.Id).Distinct(StringComparer.Ordinal).Count());
+        Document[] documents =
+        [
+            new() { Id = "a", Text = "alpha beta", OtherText = "gamma", Keyword = "john", Number = 1, Date = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero) },
+            new() { Id = "b", Text = "alpha gamma beta", OtherText = "beta", Keyword = "joan", Number = 3, Date = new DateTimeOffset(2024, 1, 1, 5, 59, 59, TimeSpan.Zero) },
+            new() { Id = "c", Text = "beta gamma", OtherText = "alpha", Keyword = "jo?n", Number = 5, Date = new DateTimeOffset(2024, 1, 1, 6, 0, 0, TimeSpan.Zero) },
+            new() { Id = "d", Text = "alphabet soup", OtherText = "beta", Keyword = "johnny", Number = 9, Date = new DateTimeOffset(2024, 1, 2, 6, 0, 0, TimeSpan.Zero) },
+            new() { Id = "e", Text = "foo bar", OtherText = "delta", Keyword = "1..5", Number = 7, Date = null },
+            new() { Id = "f", Text = "foobar", OtherText = "delta", Keyword = "val.test", Number = 2, Date = new DateTimeOffset(2023, 12, 31, 0, 0, 0, TimeSpan.Zero) },
+            new() { Id = "g", Text = "brown fox", OtherText = "delta", Keyword = "value", Number = 4, Date = new DateTimeOffset(2024, 1, 3, 0, 0, 0, TimeSpan.Zero) },
+            new() { Id = "h", Text = "quick brown fox", OtherText = "alpha", Keyword = "[0-9]+", Number = 6, Date = new DateTimeOffset(2024, 1, 4, 0, 0, 0, TimeSpan.Zero) },
+            new() { Id = "i", Text = null, OtherText = null, Keyword = null, Number = 8, Date = null },
+            new() { Id = "j", Text = "literal", OtherText = "gamma", Keyword = "john*", Number = 10, Date = new DateTimeOffset(2024, 1, 5, 0, 0, 0, TimeSpan.Zero) },
+            new() { Id = "k", Text = "value", OtherText = "gamma", Keyword = "jo?nny", Number = 0, Date = new DateTimeOffset(2024, 1, 6, 0, 0, 0, TimeSpan.Zero) },
+            new() { Id = "l", Text = "alpha", OtherText = "gamma", Keyword = "ALPHA", Number = -1, Date = new DateTimeOffset(2024, 1, 7, 0, 0, 0, TimeSpan.Zero) },
+        ];
 
         await CreateIndexAsync(Index, descriptor => descriptor
             .Settings(settings => settings.NumberOfShards(1).NumberOfReplicas(0))
@@ -62,8 +54,6 @@ public sealed class SyntaxCompatibilityFixture : ElasticsearchFixture
         Assert.True(refresh.IsValidResponse, refresh.DebugInformation);
     }
 
-    public static string CorpusPath(string name) => Path.Combine(AppContext.BaseDirectory, "Compatibility", name);
-
     public sealed class Document
     {
         public string Id { get; set; } = String.Empty;
@@ -72,6 +62,6 @@ public sealed class SyntaxCompatibilityFixture : ElasticsearchFixture
         public string? Keyword { get; set; }
         public int Number { get; set; }
         public DateTimeOffset? Date { get; set; }
-        public DateTimeOffset? DateNanos { get; set; }
+        public DateTimeOffset? DateNanos => Date;
     }
 }

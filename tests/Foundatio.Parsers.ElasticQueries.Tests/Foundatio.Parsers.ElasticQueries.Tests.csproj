@@ -6,6 +6,5 @@
     <Content Include="..\..\docker-compose.yml">
       <Link>docker-compose.yml</Link>
     </Content>
-    <Content Include="..\compatibility\*.tsv" Link="Compatibility\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
