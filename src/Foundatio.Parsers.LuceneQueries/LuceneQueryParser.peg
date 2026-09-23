@@ -115,11 +115,9 @@ field_exp<IQueryNode>
     }}
   / not:not_exp? name:fieldname node:paren_exp
     {{
-        // paren_exp may have already recorded a NOT or a prefix that was written after the colon,
-        // as in field:NOT (value) or field:-(value), so combine with it rather than overwrite it.
-        node.IsNegated = not.Any() || node.IsNegated == true;
+        node.IsNegated = not.Any();
         node.Field = name.Field;
-        node.Prefix = name.Prefix ?? node.Prefix;
+        node.Prefix = name.Prefix;
 
         return node;
     }}
@@ -141,7 +139,7 @@ field_exp<IQueryNode>
     }}
 
 fieldname<FieldInfo> -lexical
-  = op:prefix_operator_exp? fieldname:name_term _* ':' _*
+  = op:prefix_operator_exp? fieldname:name_term _* ':' _* (!(not_exp / prefix_operator) / #error{ "Place '+', '-', '!', or 'NOT' before the field name, not after ':'. Quote or escape literal values." })
     {{
         var result = new FieldInfo { Field = fieldname };
 

@@ -243,7 +243,7 @@ Date histogram aggregation for time-series data.
 | `~` | Interval: `year`, `quarter`, `month`, `week`, `day`, `hour`, `minute`, `second`, or duration (`1h`, `30m`, `1d`) |
 | `^` | Timezone (e.g., `+01:00`, `America/Los_Angeles`) |
 | `@missing` | Value for missing documents |
-| `@offset` | Bucket offset (e.g., `+6h`, `-1d`) |
+| `@offset` | Bucket offset; quote signed values (e.g., `@offset:"+6h"`, `@offset:"-1d"`) |
 
 ```
 date:field

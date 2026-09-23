@@ -372,7 +372,7 @@ Visitors that rewrite the tree (`InvertNegation`, `CleanupQueryVisitor`) also se
 
 The split between the two properties is intentional: keeping the operator that was actually written means `GenerateQueryVisitor` and `ToString()` re-emit `-value` as `-value` rather than rewriting it to `NOT value`. As a result, `IsNegated` alone is never a complete negation check.
 
-Round-tripping preserves the operator, not always its position. A prefix or `NOT` written inside a scoped field group is re-emitted in the canonical leading position, so `field:-(value)` renders as `-field:(value)` and `field:NOT (value)` as `NOT field:(value)`. These are semantically equivalent.
+Write operators before the field name: `-field:(value)` and `NOT field:(value)`. Post-colon operators such as `field:-(value)` and `field:NOT (value)` are parse errors; see the [breaking syntax correction](./query-syntax.md#breaking-syntax-correction-operator-placement). Operators inside a scoped group, such as `field:(-value)`, still belong to the inner clause and remain valid.
 
 In query contexts, use the extension methods instead of inspecting the properties directly:
 

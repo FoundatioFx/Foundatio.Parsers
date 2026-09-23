@@ -238,7 +238,24 @@ Under an OR default, the default Elasticsearch builder treats `+text:alpha text:
 
 `-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. In query contexts, use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 
-Write clause operators before the field name, with symbolic prefixes attached: `-field:value`, `!field:value`, or `NOT field:value`. Legacy post-colon forms such as `field:-value` and `field:-(value)` are currently accepted for terms and groups, but not ranges: `field:-[1 TO 2]` and `field:NOT [1 TO 2]` throw `FormatException` from `LuceneQueryParser.Parse` (`QueryValidationException` from `ElasticQueryParser.BuildQueryAsync`). Use leading operators for consistent syntax. [Issue #272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272) tracks removing the legacy post-colon forms; `field:(-value)` remains a distinct, field-scoped clause form.
+Write clause operators before the field name, with symbolic prefixes attached: `+field:value`, `-field:value`, `!field:value`, or `NOT field:value`. Operators immediately after the colon are rejected consistently for terms, groups, and ranges. Operators inside a field-scoped group, such as `field:(-value)` or `field:(NOT value)`, remain valid and apply to the inner clause.
+
+### Breaking syntax correction: operator placement
+
+Following [the decision in issue #272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272#issuecomment-5701649902), previously accepted post-colon terms and groups now produce a parse error. Update saved queries and query generators before upgrading; this correction requires a breaking-change release.
+
+| Rejected input | Replacement |
+|---|---|
+| `field:-value` | `-field:value` |
+| `field:+value` | `+field:value` |
+| `field:!value` | `!field:value` |
+| `field:NOT value` | `NOT field:value` |
+| `field:-(a OR b)` | `-field:(a OR b)` |
+| `field:NOT [1 TO 2]` | `NOT field:[1 TO 2]` |
+
+For literal values, preserve the value by quoting or escaping it: `field:"-value"`, `field:\-value`, or `field:"NOT value"`. Do not move a literal sign before the field. Signed range endpoints remain valid, for example `field:[-5 TO -1]` and `field:>=-5`. Signed aggregation option values also need quotes, for example `@offset:"-6h"`.
+
+`LuceneQueryParser.Parse` throws `FormatException` with a cursor and a message directing callers to put the operator before the field name. Elasticsearch and SQL `ParseAsync` return `null` and record that diagnostic in the supplied context. `ElasticQueryParser.BuildQueryAsync` throws `QueryValidationException`; `SqlQueryParser.ToDynamicLinqAsync` throws `ValidationException`. These are syntax errors, not empty result sets.
 
 ## Grouping
 
