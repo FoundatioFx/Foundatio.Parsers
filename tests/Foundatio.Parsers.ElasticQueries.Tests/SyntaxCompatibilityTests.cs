@@ -5,6 +5,7 @@ using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Xunit;
 using Xunit;
@@ -32,6 +33,71 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     });
 
     public SyntaxCompatibilityTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData("date:(date~1d @offset:\"-6h\")", "-6h")]
+    [InlineData("date:(date~1d @offset:\"+6h\")", "+6h")]
+    [InlineData("date:(date~1d @offset:6h)", "6h")]
+    public async Task BuildAggregationsAsync_WithLiteralOffset_PreservesSignedValue(string expression, string expected)
+    {
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var aggregations = await parser.BuildAggregationsAsync(expression);
+
+        // Assert
+        Assert.NotNull(aggregations);
+        var histogram = Assert.Single(aggregations.ToDictionary()).Value.DateHistogram;
+        Assert.NotNull(histogram);
+        Assert.Equal(expected, histogram.Offset);
+    }
+
+    [Theory]
+    [InlineData("date:(date~1d @offset:-6h)")]
+    [InlineData("date:(date~1d @offset:+6h)")]
+    public async Task BuildAggregationsAsync_WithPostColonOffsetOperator_ReportsMigrationError(string expression)
+    {
+        // Arrange
+        var parser = CreateParser();
+
+        // Act & Assert
+        var error = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildAggregationsAsync(expression));
+        Assert.Contains("before the field name", error.Message);
+    }
+
+    [Theory]
+    [InlineData("field:+term")]
+    [InlineData("field:-term")]
+    [InlineData("field:!term")]
+    [InlineData("field:NOT term")]
+    [InlineData("field:+(a OR b)")]
+    [InlineData("field:-(a OR b)")]
+    [InlineData("field:!(a OR b)")]
+    [InlineData("field:NOT (a OR b)")]
+    [InlineData("field:+[1 TO 2]")]
+    [InlineData("field:-[1 TO 2]")]
+    [InlineData("field:![1 TO 2]")]
+    [InlineData("field:NOT [1 TO 2]")]
+    public async Task ParseAsync_WithPostColonOperator_PreservesValidationContract(string query)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser();
+        var context = new ElasticQueryVisitorContext();
+
+        // Act
+        var result = await parser.ParseAsync(query, context);
+        var validation = await parser.ValidateQueryAsync(query);
+
+        // Assert
+        Assert.Null(result);
+        var error = Assert.Single(context.GetValidationResult().ValidationErrors);
+        Assert.Contains("before the field name", error.Message);
+        Assert.True(error.Index > 0);
+        Assert.False(validation.IsValid);
+        Assert.Contains("before the field name", validation.Message);
+        await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync(query));
+    }
 
     [Theory]
     [InlineData("field:1..5", "field", "1..5")]

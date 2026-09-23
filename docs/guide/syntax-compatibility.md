@@ -109,14 +109,14 @@ A numeric caret value such as `^2` is also assigned to `time_zone` on this path,
 | Input | Foundatio behavior | External syntax / migration |
 |-------|--------------------|-----------------------------|
 | `field:[1 .. 5]` or `field:[1..5]` | A range; brackets determine inclusivity | Use `field:[1 TO 5]` for Lucene classic or Elasticsearch `query_string` |
-| `field:-value`, `field:NOT value`, `field:-(a OR b)` | Legacy post-colon operator forms accepted by this grammar | Write `-field:value`, `NOT field:value`, or `-field:(a OR b)` instead |
+| `field:-value`, `field:NOT value`, `field:-(a OR b)` | Parse rejection (breaking correction of legacy terms/groups) | Write `-field:value`, `NOT field:value`, or `-field:(a OR b)` instead |
 | `field:-[1 TO 5]`, `field:NOT [1 TO 5]` | Parse rejection | Put the operator before the field: `-field:[1 TO 5]` |
 | `field\.with\.dots:value` | Parse rejection; dot is not an allowed backslash escape | Write `field.with.dots:value` |
 | `location:"New York, NY"~75mi` | Geographic distance syntax with a `geo_point` mapping, geo visitor, and city resolver | Use an explicit Elasticsearch geo query, not a fuzzy `query_string` expression |
 
 `LuceneQueryParser.Parse` reports the rejected grammar examples as `FormatException`; the public `ElasticQueryParser.BuildQueryAsync` API reports query validation failures as `QueryValidationException`. A backend request rejection is a third, separate outcome. Do not conflate these with transport or service failures.
 
-Use leading operators for consistent syntax. The current grammar accepts post-colon operators for terms and groups but rejects them before ranges. [Issue #272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272) tracks removing those legacy forms. An operator inside a field-scoped group, such as `field:(-value)`, is a different case.
+Operators must precede the field name for terms, groups, and ranges. This implements [the decision in issue #272](https://github.com/FoundatioFx/Foundatio.Parsers/issues/272#issuecomment-5701649902). See [breaking syntax correction and migration examples](./query-syntax.md#breaking-syntax-correction-operator-placement) before upgrading. Inner clauses such as `field:(-value)` and quoted or escaped literal values remain supported.
 
 ### Bare dots do not make a range
 

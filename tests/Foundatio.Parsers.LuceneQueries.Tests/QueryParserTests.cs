@@ -697,8 +697,107 @@ public class QueryParserTests : TestWithLoggingBase
     }
 
     [Theory]
-    [InlineData("field:NOT (value)", "NOT field:(value)")]
-    [InlineData("field:NOT (a b)", "NOT field:(a b)")]
+    [InlineData("field:(-term)", true, false)]
+    [InlineData("field:(!term)", true, false)]
+    [InlineData("field:(NOT term)", true, false)]
+    [InlineData("field:(+term)", false, true)]
+    public void Parse_WithOperatorInsideFieldGroup_PreservesClauseScope(string query, bool excluded, bool required)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var root = parser.Parse(query);
+
+        // Assert
+        var group = Assert.IsType<GroupNode>(root.Left);
+        var term = Assert.IsType<TermNode>(group.Left);
+        Assert.Equal("field", group.Field);
+        Assert.False(group.IsExcluded());
+        Assert.False(group.IsRequired());
+        Assert.Equal(excluded, term.IsExcluded());
+        Assert.Equal(required, term.IsRequired());
+        Assert.Same(group, term.Parent);
+        Assert.Equal(query, GenerateQueryVisitor.Run(root));
+    }
+
+    [Theory]
+    [InlineData("field:\"-term\"", "-term")]
+    [InlineData("field:\"+term\"", "+term")]
+    [InlineData("field:\"!term\"", "!term")]
+    [InlineData("field:\"NOT term\"", "NOT term")]
+    [InlineData("field:\\-term", "-term")]
+    [InlineData("field:\\+term", "+term")]
+    [InlineData("field:\\!term", "!term")]
+    [InlineData("field:NOT\\ term", "NOT term")]
+    [InlineData("field:NOTable", "NOTable")]
+    [InlineData("field:not", "not")]
+    [InlineData("field:/-term/", "-term")]
+    public void Parse_WithOperatorLiteral_PreservesValue(string query, string expected)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var root = parser.Parse(query);
+
+        // Assert
+        var term = Assert.IsType<TermNode>(root.Left);
+        Assert.Equal(expected, term.UnescapedTerm);
+        Assert.False(term.IsExcluded());
+        Assert.False(term.IsRequired());
+        Assert.Equal(GenerateQueryVisitor.Run(root), GenerateQueryVisitor.Run(parser.Parse(GenerateQueryVisitor.Run(root))));
+    }
+
+    [Theory]
+    [InlineData("+", "term")]
+    [InlineData("-", "term")]
+    [InlineData("!", "term")]
+    [InlineData("NOT ", "term")]
+    [InlineData("+", "(a OR b)")]
+    [InlineData("-", "(a OR b)")]
+    [InlineData("!", "(a OR b)")]
+    [InlineData("NOT ", "(a OR b)")]
+    [InlineData("+", "[1 TO 2]")]
+    [InlineData("-", "[1 TO 2]")]
+    [InlineData("!", "[1 TO 2]")]
+    [InlineData("NOT ", "[1 TO 2]")]
+    [InlineData("+", "{1 TO 2}")]
+    [InlineData("-", "{1 TO 2}")]
+    [InlineData("!", "{1 TO 2}")]
+    [InlineData("NOT ", "{1 TO 2}")]
+    [InlineData("+", ">1")]
+    [InlineData("-", ">1")]
+    [InlineData("!", ">1")]
+    [InlineData("NOT ", ">1")]
+    [InlineData("+", "\"term\"")]
+    [InlineData("-", "\"term\"")]
+    [InlineData("!", "\"term\"")]
+    [InlineData("NOT ", "\"term\"")]
+    [InlineData("+", "/term/")]
+    [InlineData("-", "/term/")]
+    [InlineData("!", "/term/")]
+    [InlineData("NOT ", "/term/")]
+    public void Parse_WithPostColonOperator_ReportsMigrationError(string op, string value)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+
+        // Act & Assert
+        foreach (string leading in new[] { "", "+", "-", "!", "NOT " })
+        {
+            foreach (string spacing in new[] { "", " ", "\t\n" })
+            {
+                var error = Assert.Throws<FormatException>(() => parser.Parse($"{leading}field:{spacing}{op}{value}"));
+                Assert.Contains("before the field name", error.Message);
+                Assert.IsType<Cursor>(error.Data["cursor"]);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("NOT field:(value)", "NOT field:(value)")]
+    [InlineData("NOT field:(a b)", "NOT field:(a b)")]
     public void Parse_WithNotKeywordBeforeFieldGroup_PreservesNegation(string query, string expectedQuery)
     {
         // Arrange
@@ -719,14 +818,12 @@ public class QueryParserTests : TestWithLoggingBase
     }
 
     [Theory]
-    [InlineData("field:-(value)", "-field:(value)", "-", true, false)]
-    [InlineData("field:!(value)", "!field:(value)", "!", true, false)]
-    [InlineData("field:+(value)", "+field:(value)", "+", false, true)]
-    public void Parse_WithPrefixInsideFieldGroup_PreservesPrefix(string query, string expectedQuery, string expectedPrefix, bool expectedExcluded, bool expectedRequired)
+    [InlineData("-field:(value)", "-field:(value)", "-", true, false)]
+    [InlineData("!field:(value)", "!field:(value)", "!", true, false)]
+    [InlineData("+field:(value)", "+field:(value)", "+", false, true)]
+    public void Parse_WithPrefixBeforeFieldGroup_PreservesPrefix(string query, string expectedQuery, string expectedPrefix, bool expectedExcluded, bool expectedRequired)
     {
         // Arrange
-        // A prefix written after the colon is captured by paren_exp, and field_exp used to overwrite it
-        // with the field name's null prefix, silently dropping the operator.
         var parser = new LuceneQueryParser();
 
         // Act
@@ -747,23 +844,17 @@ public class QueryParserTests : TestWithLoggingBase
     [Theory]
     [InlineData("field1:value1")]
     [InlineData("NOT field1:value1")]
-    [InlineData("field1:NOT value1")]
     [InlineData("-field1:value1")]
-    [InlineData("field1:-value1")]
     [InlineData("!field1:value1")]
-    [InlineData("field1:!value1")]
     [InlineData("+field1:value1")]
-    [InlineData("field1:+value1")]
     [InlineData("field1:(value1)")]
     [InlineData("NOT field1:(value1)")]
-    [InlineData("field1:NOT (value1)")]
     [InlineData("-field1:(value1)")]
-    [InlineData("field1:-(value1)")]
     [InlineData("!field1:(value1)")]
-    [InlineData("field1:!(value1)")]
     [InlineData("+field1:(value1)")]
-    [InlineData("field1:+(value1)")]
     [InlineData("field1:(-value1)")]
+    [InlineData("field1:(+value1)")]
+    [InlineData("field1:(!value1)")]
     [InlineData("field1:(NOT value1)")]
     [InlineData("(field1:value1)")]
     [InlineData("NOT (field1:value1)")]
@@ -772,6 +863,9 @@ public class QueryParserTests : TestWithLoggingBase
     [InlineData("NOT (NOT field1:value1)")]
     [InlineData("-(-field1:value1)")]
     [InlineData("field4:[1 TO 2]")]
+    [InlineData("field4:[-5 TO -1]")]
+    [InlineData("field4:>=-5")]
+    [InlineData("field4:(-[1 TO 2])")]
     [InlineData("NOT field4:[1 TO 2]")]
     [InlineData("-field4:[1 TO 2]")]
     [InlineData("!field4:[1 TO 2]")]

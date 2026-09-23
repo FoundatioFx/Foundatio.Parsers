@@ -95,7 +95,7 @@ Returns `ICollection<SortOptions>` instead of `IEnumerable<IFieldSort>`:
 
 **Before:**
 ```csharp
-IEnumerable<IFieldSort> sorts = await parser.BuildSortAsync("created:-1");
+IEnumerable<IFieldSort> sorts = await parser.BuildSortAsync("-created");
 
 var response = await client.SearchAsync<MyDoc>(s => s
     .Sort(sorts));
@@ -103,7 +103,7 @@ var response = await client.SearchAsync<MyDoc>(s => s
 
 **After:**
 ```csharp
-ICollection<SortOptions> sorts = await parser.BuildSortAsync("created:-1");
+ICollection<SortOptions> sorts = await parser.BuildSortAsync("-created");
 
 var response = await client.SearchAsync<MyDoc>(s => s
     .Sort(sorts));
