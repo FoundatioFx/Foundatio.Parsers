@@ -152,7 +152,7 @@ Finally, compare **both the generated query and returned documents** under the a
 
 The C# tests in `tests/Foundatio.Parsers.ElasticQueries.Tests` cover these contracts at two levels:
 
-- `SyntaxCompatibilityTests` checks AST values and generated Elasticsearch query JSON with in-memory mappings, including escaping, ranges, modifiers, wildcard paths, date-range time zones, and quoted city resolution.
+- `SyntaxCompatibilityTests` checks AST values and generated Elasticsearch query objects with in-memory mappings, including escaping, ranges, modifiers, wildcard paths, date-range time zones, and city/ZIP-code resolution.
 - `SyntaxCompatibilityIntegrationTests` runs fixed C# documents and query cases against Elasticsearch. It checks independent expected document IDs for Foundatio and `query_string` in filter and scoring contexts, plus score relationships, ranking, and date boundaries. The fixture explicitly uses standard-analyzed text, keyword, integer, `date`, and `date_nanos` fields.
 
 These tests record both agreements and known limitations. When a runtime fix changes a result, update its expected behavior and this guide together. A passing suite does not establish universal parity across mappings, analyzers, nested queries, aliases, custom visitors, engine versions, or scoring configurations. The C# suite does not execute a standalone Lucene classic parser; Lucene-specific statements rely on the primary references below.

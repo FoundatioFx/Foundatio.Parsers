@@ -340,13 +340,17 @@ Quote a location containing spaces so it remains one value:
 
 ```text
 location:"New York, NY"~75mi
+location:10001~10mi
 ```
 
-This means within 75 miles of the point returned by the application's resolver for `New York, NY`. It does not search the city's administrative boundary or geocode the name automatically.
+The first query searches within 75 miles of the point resolved for `New York, NY`; the second searches within 10 miles of the point resolved for ZIP code `10001`. Both need an application-provided lookup. They do not search city or ZIP-code boundaries or geocode the input automatically. Keep postal codes as strings to preserve leading zeros.
 
 ```csharp
 // Parse a quoted city name; the quotes are escaped inside a C# string
 var result = parser.Parse("location:\"New York, NY\"~75mi");
+
+// A ZIP code is one value and does not need quotes
+result = parser.Parse("location:10001~10mi");
 
 // Coordinates can be supplied directly (latitude, longitude)
 result = parser.Parse("location:40.7128,-74.0060~10km");
@@ -354,7 +358,7 @@ result = parser.Parse("location:40.7128,-74.0060~10km");
 
 ### Configuration
 
-To generate an Elasticsearch [geo-distance query](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-geo-distance-query) with Foundatio, map the field as [`geo_point`](https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/geo-point) and enable the geo visitor through `UseGeo`. Place names also need an application-provided resolver. This example supplies an in-memory mapping and a lookup for one city:
+To generate an Elasticsearch [geo-distance query](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-geo-distance-query) with Foundatio, map the field as [`geo_point`](https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/geo-point) and enable the geo visitor through `UseGeo`. Place names and postal codes also need an application-provided resolver. This example supplies an in-memory mapping and two illustrative lookup points:
 
 ```csharp
 using System;
@@ -374,17 +378,21 @@ var parser = new ElasticQueryParser(c => c
     .UseGeo(ResolveLocation));
 
 var query = await parser.BuildQueryAsync("location:\"New York, NY\"~75mi");
+query = await parser.BuildQueryAsync("location:10001~10mi");
 
 static string ResolveLocation(string location)
 {
     if (String.Equals(location, "New York, NY", StringComparison.OrdinalIgnoreCase))
         return "40.7128,-74.0060";
 
-    throw new ArgumentException("This example only resolves New York, NY.", nameof(location));
+    if (String.Equals(location, "10001", StringComparison.Ordinal))
+        return "40.7506,-73.9972";
+
+    throw new ArgumentException("This example only resolves New York, NY and ZIP code 10001.", nameof(location));
 }
 ```
 
-The resolver receives `New York, NY` without the surrounding quotes. In an application, use the actual index mappings and a resolver that handles the inputs you support, including coordinates or geohashes if offered. The example's in-memory mapping informs query generation; it does not create an Elasticsearch index.
+The resolver receives `New York, NY` without the surrounding quotes, or the string `10001`. In an application, use the actual index mappings and a resolver that handles the inputs you support, including coordinates or geohashes if offered. The example's in-memory mapping informs query generation; it does not create an Elasticsearch index.
 
 ## Geo Range Queries
 
@@ -466,13 +474,26 @@ The edit distance is available on the AST (`TermNode.Proximity`), but the defaul
 
 ## Escaping Special Characters
 
-The ordinary term/field escape rule accepts a literal space and these characters after a backslash:
+In unquoted terms and field names, a backslash can escape a literal space and these characters:
 
 ```
 + - ! ( ) { } [ ] ^ " ~ * ? : \ /
 ```
 
-Do not copy Elasticsearch's entire reserved-character list into an escaping function for this parser. For example, `field\.with\.dots:value` fails because `.` is not an allowed escape; write `field.with.dots:value`. Backslash escapes for `&`, `|`, `=`, `<`, and `>` are also unsupported by this ordinary escape rule. Quoted strings and regex bodies have their own grammar rules. A supported grammar escape also does not guarantee that a query builder preserves literal wildcard semantics; see [Wildcard Queries](#wildcard-queries).
+Dots do not need escaping: use `field.with.dots:value`. Writing `field\.with\.dots:value` throws `FormatException` from `LuceneQueryParser.Parse` because `\.` is not an allowed escape in an unquoted field name. The same restriction applies to unquoted term values. Backslashes before `&`, `|`, `=`, `<`, and `>` are also rejected there; those characters can appear unescaped within a term, although some have operator meanings in other positions.
+
+Quoted values and regex bodies follow different rules. They accept these backslashes and preserve them in the raw AST `Term`; the `UnescapedTerm` property removes them:
+
+| Query text | Parsing result |
+|------------|----------------|
+| `field:a.b` | Term value `a.b` |
+| `field:a\.b` | Parse error |
+| `field:a&b` | Term value `a&b` |
+| `field:a\&b` | Parse error |
+| `field:"a\.b"` | Quoted term; raw value `a\.b`, unescaped value `a.b` |
+| `field:/a\.b/` | Regex term; raw value `a\.b`, unescaped value `a.b` |
+
+These rules come from the [Foundatio grammar](https://github.com/FoundatioFx/Foundatio.Parsers/blob/main/src/Foundatio.Parsers.LuceneQueries/LuceneQueryParser.peg); they differ from [Elasticsearch's reserved-character rules](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query). Successful parsing still does not guarantee literal wildcard matching or regex execution in the generated query. See [Wildcard Queries](#wildcard-queries) and [Regex Queries](#regex-queries).
 
 ```csharp
 // Escape colon in value (the C# string needs a second backslash)

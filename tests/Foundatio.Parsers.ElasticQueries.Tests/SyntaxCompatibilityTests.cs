@@ -1,8 +1,6 @@
 using System;
-using System.IO;
-using System.Text.Json;
+using System.Linq;
 using System.Threading.Tasks;
-using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -16,6 +14,7 @@ namespace Foundatio.Parsers.ElasticQueries.Tests;
 // Characterizes the default query pipeline for docs/guide/syntax-compatibility.md.
 // The unsupported modifier cases describe the current limitations tracked in #278,
 // not desired behavior. Update these assertions and the documentation when fixing them.
+// Scoring contexts expose the generated query directly, without a filter wrapper.
 public class SyntaxCompatibilityTests : TestWithLoggingBase
 {
     private readonly ElasticMappingResolver _resolver = new(() => new TypeMapping
@@ -91,11 +90,8 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         // Arrange
         var parser = new LuceneQueryParser();
 
-        // Act
-        Action parse = () => parser.Parse(query);
-
-        // Assert
-        Assert.Throws<FormatException>(parse);
+        // Act & Assert
+        Assert.Throws<FormatException>(() => parser.Parse(query));
     }
 
     [Theory]
@@ -126,6 +122,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     [InlineData("text:jo*n", "text", "jo*n")]
     [InlineData("text:*john", "text", "*john")]
     [InlineData("text:/foo.bar/", "text", "foo.bar")]
+    [InlineData("text:/foo\\.bar/", "text", "foo.bar")]
     [InlineData("text:value~2", "text", "value")]
     [InlineData("text:value^2", "text", "value")]
     public async Task BuildQueryAsync_WithTextTerm_EmitsMatchWithoutModifiers(string query, string field, string value)
@@ -134,17 +131,15 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var parser = CreateParser();
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, query);
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
-        var match = Assert.Single(json.RootElement.EnumerateObject());
+        var match = Assert.IsType<MatchQuery>(result.Match);
 
-        Assert.Equal("match", match.Name);
-
-        var options = match.Value.GetProperty(field);
-        Assert.Equal(value, options.GetProperty("query").GetString());
-        Assert.False(options.TryGetProperty("fuzziness", out _));
-        Assert.False(options.TryGetProperty("boost", out _));
+        Assert.Equal(field, match.Field.Name);
+        Assert.Equal(value, match.Query);
+        Assert.Null(match.Fuzziness);
+        Assert.Null(match.Boost);
     }
 
     [Theory]
@@ -161,16 +156,15 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var parser = CreateParser();
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, query);
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
-        var term = Assert.Single(json.RootElement.EnumerateObject());
+        var term = Assert.IsType<TermQuery>(result.Term);
 
-        Assert.Equal("term", term.Name);
-
-        var options = term.Value.GetProperty("keyword");
-        Assert.Equal(value, options.GetProperty("value").GetString());
-        Assert.False(options.TryGetProperty("boost", out _));
+        Assert.Equal("keyword", term.Field.Name);
+        Assert.True(term.Value.TryGetString(out string? actualValue));
+        Assert.Equal(value, actualValue);
+        Assert.Null(term.Boost);
     }
 
     [Theory]
@@ -182,17 +176,15 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var parser = CreateParser();
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, query);
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
-        var phrase = Assert.Single(json.RootElement.EnumerateObject());
+        var phrase = Assert.IsType<MatchPhraseQuery>(result.MatchPhrase);
 
-        Assert.Equal("match_phrase", phrase.Name);
-
-        var options = phrase.Value.GetProperty("text");
-        Assert.Equal("a b", options.GetProperty("query").GetString());
-        Assert.False(options.TryGetProperty("slop", out _));
-        Assert.False(options.TryGetProperty("boost", out _));
+        Assert.Equal("text", phrase.Field.Name);
+        Assert.Equal("a b", phrase.Query);
+        Assert.Null(phrase.Slop);
+        Assert.Null(phrase.Boost);
     }
 
     [Theory]
@@ -205,19 +197,19 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     {
         // Arrange
         var parser = CreateParser(["text", "otherText"]);
+        string[] expectedFields = query.StartsWith("text:", StringComparison.Ordinal) ? ["text"] : ["text", "otherText"];
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, query);
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
-        var queryString = Assert.Single(json.RootElement.EnumerateObject());
+        var queryString = Assert.IsType<QueryStringQuery>(result.QueryString);
 
-        Assert.Equal("query_string", queryString.Name);
-        Assert.Equal(value, queryString.Value.GetProperty("query").GetString());
-        Assert.True(queryString.Value.GetProperty("analyze_wildcard").GetBoolean());
-        Assert.False(queryString.Value.GetProperty("allow_leading_wildcard").GetBoolean());
-        Assert.Equal(query.StartsWith("text:", StringComparison.Ordinal) ? 1 : 2,
-            queryString.Value.GetProperty("fields").GetArrayLength());
+        Assert.Equal(value, queryString.Query);
+        Assert.True(queryString.AnalyzeWildcard);
+        Assert.False(queryString.AllowLeadingWildcard);
+        Assert.NotNull(queryString.Fields);
+        Assert.Equal(expectedFields, queryString.Fields.Select(field => field.Name));
     }
 
     [Theory]
@@ -231,13 +223,13 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var parser = CreateParser();
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, query);
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
-        var prefix = Assert.Single(json.RootElement.EnumerateObject());
+        var prefix = Assert.IsType<PrefixQuery>(result.Prefix);
 
-        Assert.Equal("prefix", prefix.Name);
-        Assert.Equal(value, prefix.Value.GetProperty("keyword").GetProperty("value").GetString());
+        Assert.Equal("keyword", prefix.Field.Name);
+        Assert.Equal(value, prefix.Value);
     }
 
     [Theory]
@@ -251,17 +243,15 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         string query = $"{field}:[2024-01-01 TO *]^\"{timeZone}\"";
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, query);
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
-        var range = Assert.Single(json.RootElement.EnumerateObject());
+        var range = Assert.IsType<DateRangeQuery>(result.Range);
 
-        Assert.Equal("range", range.Name);
-
-        var options = range.Value.GetProperty(field);
-        Assert.Equal("2024-01-01", options.GetProperty("gte").GetString());
-        Assert.Equal(timeZone, options.GetProperty("time_zone").GetString());
-        Assert.False(options.TryGetProperty("boost", out _));
+        Assert.Equal(field, range.Field.Name);
+        Assert.Equal("2024-01-01", range.Gte?.ToString());
+        Assert.Equal(timeZone, range.TimeZone);
+        Assert.Null(range.Boost);
     }
 
     [Fact]
@@ -271,35 +261,39 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var parser = CreateParser();
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, "john*");
+        var result = await parser.BuildQueryAsync("john*", new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
-        var multiMatch = Assert.Single(json.RootElement.EnumerateObject());
+        var multiMatch = Assert.IsType<MultiMatchQuery>(result.MultiMatch);
 
-        Assert.Equal("multi_match", multiMatch.Name);
-        Assert.Equal("john*", multiMatch.Value.GetProperty("query").GetString());
+        Assert.Equal("john*", multiMatch.Query);
     }
 
-    [Fact]
-    public async Task BuildQueryAsync_WithQuotedCity_ResolvesWholeNameAndBuildsGeoDistance()
+    [Theory]
+    [InlineData("location:\"New York, NY\"~75mi", "New York, NY", "40.7128,-74.0060", "75mi")]
+    [InlineData("location:10001~10mi", "10001", "40.7506,-73.9972", "10mi")]
+    public async Task BuildQueryAsync_WithNamedLocation_ResolvesWholeValueAndBuildsGeoDistance(string query, string location, string coordinates, string distance)
     {
         // Arrange
         string? resolvedLocation = null;
-        var parser = new ElasticQueryParser(c => c.UseMappings(_resolver).UseGeo(location =>
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(_resolver).UseGeo(value =>
         {
-            resolvedLocation = location;
-            return "40.7128,-74.0060";
+            resolvedLocation = value;
+            return coordinates;
         }));
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, "location:\"New York, NY\"~75mi");
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
-        Assert.Equal("New York, NY", resolvedLocation);
+        Assert.Equal(location, resolvedLocation);
 
-        var geo = json.RootElement.GetProperty("geo_distance");
-        Assert.Equal("75mi", geo.GetProperty("distance").GetString());
-        Assert.Equal("40.7128,-74.0060", geo.GetProperty("location").GetString());
+        var geo = Assert.IsType<GeoDistanceQuery>(result.GeoDistance);
+
+        Assert.Equal("location", geo.Field.Name);
+        Assert.Equal(distance, geo.Distance);
+        Assert.True(geo.Location.TryGetText(out string? actualCoordinates));
+        Assert.Equal(coordinates, actualCoordinates);
     }
 
     [Fact]
@@ -309,13 +303,25 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var parser = CreateParser();
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, "city:(\"New York\" OR Madison)");
+        var result = await parser.BuildQueryAsync("city:(\"New York\" OR Madison)", new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
-        var clauses = json.RootElement.GetProperty("bool").GetProperty("should");
-        Assert.Equal(2, clauses.GetArrayLength());
-        Assert.Equal("New York", clauses[0].GetProperty("match_phrase").GetProperty("city").GetProperty("query").GetString());
-        Assert.Equal("Madison", clauses[1].GetProperty("match").GetProperty("city").GetProperty("query").GetString());
+        var boolean = Assert.IsType<BoolQuery>(result.Bool);
+
+        Assert.NotNull(boolean.Should);
+        Assert.Collection(boolean.Should,
+            clause =>
+            {
+                var phrase = Assert.IsType<MatchPhraseQuery>(clause.MatchPhrase);
+                Assert.Equal("city", phrase.Field.Name);
+                Assert.Equal("New York", phrase.Query);
+            },
+            clause =>
+            {
+                var term = Assert.IsType<MatchQuery>(clause.Match);
+                Assert.Equal("city", term.Field.Name);
+                Assert.Equal("Madison", term.Query);
+            });
     }
 
     [Fact]
@@ -323,21 +329,26 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     {
         // Arrange
         bool resolverCalled = false;
-        var parser = new ElasticQueryParser(c => c.UseMappings(_resolver).UseGeo(location =>
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(_resolver).UseGeo(location =>
         {
             resolverCalled = true;
             return location;
         }));
 
         // Act
-        using var json = await BuildQueryJsonAsync(parser, "location:[40.92,-74.26 TO 40.49,-73.70]");
+        var result = await parser.BuildQueryAsync("location:[40.92,-74.26 TO 40.49,-73.70]", new ElasticQueryVisitorContext { UseScoring = true });
 
         // Assert
         Assert.False(resolverCalled);
 
-        var bounds = json.RootElement.GetProperty("geo_bounding_box").GetProperty("location");
-        Assert.Equal("40.92,-74.26", bounds.GetProperty("top_left").GetString());
-        Assert.Equal("40.49,-73.70", bounds.GetProperty("bottom_right").GetString());
+        var bounds = Assert.IsType<GeoBoundingBoxQuery>(result.GeoBoundingBox);
+
+        Assert.Equal("location", bounds.Field.Name);
+        Assert.True(bounds.BoundingBox.TryGetTopLeftBottomRight(out var corners));
+        Assert.True(corners.TopLeft.TryGetText(out string? topLeft));
+        Assert.True(corners.BottomRight.TryGetText(out string? bottomRight));
+        Assert.Equal("40.92,-74.26", topLeft);
+        Assert.Equal("40.49,-73.70", bottomRight);
     }
 
     [Theory]
@@ -370,6 +381,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
 
         // Assert
         var term = Assert.IsType<TermNode>(root.Left);
+
         Assert.Equal($"before{character}after", term.UnescapedField);
         Assert.Equal($"before{character}after", term.UnescapedTerm);
         Assert.Null(root.Right);
@@ -386,13 +398,84 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     {
         // Arrange
         var parser = new LuceneQueryParser();
-        string query = $"field:before\\{character}after";
+
+        // Act & Assert
+        Assert.Throws<FormatException>(() => parser.Parse($"field:before\\{character}after"));
+        Assert.Throws<FormatException>(() => parser.Parse($"before\\{character}after:value"));
+    }
+
+    [Theory]
+    [InlineData('.')]
+    [InlineData('&')]
+    [InlineData('|')]
+    [InlineData('=')]
+    [InlineData('<')]
+    [InlineData('>')]
+    public void Parse_WithUnescapedOrdinaryCharacter_PreservesFieldAndTerm(char character)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+        string value = $"before{character}after";
 
         // Act
-        Action parse = () => parser.Parse(query);
+        var root = parser.Parse($"{value}:{value}");
 
         // Assert
-        Assert.Throws<FormatException>(parse);
+        var term = Assert.IsType<TermNode>(root.Left);
+
+        Assert.Equal(value, term.UnescapedField);
+        Assert.Equal(value, term.UnescapedTerm);
+        Assert.Null(root.Right);
+    }
+
+    [Theory]
+    [InlineData('.')]
+    [InlineData('&')]
+    [InlineData('|')]
+    [InlineData('=')]
+    [InlineData('<')]
+    [InlineData('>')]
+    public void Parse_WithQuotedEscape_PreservesRawTermAndUnescapesValue(char character)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+        string value = $"before\\{character}after";
+
+        // Act
+        var root = parser.Parse($"field:\"{value}\"");
+
+        // Assert
+        var term = Assert.IsType<TermNode>(root.Left);
+
+        Assert.True(term.IsQuotedTerm);
+        Assert.Equal(value, term.Term);
+        Assert.Equal($"before{character}after", term.UnescapedTerm);
+        Assert.Null(root.Right);
+    }
+
+    [Theory]
+    [InlineData('.')]
+    [InlineData('&')]
+    [InlineData('|')]
+    [InlineData('=')]
+    [InlineData('<')]
+    [InlineData('>')]
+    public void Parse_WithRegexEscape_PreservesRawTermAndUnescapesValue(char character)
+    {
+        // Arrange
+        var parser = new LuceneQueryParser();
+        string value = $"before\\{character}after";
+
+        // Act
+        var root = parser.Parse($"field:/{value}/");
+
+        // Assert
+        var term = Assert.IsType<TermNode>(root.Left);
+
+        Assert.True(term.IsRegexTerm);
+        Assert.Equal(value, term.Term);
+        Assert.Equal($"before{character}after", term.UnescapedTerm);
+        Assert.Null(root.Right);
     }
 
     private ElasticQueryParser CreateParser(string[]? defaultFields = null) => new(c =>
@@ -406,17 +489,5 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     {
         _resolver.Dispose();
         return base.DisposeAsync();
-    }
-
-    private static async Task<JsonDocument> BuildQueryJsonAsync(ElasticQueryParser parser, string query)
-    {
-        // Scoring mode prevents a filter wrapper from hiding missing score modifiers.
-        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
-        using var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
-        var client = new ElasticsearchClient(settings);
-        using var stream = new MemoryStream();
-        client.RequestResponseSerializer.Serialize<Query>(result, stream);
-        stream.Position = 0;
-        return await JsonDocument.ParseAsync(stream, cancellationToken: TestContext.Current.CancellationToken);
     }
 }
