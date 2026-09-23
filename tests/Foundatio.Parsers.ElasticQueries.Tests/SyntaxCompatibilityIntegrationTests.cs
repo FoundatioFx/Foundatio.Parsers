@@ -7,6 +7,7 @@ using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
@@ -14,12 +15,10 @@ namespace Foundatio.Parsers.ElasticQueries.Tests;
 public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<SyntaxCompatibilityFixture>
 {
     private readonly SyntaxCompatibilityFixture _fixture;
-    private readonly ITestOutputHelper _output;
 
     public SyntaxCompatibilityIntegrationTests(ITestOutputHelper output, SyntaxCompatibilityFixture fixture) : base(output, fixture)
     {
         _fixture = fixture;
-        _output = output;
     }
 
     public static IEnumerable<TheoryDataRow<string, string, GroupOperator?, string?, string?, bool>> MatchingCases()
@@ -114,6 +113,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         };
         if (defaultOperator.HasValue)
             reference.DefaultOperator = defaultOperator == GroupOperator.And ? Operator.And : Operator.Or;
+
         Query referenceQuery = scoring ? reference : new BoolQuery { Filter = [reference] };
 
         // Act
@@ -127,13 +127,14 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         {
             // BuildQueryAsync reports grammar failures through its public validation API.
             // Do not turn transport or result-deserialization exceptions into expected rejection.
-            _output.WriteLine($"Foundatio query rejection: {exception.Message}");
+            _logger.LogInformation("Foundatio query rejection: {Message}", exception.Message);
         }
 
         string? native = query is null ? null : await GetMatchesAsync(query);
         string? external = await GetMatchesAsync(referenceQuery);
 
-        _output.WriteLine($"{id}: {text}; scoring={scoring}; Foundatio={native}; query_string={external}");
+        _logger.LogInformation("{Case}: {Query}; scoring={Scoring}; Foundatio={Native}; query_string={External}",
+            id, text, scoring, native, external);
 
         // Assert
         Assert.Equal(expectedNative, native);
@@ -158,6 +159,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         // Assert
         Assert.Equal(external.Keys.Order(StringComparer.Ordinal), native.Keys.Order(StringComparer.Ordinal));
         Assert.NotEmpty(native);
+
         foreach (string id in native.Keys)
             AssertClose(external[id], native[id]);
     }
@@ -183,8 +185,10 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         Assert.Equal(native.Keys.Order(StringComparer.Ordinal), external.Keys.Order(StringComparer.Ordinal));
         Assert.Equal(native.Keys.Order(StringComparer.Ordinal), nativeBoosted.Keys.Order(StringComparer.Ordinal));
         Assert.Equal(external.Keys.Order(StringComparer.Ordinal), externalBoosted.Keys.Order(StringComparer.Ordinal));
+
         foreach (string id in native.Keys)
             AssertClose(native[id], nativeBoosted[id]);
+
         foreach (string id in external.Keys)
             AssertClose(external[id] * 8, externalBoosted[id]);
     }
@@ -245,7 +249,8 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         Assert.Equal(native, external);
     }
 
-    private static ElasticQueryParser CreateParser(ElasticMappingResolver resolver) => new(configuration => configuration
+    private ElasticQueryParser CreateParser(ElasticMappingResolver resolver) => new(configuration => configuration
+        .SetLoggerFactory(Log)
         .UseMappings(resolver)
         .SetDefaultFields(["text"])
         .UseIncludes(new Dictionary<string, string> { { "active", "keyword:john" } }));
@@ -267,11 +272,13 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         if (!response.IsValidResponse)
         {
             Assert.Equal(400, response.ApiCallDetails.HttpStatusCode);
-            _output.WriteLine($"Elasticsearch rejected query: {response.DebugInformation}");
+
+            _logger.LogInformation("Elasticsearch rejected query: {DebugInformation}", response.DebugInformation);
             return null;
         }
 
         AssertComplete(response);
+
         return String.Join(',', response.Documents.Select(document => document.Id).Order(StringComparer.Ordinal));
     }
 
@@ -280,20 +287,22 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         var response = await SearchAsync(query);
         Assert.True(response.IsValidResponse, response.DebugInformation);
         AssertComplete(response);
+
         var scores = response.Hits.ToDictionary(hit => hit.Source!.Id, hit => hit.Score ?? Double.NaN, StringComparer.Ordinal);
         Assert.All(scores.Values, score => Assert.True(Double.IsFinite(score) && score >= 0));
-        _output.WriteLine(String.Join(", ", scores.OrderByDescending(pair => pair.Value).Select(pair => $"{pair.Key}={pair.Value:R}")));
+
+        _logger.LogInformation("Scores: {Scores}", String.Join(", ", scores.OrderByDescending(pair => pair.Value).Select(pair => $"{pair.Key}={pair.Value:R}")));
         return scores;
     }
 
-    private Task<SearchResponse<SyntaxCompatibilityFixture.Document>> SearchAsync(Query query) => Client.SearchAsync<SyntaxCompatibilityFixture.Document>(descriptor => descriptor
+    private Task<SearchResponse<SyntaxCompatibilityFixture.CompatibilityDocument>> SearchAsync(Query query) => Client.SearchAsync<SyntaxCompatibilityFixture.CompatibilityDocument>(descriptor => descriptor
         .Indices(_fixture.Index)
         .Query(query)
         .Size(100)
         .TrackTotalHits(true)
         .AllowPartialSearchResults(false), TestCancellationToken);
 
-    private static void AssertComplete(SearchResponse<SyntaxCompatibilityFixture.Document> response)
+    private static void AssertComplete(SearchResponse<SyntaxCompatibilityFixture.CompatibilityDocument> response)
     {
         Assert.False(response.TimedOut);
         Assert.Equal(0, response.Shards.Failed);

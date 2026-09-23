@@ -29,7 +29,7 @@ public sealed class SyntaxCompatibilityFixture : ElasticsearchFixture
     public override async ValueTask InitializeAsync()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        Document[] documents =
+        CompatibilityDocument[] documents =
         [
             new() { Id = "a", Text = "alpha beta", OtherText = "gamma", Keyword = "john", Number = 1, Date = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero) },
             new() { Id = "b", Text = "alpha gamma beta", OtherText = "beta", Keyword = "joan", Number = 3, Date = new DateTimeOffset(2024, 1, 1, 5, 59, 59, TimeSpan.Zero) },
@@ -50,18 +50,19 @@ public sealed class SyntaxCompatibilityFixture : ElasticsearchFixture
             .Mappings(Mapping));
         var bulk = await Client.IndexManyAsync(documents, Index, timeout.Token);
         Assert.True(bulk.IsValidResponse && !bulk.Errors, bulk.DebugInformation);
+
         var refresh = await Client.Indices.RefreshAsync(Index, cancellationToken: timeout.Token);
         Assert.True(refresh.IsValidResponse, refresh.DebugInformation);
     }
 
-    public sealed class Document
+    public sealed record CompatibilityDocument
     {
-        public string Id { get; set; } = String.Empty;
-        public string? Text { get; set; }
-        public string? OtherText { get; set; }
-        public string? Keyword { get; set; }
-        public int Number { get; set; }
-        public DateTimeOffset? Date { get; set; }
+        public required string Id { get; init; }
+        public string? Text { get; init; }
+        public string? OtherText { get; init; }
+        public string? Keyword { get; init; }
+        public int Number { get; init; }
+        public DateTimeOffset? Date { get; init; }
         public DateTimeOffset? DateNanos => Date;
     }
 }

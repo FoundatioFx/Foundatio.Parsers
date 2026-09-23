@@ -140,6 +140,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var match = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("match", match.Name);
+
         var options = match.Value.GetProperty(field);
         Assert.Equal(value, options.GetProperty("query").GetString());
         Assert.False(options.TryGetProperty("fuzziness", out _));
@@ -166,6 +167,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var term = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("term", term.Name);
+
         var options = term.Value.GetProperty("keyword");
         Assert.Equal(value, options.GetProperty("value").GetString());
         Assert.False(options.TryGetProperty("boost", out _));
@@ -186,6 +188,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var phrase = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("match_phrase", phrase.Name);
+
         var options = phrase.Value.GetProperty("text");
         Assert.Equal("a b", options.GetProperty("query").GetString());
         Assert.False(options.TryGetProperty("slop", out _));
@@ -254,6 +257,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         var range = Assert.Single(json.RootElement.EnumerateObject());
 
         Assert.Equal("range", range.Name);
+
         var options = range.Value.GetProperty(field);
         Assert.Equal("2024-01-01", options.GetProperty("gte").GetString());
         Assert.Equal(timeZone, options.GetProperty("time_zone").GetString());
@@ -292,6 +296,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
 
         // Assert
         Assert.Equal("New York, NY", resolvedLocation);
+
         var geo = json.RootElement.GetProperty("geo_distance");
         Assert.Equal("75mi", geo.GetProperty("distance").GetString());
         Assert.Equal("40.7128,-74.0060", geo.GetProperty("location").GetString());
@@ -329,6 +334,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
 
         // Assert
         Assert.False(resolverCalled);
+
         var bounds = json.RootElement.GetProperty("geo_bounding_box").GetProperty("location");
         Assert.Equal("40.92,-74.26", bounds.GetProperty("top_left").GetString());
         Assert.Equal("40.49,-73.70", bounds.GetProperty("bottom_right").GetString());
@@ -391,7 +397,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
 
     private ElasticQueryParser CreateParser(string[]? defaultFields = null) => new(c =>
         {
-            c.UseMappings(_resolver);
+            c.SetLoggerFactory(Log).UseMappings(_resolver);
             if (defaultFields is not null)
                 c.SetDefaultFields(defaultFields);
         });

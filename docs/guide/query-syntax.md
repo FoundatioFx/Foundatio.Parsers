@@ -4,6 +4,8 @@ The query syntax is inspired by [Lucene classic QueryParser](https://lucene.apac
 
 ## Basic Queries
 
+The parsing snippets below use `Foundatio.Parsers.LuceneQueries` and reuse a `LuceneQueryParser` named `parser`. The geo configuration, nested-query, and complete examples create their own parsers.
+
 ### Term Queries
 
 Match documents where a field contains a specific value:
@@ -15,6 +17,8 @@ Match documents where a field contains a specific value:
 | `value` | Search default fields | `error` |
 
 ```csharp
+using Foundatio.Parsers.LuceneQueries;
+
 var parser = new LuceneQueryParser();
 
 // Simple term
@@ -309,8 +313,8 @@ Assuming current time is `2024-06-15 12:00:00`:
 // Last 7 days
 var result = parser.Parse("created:[now-7d TO now]");
 
-// Last month
-result = parser.Parse("created:[now-1M/M TO now/M]");
+// Previous calendar month: inclusive start, exclusive end
+result = parser.Parse("created:[now-1M/M TO now/M}");
 
 // Future dates
 result = parser.Parse("expires:[now TO now+30d]");
@@ -350,7 +354,7 @@ result = parser.Parse("location:40.7128,-74.0060~10km");
 
 ### Configuration
 
-Elasticsearch geo-distance queries require a field mapped as `geo_point` and the geo visitor enabled through `UseGeo`. Place names also need an application-provided resolver. This example supplies an in-memory mapping and a deterministic city lookup:
+To generate an Elasticsearch [geo-distance query](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-geo-distance-query) with Foundatio, map the field as [`geo_point`](https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/geo-point) and enable the geo visitor through `UseGeo`. Place names also need an application-provided resolver. This example supplies an in-memory mapping and a lookup for one city:
 
 ```csharp
 using System;
@@ -367,11 +371,17 @@ using var mappings = new ElasticMappingResolver(() => new TypeMapping
 
 var parser = new ElasticQueryParser(c => c
     .UseMappings(mappings)
-    .UseGeo(location => location == "New York, NY"
-        ? "40.7128,-74.0060"
-        : throw new ArgumentException("Unknown location", nameof(location))));
+    .UseGeo(ResolveLocation));
 
 var query = await parser.BuildQueryAsync("location:\"New York, NY\"~75mi");
+
+static string ResolveLocation(string location)
+{
+    if (String.Equals(location, "New York, NY", StringComparison.OrdinalIgnoreCase))
+        return "40.7128,-74.0060";
+
+    throw new ArgumentException("This example only resolves New York, NY.", nameof(location));
+}
 ```
 
 The resolver receives `New York, NY` without the surrounding quotes. In an application, use the actual index mappings and a resolver that handles the inputs you support, including coordinates or geohashes if offered. The example's in-memory mapping informs query generation; it does not create an Elasticsearch index.
@@ -389,13 +399,15 @@ geofield:[topLeft TO bottomRight]
 var result = parser.Parse("location:[40.92,-74.26 TO 40.49,-73.70]");
 ```
 
-The field must be mapped as `geo_point` and the geo visitor enabled to generate an Elasticsearch bounding-box query. Bounds accept coordinates or geohashes directly; the range visitor does not resolve city names. The rectangle is illustrative, not an exact city boundary.
+The field must be mapped as `geo_point` and the geo visitor enabled to generate an Elasticsearch [bounding-box query](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-geo-bounding-box-query). Bounds accept coordinates or geohashes directly; the range visitor does not resolve city names. The rectangle is illustrative, not an exact city boundary.
 
 ## Nested Document Queries
 
-When using Elasticsearch, queries on nested document fields work automatically with the `ElasticQueryParser`:
+Enable nested-query handling with `UseNested()`. This example uses a configured `ElasticsearchClient` named `client` and an existing `my-index` index with `comments` mapped as [`nested`](https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/nested):
 
 ```csharp
+using Foundatio.Parsers.ElasticQueries;
+
 var parser = new ElasticQueryParser(c => c
     .UseMappings(client, "my-index")
     .UseNested());

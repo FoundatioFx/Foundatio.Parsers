@@ -26,6 +26,8 @@ dotnet add package Foundatio.Parsers.SqlQueries
 
 ## Quick Start
 
+The C# examples use SDK-style projects with implicit usings enabled. Install the package for the integration you use; application-specific clients and contexts are described below.
+
 ### Parse and Inspect Queries
 
 ```csharp
@@ -43,13 +45,14 @@ Output from `DebugQueryVisitor`:
 
 ```
 Group:
-  Left - Term:
-      TermMax: 2
-      TermMin: 1
-      MinInclusive: True
-      MaxInclusive: True
-      Field:
-          Name: field
+    Left - Term Range:
+        Field: field
+        Original Field: field
+        IsNegated: False
+        Max: 2
+        Min: 1
+        MinInclusive: True
+        MaxInclusive: True
 ```
 
 Regenerate the original query:
@@ -60,6 +63,8 @@ string query = GenerateQueryVisitor.Run(result);
 ```
 
 ### Build Elasticsearch Queries
+
+These examples use a configured `ElasticsearchClient` named `client` and an existing `my-index` index. Its mappings determine field types and query translation; see the [official .NET client setup](https://www.elastic.co/docs/reference/elasticsearch/clients/dotnet/connecting).
 
 ```csharp
 using Foundatio.Parsers.ElasticQueries;
@@ -82,14 +87,18 @@ var sort = await parser.BuildSortAsync("-created +name");
 
 ### Build SQL/EF Core Queries
 
+Here, `db` is your EF Core context with a `Products` set whose entity has `Name`, `Description`, `Status`, and `Price` properties. The parser produces a Dynamic LINQ predicate; EF Core translates it for your database provider.
+
 ```csharp
+using System.Linq.Dynamic.Core;
 using Foundatio.Parsers.SqlQueries;
+using Microsoft.EntityFrameworkCore;
 
 var parser = new SqlQueryParser(c => c
     .SetDefaultFields(new[] { "Name", "Description" }));
 
 var context = parser.GetContext(db.Products.EntityType);
-string dynamicLinq = await parser.ToDynamicLinqAsync("status:active AND price:>100", context);
+string dynamicLinq = await parser.ToDynamicLinqAsync("Status:active AND Price:>100", context);
 
 var results = await db.Products
     .Where(parser.ParsingConfig, dynamicLinq)
@@ -123,6 +132,8 @@ Parsing a syntax form does not guarantee that every backend implements it. In pa
 Map user-friendly names to actual field paths:
 
 ```csharp
+using Foundatio.Parsers.ElasticQueries;
+
 var parser = new ElasticQueryParser(c => c
     .UseFieldMap(new Dictionary<string, string> {
         { "user", "data.user.identity" },
@@ -137,6 +148,8 @@ var parser = new ElasticQueryParser(c => c
 Define reusable query macros:
 
 ```csharp
+using Foundatio.Parsers.ElasticQueries;
+
 var parser = new ElasticQueryParser(c => c
     .UseIncludes(new Dictionary<string, string> {
         { "active", "status:active AND deleted:false" },
@@ -154,6 +167,9 @@ var query = await parser.BuildQueryAsync("@include:active AND category:electroni
 Validate and restrict queries:
 
 ```csharp
+using Foundatio.Parsers.ElasticQueries;
+using Foundatio.Parsers.LuceneQueries;
+
 var parser = new ElasticQueryParser(c => c
     .SetValidationOptions(new QueryValidationOptions {
         AllowedFields = { "status", "name", "created" },
@@ -161,9 +177,9 @@ var parser = new ElasticQueryParser(c => c
         AllowedMaxNodeDepth = 10
     }));
 
-var result = await parser.ValidateQueryAsync(userQuery);
+var result = await parser.ValidateQueryAsync("status:active");
 if (!result.IsValid)
-    return BadRequest(result.Message);
+    Console.WriteLine(result.Message);
 ```
 
 [Validation Guide](https://parsers.foundatio.dev/guide/validation)
@@ -173,17 +189,21 @@ if (!result.IsValid)
 Extend with custom query transformations:
 
 ```csharp
-public class CustomVisitor : ChainableQueryVisitor
-{
-    public override async Task VisitAsync(TermNode node, IQueryVisitorContext context)
-    {
-        // Custom transformation logic
-        await base.VisitAsync(node, context);
-    }
-}
+using Foundatio.Parsers.ElasticQueries;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 
 var parser = new ElasticQueryParser(c => c
     .AddVisitor(new CustomVisitor(), priority: 100));
+
+public class CustomVisitor : ChainableQueryVisitor
+{
+    public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
+    {
+        // Add your term transformation here.
+        return base.VisitAsync(node, context);
+    }
+}
 ```
 
 [Visitors Guide](https://parsers.foundatio.dev/guide/visitors)
