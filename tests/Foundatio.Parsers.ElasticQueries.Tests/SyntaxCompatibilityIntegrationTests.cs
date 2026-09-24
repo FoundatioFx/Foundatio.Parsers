@@ -401,7 +401,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         var scores = response.Hits.ToDictionary(hit => hit.Source!.Id, hit => hit.Score ?? Double.NaN, StringComparer.Ordinal);
         Assert.All(scores.Values, score => Assert.True(Double.IsFinite(score) && score >= 0));
 
-        _logger.LogInformation("Scores: {Scores}", String.Join(", ", scores.OrderByDescending(pair => pair.Value).Select(pair => $"{pair.Key}={pair.Value:R}")));
+        _logger.LogInformation("Scores: {Scores}", String.Join(", ", scores.OrderByDescending(pair => pair.Value).Select(pair => FormattableString.Invariant($"{pair.Key}={pair.Value:R}"))));
         return scores;
     }
 
