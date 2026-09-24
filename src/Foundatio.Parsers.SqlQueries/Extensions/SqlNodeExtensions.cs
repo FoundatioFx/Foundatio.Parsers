@@ -179,9 +179,8 @@ public static class SqlNodeExtensions
 
             if (wildcardKind is SqlWildcardKind.Advanced)
             {
-                if (isExcluded)
-                    builder.Append("!(");
-                builder.Append("(");
+                builder.Append(isExcluded ? "!(" : "(");
+
                 bool isFirstField = true;
                 string likePattern = SqlWildcardPattern.GetLikePattern(node);
                 foreach (string defaultFieldName in context.DefaultFields)
@@ -193,9 +192,9 @@ public static class SqlNodeExtensions
                     AppendLike(builder, defaultField, likePattern);
                     isFirstField = false;
                 }
-                builder.Append(")");
-                if (isExcluded)
-                    builder.Append(")");
+
+                builder.Append(')');
+
                 return builder.ToString();
             }
 
@@ -324,9 +323,12 @@ public static class SqlNodeExtensions
         {
             if (isExcluded)
                 builder.Append("!(");
+
             AppendLike(builder, field, SqlWildcardPattern.GetLikePattern(node));
+
             if (isExcluded)
                 builder.Append(")");
+
             return builder.ToString();
         }
 

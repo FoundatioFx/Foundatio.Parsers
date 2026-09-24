@@ -80,6 +80,26 @@ public class SqlQuerySyntaxTests : TestWithLoggingBase
         Assert.Contains("jo_n", navigationSql, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithExcludedDefaultFields_TranslatesNegatedWildcard()
+    {
+        // Arrange
+        using var db = CreateContext();
+        var parser = new SqlQueryParser(configuration => configuration
+            .SetLoggerFactory(Log)
+            .SetDefaultFields(["FullName", "Title"]));
+
+        // Act
+        string predicate = await parser.ToDynamicLinqAsync("-jo?n", parser.GetContext(db.Employees.EntityType));
+        string sql = db.Employees.Where(parser.ParsingConfig, predicate).ToQueryString();
+
+        // Assert
+        Assert.StartsWith("!(", predicate);
+        Assert.DoesNotContain("!((", predicate, StringComparison.Ordinal);
+        Assert.Equal(2, sql.Split(" LIKE ").Length - 1);
+        Assert.Contains("NOT", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData(@"jo\*n", "jo*n")]
     [InlineData(@"jo\?n", "jo?n")]
@@ -210,6 +230,6 @@ public class SqlQuerySyntaxTests : TestWithLoggingBase
     }
 
     private static SampleContext CreateContext() => new(new DbContextOptionsBuilder<SampleContext>()
-        .UseSqlServer("Server=localhost;Database=foundatio;User Id=sa;Password=P@ssword1;Encrypt=False")
+        .UseSqlServer()
         .Options);
 }

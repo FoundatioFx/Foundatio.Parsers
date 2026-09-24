@@ -528,6 +528,24 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task ToDynamicLinqAsync_WithExcludedDefaultWildcard_ReturnsOnlyNonMatchingEmployee()
+    {
+        // Arrange
+        var serviceProvider = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(serviceProvider);
+        var parser = new SqlQueryParser(configuration => configuration
+            .SetLoggerFactory(Log)
+            .SetDefaultFields(["FullName", "Title"]));
+
+        // Act
+        string predicate = await parser.ToDynamicLinqAsync("-Jo?n", parser.GetContext(db.Employees.EntityType));
+        var employees = await db.Employees.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
+
+        // Assert
+        Assert.Equal("Jane Doe", Assert.Single(employees).FullName);
+    }
+
+    [Fact]
     public async Task ToDynamicLinqAsync_WithQuestionMarkAndTrailingStar_ReturnsMatchingEmployee()
     {
         // Arrange
