@@ -417,6 +417,21 @@ aggs = await parser.BuildAggregationsAsync("terms:(category +min:price)");
 aggs = await parser.BuildAggregationsAsync("terms:(category~10)");
 ```
 
+::: warning
+`+` and `-` are the only ordering operators. The boolean negation operators `NOT` and `!` are
+[query operators](./query-syntax#boolean-operators) and are rejected in aggregation expressions, so
+`terms:(category !max:price)` and `terms:(category NOT max:price)` fail validation rather than being
+silently ignored.
+:::
+
+::: warning Distributed terms ordering
+Valid syntax does not guarantee accurate bucket selection across shards. For ordering terms by a
+sub-aggregation, Elasticsearch identifies maximum descending (`-max:price`) and minimum ascending
+(`+min:price`) as safe directions. Other combinations, including `+max:price`, can return incorrect
+bucket ordering. Even safe directions can have approximate document counts and other metric values.
+See [Elasticsearch's terms ordering guidance](https://www.elastic.co/docs/reference/aggregations/search-aggregations-bucket-terms-aggregation#search-aggregations-bucket-terms-aggregation-order).
+:::
+
 ## Field Aliases
 
 Aggregations support [field aliases](./field-aliases):

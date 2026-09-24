@@ -132,6 +132,9 @@ var response = await client.SearchAsync<MyDocument>(s => s
     .Sort(sort));
 ```
 
+`+` and `-` are the only ordering operators; `NOT` and `!` are rejected in sort expressions. See
+[Building Sort](./elastic-query-parser#building-sort).
+
 ## SQL/Entity Framework Core Integration
 
 The `SqlQueryParser` generates Dynamic LINQ expressions for EF Core:

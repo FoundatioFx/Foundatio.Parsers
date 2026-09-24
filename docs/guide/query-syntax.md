@@ -259,6 +259,13 @@ The grammar is shared by queries, sorts, aggregations, and parsed include expres
 
 `LuceneQueryParser.Parse` throws `FormatException` with a cursor and a message directing callers to put the operator before the field name. Elasticsearch and SQL `ParseAsync` return `null` and record that diagnostic in the supplied context. `ElasticQueryParser.BuildQueryAsync` throws `QueryValidationException`; `SqlQueryParser.ToDynamicLinqAsync` throws `ValidationException`. These are syntax errors, not empty result sets.
 
+::: warning
+The table above applies to query expressions only. In sort and aggregation expressions, `+` and `-`
+are ordering operators (ascending and descending) and the boolean negation operators `NOT` and `!`
+are rejected as validation errors. See [Building Sort](./elastic-query-parser#building-sort) and
+[Sorting Bucket Aggregations](./aggregation-syntax#sorting-bucket-aggregations).
+:::
+
 ## Grouping
 
 Use parentheses to group clauses and control precedence:

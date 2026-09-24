@@ -27,6 +27,9 @@ public class AssignOperationTypeVisitor : ChainableQueryVisitor
         if (node.Field.StartsWith("@"))
             return base.VisitAsync(node, context);
 
+        // The primary field term is removed below, so validate its operators before they are lost.
+        ValidationVisitor.ValidateOrderingOperators(leftTerm, context, leftTerm.Term);
+
         node.SetOperationType(node.Field);
         node.Field = leftTerm.Term;
         node.Boost = leftTerm.Boost;

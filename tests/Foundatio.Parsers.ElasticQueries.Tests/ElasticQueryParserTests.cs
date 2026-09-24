@@ -1599,14 +1599,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     [InlineData("field1", SortOrder.Asc)]
     [InlineData("+field1", SortOrder.Asc)]
     [InlineData("-field1", SortOrder.Desc)]
-    [InlineData("!field1", SortOrder.Desc)]
-    [InlineData("NOT field1", SortOrder.Desc)]
-    [InlineData("NOT -field1", SortOrder.Desc)]
-    // A "+" prefix wins over a "NOT" keyword because IsNodeOrGroupNegated() returns false when
-    // IsRequired() is true. In a sort context that means "NOT +field1" sorts ascending. This is
-    // pre-existing behavior and is pinned here so it cannot change silently.
-    [InlineData("NOT +field1", SortOrder.Asc)]
-    public async Task BuildSortAsync_WithNegationAndPrefixOperators_MapsToSortOrder(string sort, SortOrder expectedOrder)
+    public async Task BuildSortAsync_WithExplicitDirection_MapsToSortOrder(string sort, SortOrder expectedOrder)
     {
         // Arrange
         string index = await CreateRandomIndexAsync<MyType>(m => m.Dynamic(DynamicMapping.True));
@@ -1627,6 +1620,32 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
         Assert.Equal(expectedRequest, actualRequest);
+    }
+
+    [Theory]
+    [InlineData("!field1", "!")]
+    [InlineData("NOT field1", "NOT")]
+    [InlineData("NOT -field1", "NOT")]
+    // A "+" prefix used to win over a "NOT" keyword because IsNodeOrGroupNegated() returns false
+    // when IsRequired() is true, so "NOT +field1" silently sorted ascending. Contradictory input
+    // now fails loudly instead of resolving to a direction.
+    [InlineData("NOT +field1", "NOT")]
+    [InlineData("field1 !field2", "!")]
+    [InlineData("!(field1 field2)", "!")]
+    public async Task BuildSortAsync_WithBooleanNegationOperator_ThrowsValidationException(string sort, string expectedOperator)
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<MyType>(m => m.Dynamic(DynamicMapping.True));
+        var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
+
+        // Act
+        var ex = await Assert.ThrowsAsync<QueryValidationException>(() => processor.BuildSortAsync(sort));
+
+        // Assert
+        Assert.Contains($"Boolean operator ({expectedOperator}) is not supported in sort expressions", ex.Message);
+        Assert.Contains("use + for ascending or - for descending order", ex.Message);
+        Assert.NotNull(ex.Result);
+        Assert.False(ex.Result.IsValid);
     }
 
     [Theory]

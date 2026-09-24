@@ -270,6 +270,7 @@ public async Task ParseAsync_WithValidQuery_CanRoundTrip(string query)
 - Mirror the main code structure (e.g., `Visitors/` tests for visitor implementations)
 - Use constructors and `IDisposable` for setup/teardown
 - Inject `ITestOutputHelper` for test logging
+- Inherit the existing logging test base (`TestWithLoggingBase` for unit tests or the provider test base for integration tests) and pass `Log` to configurable parsers with `SetLoggerFactory(Log)`.
 
 ### Integration Testing
 

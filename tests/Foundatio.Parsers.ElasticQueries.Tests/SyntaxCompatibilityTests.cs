@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
@@ -82,7 +83,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     public async Task ParseAsync_WithPostColonOperator_PreservesValidationContract(string query)
     {
         // Arrange
-        var parser = new ElasticQueryParser();
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
         var context = new ElasticQueryVisitorContext();
 
         // Act
@@ -544,6 +545,217 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         Assert.Null(root.Right);
     }
 
+    [Theory]
+    [InlineData("+max:price", SortOrder.Asc)]
+    [InlineData("-max:price", SortOrder.Desc)]
+    public async Task BuildAggregationsAsync_WithExplicitMaxDirection_AppliesTermsOrder(string metric, SortOrder expectedOrder)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+
+        // Act
+        var aggregations = await parser.BuildAggregationsAsync($"terms:(category {metric})");
+
+        // Assert
+        Assert.NotNull(aggregations);
+        var terms = aggregations.ToDictionary()["terms_category"];
+        var order = Assert.Single(terms.Terms!.Order!);
+        Assert.Equal(new Field("max_price"), order.Key);
+        Assert.Equal(expectedOrder, order.Value);
+        Assert.NotNull(terms.Aggregations!["max_price"].Max);
+    }
+
+    [Theory]
+    [InlineData("terms:(!category)", "!", "category")]
+    [InlineData("terms:(NOT category)", "NOT", "category")]
+    [InlineData("terms:(NOT +category)", "NOT", "category")]
+    [InlineData("terms:(NOT -category)", "NOT", "category")]
+    [InlineData("+terms:(!category)", "!", "category")]
+    [InlineData("-terms:(NOT +category)", "NOT", "category")]
+    [InlineData("terms:(!category -max:price)", "!", "category")]
+    [InlineData("terms:(category +max:(NOT price))", "NOT", "price")]
+    public async Task BuildAggregationsAsync_WithNegatedPrimaryField_MatchesValidationError(string aggregations, string expectedOperator, string expectedField)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+        string expectedMessage = $"Boolean operator ({expectedOperator}) is not supported in aggregation expressions for field ({expectedField}): use + for ascending or - for descending order.";
+
+        // Act
+        var result = await parser.ValidateAggregationsAsync(aggregations);
+        var exception = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildAggregationsAsync(aggregations));
+
+        // Assert
+        Assert.False(result.IsValid);
+        Assert.Equal(expectedMessage, Assert.Single(result.ValidationErrors).Message);
+        Assert.NotNull(exception.Result);
+        Assert.Equal(expectedMessage, Assert.Single(exception.Result.ValidationErrors).Message);
+    }
+
+    [Theory]
+    [InlineData("!price", "!")]
+    [InlineData("NOT price", "NOT")]
+    [InlineData("NOT +price", "NOT")]
+    [InlineData("NOT -price", "NOT")]
+    [InlineData("!(price name)", "!")]
+    [InlineData("NOT (price name)", "NOT")]
+    public async Task BuildSortAsync_WithBooleanNegation_MatchesValidationError(string sort, string expectedOperator)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+
+        // Act
+        var result = await parser.ValidateSortAsync(sort);
+        var exception = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildSortAsync(sort));
+
+        // Assert
+        Assert.False(result.IsValid);
+        string expectedMessage = Assert.Single(result.ValidationErrors).Message;
+        Assert.Contains($"Boolean operator ({expectedOperator}) is not supported in sort expressions", expectedMessage);
+        Assert.NotNull(exception.Result);
+        Assert.Equal(expectedMessage, Assert.Single(exception.Result.ValidationErrors).Message);
+    }
+
+    [Theory]
+    [InlineData("!@include:ordering", "!")]
+    [InlineData("NOT @include:ordering", "NOT")]
+    public async Task BuildSortAsync_WithNegatedInclude_ThrowsValidationException(string sort, string expectedOperator)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(_ => "price"));
+        var context = new ElasticQueryVisitorContext();
+        context.SetIncludeResolver(_ => Task.FromResult<string?>("price"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildSortAsync(sort, context));
+
+        // Assert
+        Assert.NotNull(exception.Result);
+        Assert.Contains($"Boolean operator ({expectedOperator}) is not supported in sort expressions", Assert.Single(exception.Result.ValidationErrors).Message);
+        Assert.Empty(exception.Result.UnresolvedIncludes);
+    }
+
+    [Fact]
+    public async Task BuildSortAsync_WithDescendingGroup_PreservesExplicitAscendingOverride()
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+
+        // Act
+        var sort = await parser.BuildSortAsync("-(price name +rank)");
+
+        // Assert
+        Assert.Collection(sort,
+            item => Assert.Equal(SortOrder.Desc, item.Field!.Order),
+            item => Assert.Equal(SortOrder.Desc, item.Field!.Order),
+            item => Assert.Equal(SortOrder.Asc, item.Field!.Order));
+    }
+
+    [Theory]
+    [InlineData("terms:(!category)")]
+    [InlineData("terms:(NOT category)")]
+    public async Task ValidateAggregationsAsync_WithThrowingOptions_RejectsNegatedPrimaryField(string expression)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+        var options = new QueryValidationOptions { ShouldThrow = true };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<QueryValidationException>(() => parser.ValidateAggregationsAsync(expression, options));
+
+        // Assert
+        Assert.NotNull(exception.Result);
+        Assert.Contains("is not supported in aggregation expressions", Assert.Single(exception.Result.ValidationErrors).Message);
+    }
+
+    [Theory]
+    [InlineData("!@include:ordering", "!")]
+    [InlineData("NOT @include:ordering", "NOT")]
+    public async Task BuildAggregationsAsync_WithNegatedInclude_ThrowsValidationException(string expression, string expectedOperator)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(_ => "max:price", priority: -1));
+        var context = new ElasticQueryVisitorContext();
+        context.SetIncludeResolver(_ => Task.FromResult<string?>("max:price"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildAggregationsAsync(expression, context));
+
+        // Assert
+        Assert.NotNull(exception.Result);
+        Assert.Contains($"Boolean operator ({expectedOperator}) is not supported in aggregation expressions", Assert.Single(exception.Result.ValidationErrors).Message);
+        Assert.Empty(exception.Result.UnresolvedIncludes);
+    }
+
+    [Theory]
+    [InlineData(QueryTypes.Sort, "!max:+price")]
+    [InlineData(QueryTypes.Sort, "+max:!(price)")]
+    [InlineData(QueryTypes.Sort, "!@include:+ordering")]
+    [InlineData(QueryTypes.Aggregation, "!max:-price")]
+    [InlineData(QueryTypes.Aggregation, "-max:!(price)")]
+    [InlineData(QueryTypes.Aggregation, "!@include:-ordering")]
+    public async Task BuildAsync_WithPostColonOrderingOperator_ReportsParseError(string queryType, string expression)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+
+        // Act
+        var error = queryType is QueryTypes.Sort
+            ? await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildSortAsync(expression))
+            : await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildAggregationsAsync(expression));
+
+        // Assert
+        Assert.Contains("before the field name", error.Message);
+        Assert.NotNull(error.Result);
+        Assert.True(Assert.Single(error.Result.ValidationErrors).Index > 0);
+    }
+
+    [Theory]
+    [InlineData(QueryTypes.Sort, @"max:\!price")]
+    [InlineData(QueryTypes.Sort, "max:\"!price\"")]
+    [InlineData(QueryTypes.Sort, "max:/!price/")]
+    [InlineData(QueryTypes.Sort, "max:\"NOT price\"")]
+    [InlineData(QueryTypes.Aggregation, @"max:\!price")]
+    [InlineData(QueryTypes.Aggregation, "max:\"!price\"")]
+    [InlineData(QueryTypes.Aggregation, "max:/!price/")]
+    [InlineData(QueryTypes.Aggregation, "max:\"NOT price\"")]
+    public async Task ValidateAsync_WithLiteralOrderingOperatorText_RemainsValid(string queryType, string expression)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log));
+
+        // Act
+        var result = queryType is QueryTypes.Sort
+            ? await parser.ValidateSortAsync(expression)
+            : await parser.ValidateAggregationsAsync(expression);
+
+        // Assert
+        Assert.True(result.IsValid, result.Message);
+    }
+
+    [Theory]
+    [InlineData(QueryTypes.Sort, "!price")]
+    [InlineData(QueryTypes.Sort, "NOT +price")]
+    [InlineData(QueryTypes.Aggregation, "!max:price")]
+    [InlineData(QueryTypes.Aggregation, "NOT max:price")]
+    public async Task BuildAsync_WithNegationInsideNestedInclude_RejectsOrdering(string queryType, string expression)
+    {
+        // Arrange
+        Task<string?> Resolve(string name) => Task.FromResult<string?>(name is "outer" ? "@include:inner" : expression);
+        var parser = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseIncludes(Resolve, priority: -1));
+        var context = new ElasticQueryVisitorContext();
+        context.SetIncludeResolver(Resolve);
+
+        // Act
+        var error = queryType is QueryTypes.Sort
+            ? await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildSortAsync("@include:outer", context))
+            : await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildAggregationsAsync("@include:outer", context));
+
+        // Assert
+        Assert.NotNull(error.Result);
+        Assert.Contains("is not supported", Assert.Single(error.Result.ValidationErrors).Message);
+        Assert.Empty(error.Result.UnresolvedIncludes);
+    }
+
     private ElasticQueryParser CreateParser(string[]? defaultFields = null) => new(c =>
         {
             c.SetLoggerFactory(Log).UseMappings(_resolver);
@@ -556,4 +768,5 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         _resolver.Dispose();
         return base.DisposeAsync();
     }
+
 }
