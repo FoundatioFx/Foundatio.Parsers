@@ -140,6 +140,12 @@ Use `field:[1 TO 5]` when an inclusive interval is intended. The local shorthand
 
 Escaping is not interchangeable either: Foundatio's ordinary escape rule accepts a literal space and `+ - ! ( ) { } [ ] ^ " ~ * ? : \ /`. It does not accept backslash-escaped dots or the full reserved-character list from Elasticsearch. See [Escaping Special Characters](./query-syntax#escaping-special-characters).
 
+### Sort and aggregation ordering
+
+Ordering has a separate contract from search queries: `price`, `+price`, and `-price` are valid sort expressions; `+max:price` and `-max:price` select aggregation order. Boolean `!` and `NOT` are rejected in ordering expressions, including `NOT +price`, rather than interpreted as descending or silently ignored. Their meaning in search queries is unchanged. This follows the [ordering decision in #273](https://github.com/FoundatioFx/Foundatio.Parsers/issues/273#issuecomment-5687993474).
+
+This is a behavioral breaking change for previously accepted ordering input. Choose an explicit direction when migrating; do not automatically turn ignored aggregation negation into descending order. See [Ordering Operators](./validation#ordering-operators) for validation errors, migration examples, and the limits of raw AST build overloads.
+
 ## Choosing a portable query
 
 Start with explicit fields, explicit Boolean operators and parentheses, leading negation, and `TO` ranges. For a bare Lucene classic consumer, do not send Elasticsearch-specific existence or comparison syntax, and explicitly account for pure-negative queries. For an Elasticsearch consumer, replace `_missing_` with `NOT _exists_` and expand configured includes first.

@@ -172,6 +172,25 @@ var response = await client.SearchAsync<MyDocument>(s => s
     .Sort(sort));
 ```
 
+For standalone fields, sort direction is explicit:
+
+| Prefix | Direction |
+|--------|-----------|
+| none | Ascending |
+| `+` | Ascending |
+| `-` | Descending |
+
+Unprefixed fields can inherit direction from their nearest parenthesized group. For example,
+`-(price name +rank)` sorts `price` and `name` descending and `rank` ascending: a node-local `+`
+overrides the group direction.
+
+::: warning
+The boolean negation operators `NOT` and `!` are [query operators](./query-syntax#boolean-operators),
+not ordering operators. `BuildSortAsync("!created")`, `BuildSortAsync("NOT created")`, and
+`BuildSortAsync("NOT +created")` throw a `QueryValidationException` rather than resolving to a
+direction. Use `-created` for descending order.
+:::
+
 ## Validation
 
 ### Validate Before Building
