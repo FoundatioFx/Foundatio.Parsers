@@ -8,3 +8,28 @@ jobs:
     with:
       new-test-runner: true
       minimum-major-minor: '8.0'
+
+  elasticsearch-8:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Build
+        run: dotnet build Foundatio.Parsers.slnx --configuration Release
+      - name: Start disposable Elasticsearch 8 and SQL Server
+        env:
+          ELASTICSEARCH_VERSION: '8.19.15'
+        run: docker compose up -d && docker compose up ready
+      - name: Run full solution tests
+        run: dotnet test --solution Foundatio.Parsers.slnx --configuration Release --no-build --report-github
