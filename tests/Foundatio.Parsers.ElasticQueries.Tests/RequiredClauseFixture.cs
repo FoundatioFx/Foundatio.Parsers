@@ -1,0 +1,76 @@
+using System;
+using System.Globalization;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Mapping;
+using Xunit;
+
+namespace Foundatio.Parsers.ElasticQueries.Tests;
+
+// Eight documents cover every combination of three tags; nested values distinguish
+// matches within one child from matches spread across different children.
+public sealed class RequiredClauseFixture : ElasticsearchFixture
+{
+    public string Index { get; } = $"required_{Guid.NewGuid():N}";
+
+    public static TypeMapping Mapping => new()
+    {
+        Dynamic = DynamicMapping.Strict,
+        Properties = new Properties
+        {
+            { "id", new KeywordProperty() },
+            { "tags", new KeywordProperty() },
+            { "children", new NestedProperty
+                {
+                    Properties = new Properties
+                    {
+                        { "name", new KeywordProperty() },
+                        { "value", new KeywordProperty() }
+                    }
+                }
+            }
+        }
+    };
+
+    public override async ValueTask InitializeAsync()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        NestedClauseValue[][] children =
+        [
+            [],
+            [new("a", "x"), new("b", "y")],
+            [new("b", "y")],
+            [new("a", "y"), new("b", "x")],
+            [],
+            [new("a", "x")],
+            [new("b", "y")],
+            [new("a", "y")]
+        ];
+        var documents = Enumerable.Range(0, 8).Select(bits => new RequiredClauseDocument
+        {
+            Id = bits.ToString(CultureInfo.InvariantCulture),
+            Tags = new[] { "a", "b", "c" }.Where((_, bit) => (bits & (1 << bit)) is not 0).ToArray(),
+            Children = children[bits]
+        }).ToArray();
+
+        await CreateIndexAsync(Index, descriptor => descriptor
+            .Settings(settings => settings.NumberOfShards(1).NumberOfReplicas(0))
+            .Mappings(Mapping));
+        var bulk = await Client.IndexManyAsync(documents, Index, timeout.Token);
+        Assert.True(bulk.IsValidResponse && !bulk.Errors, bulk.DebugInformation);
+
+        var refresh = await Client.Indices.RefreshAsync(Index, cancellationToken: timeout.Token);
+        Assert.True(refresh.IsValidResponse, refresh.DebugInformation);
+    }
+
+    public sealed record RequiredClauseDocument
+    {
+        public required string Id { get; init; }
+        public string[] Tags { get; init; } = [];
+        public NestedClauseValue[] Children { get; init; } = [];
+    }
+
+    public sealed record NestedClauseValue(string Name, string Value);
+}

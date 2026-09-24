@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -34,6 +35,55 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     });
 
     public SyntaxCompatibilityTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public async Task ParseAsync_WithConcurrentRequiredIncludes_KeepsContextsIndependent()
+    {
+        // Arrange
+        const int requestCount = 32;
+        int arrived = 0;
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var parser = new ElasticQueryParser(configuration => configuration
+            .SetLoggerFactory(Log)
+            .UseMappings(_resolver)
+            .UseIncludes(async name =>
+            {
+                if (Interlocked.Increment(ref arrived) is requestCount)
+                    ready.SetResult();
+
+                await ready.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellationToken);
+                return $"keyword:{name}";
+            }));
+
+        // Act
+        var requests = new Task<(int Index, IQueryNode? Node, ElasticQueryVisitorContext Context)>[requestCount];
+        for (int index = 0; index < requestCount; index++)
+        {
+            int requestIndex = index;
+            requests[index] = Task.Run(() => ParseRequestAsync(requestIndex), TestCancellationToken);
+        }
+
+        var results = await Task.WhenAll(requests);
+
+        // Assert
+        foreach (var result in results)
+        {
+            Assert.True(result.Context.IsValid(), result.Context.GetValidationResult().Message);
+            Assert.Equal($"value{result.Index}", Assert.Single(result.Context.GetValidationResult().ReferencedIncludes));
+            var root = Assert.IsType<GroupNode>(result.Node);
+            var required = Assert.IsType<GroupNode>(root.Left);
+            Assert.Equal("+", required.Prefix);
+            var included = Assert.IsType<GroupNode>(required.Left);
+            Assert.Equal($"value{result.Index}", Assert.IsType<TermNode>(included.Left).Term);
+        }
+
+        async Task<(int Index, IQueryNode? Node, ElasticQueryVisitorContext Context)> ParseRequestAsync(int index)
+        {
+            var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = index % 2 is 0 };
+            var node = await parser.ParseAsync($"+@include:value{index} keyword:optional", context);
+            return (index, node, context);
+        }
+    }
 
     [Theory]
     [InlineData("date:(date~1d @offset:\"-6h\")", "-6h")]
@@ -98,6 +148,66 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         Assert.False(validation.IsValid);
         Assert.Contains("before the field name", validation.Message);
         await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync(query));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BuildQueryAsync_WithRequiredCustomGroup_PreservesCustomQuery(bool scoring)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(configuration => configuration
+            .SetLoggerFactory(Log)
+            .UseMappings(_resolver)
+            .AddQueryVisitor(new CustomFilterVisitor()));
+        var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring };
+
+        // Act
+        var query = await parser.BuildQueryAsync("+@custom:(one) keyword:b", context);
+
+        // Assert
+        var clauses = scoring ? query.Bool : Assert.Single(query.Bool!.Filter!).Bool;
+        Assert.NotNull(clauses);
+        var required = Assert.Single(scoring ? clauses.Must! : clauses.Filter!).Terms;
+        Assert.NotNull(required);
+        Assert.Equal("id", required.Field!.ToString());
+        Assert.Equal("b", Assert.Single(clauses.Should!).Term!.Value.ToString());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BuildQueryAsync_WithRequiredAndOptionalClauses_PreservesBooleanScope(bool scoring)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings(_resolver));
+        var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring };
+
+        // Act
+        var query = await parser.BuildQueryAsync("+(keyword:a OR keyword:b) keyword:c", context);
+
+        // Assert
+        var clauses = scoring ? query.Bool : Assert.Single(query.Bool!.Filter!).Bool;
+        Assert.NotNull(clauses);
+        var required = Assert.Single(scoring ? clauses.Must! : clauses.Filter!).Bool;
+        Assert.NotNull(required);
+        Assert.Equal(2, required.Should!.Count);
+        Assert.Null(required.Must);
+        Assert.Null(required.Filter);
+        Assert.Equal("c", Assert.Single(clauses.Should!).Term!.Value.ToString());
+    }
+
+    [Theory]
+    [InlineData(GroupOperator.And)]
+    [InlineData(GroupOperator.Or)]
+    public Task BuildQueryAsync_WithUntranslatableRequiredClause_ThrowsValidationException(GroupOperator op)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings(_resolver));
+        var context = new ElasticQueryVisitorContext { DefaultOperator = op };
+
+        // Act & Assert
+        return Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync("+[1 TO 5] keyword:a", context));
     }
 
     [Theory]
@@ -756,17 +866,16 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         Assert.Empty(error.Result.UnresolvedIncludes);
     }
 
-    private ElasticQueryParser CreateParser(string[]? defaultFields = null) => new(c =>
-        {
-            c.SetLoggerFactory(Log).UseMappings(_resolver);
-            if (defaultFields is not null)
-                c.SetDefaultFields(defaultFields);
-        });
-
     public override ValueTask DisposeAsync()
     {
         _resolver.Dispose();
         return base.DisposeAsync();
     }
 
+    private ElasticQueryParser CreateParser(string[]? defaultFields = null) => new(c =>
+        {
+            c.SetLoggerFactory(Log).UseMappings(_resolver);
+            if (defaultFields is not null)
+                c.SetDefaultFields(defaultFields);
+        });
 }

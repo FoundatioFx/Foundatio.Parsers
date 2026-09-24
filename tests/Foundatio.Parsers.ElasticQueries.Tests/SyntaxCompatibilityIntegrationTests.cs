@@ -37,7 +37,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("implicit-default", "alpha beta", null, "a,b", "a,b,c,l"),
             ("implicit-and", "alpha beta", GroupOperator.And, "a,b", "a,b"),
             ("implicit-or", "alpha beta", GroupOperator.Or, "a,b,c,l", "a,b,c,l"),
-            ("required-term", "+text:alpha text:gamma", GroupOperator.Or, "a,b,c,l", "a,b,l"),
+            ("required-term", "+text:alpha text:gamma", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("negative-only", "NOT text:alpha", GroupOperator.Or, "c,d,e,f,g,h,i,j,k", "c,d,e,f,g,h,i,j,k"),
             ("negative-minus", "-text:alpha", GroupOperator.Or, "c,d,e,f,g,h,i,j,k", "c,d,e,f,g,h,i,j,k"),
             ("negative-bang", "!text:alpha", GroupOperator.Or, "c,d,e,f,g,h,i,j,k", "c,d,e,f,g,h,i,j,k"),

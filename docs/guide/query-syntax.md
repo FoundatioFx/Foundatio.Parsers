@@ -217,7 +217,7 @@ The AST records required/excluded clause markers:
 
 | Prefix | Parsed meaning |
 |--------|----------------|
-| `+` | Required marker; see the query-builder limitation below |
+| `+` | Required clause in the default Elasticsearch query builder |
 | `-` | Excluded marker |
 | `!` | Excluded marker |
 
@@ -232,9 +232,11 @@ result = parser.Parse("-deleted:true");
 result = parser.Parse("+status:active -deleted:true type:user");
 ```
 
-::: warning Required clauses are not reliably enforced
-Under an OR default, the default Elasticsearch builder treats `+text:alpha text:gamma` as optional alternatives and can return documents without `alpha`. This changes which documents match. [Issue #288](https://github.com/FoundatioFx/Foundatio.Parsers/issues/288) tracks the fix. Until fixed, do not rely on `+` for mandatory conditions; explicitly construct the required backend clauses or reject unsupported input. A successful parse or validation does not enforce the marker.
-:::
+A **clause** is one search condition, such as `status:active`, or a parenthesized group of conditions. **Required** means a returned document must satisfy that condition. For example, with an OR default, `+status:active category:premium` means “show active records; matching premium can improve their ranking.” It must not return an inactive record just because it is premium.
+
+In the default Elasticsearch query builder, `+` requires a clause at its enclosing Boolean scope. With an OR default, `+text:alpha text:gamma` requires `alpha`; `gamma` is optional for matching and contributes to scoring when scoring is enabled. With an AND default, both terms must match. A required group keeps its internal operator: `+(text:alpha OR text:beta)` requires either term, not both. Include expansion preserves the outer required or excluded marker. These execution guarantees apply to Elasticsearch; the AST markers alone do not establish equivalent behavior in other consumers. See the [upgrade guidance](./syntax-compatibility#upgrading-queries-that-use-required-clauses-or-includes) for the changed result sets.
+
+Parentheses establish the scope of required conditions. For example, `category:premium OR status:active AND +region:us` requires both active status and the US region. Writing `category:premium OR (status:active AND +region:us)` instead allows premium records through the separate OR alternative. Use parentheses to make mixed AND/OR expressions explicit; the parser's existing grouping rules are preserved.
 
 `-`, `!`, and `NOT` all negate a clause, but the parser stores them on different node properties: `NOT` sets `IsNegated` while `-` and `!` set `Prefix`. In query contexts, use the `IsExcluded()` extension method rather than checking either property directly. See [Negation and Prefix Operators](./visitors#negation-and-prefix-operators).
 

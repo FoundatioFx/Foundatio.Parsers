@@ -14,10 +14,13 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 {
     public override async Task VisitAsync(GroupNode node, IQueryVisitorContext context)
     {
-        await base.VisitAsync(node, context).AnyContext();
-
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+        // Capture the original OR operands before base visits children and caches their queries.
+        // Otherwise generated group queries would be indistinguishable from custom visitor queries.
+        var requiredClauses = await RequiredQueryBuilder.GetClausesAsync(node, elasticContext).AnyContext();
+        await base.VisitAsync(node, context).AnyContext();
 
         Query? query = await node.GetQueryAsync(() => node.GetDefaultQueryAsync(context)).AnyContext();
         Query? container = query;
@@ -28,7 +31,23 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (nested is not null && node.Parent is not null)
             container = null;
 
-        var op = GetEffectiveOperator(node, elasticContext);
+        // + requires this group in its parent; it must not turn +(a OR b) into +(a AND b).
+        var op = node.GetOperator(elasticContext);
+        if (requiredClauses is not null)
+        {
+            var requiredQuery = await RequiredQueryBuilder.BuildAsync(requiredClauses, nested is null ? container : null, elasticContext).AnyContext();
+            if (nested is not null)
+            {
+                nested.Query = ApplyNestedFilter(requiredQuery, node.GetNestedFilter());
+                node.SetQuery(nested);
+            }
+            else
+            {
+                node.SetQuery(requiredQuery);
+            }
+
+            return;
+        }
 
         var nestedQueries = new Dictionary<string, List<(IFieldQueryNode Node, Query InnerQuery)>>();
         var regularQueries = new List<(IFieldQueryNode Node, Query Query)>();
@@ -37,7 +56,12 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         {
             var childQuery = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).AnyContext();
             if (childQuery is null)
+            {
+                if (child.IsRequired() && !child.IsExcluded())
+                    context.AddValidationError($"A required clause did not produce a query: {child}");
+
                 continue;
+            }
 
             // Explicit nested groups (e.g., nested:(...)) were already combined by a recursive
             // visit, so treat them as atomic queries rather than coalescing their inner queries.
@@ -110,9 +134,9 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
             if (filteredChildren is { Count: > 0 })
             {
-                Query filteredQuery = filteredChildren.Count == 1
+                Query filteredQuery = filteredChildren.Count is 1
                     ? filteredChildren[0]
-                    : op == GroupOperator.Or
+                    : op is GroupOperator.Or
                         ? new BoolQuery { Should = filteredChildren }
                         : new BoolQuery { Must = filteredChildren };
                 combinedInner = Combine(combinedInner, filteredQuery, op, useScoring);
@@ -197,10 +221,10 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         // If we have OR clauses and the container is a BoolQuery with only should clauses,
         // set minimum_should_match = 1 so at least one clause must match.
-        if (op == GroupOperator.Or && container?.Bool is { } boolQuery)
+        if (op is GroupOperator.Or && container?.Bool is { } boolQuery)
         {
             bool isRootQuery = node.Parent is null;
-            bool parentUsesAndOperator = node.Parent is GroupNode parentGroup && parentGroup.GetOperator(elasticContext) == GroupOperator.And;
+            bool parentUsesAndOperator = node.Parent is GroupNode parentGroup && parentGroup.GetOperator(elasticContext) is GroupOperator.And;
             bool shouldSetMinimumShouldMatch = isRootQuery || (node.HasParens && parentUsesAndOperator);
 
             if (shouldSetMinimumShouldMatch)
@@ -242,14 +266,6 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         }
     }
 
-    private static GroupOperator GetEffectiveOperator(GroupNode node, IElasticQueryVisitorContext context)
-    {
-        var op = node.GetOperator(context);
-        if (op is GroupOperator.Or && node.IsRequired())
-            op = GroupOperator.And;
-        return op;
-    }
-
     private static Query? Combine(Query? left, Query? right, GroupOperator op, bool useScoring = true)
     {
         if (left is null)
@@ -257,7 +273,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
         if (right is null)
             return left;
 
-        if (op == GroupOperator.And)
+        if (op is GroupOperator.And)
         {
             if (!useScoring)
             {

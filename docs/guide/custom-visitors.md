@@ -470,6 +470,16 @@ For queries with nested field groups like `field:(-field:(value) OR other)`, bot
 
 See [Nested Queries and Visitor Traversal](./nested-queries) for a complete breakdown of how the AST is structured and traversed for nested queries.
 
+### Required clauses and implicit groups
+
+`CombineQueriesVisitor` first identifies the original clauses, then calls `base.VisitAsync` to build child queries, and finally combines those results. Identifying clauses first distinguishes custom queries supplied by earlier visitors from queries generated during recursive traversal.
+
+The parser represents `a OR b OR c` using binary `GroupNode` objects even though the user wrote no parentheses. An **implicit group** is such a node with no parentheses, field scope, prefix, negation, boost or proximity modifier. Implicit OR groups can be flattened into one clause list. An implicit AND subtree stays intact; if it contains a required condition, the subtree is required in the enclosing OR group. Explicit groups such as `(a OR b)` and custom queries remain separate conditions.
+
+`RequiredQueryBuilder` handles OR groups containing `+`: required clauses become `must` (scoring) or `filter` (non-scoring), optional clauses become `should`, and excluded clauses become `must_not`. Once a required clause exists, optional clauses need not match. A group's `+` applies to its place in its parent, not to the group's internal operator: `+(a OR b)` still means either `a` or `b`.
+
+The new clause lists and nested-path dictionaries belong to each invocation; they are not shared visitor state. Give overlapping requests separate visitor contexts and ASTs, configure the visitor chain before using it concurrently, and ensure custom visitors and resolver callbacks also support concurrent calls. The helper does not make shared mutable contexts or concurrent configuration changes safe.
+
 ## Next Steps
 
 - [Nested Queries and Visitor Traversal](./nested-queries) - Nested query handling and traversal details
