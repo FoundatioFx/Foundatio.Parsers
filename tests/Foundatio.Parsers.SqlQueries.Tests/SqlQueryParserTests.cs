@@ -538,7 +538,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
             .SetDefaultFields(["FullName", "Title"]));
 
         // Act
-        string predicate = await parser.ToDynamicLinqAsync("-Jo?n", parser.GetContext(db.Employees.EntityType));
+        string predicate = await parser.ToDynamicLinqAsync("-Jo?n*", parser.GetContext(db.Employees.EntityType));
         var employees = await db.Employees.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
 
         // Assert

@@ -90,7 +90,7 @@ public class SqlQuerySyntaxTests : TestWithLoggingBase
             .SetDefaultFields(["FullName", "Title"]));
 
         // Act
-        string predicate = await parser.ToDynamicLinqAsync("-jo?n", parser.GetContext(db.Employees.EntityType));
+        string predicate = await parser.ToDynamicLinqAsync("-jo?n*", parser.GetContext(db.Employees.EntityType));
         string sql = db.Employees.Where(parser.ParsingConfig, predicate).ToQueryString();
 
         // Assert
