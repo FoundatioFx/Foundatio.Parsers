@@ -143,6 +143,7 @@ public class SqlQueryParser : LuceneQueryParser
                 IsDate = property.ClrType.UnwrapNullable()?.IsDateTime() ?? false,
                 IsDateOnly = property.ClrType.UnwrapNullable()?.IsDateOnly() ?? false,
                 IsBoolean = property.ClrType.UnwrapNullable()?.IsBoolean() ?? false,
+                IsString = property.ClrType.UnwrapNullable() == typeof(string),
                 Parent = parent
             });
         }
@@ -246,4 +247,4 @@ public static class FTS
     }
 }
 
-public class DynamicLinqTypeProvider() : DefaultDynamicLinqCustomTypeProvider(ParsingConfig.Default, [typeof(EF), typeof(FTS)]);
+public class DynamicLinqTypeProvider() : DefaultDynamicLinqCustomTypeProvider(ParsingConfig.Default, [typeof(EF), typeof(FTS), typeof(DbFunctionsExtensions)]);

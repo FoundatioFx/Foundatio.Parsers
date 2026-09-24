@@ -28,6 +28,8 @@ public class EntityFieldInfo
     public bool IsDate { get; set; }
     public bool IsDateOnly { get; set; }
     public bool IsBoolean { get; set; }
+    /// <summary>Whether the mapped property is a string, or null when its type is unknown.</summary>
+    public bool? IsString { get; set; }
     public bool IsCollection { get; set; }
     public bool IsNavigation { get; set; }
     public EntityFieldInfo? Parent { get; set; }

@@ -91,7 +91,7 @@ With no configured default fields, wildcard and regex terms use Elasticsearch `q
 
 ### Upgrading term translation and controlling cost
 
-**Breaking behavior change:** previously ignored modifiers now change matching or ranking, and escaped wildcards no longer broaden a literal into a prefix. Re-run saved queries and custom visitors against positive and negative fixtures before upgrading. Public API signatures and the grammar are unchanged by this translation update; the separate post-colon migration below still applies. SQL and aggregation translation do not gain these Elasticsearch query features.
+**Breaking behavior change:** previously ignored modifiers now change matching or ranking, and escaped wildcards no longer broaden a literal into a prefix. Re-run saved queries and custom visitors against positive and negative fixtures before upgrading. Public API signatures and the grammar are unchanged by this translation update; the separate post-colon migration below still applies. SQL now translates advanced wildcards on mapped string fields with escaped `LIKE` and rejects regex, fuzzy, proximity, and boost modifiers. Aggregation translation does not gain these Elasticsearch query features.
 
 Leading and embedded wildcards, regex, and fuzzy expansions can be expensive. Restrict fields and accepted syntax in the application, set `AllowLeadingWildcards = false` where appropriate, and configure Elasticsearch's expensive-query policy and request timeouts for the deployment. Regex complexity and fuzzy expansion limits remain Elasticsearch defaults; this library does not expose separate per-expression limits. Disabling leading wildcards does not bound regex cost. Server rejection is distinct from a library validation error or a successful empty result.
 

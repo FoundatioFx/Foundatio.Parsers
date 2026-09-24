@@ -218,18 +218,31 @@ await TermToFieldVisitor.RunAsync(result);
 Multiple visitors can be chained together with priority ordering:
 
 ```csharp
+using System;
+using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Visitors;
 
+var ast = await new LuceneQueryParser().ParseAsync("@include:active")
+    ?? throw new InvalidOperationException("Could not parse the example query.");
+var context = new QueryVisitorContext
+{
+    IncludeResolver = name => Task.FromResult<string?>(name is "active" ? "alias:active" : null)
+};
+QueryFieldResolver fieldResolver = (field, _) => Task.FromResult<string?>(field is "alias" ? "status" : field);
 var chainedVisitor = new ChainedQueryVisitor();
 
 // Add visitors with priority (lower runs first)
+chainedVisitor.AddVisitor(new IncludeVisitor(), priority: 0);
 chainedVisitor.AddVisitor(new FieldResolverQueryVisitor(fieldResolver), priority: 10);
-chainedVisitor.AddVisitor(new IncludeVisitor(), priority: 20);
 chainedVisitor.AddVisitor(new ValidationVisitor(), priority: 30);
 
 // Run all visitors
 var result = await chainedVisitor.AcceptAsync(ast, context);
+var query = await GenerateQueryVisitor.RunAsync(result!); // (status:active)
 ```
+
+Expanding includes first lets field resolution and validation process terms from the included query. At priority 20, included terms would miss the field resolver at priority 10.
 
 ### Managing Chained Visitors
 

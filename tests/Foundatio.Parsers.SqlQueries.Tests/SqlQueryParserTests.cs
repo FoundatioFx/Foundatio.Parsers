@@ -478,6 +478,91 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task ToDynamicLinqAsync_WithAliasedIncludeAndSqlLikeCharacters_ReturnsMatchingNonNullRow()
+    {
+        // Arrange
+        var serviceProvider = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(serviceProvider);
+        db.Companies.Add(new Company { Name = "Second", Location = "jo%_hn" });
+        await db.SaveChangesAsync(TestCancellationToken);
+
+        var parser = new SqlQueryParser(c => c.SetLoggerFactory(Log)
+            .UseFieldMap(new Dictionary<string, string> { ["location"] = "Location" })
+            .UseIncludes(new Dictionary<string, string> { ["matching"] = "location:jo%_?n" }));
+        var context = parser.GetContext(db.Companies.EntityType);
+        context.ValidationOptions!.AllowedFields.Add("location");
+
+        // Act
+        string predicate = await parser.ToDynamicLinqAsync("@include:matching", context);
+        string sql = db.Companies.Where(parser.ParsingConfig, predicate).ToQueryString();
+        var companies = await db.Companies.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
+
+        // Assert
+        Assert.Contains(" LIKE ", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(" ESCAPE ", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(companies);
+        Assert.Equal("Second", companies[0].Name);
+    }
+
+    [Theory]
+    [InlineData(@"Location:jo\*n", "jo*n")]
+    [InlineData(@"Location:jo\?n", "jo?n")]
+    public async Task ToDynamicLinqAsync_WithEscapedWildcard_ReturnsLiteralMatch(string query, string location)
+    {
+        // Arrange
+        var serviceProvider = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(serviceProvider);
+        db.Companies.Add(new Company { Name = "Literal", Location = location });
+        db.Companies.Add(new Company { Name = "Other", Location = "john" });
+        await db.SaveChangesAsync(TestCancellationToken);
+        var parser = new SqlQueryParser(configuration => configuration.SetLoggerFactory(Log));
+
+        // Act
+        string predicate = await parser.ToDynamicLinqAsync(query, parser.GetContext(db.Companies.EntityType));
+        string sql = db.Companies.Where(parser.ParsingConfig, predicate).ToQueryString();
+        var companies = await db.Companies.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
+
+        // Assert
+        Assert.DoesNotContain(" LIKE ", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Literal", Assert.Single(companies).Name);
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithExcludedDefaultWildcard_ReturnsOnlyNonMatchingEmployee()
+    {
+        // Arrange
+        var serviceProvider = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(serviceProvider);
+        var parser = new SqlQueryParser(configuration => configuration
+            .SetLoggerFactory(Log)
+            .SetDefaultFields(["FullName", "Title"]));
+
+        // Act
+        string predicate = await parser.ToDynamicLinqAsync("-Jo?n*", parser.GetContext(db.Employees.EntityType));
+        var employees = await db.Employees.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
+
+        // Assert
+        Assert.Equal("Jane Doe", Assert.Single(employees).FullName);
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithQuestionMarkAndTrailingStar_ReturnsMatchingEmployee()
+    {
+        // Arrange
+        var serviceProvider = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(serviceProvider);
+        var parser = new SqlQueryParser(configuration => configuration.SetLoggerFactory(Log));
+
+        // Act
+        string predicate = await parser.ToDynamicLinqAsync("FullName:Jo?n*", parser.GetContext(db.Employees.EntityType));
+        var employees = await db.Employees.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
+
+        // Assert
+        Assert.Single(employees);
+        Assert.Equal("John Doe", employees[0].FullName);
+    }
+
+    [Fact]
     public async Task CanSearchWithTokenizer()
     {
         var sp = GetServiceProvider();

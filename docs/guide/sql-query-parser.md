@@ -12,6 +12,7 @@ dotnet add package Foundatio.Parsers.SqlQueries
 
 ```csharp
 using Foundatio.Parsers.SqlQueries;
+using System.Linq.Dynamic.Core;
 using Microsoft.EntityFrameworkCore;
 
 var parser = new SqlQueryParser(c => c
@@ -53,7 +54,7 @@ var parser = new SqlQueryParser(c => c
     
     // Query includes
     .UseIncludes(new Dictionary<string, string> {
-        { "active", "Status == \"Active\"" }
+        { "active", "Status:Active" }
     })
     
     // Validation
@@ -102,15 +103,16 @@ Each field has metadata:
 ```csharp
 public class EntityFieldInfo
 {
-    public string Name { get; }           // Property name
-    public string FullName { get; }       // Full path (e.g., "Category.Name")
-    public bool IsNumber { get; }         // Numeric type
-    public bool IsDate { get; }           // DateTime type
-    public bool IsDateOnly { get; }       // DateOnly type
-    public bool IsBoolean { get; }        // Boolean type
-    public bool IsCollection { get; }     // Collection navigation
-    public bool IsNavigation { get; }     // Navigation property
-    public EntityFieldInfo Parent { get; } // Parent for nested fields
+    public string? Name { get; init; }          // Property name
+    public string? FullName { get; init; }      // Full path (e.g., "Category.Name")
+    public bool IsNumber { get; set; }         // Numeric type
+    public bool IsDate { get; set; }           // DateTime type
+    public bool IsDateOnly { get; set; }       // DateOnly type
+    public bool IsBoolean { get; set; }        // Boolean type
+    public bool? IsString { get; set; }        // String type when known
+    public bool IsCollection { get; set; }     // Collection navigation
+    public bool IsNavigation { get; set; }     // Navigation property
+    public EntityFieldInfo? Parent { get; set; } // Parent for nested fields
 }
 ```
 
@@ -134,7 +136,13 @@ public class EntityFieldInfo
 // Wildcard (contains)
 "name:*john*"
 // Generates: Name.Contains("john")
+
+// Embedded * or ? on a mapped string field
+"name:jo?n*"
+// Generates: DbFunctionsExtensions.Like(EF.Functions, Name, "jo_n%", "\\")
 ```
+
+Advanced wildcard patterns use SQL `LIKE` with an escape character. Literal `%`, `_`, and backslashes in the query are escaped in the pattern. Quoted and backslash-escaped `*` and `?` remain literal. Regex, fuzzy, proximity, and boost modifiers are rejected by SQL validation; `ValidateAsync` returns diagnostics and `ToDynamicLinqAsync` throws a validation exception. Advanced wildcards require mapped string fields outside SQL full-text search.
 
 ### Range Queries
 
@@ -348,8 +356,15 @@ var parser = new SqlQueryParser(c => c
 ## Complete Example
 
 ```csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.SqlQueries;
+using System.Linq.Dynamic.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 public class ProductSearchService
 {
@@ -368,8 +383,8 @@ public class ProductSearchService
                 { "brand", "Brand.Name" }
             })
             .UseIncludes(new Dictionary<string, string> {
-                { "available", "Status == \"Active\" AND Inventory > 0" },
-                { "sale", "DiscountPercent > 0" }
+                { "available", "Status:Active AND Inventory:>0" },
+                { "sale", "DiscountPercent:>0" }
             })
             .SetFieldDepth(2)
             .SetValidationOptions(new QueryValidationOptions {
@@ -400,7 +415,7 @@ public class ProductSearchService
 
     public async Task<PagedResult<Product>> SearchPagedAsync(
         string query,
-        string sort = null,
+        string? sort = null,
         int page = 1,
         int pageSize = 20)
     {

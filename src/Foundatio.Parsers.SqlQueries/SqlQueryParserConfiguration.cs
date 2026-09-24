@@ -18,6 +18,7 @@ public class SqlQueryParserConfiguration
     {
         AddSortVisitor(new TermToFieldVisitor(), 0);
         AddVisitor(new FieldResolverQueryVisitor((field, context) => FieldResolver is not null ? FieldResolver(field, context) : Task.FromResult<string?>(null)), 10);
+        AddQueryVisitor(new SqlSyntaxValidationVisitor(), 20);
         AddVisitor(new ValidationVisitor(), 30);
     }
 

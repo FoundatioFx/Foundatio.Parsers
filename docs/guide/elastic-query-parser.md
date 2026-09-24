@@ -454,7 +454,10 @@ query = await parser.BuildQueryAsync("nested.field5:val*");
 When default fields include both nested and non-nested fields, queries are automatically split and combined:
 
 ```csharp
-parser.SetDefaultFields(["field1", "nested.field1", "nested.field2"]);
+var parser = new ElasticQueryParser(c => c
+    .SetDefaultFields(["field1", "nested.field1", "nested.field2"])
+    .UseMappings(client, "my-index")
+    .UseNested());
 
 // Unqualified search term produces:
 // match(field1, "term") OR nested(multi_match(nested.field1, nested.field2, "term"))
@@ -463,9 +466,7 @@ var query = await parser.BuildQueryAsync("searchterm");
 
 ### Known Limitations
 
-- **Multi-level deeply nested types** -- Fields nested more than one level deep (e.g., `parent.child.field1` where both `parent` and `parent.child` are nested types) are wrapped at the outermost nested path only. The inner nested wrapper required by Elasticsearch for multi-level nesting is not generated automatically.
-
-For a detailed explanation of how visitors traverse nested query structures, field scoping rules, and the full AST breakdown, see [Nested Queries and Visitor Traversal](./nested-queries).
+Nested groups do not compose relative child field names from the enclosing group. Use the full path, such as `parent.child.field1`. With mappings for each nested level and `UseNested()`, a single field query uses the deepest nested path, while a query combining parent and child fields creates correlated wrappers. See [Nested Queries and Visitor Traversal](./nested-queries) for details.
 
 ## Runtime Fields
 

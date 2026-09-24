@@ -274,45 +274,51 @@ var query = await parser.BuildQueryAsync("@custom:(premium) AND category:electro
 Expand relative date expressions:
 
 ```csharp
+using System;
+using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
+
 public class DateRangeExpansionVisitor : ChainableMutatingQueryVisitor
 {
-    public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
+    public override Task<IQueryNode?> VisitAsync(TermNode node, IQueryVisitorContext context)
     {
-        if (IsDateField(node.Field) && IsRelativeDate(node.Term))
+        if (IsDateField(node.Field) && node.Term is { } term && IsRelativeDate(term))
         {
-            var (start, end) = ExpandRelativeDate(node.Term);
+            var (start, end) = ExpandRelativeDate(term);
             
             // Replace term node with range node
             var rangeNode = new TermRangeNode
             {
                 Field = node.Field,
+                Prefix = node.Prefix,
+                IsNegated = node.IsNegated,
                 Min = start,
                 Max = end,
                 MinInclusive = true,
                 MaxInclusive = true
             };
             
-            node.ReplaceSelf(rangeNode);
+            return Task.FromResult<IQueryNode?>(node.ReplaceSelf(rangeNode));
         }
         
-        return Task.CompletedTask;
+        return Task.FromResult<IQueryNode?>(node);
     }
 
-    private bool IsDateField(string field)
+    private static bool IsDateField(string? field)
     {
-        return field?.EndsWith("_date") == true || 
-               field?.EndsWith("_at") == true ||
-               field == "created" || 
-               field == "updated";
+        return field is "created" or "updated" ||
+               field?.EndsWith("_date", StringComparison.Ordinal) is true ||
+               field?.EndsWith("_at", StringComparison.Ordinal) is true;
     }
 
-    private bool IsRelativeDate(string term)
+    private static bool IsRelativeDate(string term)
     {
-        return term == "today" || term == "yesterday" || 
-               term == "this_week" || term == "last_week";
+        return term is "today" or "yesterday" or "this_week" or "last_week";
     }
 
-    private (string start, string end) ExpandRelativeDate(string term)
+    private static (string start, string end) ExpandRelativeDate(string term)
     {
         return term switch
         {
@@ -328,40 +334,36 @@ public class DateRangeExpansionVisitor : ChainableMutatingQueryVisitor
 
 ## Example: Query Logging Visitor
 
-Log all queries for analytics:
+Log query structure without recording raw terms:
 
 ```csharp
+using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
+using Microsoft.Extensions.Logging;
+
 public class QueryLoggingVisitor : ChainableQueryVisitor
 {
     private readonly ILogger _logger;
-    private readonly List<string> _terms = new();
-    private readonly List<string> _fields = new();
 
     public QueryLoggingVisitor(ILogger logger)
     {
         _logger = logger;
     }
 
-    public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
+    public override async Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        _fields.Add(node.Field ?? "_default");
-        _terms.Add(node.Term);
-        return Task.CompletedTask;
+        var result = await base.AcceptAsync(node, context);
+        _logger.LogInformation("Query parsed. Term count: {TermCount}", CountTerms(result ?? node));
+        return result;
     }
 
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
+    private static int CountTerms(IQueryNode node)
     {
-        _terms.Clear();
-        _fields.Clear();
-        
-        var result = await base.AcceptAsync(node, context);
-        
-        _logger.LogInformation(
-            "Query executed. Fields: {Fields}, Terms: {Terms}",
-            string.Join(", ", _fields.Distinct()),
-            string.Join(", ", _terms));
-        
-        return result;
+        int count = node is TermNode ? 1 : 0;
+        foreach (var child in node.Children)
+            count += CountTerms(child);
+        return count;
     }
 }
 ```
@@ -371,19 +373,18 @@ public class QueryLoggingVisitor : ChainableQueryVisitor
 When using chained visitors, priority determines execution order (lower runs first):
 
 ```csharp
+using System.Collections.Generic;
+using Foundatio.Parsers.ElasticQueries;
+
+var includes = new Dictionary<string, string> { ["active"] = "statusAlias:active" };
+var fieldAliases = new Dictionary<string, string> { ["statusAlias"] = "status" };
 var parser = new ElasticQueryParser(c => c
-    // Field resolution first
-    .AddVisitor(new FieldResolverQueryVisitor(resolver), priority: 10)
-    
-    // Then include expansion
-    .AddVisitor(new IncludeVisitor(), priority: 20)
-    
-    // Then custom processing
-    .AddVisitor(new CustomFilterVisitor(), priority: 50)
-    
-    // Validation last
-    .AddVisitor(new ValidationVisitor(), priority: 100));
+    .UseIncludes(includes) // Expands includes at priority 0
+    .UseFieldMap(fieldAliases) // Resolves fields at priority 10
+    .AddVisitor(new CustomFilterVisitor(), priority: 15));
 ```
+
+Expand includes before resolving fields so aliases inside included queries are resolved too. Priority 15 runs the custom visitor after field resolution (10) and before mapping validation (20) and query validation (30). `AddVisitor` registers it in the query, aggregation, and sort chains; use `AddQueryVisitor` only when it should process queries alone.
 
 ## Best Practices
 
