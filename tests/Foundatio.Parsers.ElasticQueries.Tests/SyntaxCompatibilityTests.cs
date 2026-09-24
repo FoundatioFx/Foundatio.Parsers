@@ -56,12 +56,13 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
             }));
 
         // Act
-        var results = await Task.WhenAll(Enumerable.Range(0, requestCount).Select(index => Task.Run(async () =>
+        var requests = new Task<(int Index, IQueryNode? Node, ElasticQueryVisitorContext Context)>[requestCount];
+        for (int index = 0; index < requestCount; index++)
         {
-            var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = index % 2 is 0 };
-            var node = await parser.ParseAsync($"+@include:value{index} keyword:optional", context);
-            return (Index: index, Node: node, Context: context);
-        }, TestCancellationToken)));
+            int requestIndex = index;
+            requests[index] = Task.Run(() => ParseRequestAsync(requestIndex), TestCancellationToken);
+        }
+        var results = await Task.WhenAll(requests);
 
         // Assert
         foreach (var result in results)
@@ -73,6 +74,13 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
             Assert.Equal("+", required.Prefix);
             var included = Assert.IsType<GroupNode>(required.Left);
             Assert.Equal($"value{result.Index}", Assert.IsType<TermNode>(included.Left).Term);
+        }
+
+        async Task<(int Index, IQueryNode? Node, ElasticQueryVisitorContext Context)> ParseRequestAsync(int index)
+        {
+            var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = index % 2 is 0 };
+            var node = await parser.ParseAsync($"+@include:value{index} keyword:optional", context);
+            return (index, node, context);
         }
     }
 

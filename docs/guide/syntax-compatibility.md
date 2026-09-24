@@ -10,7 +10,7 @@ This page describes known differences in the default `ElasticQueryParser` query 
 
 Foundatio's default query operator is **AND**; Elasticsearch `query_string` and bare Lucene classic default to **OR**. Configure the operator explicitly when migrating fieldless or adjacent terms. Matching that setting does not remove the other differences below.
 
-The C# integration tests include these standard-analyzed documents:
+Consider these documents with a standard-analyzed `text` field:
 
 | ID | `text` |
 |----|--------|
@@ -67,11 +67,9 @@ These are query-generation limitations, not recommendations to remove support fr
 
 ### Matching and scoring are separate contracts
 
-The live scoring controls show that `^8` on a term, phrase, or parenthesized disjunction leaves Foundatio's scores unchanged. Elasticsearch `query_string` applies an eightfold multiplier in these controls. In the full corpus, `text:alpha^8 OR text:gamma` reverses the relative ranking of documents `a` and `c` in Elasticsearch `query_string`, but not in Foundatio. Group boosts therefore need the same caution as term and phrase boosts.
+The default builder does not apply `^8` to terms, phrases, or parenthesized groups. Elasticsearch `query_string` applies the boost, so the same expression can rank matching documents differently. Group boosts need the same caution as term and phrase boosts.
 
-`UseScoring = false` intentionally builds filter-context queries. Compare their document sets with a reference query in filter context; do not expect relevance scores to equal a scoring query. The integration tests separately check zero filter scores, matching document IDs, score equivalence for selected unmodified queries on the same Elasticsearch index, and the boost/ranking differences above.
-
-The score comparisons use the same Elasticsearch index. They do not establish raw-score equality with a separately built Lucene index: similarity, indexed statistics, and query rewriting can affect scores.
+`UseScoring = false` intentionally builds filter-context queries with zero scores. Optional conditions can affect ranking only when scoring is enabled. Scores also depend on mappings, analyzers, indexed statistics, and query rewriting; matching document sets do not imply identical scores across consumers or indexes.
 
 ### Wildcards depend on the generated query path
 
@@ -169,15 +167,6 @@ Do not forward negated-disjunction, fuzzy, proximity, regex, boost, or general w
 
 Finally, compare **both the generated query and returned documents** under the application's actual mappings. Include positive and negative fixtures, analyzed and keyword fields, and scoring assertions when ranking matters. Default fields, default operators, filter/scoring context, nested queries, aliases, and visitors can all change behavior without changing whether the input parses. For production inputs, enforce the supported subset explicitly; documenting an ignored modifier does not make it safe to accept when the application requires its semantics.
 
-## Verification and maintenance
+## References
 
-The C# tests in `tests/Foundatio.Parsers.ElasticQueries.Tests` cover these contracts at two levels:
-
-- `SyntaxCompatibilityTests` checks AST values and generated Elasticsearch query objects with in-memory mappings, including escaping, ranges, modifiers, wildcard paths, date-range time zones, and city/ZIP-code resolution.
-- `SyntaxCompatibilityIntegrationTests` runs fixed C# documents and query cases against Elasticsearch. It checks independent expected document IDs for Foundatio and `query_string` in filter and scoring contexts, plus score relationships, ranking, and date boundaries. The fixture explicitly uses standard-analyzed text, keyword, integer, `date`, and `date_nanos` fields.
-
-`RequiredClauseIntegrationTests` uses a separate eight-document fixture containing every combination of three keyword tags. It checks required/optional/excluded combinations against independent expected results, with additional group, include, nested and scoring cases. The small overlap with compatibility examples is intentional: readable examples explain regressions, while the generated permutations check modifier position and Boolean combinations. Existing visitor and SQL test classes cover include parent links, failure recovery, concurrent contexts, and Dynamic LINQ execution and translation.
-
-These tests record both agreements and known limitations. When a runtime fix changes a result, update its expected behavior and this guide together. A passing suite does not establish universal parity across mappings, analyzers, nested queries, aliases, custom visitors, engine versions, or scoring configurations. The C# suite does not execute a standalone Lucene classic parser; Lucene-specific statements rely on the primary references below.
-
-Primary references: [Elasticsearch query_string](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query), [Elasticsearch exists](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-exists-query), [Lucene classic QueryParser](https://lucene.apache.org/core/10_3_1/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html), and [Lucene's classic grammar](https://github.com/apache/lucene/blob/main/lucene/queryparser/src/java/org/apache/lucene/queryparser/classic/QueryParser.jj). Foundatio's behavior is defined by `LuceneQueryParser.peg`, `Visitors/CombineQueriesVisitor.cs`, and `Extensions/DefaultQueryNodeExtensions.cs`.
+See [Elasticsearch query_string](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query), [Elasticsearch exists](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-exists-query), [Lucene classic QueryParser](https://lucene.apache.org/core/10_3_1/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html), and [Lucene's classic grammar](https://github.com/apache/lucene/blob/main/lucene/queryparser/src/java/org/apache/lucene/queryparser/classic/QueryParser.jj).

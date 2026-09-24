@@ -2079,6 +2079,62 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         Assert.Contains(response.Documents, d => d.Title is "docA");
     }
 
+    [Theory]
+    [InlineData("+title:keep -parent.childA.name:Alice -parent.childB.name:Bob", false)]
+    [InlineData("+title:keep -parent.childA.name:Alice -parent.childB.name:Bob", true)]
+    [InlineData("+title:keep parent.childA.name:NotAlice -parent.childA.name:Alice -parent.childB.name:Bob", false)]
+    [InlineData("+title:keep parent.childA.name:NotAlice -parent.childA.name:Alice -parent.childB.name:Bob", true)]
+    public async Task BuildQueryAsync_WithRequiredRootAndExcludedNestedSiblings_ExcludesAnyProhibitedParent(string text, bool scoring)
+    {
+        // Arrange
+        string index = await CreateRandomIndexAsync<SiblingNestedDoc>(d => d.Properties(p => p
+            .Keyword("title")
+            .Nested("parent", parent => parent.Properties(properties => properties
+                .Nested("childA", child => child.Properties(fields => fields.Keyword("name")))
+                .Nested("childB", child => child.Properties(fields => fields.Keyword("name")))))));
+        SiblingParent clean = new()
+        {
+            ChildA = [new SiblingChild { Name = "NotAlice" }],
+            ChildB = [new SiblingChild { Name = "NotBob" }]
+        };
+        SiblingParent alice = new() { ChildA = [new SiblingChild { Name = "Alice" }] };
+        SiblingParent bob = new() { ChildB = [new SiblingChild { Name = "Bob" }] };
+        SiblingNestedDoc[] documents =
+        [
+            new() { Title = "keep", Parent = [clean] },
+            new() { Title = "keep" },
+            new() { Title = "keep", Parent = [alice] },
+            new() { Title = "keep", Parent = [bob] },
+            new() { Title = "keep", Parent = [clean, alice] },
+            new() { Title = "keep", Parent = [clean, bob] },
+            new() { Title = "other", Parent = [clean] }
+        ];
+        var indexed = await Client.IndexManyAsync(documents, index, TestCancellationToken);
+        Assert.False(indexed.Errors, indexed.DebugInformation);
+        await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+        var parser = new ElasticQueryParser(configuration => configuration.UseMappings<SiblingNestedDoc>(Client).UseNested());
+
+        // Act
+        var query = await parser.BuildQueryAsync(text,
+            new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring });
+        var response = await Client.SearchAsync<SiblingNestedDoc>(descriptor => descriptor.Indices(index).Query(query), TestCancellationToken);
+
+        // Assert
+        Assert.True(response.IsValidResponse, response.DebugInformation);
+        Assert.Equal(0, response.Shards.Failed);
+        Assert.False(response.TimedOut);
+        Assert.Equal(2, response.Total);
+        Assert.All(response.Documents, document =>
+        {
+            Assert.Equal("keep", document.Title);
+            Assert.All(document.Parent, parent =>
+            {
+                Assert.DoesNotContain(parent.ChildA, child => child.Name is "Alice");
+                Assert.DoesNotContain(parent.ChildB, child => child.Name is "Bob");
+            });
+        });
+    }
+
     public class FilteredItemsDoc
     {
         public string Title { get; set; } = null!;

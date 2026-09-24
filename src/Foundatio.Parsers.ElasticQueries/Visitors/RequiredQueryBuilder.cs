@@ -12,7 +12,8 @@ namespace Foundatio.Parsers.ElasticQueries.Visitors;
 /// <summary>Builds OR groups containing + clauses without making their optional clauses mandatory.</summary>
 internal static class RequiredQueryBuilder
 {
-    public static async Task<List<IFieldQueryNode>?> GetClausesAsync(GroupNode node, IElasticQueryVisitorContext context)
+    /// <summary>Captures an OR group's operands and required status before child queries are generated.</summary>
+    public static async Task<List<(IFieldQueryNode Node, bool Required)>?> GetClausesAsync(GroupNode node, IElasticQueryVisitorContext context)
     {
         if (node.GetOperator(context) is not GroupOperator.Or)
             return null;
@@ -20,27 +21,32 @@ internal static class RequiredQueryBuilder
         // The parser uses binary groups even for a OR b OR c without parentheses.
         // Unmodified groups with the same OR operator belong to one list of clauses;
         // parentheses, field scopes, modifiers and custom queries keep their own boundaries.
-        if (IsImplicitGroup(node) && node.Parent is GroupNode parent && parent.GetOperator(context) is GroupOperator.Or
-            && await node.GetQueryAsync().AnyContext() is null)
-        {
+        bool isImplicit = await IsImplicitGroupAsync(node).AnyContext();
+        if (isImplicit && node.Parent is GroupNode parent && parent.GetOperator(context) is GroupOperator.Or)
             return null;
-        }
 
-        var clauses = new List<IFieldQueryNode>();
+        var clauses = new List<(IFieldQueryNode Node, bool Required)>();
         var pending = new Stack<IQueryNode>();
         PushChildren(node);
         bool hasRequired = false;
         while (pending.TryPop(out var child))
         {
-            if (child is GroupNode group && IsImplicitGroup(group) && group.GetOperator(context) is GroupOperator.Or
-                && await group.GetQueryAsync().AnyContext() is null)
+            if (child is GroupNode group && group.GetOperator(context) is GroupOperator.Or)
             {
-                PushChildren(group);
+                bool flatten = await IsImplicitGroupAsync(group).AnyContext();
+                if (flatten)
+                {
+                    PushChildren(group);
+
+                    continue;
+                }
             }
-            else if (child is IFieldQueryNode fieldNode)
+
+            if (child is IFieldQueryNode fieldNode)
             {
-                clauses.Add(fieldNode);
-                hasRequired |= fieldNode.IsRequired() && !fieldNode.IsExcluded();
+                bool required = await HasRequiredClauseAsync(fieldNode).AnyContext();
+                clauses.Add((fieldNode, required));
+                hasRequired |= required;
             }
         }
 
@@ -56,10 +62,8 @@ internal static class RequiredQueryBuilder
         }
     }
 
-    private static bool IsImplicitGroup(GroupNode node) => !node.HasParens && String.IsNullOrEmpty(node.Field)
-        && node.Prefix is null && node.IsNegated is not true && node.Boost is null && node.Proximity is null;
-
-    public static async Task<Query> BuildAsync(List<IFieldQueryNode> clauses, Query? initial, IElasticQueryVisitorContext context)
+    /// <summary>Combines generated operands while preserving required conditions and nested correlation.</summary>
+    public static async Task<Query> BuildAsync(List<(IFieldQueryNode Node, bool Required)> clauses, Query? initial, IElasticQueryVisitorContext context)
     {
         var root = new ClauseSet(context.UseScoring);
         if (initial is not null)
@@ -67,12 +71,12 @@ internal static class RequiredQueryBuilder
 
         var nestedClauses = new Dictionary<string, ClauseSet>(StringComparer.Ordinal);
         var excludedNested = new Dictionary<string, List<Query>>(StringComparer.Ordinal);
-        foreach (var child in clauses)
+        foreach (var (child, required) in clauses)
         {
             var query = await child.GetQueryAsync(() => child.GetDefaultQueryAsync(context)).AnyContext();
             if (query is null)
             {
-                if (child.IsRequired() && !child.IsExcluded())
+                if (required)
                     context.AddValidationError($"A required clause did not produce a query: {child}");
 
                 continue;
@@ -81,7 +85,7 @@ internal static class RequiredQueryBuilder
             bool explicitNestedGroup = child is GroupNode group && group.GetNestedPath() is not null;
             if (query.Nested is not { Path: not null } nested || explicitNestedGroup)
             {
-                root.Add(query, child.IsRequired(), child.IsExcluded());
+                root.Add(query, required, child.IsExcluded());
 
                 continue;
             }
@@ -99,15 +103,19 @@ internal static class RequiredQueryBuilder
             }
             else
             {
-                GetClauseSet(path).Add(inner, child.IsRequired());
+                GetClauseSet(path).Add(inner, required);
             }
         }
 
         var originalPaths = nestedClauses.Keys.Union(excludedNested.Keys, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
         var ancestorCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var requiredPaths = new HashSet<string>(StringComparer.Ordinal);
         foreach (string path in originalPaths)
         {
             var chain = NestedPathResolver.GetNestedPathChain(path, context);
+            if (nestedClauses.TryGetValue(path, out var clausesAtPath) && clausesAtPath.HasRequired)
+                requiredPaths.UnionWith(chain);
+
             foreach (string ancestor in chain.Take(chain.Count - 1))
                 ancestorCounts[ancestor] = ancestorCounts.GetValueOrDefault(ancestor) + 1;
         }
@@ -126,10 +134,16 @@ internal static class RequiredQueryBuilder
             if (nestedClauses.TryGetValue(path, out var pathClauses) && pathClauses.Build() is { } inner)
                 target.Add(new NestedQuery(path, inner), pathClauses.HasRequired);
 
-            // A prohibited nested clause is an anti-existence test, not a negated inner term.
             if (excludedNested.TryGetValue(path, out var excluded))
+            {
+                // Correlate exclusions only within a required nested ancestor. Otherwise
+                // keep them at the root: a clean sibling must not hide a prohibited match.
+                string? requiredParent = sortedPaths.FirstOrDefault(candidate => requiredPaths.Contains(candidate)
+                    && candidate.Length < path.Length && path.StartsWith(candidate + ".", StringComparison.Ordinal));
+                var exclusionTarget = requiredParent is null ? root : GetClauseSet(requiredParent);
                 foreach (var query in excluded)
-                    target.Add(new NestedQuery(path, query), excluded: true);
+                    exclusionTarget.Add(new NestedQuery(path, query), excluded: true);
+            }
         }
 
         return root.Build() ?? new MatchNoneQuery();
@@ -138,8 +152,42 @@ internal static class RequiredQueryBuilder
         {
             if (!nestedClauses.TryGetValue(path, out var set))
                 nestedClauses[path] = set = new ClauseSet(context.UseScoring);
+
             return set;
         }
+    }
+
+    /// <summary>Identifies parser-created grouping that adds no user-defined scope or custom query.</summary>
+    private static async Task<bool> IsImplicitGroupAsync(GroupNode node)
+    {
+        if (node.HasParens || !String.IsNullOrEmpty(node.Field) || node.Prefix is not null
+            || node.IsNegated is true || node.Boost is not null || node.Proximity is not null)
+            return false;
+
+        var query = await node.GetQueryAsync().AnyContext();
+        return query is null;
+    }
+
+    /// <summary>Preserves required conditions across implicit operator groups without crossing explicit scopes.</summary>
+    private static async Task<bool> HasRequiredClauseAsync(IFieldQueryNode node)
+    {
+        if (node.IsExcluded())
+            return false;
+        if (node.IsRequired())
+            return true;
+        if (node is not GroupNode group)
+            return false;
+
+        bool isImplicit = await IsImplicitGroupAsync(group).AnyContext();
+        if (!isImplicit)
+            return false;
+
+        // Keep an implicit AND subtree intact, but require it when it contains +.
+        bool leftRequired = group.Left is IFieldQueryNode left && await HasRequiredClauseAsync(left).AnyContext();
+        if (leftRequired)
+            return true;
+
+        return group.Right is IFieldQueryNode right && await HasRequiredClauseAsync(right).AnyContext();
     }
 
     private sealed class ClauseSet(bool useScoring)

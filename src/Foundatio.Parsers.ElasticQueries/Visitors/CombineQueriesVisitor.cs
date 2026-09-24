@@ -45,6 +45,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
             {
                 node.SetQuery(requiredQuery);
             }
+
             return;
         }
 

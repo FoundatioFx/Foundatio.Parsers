@@ -82,7 +82,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         };
         Employee[] employees = [new() { Id = 1 }, new() { Id = 2 }];
         using var db = new SampleContext(new DbContextOptionsBuilder<SampleContext>()
-            .UseSqlServer("Server=localhost;Database=QueryTranslation;Integrated Security=True")
+            .UseSqlServer()
             .Options);
 
         // Act
