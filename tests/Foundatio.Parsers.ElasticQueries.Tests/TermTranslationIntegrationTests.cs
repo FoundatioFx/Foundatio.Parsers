@@ -21,7 +21,7 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
         _fixture = fixture;
     }
 
-    public static IEnumerable<object[]> Cases()
+    public static IEnumerable<TheoryDataRow<string, string, bool>> TermMatchingCases()
     {
         (string Query, string Expected)[] cases =
         [
@@ -69,25 +69,39 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
 
         foreach (var (query, expected) in cases)
             foreach (bool scoring in new[] { false, true })
-                yield return [query, expected, scoring];
+                yield return new(query, expected, scoring);
     }
 
     [Theory]
-    [MemberData(nameof(Cases))]
-    public async Task BuildQueryAsync_WithTermSyntax_PreservesIndependentDocumentExpectations(string text, string expected, bool scoring)
+    [MemberData(nameof(TermMatchingCases))]
+    public async Task BuildQueryAsync_WithTermSyntax_ReturnsExpectedDocuments(string text, string expected, bool scoring)
     {
+        // Arrange
         using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
         var parser = CreateParser(resolver);
-        var native = await SearchAsync(await parser.BuildQueryAsync(text, Context(scoring)));
-        Assert.Equal(expected, Ids(native));
+
+        // Native bare fuzziness is distance 2; query_string otherwise defaults to AUTO.
+        string referenceText = text.EndsWith("~", StringComparison.Ordinal) ? text + "2" : text;
+        var referenceQuery = new QueryStringQuery(referenceText)
+        {
+            DefaultOperator = Operator.Or,
+            AnalyzeWildcard = true,
+            AllowLeadingWildcard = true
+        };
+
+        // Act
+        var query = await parser.BuildQueryAsync(text, CreateQueryContext(scoring));
+        var native = await SearchAsync(query);
+        var reference = text.Contains("children.", StringComparison.Ordinal) ? null : await SearchAsync(referenceQuery);
+
+        // Assert
+        Assert.Equal(expected, GetDocumentIds(native));
+
         if (!scoring)
             Assert.All(native.Hits, hit => Assert.Equal(0, hit.Score));
 
-        if (!text.Contains("children.", StringComparison.Ordinal))
-        {
-            var reference = await SearchAsync(new QueryStringQuery(text.EndsWith("~", StringComparison.Ordinal) ? text + "2" : text) { DefaultOperator = Operator.Or, AnalyzeWildcard = true, AllowLeadingWildcard = true });
-            Assert.Equal(expected, Ids(reference));
-        }
+        if (reference is not null)
+            Assert.Equal(expected, GetDocumentIds(reference));
     }
 
     [Theory]
@@ -99,32 +113,53 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [InlineData("john~1", "text", "a,b,e,g")]
     [InlineData("jo?n", "children.keyword", "a,b,c")]
     [InlineData("john\\*", "children.keyword", "e")]
-    public async Task BuildQueryAsync_WithConfiguredDefaultField_PreservesTermSyntax(string text, string field, string expected)
+    public async Task BuildQueryAsync_WithConfiguredDefaultField_ReturnsExpectedDocuments(string text, string field, string expected)
     {
+        // Arrange
         using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
         var parser = CreateParser(resolver, [field]);
-        Assert.Equal(expected, Ids(await SearchAsync(await parser.BuildQueryAsync(text, Context(true)))));
+
+        // Act
+        var query = await parser.BuildQueryAsync(text, CreateQueryContext(true));
+        var result = await SearchAsync(query);
+
+        // Assert
+        Assert.Equal(expected, GetDocumentIds(result));
     }
 
     [Theory]
     [InlineData("jo?n", "a,b,e,g,p")]
     [InlineData("john~1", "a,b,e,g,p")]
     [InlineData("/john/", "a,e,g,p")]
-    public async Task BuildQueryAsync_WithMultipleAnalyzedFields_PreservesTermSyntax(string text, string expected)
+    public async Task BuildQueryAsync_WithMultipleAnalyzedFields_ReturnsExpectedDocuments(string text, string expected)
     {
+        // Arrange
         using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
         var parser = CreateParser(resolver, ["text", "otherText"]);
-        Assert.Equal(expected, Ids(await SearchAsync(await parser.BuildQueryAsync(text, Context(true)))));
+
+        // Act
+        var query = await parser.BuildQueryAsync(text, CreateQueryContext(true));
+        var result = await SearchAsync(query);
+
+        // Assert
+        Assert.Equal(expected, GetDocumentIds(result));
     }
 
     [Theory]
     [InlineData("jo?n", "a,b,c,e,g")]
     [InlineData("/john/", "a,e,g")]
-    public async Task BuildQueryAsync_WithMixedDefaultFields_PreservesTermSyntax(string text, string expected)
+    public async Task BuildQueryAsync_WithMixedDefaultFields_ReturnsExpectedDocuments(string text, string expected)
     {
+        // Arrange
         using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
         var parser = CreateParser(resolver, ["text", "keyword", "children.keyword"]);
-        Assert.Equal(expected, Ids(await SearchAsync(await parser.BuildQueryAsync(text, Context(true)))));
+
+        // Act
+        var query = await parser.BuildQueryAsync(text, CreateQueryContext(true));
+        var result = await SearchAsync(query);
+
+        // Assert
+        Assert.Equal(expected, GetDocumentIds(result));
     }
 
     [Theory]
@@ -144,15 +179,26 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [InlineData("+(children.text:john OR children.text:alpha)", "+(children.text:john OR children.text:alpha)^8")]
     public async Task BuildQueryAsync_WithBoost_MultipliesScoresWithoutChangingMembership(string baseline, string boosted)
     {
+        // Arrange
         using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
         var parser = CreateParser(resolver, ["text", "keyword", "children.keyword"]);
-        var before = await SearchAsync(await parser.BuildQueryAsync(baseline, Context(true)));
-        var after = await SearchAsync(await parser.BuildQueryAsync(boosted, Context(true)));
+
+        // Act
+        var baselineQuery = await parser.BuildQueryAsync(baseline, CreateQueryContext(true));
+        var boostedQuery = await parser.BuildQueryAsync(boosted, CreateQueryContext(true));
+        var before = await SearchAsync(baselineQuery);
+        var after = await SearchAsync(boostedQuery);
+
+        // Assert
         Assert.NotEmpty(before.Hits);
-        Assert.Equal(Ids(before), Ids(after));
+        Assert.Equal(GetDocumentIds(before), GetDocumentIds(after));
+
         var scores = before.Hits.ToDictionary(hit => hit.Id, hit => hit.Score!.Value);
         foreach (var hit in after.Hits)
-            Assert.True(Math.Abs(hit.Score!.Value - scores[hit.Id] * 8) <= 0.00001 * Math.Max(1, scores[hit.Id] * 8));
+        {
+            double expectedScore = scores[hit.Id] * 8;
+            Assert.True(Math.Abs(hit.Score!.Value - expectedScore) <= 0.00001 * Math.Max(1, expectedScore));
+        }
     }
 
     [Theory]
@@ -162,10 +208,16 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [InlineData("\"alpha beta\"~1", "k,l")]
     public async Task BuildQueryAsync_WithoutDefaultFields_UsesServerDefaultFields(string text, string expected)
     {
+        // Arrange
         using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
         var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings(resolver));
-        var result = await SearchAsync(await parser.BuildQueryAsync(text, Context(true)));
-        Assert.Equal(expected, Ids(result));
+
+        // Act
+        var query = await parser.BuildQueryAsync(text, CreateQueryContext(true));
+        var result = await SearchAsync(query);
+
+        // Assert
+        Assert.Equal(expected, GetDocumentIds(result));
     }
 
     [Theory]
@@ -174,13 +226,20 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [InlineData("children.keyword:*john")]
     public async Task BuildQueryAsync_WithDisallowedLeadingWildcard_RejectsBeforeSearch(string text)
     {
+        // Arrange
         using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
         var parser = CreateParser(resolver);
         var options = new QueryValidationOptions { AllowLeadingWildcards = false };
-        Assert.False((await parser.ValidateQueryAsync(text, options)).IsValid);
-        var context = Context(true);
+        var context = CreateQueryContext(true);
         context.SetValidationOptions(options);
-        await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync(text, context));
+
+        // Act
+        var validation = await parser.ValidateQueryAsync(text, options);
+        var error = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync(text, context));
+
+        // Assert
+        Assert.False(validation.IsValid);
+        Assert.NotNull(error.Result);
     }
 
     [Theory]
@@ -189,11 +248,18 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [InlineData("keyword:\"?ohn\"")]
     public async Task BuildQueryAsync_WithLiteralLeadingWildcard_DoesNotTreatItAsAnOperator(string text)
     {
+        // Arrange
         using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
         var parser = CreateParser(resolver);
-        var context = Context(true);
+        var context = CreateQueryContext(true);
         context.SetValidationOptions(new QueryValidationOptions { AllowLeadingWildcards = false });
-        Assert.Empty((await SearchAsync(await parser.BuildQueryAsync(text, context))).Hits);
+
+        // Act
+        var query = await parser.BuildQueryAsync(text, context);
+        var result = await SearchAsync(query);
+
+        // Assert
+        Assert.Empty(result.Hits);
     }
 
     private ElasticQueryParser CreateParser(ElasticMappingResolver resolver, string[]? fields = null) => new(configuration => configuration
@@ -203,19 +269,21 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
         .UseIncludes(new Dictionary<string, string> { { "john", "text:john" } })
         .UseNested());
 
-    private static ElasticQueryVisitorContext Context(bool scoring) => new() { UseScoring = scoring, DefaultOperator = GroupOperator.Or };
+    private static ElasticQueryVisitorContext CreateQueryContext(bool scoring) => new() { UseScoring = scoring, DefaultOperator = GroupOperator.Or };
 
-    private async Task<SearchResponse<TermTranslationFixture.Document>> SearchAsync(Query query)
+    private async Task<SearchResponse<TermTranslationFixture.TermTranslationDocument>> SearchAsync(Query query)
     {
-        var response = await Client.SearchAsync<TermTranslationFixture.Document>(descriptor => descriptor
+        var response = await Client.SearchAsync<TermTranslationFixture.TermTranslationDocument>(descriptor => descriptor
             .Indices(_fixture.Index).Query(query).Size(100).TrackTotalHits(true).AllowPartialSearchResults(false), TestCancellationToken);
+
         Assert.True(response.IsValidResponse, response.DebugInformation);
         Assert.False(response.TimedOut);
         Assert.Equal(0, response.Shards.Failed);
         Assert.Equal(response.Total, response.Hits.Count);
         Assert.All(response.Hits, hit => Assert.True(hit.Score.HasValue && Double.IsFinite(hit.Score.Value)));
+
         return response;
     }
 
-    private static string Ids(SearchResponse<TermTranslationFixture.Document> response) => String.Join(',', response.Hits.Select(hit => hit.Id).Order(StringComparer.Ordinal));
+    private static string GetDocumentIds(SearchResponse<TermTranslationFixture.TermTranslationDocument> response) => String.Join(',', response.Hits.Select(hit => hit.Id).Order(StringComparer.Ordinal));
 }

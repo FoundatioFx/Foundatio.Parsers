@@ -1,6 +1,4 @@
 using System;
-using System.Globalization;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
@@ -37,33 +35,53 @@ public sealed class TermTranslationFixture : ElasticsearchFixture
     public override async ValueTask InitializeAsync()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        string?[] values = ["john", "joan", "jo?n", "johnny", "john*", "jo?nny", "JOHN", "foo:bar", "foo:barista", "foo:bar*", "alpha beta", "alpha:beta", "path\\name", "path/name", "", null];
-        var documents = values.Select((value, index) => new Document
-        {
-            Id = ((char)('a' + index)).ToString(CultureInfo.InvariantCulture),
-            Keyword = value,
-            Text = index == 11 ? "alpha gamma beta" : value,
-            OtherText = index == 15 ? "john" : null,
-            Children = value is null ? [] : [new Child(value, index == 11 ? "alpha gamma beta" : value)]
-        }).ToArray();
+        TermTranslationDocument[] documents =
+        [
+            CreateDocument("a", "john"),
+            CreateDocument("b", "joan"),
+            CreateDocument("c", "jo?n"),
+            CreateDocument("d", "johnny"),
+            CreateDocument("e", "john*"),
+            CreateDocument("f", "jo?nny"),
+            CreateDocument("g", "JOHN"),
+            CreateDocument("h", "foo:bar"),
+            CreateDocument("i", "foo:barista"),
+            CreateDocument("j", "foo:bar*"),
+            CreateDocument("k", "alpha beta"),
+            CreateDocument("l", "alpha:beta", text: "alpha gamma beta"),
+            CreateDocument("m", @"path\name"),
+            CreateDocument("n", "path/name"),
+            CreateDocument("o", String.Empty),
+            CreateDocument("p", null, otherText: "john")
+        ];
 
         await CreateIndexAsync(Index, descriptor => descriptor
             .Settings(settings => settings.NumberOfShards(1).NumberOfReplicas(0))
             .Mappings(Mapping));
         var bulk = await Client.IndexManyAsync(documents, Index, timeout.Token);
         Assert.True(bulk.IsValidResponse && !bulk.Errors, bulk.DebugInformation);
+
         var refresh = await Client.Indices.RefreshAsync(Index, cancellationToken: timeout.Token);
         Assert.True(refresh.IsValidResponse, refresh.DebugInformation);
     }
 
-    public sealed class Document
+    private static TermTranslationDocument CreateDocument(string id, string? value, string? text = null, string? otherText = null) => new()
     {
-        public string Id { get; set; } = String.Empty;
-        public string? Keyword { get; set; }
-        public string? Text { get; set; }
-        public string? OtherText { get; set; }
-        public Child[] Children { get; set; } = [];
+        Id = id,
+        Keyword = value,
+        Text = text ?? value,
+        OtherText = otherText,
+        Children = value is null ? [] : [new NestedTermValue(value, text ?? value)]
+    };
+
+    public sealed record TermTranslationDocument
+    {
+        public required string Id { get; init; }
+        public string? Keyword { get; init; }
+        public string? Text { get; init; }
+        public string? OtherText { get; init; }
+        public NestedTermValue[] Children { get; init; } = [];
     }
 
-    public sealed record Child(string? Keyword, string? Text);
+    public sealed record NestedTermValue(string? Keyword, string? Text);
 }

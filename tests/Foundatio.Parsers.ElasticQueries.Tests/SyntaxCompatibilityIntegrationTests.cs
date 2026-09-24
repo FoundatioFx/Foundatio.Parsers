@@ -207,9 +207,11 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         var native = await GetScoresAsync(await parser.BuildQueryAsync(query, ScoringContext()));
         var external = await GetScoresAsync(ReferenceQuery(query));
 
+        // Assert
         Assert.True(native["a"] > native["c"], "The alpha boost must reverse the unboosted ranking.");
         Assert.True(external["a"] > external["c"], "The reference boost must reverse that document ranking.");
         Assert.Equal(external.Keys.Order(StringComparer.Ordinal), native.Keys.Order(StringComparer.Ordinal));
+
         foreach (string id in native.Keys)
             AssertClose(external[id], native[id]);
     }

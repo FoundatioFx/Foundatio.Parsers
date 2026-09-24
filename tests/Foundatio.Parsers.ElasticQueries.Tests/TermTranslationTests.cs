@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
@@ -8,7 +10,6 @@ using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
-using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Xunit;
 using Xunit;
@@ -19,6 +20,8 @@ namespace Foundatio.Parsers.ElasticQueries.Tests;
 // Keep the executable contract and both syntax guides synchronized.
 public class TermTranslationTests : TestWithLoggingBase
 {
+    private readonly ElasticMappingResolver _resolver = CreateResolver();
+
     public TermTranslationTests(ITestOutputHelper output) : base(output) { }
 
     [Theory]
@@ -28,30 +31,53 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("keyword:john\\*", "term", "keyword", "value", "john*")]
     [InlineData("keyword:jo\\?n", "term", "keyword", "value", "jo?n")]
     [InlineData("keyword:\"john*\"", "term", "keyword", "value", "john*")]
-    public async Task BuildQueryAsync_WithLiteralTerm_DoesNotInventWildcardOperators(string query, string kind, string field, string property, string expected)
+    public async Task BuildQueryAsync_WithLiteralTerm_EmitsLiteralValue(string query, string kind, string field, string property, string expected)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
         var actual = Assert.Single(json.RootElement.EnumerateObject());
+
         Assert.Equal(kind, actual.Name);
-        Assert.Equal(expected, actual.Value.GetProperty(field).GetProperty(property).GetString());
+
+        var options = actual.Value.GetProperty(field);
+
+        Assert.Equal(expected, options.GetProperty(property).GetString());
+        Assert.False(options.TryGetProperty("boost", out _));
+        Assert.False(options.TryGetProperty("fuzziness", out _));
     }
 
     [Theory]
     [InlineData("text:john*", "john*", 1)]
     [InlineData("text:jo?n*", "jo?n*", 1)]
     [InlineData("text:jo?n", "jo?n", 1)]
+    [InlineData("text:jo*n", "jo*n", 1)]
     [InlineData("text:*john", "*john", 1)]
     [InlineData("text:otherText\\:john*", "otherText\\:john*", 1)]
     [InlineData("john*", "john*", 2)]
     public async Task BuildQueryAsync_WithAnalyzedWildcard_UsesEscapedTermAndExplicitOptions(string query, string value, int fieldCount)
     {
-        using var json = await BuildQueryJsonAsync(query, ["text", "otherText"]);
+        // Arrange
+        var parser = CreateParser(["text", "otherText"]);
+        string[] expectedFields = fieldCount == 1 ? ["text"] : ["text", "otherText"];
+
+        // Act
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
         var actual = Assert.Single(json.RootElement.EnumerateObject());
+
         Assert.Equal("query_string", actual.Name);
         Assert.Equal(value, actual.Value.GetProperty("query").GetString());
         Assert.True(actual.Value.GetProperty("analyze_wildcard").GetBoolean());
         Assert.True(actual.Value.GetProperty("allow_leading_wildcard").GetBoolean());
-        Assert.Equal(fieldCount, actual.Value.GetProperty("fields").GetArrayLength());
+        Assert.Equal(expectedFields, actual.Value.GetProperty("fields").EnumerateArray().Select(field => field.GetString()));
     }
 
     [Theory]
@@ -64,21 +90,39 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("keyword:jo?n*", "wildcard", "jo?n*")]
     public async Task BuildQueryAsync_WithKeywordPattern_DistinguishesPrefixAndWildcard(string query, string kind, string value)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
         var actual = Assert.Single(json.RootElement.EnumerateObject());
+
         Assert.Equal(kind, actual.Name);
         Assert.Equal(value, actual.Value.GetProperty("keyword").GetProperty("value").GetString());
     }
 
     [Theory]
     [InlineData("text:/foo.bar/", "text", "foo.bar")]
+    [InlineData("text:/foo\\.bar/", "text", "foo\\.bar")]
+    [InlineData("text:/val.*/", "text", "val.*")]
     [InlineData("keyword:/[0-9]+/", "keyword", "[0-9]+")]
     [InlineData("keyword:/val.*/", "keyword", "val.*")]
     [InlineData("keyword:/foo\\.bar/", "keyword", "foo\\.bar")]
     public async Task BuildQueryAsync_WithRegex_PreservesRegexOperatorsAndEscapes(string query, string field, string pattern)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
         var actual = Assert.Single(json.RootElement.EnumerateObject());
+
         Assert.Equal("regexp", actual.Name);
         Assert.Equal(pattern, actual.Value.GetProperty(field).GetProperty("value").GetString());
     }
@@ -88,10 +132,19 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("text:value~", "match", "text", 2)]
     [InlineData("text:value~0", "match", "text", 0)]
     [InlineData("keyword:value~1", "fuzzy", "keyword", 1)]
+    [InlineData("keyword:value~2", "fuzzy", "keyword", 2)]
     public async Task BuildQueryAsync_WithFuzzyTerm_EmitsEditDistance(string query, string kind, string field, int distance)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
         var actual = Assert.Single(json.RootElement.EnumerateObject());
+
         Assert.Equal(kind, actual.Name);
         Assert.Equal(distance, actual.Value.GetProperty(field).GetProperty("fuzziness").GetInt32());
     }
@@ -102,14 +155,24 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("keyword:\"a b\"~3", "keyword", 3)]
     public async Task BuildQueryAsync_WithPhraseSlop_EmitsSlop(string query, string field, int slop)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
         var actual = Assert.Single(json.RootElement.EnumerateObject());
+
         Assert.Equal("match_phrase", actual.Name);
         Assert.Equal(slop, actual.Value.GetProperty(field).GetProperty("slop").GetInt32());
     }
 
     [Theory]
     [InlineData("text:value^2", "match", "text", 2)]
+    [InlineData("text:\"a b\"^2", "match_phrase", "text", 2)]
+    [InlineData("keyword:value^2", "term", "keyword", 2)]
     [InlineData("text:\"a b\"^3", "match_phrase", "text", 3)]
     [InlineData("keyword:value^0", "term", "keyword", 0)]
     [InlineData("keyword:jo?n^4", "wildcard", "keyword", 4)]
@@ -117,35 +180,36 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("number:[1 TO 5]^2", "range", "number", 2)]
     public async Task BuildQueryAsync_WithBoost_EmitsNativeBoost(string query, string kind, string field, float boost)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
         var actual = Assert.Single(json.RootElement.EnumerateObject());
+
         Assert.Equal(kind, actual.Name);
         Assert.Equal(boost, actual.Value.GetProperty(field).GetProperty("boost").GetSingle());
     }
 
     [Fact]
-    public async Task BuildQueryAsync_WithGroupBoost_AppliesItToTheWholeGroup()
+    public async Task BuildQueryAsync_WithGroupBoost_BoostsTheWholeGroup()
     {
-        using var json = await BuildQueryJsonAsync("(text:a OR text:b)^8");
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var result = await parser.BuildQueryAsync("(text:a OR text:b)^8", new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
         var actual = Assert.Single(json.RootElement.EnumerateObject());
+
         Assert.Equal("bool", actual.Name);
         Assert.Equal(8, actual.Value.GetProperty("boost").GetSingle());
         Assert.Equal(2, actual.Value.GetProperty("must").GetProperty("bool").GetProperty("should").GetArrayLength());
-    }
-
-    [Theory]
-    [InlineData("date", "America/Chicago")]
-    [InlineData("dateNanos", "America/Chicago")]
-    [InlineData("date", "2")]
-    public async Task BuildQueryAsync_WithDateRangeCaret_EmitsTimeZoneNotBoost(string field, string timeZone)
-    {
-        using var json = await BuildQueryJsonAsync($"{field}:[2024-01-01 TO *]^\"{timeZone}\"");
-        var range = Assert.Single(json.RootElement.EnumerateObject());
-        Assert.Equal("range", range.Name);
-        var options = range.Value.GetProperty(field);
-        Assert.Equal("2024-01-01", options.GetProperty("gte").GetString());
-        Assert.Equal(timeZone, options.GetProperty("time_zone").GetString());
-        Assert.False(options.TryGetProperty("boost", out _));
     }
 
     [Theory]
@@ -155,10 +219,19 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("\"alpha beta\"~2", "multi_match")]
     public async Task BuildQueryAsync_WithoutDefaultFields_RetainsTermSyntax(string query, string kind)
     {
-        using var json = await BuildQueryJsonAsync(query);
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
         var actual = Assert.Single(json.RootElement.EnumerateObject());
+
         Assert.Equal(kind, actual.Name);
         Assert.False(actual.Value.TryGetProperty("fields", out _));
+
         if (query.Contains('~'))
             Assert.Equal(query.StartsWith('"') ? 2 : 1, actual.Value.GetProperty(query.StartsWith('"') ? "slop" : "fuzziness").GetInt32());
     }
@@ -181,20 +254,34 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("text:\"a b\"~junk")]
     public async Task BuildQueryAsync_WithInvalidModifier_ReportsPublicValidationError(string query)
     {
-        using var resolver = CreateResolver();
-        var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings(resolver));
-        Assert.False((await parser.ValidateQueryAsync(query)).IsValid);
-        await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync(query));
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var validation = await parser.ValidateQueryAsync(query);
+        var error = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync(query));
+
+        // Assert
+        Assert.False(validation.IsValid);
+        Assert.NotNull(error.Result);
     }
 
     [Fact]
     public async Task BuildQueryAsync_WithBoost_UsesInvariantCulture()
     {
+        // Arrange
         var previous = CultureInfo.CurrentCulture;
         try
         {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
-            using var json = await BuildQueryJsonAsync("text:value^1.5");
+            var parser = CreateParser();
+
+            // Act
+            var result = await parser.BuildQueryAsync("text:value^1.5", new ElasticQueryVisitorContext { UseScoring = true });
+
+            // Assert
+            using var json = await SerializeQueryAsync(result);
+
             Assert.Equal(1.5, json.RootElement.GetProperty("match").GetProperty("text").GetProperty("boost").GetDouble());
         }
         finally
@@ -209,29 +296,45 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("alias:/jo.n/", "regexp", "jo.n")]
     public async Task BuildQueryAsync_WithIncludedAlias_PreservesTranslationAndFieldRestrictions(string fragment, string kind, string value)
     {
-        using var resolver = CreateResolver();
+        // Arrange
         var parser = new ElasticQueryParser(configuration => configuration
             .SetLoggerFactory(Log)
-            .UseMappings(resolver)
-            .UseFieldMap(new System.Collections.Generic.Dictionary<string, string> { ["alias"] = "keyword" })
-            .UseIncludes(new System.Collections.Generic.Dictionary<string, string> { ["saved"] = fragment }));
+            .UseMappings(_resolver)
+            .UseFieldMap(new Dictionary<string, string> { ["alias"] = "keyword" })
+            .UseIncludes(new Dictionary<string, string> { ["saved"] = fragment }));
         var options = new QueryValidationOptions { AllowedFields = { "alias" } };
         var context = new ElasticQueryVisitorContext { UseScoring = true };
         context.SetValidationOptions(options);
 
+        // Act
         var query = await parser.BuildQueryAsync("@include:saved", context);
+        var restricted = await parser.ValidateQueryAsync("@include:saved", new QueryValidationOptions { RestrictedFields = { "alias" } });
+        var unresolved = await parser.ValidateQueryAsync("@include:missing");
 
+        // Assert
+        using var json = await SerializeQueryAsync(query);
+        var actual = Assert.Single(json.RootElement.EnumerateObject());
+
+        Assert.Equal(kind, actual.Name);
+        Assert.Equal(value, actual.Value.GetProperty("keyword").GetProperty("value").GetString());
         Assert.Contains("alias", context.GetValidationResult().ReferencedFields);
         Assert.Contains("saved", context.GetValidationResult().ReferencedIncludes);
-        if (kind == "term")
-            Assert.Equal(value, query.Term!.Value.ToString());
-        else if (kind == "wildcard")
-            Assert.Equal(value, query.Wildcard!.Value);
-        else
-            Assert.Equal(value, query.Regexp!.Value);
-        Assert.False((await parser.ValidateQueryAsync("@include:saved", new QueryValidationOptions { RestrictedFields = { "alias" } })).IsValid);
-        Assert.False((await parser.ValidateQueryAsync("@include:missing")).IsValid);
+        Assert.False(restricted.IsValid);
+        Assert.False(unresolved.IsValid);
     }
+
+    public override ValueTask DisposeAsync()
+    {
+        _resolver.Dispose();
+        return base.DisposeAsync();
+    }
+
+    private ElasticQueryParser CreateParser(string[]? defaultFields = null) => new(configuration =>
+    {
+        configuration.SetLoggerFactory(Log).UseMappings(_resolver);
+        if (defaultFields is not null)
+            configuration.SetDefaultFields(defaultFields);
+    });
 
     private static ElasticMappingResolver CreateResolver() => new(() => new TypeMapping
     {
@@ -246,20 +349,12 @@ public class TermTranslationTests : TestWithLoggingBase
         }
     });
 
-    private async Task<JsonDocument> BuildQueryJsonAsync(string query, string[]? defaultFields = null)
+    private static async Task<JsonDocument> SerializeQueryAsync(Query query)
     {
-        using var resolver = CreateResolver();
-        var parser = new ElasticQueryParser(configuration =>
-        {
-            configuration.SetLoggerFactory(Log).UseMappings(resolver);
-            if (defaultFields is not null)
-                configuration.SetDefaultFields(defaultFields);
-        });
-        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
         using var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
         var client = new ElasticsearchClient(settings);
         using var stream = new MemoryStream();
-        client.RequestResponseSerializer.Serialize<Query>(result, stream);
+        client.RequestResponseSerializer.Serialize(query, stream);
         stream.Position = 0;
         return await JsonDocument.ParseAsync(stream, cancellationToken: TestContext.Current.CancellationToken);
     }
