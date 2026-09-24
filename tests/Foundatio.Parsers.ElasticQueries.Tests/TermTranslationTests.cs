@@ -162,6 +162,31 @@ public class TermTranslationTests : TestWithLoggingBase
     }
 
     [Theory]
+    [InlineData("text:value~AUTO", "match", "text", "AUTO")]
+    [InlineData("keyword:value~auto", "fuzzy", "keyword", "AUTO")]
+    [InlineData(@"text:value~AUTO\:3,6", "match", "text", "AUTO:3,6")]
+    [InlineData(@"keyword:value~auto\:2,4", "fuzzy", "keyword", "AUTO:2,4")]
+    [InlineData(@"keyword:value~AUTO\:0,0", "fuzzy", "keyword", "AUTO:0,0")]
+    [InlineData(@"keyword:value~AUTO\:3,3", "fuzzy", "keyword", "AUTO:3,3")]
+    [InlineData(@"keyword:value~AUTO\:+3,+6", "fuzzy", "keyword", "AUTO:3,6")]
+    [InlineData(@"keyword:value~AUTO\:0,2147483647", "fuzzy", "keyword", "AUTO:0,2147483647")]
+    public async Task BuildQueryAsync_WithAutoFuzziness_EmitsLengthDependentPolicy(string query, string kind, string field, string policy)
+    {
+        // Arrange
+        var parser = CreateParser();
+
+        // Act
+        var result = await parser.BuildQueryAsync(query, new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var json = await SerializeQueryAsync(result);
+        var actual = Assert.Single(json.RootElement.EnumerateObject());
+
+        Assert.Equal(kind, actual.Name);
+        Assert.Equal(policy, actual.Value.GetProperty(field).GetProperty("fuzziness").GetString());
+    }
+
+    [Theory]
     [InlineData("text:\"a b\"~5", "text", 5)]
     [InlineData("text:\"a b\"~", "text", 0)]
     [InlineData("keyword:\"a b\"~3", "keyword", 3)]
@@ -340,10 +365,21 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("text:value~3")]
     [InlineData("text:value~NaN")]
     [InlineData("text:value~0.8")]
-    [InlineData("text:value~AUTO")]
-    [InlineData("keyword:value~AUTO")]
-    [InlineData(@"text:value~AUTO\:3,6")]
-    [InlineData(@"keyword:value~AUTO\:3,6")]
+    [InlineData("text:value~AUTOMATIC")]
+    [InlineData(@"keyword:value~AUTO\:")]
+    [InlineData(@"keyword:value~AUTO\:3")]
+    [InlineData(@"keyword:value~AUTO\:3,")]
+    [InlineData(@"keyword:value~AUTO\:,6")]
+    [InlineData(@"keyword:value~AUTO\:3,6,9")]
+    [InlineData(@"keyword:value~AUTO\:-1,6")]
+    [InlineData(@"keyword:value~AUTO\:6,3")]
+    [InlineData(@"keyword:value~AUTO\:3.5,6")]
+    [InlineData(@"keyword:value~AUTO\:3,2147483648")]
+    [InlineData(@"keyword:value~AUTO\:3,\ 6")]
+    [InlineData("text:\"a b\"~AUTO")]
+    [InlineData("keyword:jo*n~AUTO")]
+    [InlineData("keyword:/john/~AUTO")]
+    [InlineData("(text:a OR text:b)~AUTO")]
     [InlineData("text:value^NaN")]
     [InlineData("text:value^-1")]
     [InlineData("text:value^1e100")]
@@ -367,6 +403,28 @@ public class TermTranslationTests : TestWithLoggingBase
         // Assert
         Assert.False(validation.IsValid);
         Assert.NotNull(error.Result);
+    }
+
+    [Theory]
+    [InlineData("number", "/12/")]
+    [InlineData("date", "/2026/")]
+    [InlineData("dateNanos", "/2026/")]
+    [InlineData("boolean", "/true/")]
+    [InlineData("number", "12~1")]
+    [InlineData("date", "2026~AUTO")]
+    [InlineData("boolean", "true~AUTO")]
+    public async Task BuildQueryAsync_WithStringModifierOnScalarField_ReportsValidationError(string field, string term)
+    {
+        // Arrange
+        var parser = CreateParser(["text", field]);
+
+        // Act
+        var explicitError = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync($"{field}:{term}"));
+        var defaultFieldError = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync(term));
+
+        // Assert
+        Assert.Contains(field, explicitError.Message);
+        Assert.Contains(field, defaultFieldError.Message);
     }
 
     [Fact]
@@ -447,6 +505,7 @@ public class TermTranslationTests : TestWithLoggingBase
             { "otherText", new TextProperty() },
             { "keyword", new KeywordProperty() },
             { "number", new IntegerNumberProperty() },
+            { "boolean", new BooleanProperty() },
             { "date", new DateProperty() },
             { "dateNanos", new DateNanosProperty() }
         }

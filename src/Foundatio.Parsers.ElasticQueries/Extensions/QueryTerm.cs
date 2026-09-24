@@ -74,17 +74,9 @@ internal readonly record struct QueryTerm
                     return false;
                 }
             }
-            else if (proximity.Length is 0)
+            else if (!TryReadFuzziness(proximity, out fuzziness))
             {
-                fuzziness = new Fuzziness(2);
-            }
-            else if (Int32.TryParse(proximity, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int distance) && distance is >= 0 and <= 2)
-            {
-                fuzziness = new Fuzziness(distance);
-            }
-            else
-            {
-                context.AddValidationError($"Fuzzy edit distance must be 0, 1, or 2: {proximity}");
+                context.AddValidationError($"Fuzziness must be 0, 1, 2, AUTO, or AUTO:low,high with non-negative integer thresholds and low <= high: {proximity}");
                 return false;
             }
         }
@@ -102,6 +94,30 @@ internal readonly record struct QueryTerm
             Fuzziness = fuzziness
         };
         return true;
+    }
+
+    private static bool TryReadFuzziness(string value, out Fuzziness? fuzziness)
+    {
+        fuzziness = null;
+        if (value.Length is 0)
+            fuzziness = new Fuzziness(2);
+        else if (Int32.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int distance) && distance is >= 0 and <= 2)
+            fuzziness = new Fuzziness(distance);
+        else if (String.Equals(value, "AUTO", StringComparison.OrdinalIgnoreCase))
+            fuzziness = new Fuzziness("AUTO");
+        else if (value.StartsWith("AUTO:", StringComparison.OrdinalIgnoreCase))
+        {
+            string[] thresholds = value[5..].Split(',');
+            if (thresholds.Length is 2
+                && Int32.TryParse(thresholds[0], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int low)
+                && Int32.TryParse(thresholds[1], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int high)
+                && low is >= 0 && high >= low)
+            {
+                fuzziness = new Fuzziness(FormattableString.Invariant($"AUTO:{low},{high}"));
+            }
+        }
+
+        return fuzziness is not null;
     }
 
     public static bool TryReadBoost(string? value, IQueryVisitorContext context, out float? boost)

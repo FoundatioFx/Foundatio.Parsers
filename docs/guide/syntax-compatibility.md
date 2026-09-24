@@ -54,6 +54,8 @@ The default Elasticsearch query builder translates the following forms on text a
 |-------|-------------------------------|
 | `text:value~2` | `match` with `fuzziness: 2` |
 | `keyword:value~1` | `fuzzy` with `fuzziness: 1` |
+| `keyword:value~AUTO` | `fuzzy` with length-dependent `fuzziness: "AUTO"` |
+| `text:value~AUTO\:2,4` | `match` with `fuzziness: "AUTO:2,4"`; the colon is escaped in query syntax |
 | `text:"a b"~5` | `match_phrase` with `slop: 5` |
 | `text:value^2` | `match` with `boost: 2` |
 | `text:"a b"^2` | `match_phrase` with `boost: 2` |
@@ -62,9 +64,9 @@ The default Elasticsearch query builder translates the following forms on text a
 
 Unquoted fuzzy terms accept edit distances `0`, `1`, and `2`; bare `~` means **2**, which can differ from Elasticsearch `query_string`'s default `AUTO` behavior. Specify a distance in both consumers when comparing results. Quoted phrase slop accepts non-negative integers; bare phrase `~` means zero. Wildcard/regex terms cannot also use fuzzy syntax. Invalid distances, slop, or non-finite/negative boosts produce query validation errors; group proximity is unsupported. Numeric boosts are parsed using invariant culture.
 
-The Elasticsearch JSON API also accepts `AUTO` and custom `AUTO:low,high` thresholds. This library's fuzzy suffix and parser configuration do not expose those policies; `term~AUTO` is a validation error. Bare `~` stays at distance 2 regardless of term length. Use an explicit Elasticsearch query or custom visitor for `AUTO`, and see the [fuzziness policy boundary](./query-syntax#fuzzy-queries) before adopting Elasticsearch's length-dependent defaults.
+The Elasticsearch translator supports explicit `term~AUTO` and custom `term~AUTO\:low,high` thresholds. `AUTO` is case-insensitive; thresholds must be non-negative 32-bit integers with `low <= high`. Escape the colon as shown to preserve the grammar's field separator. The default `AUTO:3,6` policy chooses zero edits for terms shorter than 3, one for lengths 3–5, and two for length 6 or greater. Bare `~` stays at distance 2 regardless of term length. This extension does not add automatic fuzziness to SQL or Lucene's classic query parser. See [fuzzy-query examples](./query-syntax#fuzzy-queries).
 
-Regex uses Elasticsearch/Lucene automaton syntax, not .NET regular expressions. The raw pattern preserves backslash intent. Regex and wildcard queries operate on indexed terms, so text analyzers and keyword normalizers affect matching. Mapping support still matters: successful library validation does not guarantee a server will accept a modifier on numeric, date, boolean, or other non-string fields. Geo visitors and custom visitors can supply their own queries before default translation; these extensions need separate qualification.
+Regex uses Elasticsearch/Lucene automaton syntax, not .NET regular expressions. The raw pattern preserves backslash intent. Regex and wildcard queries operate on indexed terms, so text analyzers and keyword normalizers affect matching. The default translator rejects regex and fuzzy modifiers on explicitly mapped numeric, date, and boolean fields, including configured default fields. Other field types and server-selected default fields still require compatible mappings; successful library validation is not a guarantee of server support. Geo visitors and custom visitors can supply their own queries before default translation; these extensions need separate qualification.
 
 ### Matching and scoring are separate contracts
 
@@ -166,7 +168,7 @@ The required/optional distinction follows [Elasticsearch's Boolean operators](ht
 
 Start with explicit fields, explicit Boolean operators and parentheses, leading negation, and `TO` ranges. For a bare Lucene classic consumer, do not send Elasticsearch-specific existence or comparison syntax, and explicitly account for pure-negative queries. For an Elasticsearch consumer, replace `_missing_` with `NOT _exists_` and expand configured includes first.
 
-Do not forward negated-disjunction, fuzzy, proximity, regex, boost, or general wildcard expressions under an assumption of equivalent query generation. Prefix searches still require aligned wildcard options and field configuration. Date-range time zones must be configured for each consumer rather than forwarded as caret suffixes.
+The Elasticsearch translator now applies wildcard, regex, fuzzy, phrase-slop, and boost syntax. That does not make every expression portable: align mappings, analyzers, wildcard options, default fields, and scoring, and keep the `AUTO` suffix within this translator. Negated disjunctions and other backends retain the differences documented above. Date-range time zones must be configured for each consumer rather than forwarded as caret suffixes.
 
 Finally, compare **both the generated query and returned documents** under the application's actual mappings. Include positive and negative fixtures, analyzed and keyword fields, and scoring assertions when ranking matters. Default fields, default operators, filter/scoring context, nested queries, aliases, and visitors can all change behavior without changing whether the input parses. For production inputs, enforce the supported subset explicitly; successful validation alone does not establish the required mapping or scoring semantics.
 

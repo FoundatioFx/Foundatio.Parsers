@@ -130,6 +130,7 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [Theory]
     [InlineData("jo?n", "a,b,e,g,p")]
     [InlineData("john~1", "a,b,e,g,p")]
+    [InlineData("john~AUTO", "a,b,e,g,p")]
     [InlineData("/john/", "a,e,g,p")]
     public async Task BuildQueryAsync_WithMultipleAnalyzedFields_ReturnsExpectedDocuments(string text, string expected)
     {
@@ -148,6 +149,7 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [Theory]
     [InlineData("jo?n", "a,b,c,e,g")]
     [InlineData("/john/", "a,e,g")]
+    [InlineData("john~AUTO", "a,b,c,e,g")]
     public async Task BuildQueryAsync_WithMixedDefaultFields_ReturnsExpectedDocuments(string text, string expected)
     {
         // Arrange
@@ -165,6 +167,7 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [Theory]
     [InlineData("keyword:john", "keyword:john^8")]
     [InlineData("keyword:john~1", "keyword:john~1^8")]
+    [InlineData("keyword:john~AUTO", "keyword:john~AUTO^8")]
     [InlineData("keyword:jo?n", "keyword:jo?n^8")]
     [InlineData("keyword:/jo.n/", "keyword:/jo.n/^8")]
     [InlineData("text:john", "text:john^8")]
@@ -208,6 +211,7 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [InlineData("john*", "a,d,e,g,p")]
     [InlineData("/john/", "a,e,g,p")]
     [InlineData("john~1", "a,b,c,e,g,p")]
+    [InlineData("john~AUTO", "a,b,c,e,g,p")]
     [InlineData("\"alpha beta\"~1", "k,l")]
     public async Task BuildQueryAsync_WithoutDefaultFields_UsesServerDefaultFields(string text, string expected)
     {
@@ -265,6 +269,52 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
         Assert.Empty(result.Hits);
     }
 
+    public static IEnumerable<TheoryDataRow<string, string, bool>> AutoFuzzinessCases()
+    {
+        (string Query, string Expected)[] cases =
+        [
+            ("keyword:john~AUTO", "a,b,c,e"),
+            ("keyword:john~auto", "a,b,c,e"),
+            (@"keyword:john~AUTO\:2,4", "a,b,c,d,e"),
+            (@"keyword:john~AUTO\:5,8", "a"),
+            (@"keyword:john~AUTO\:0,0", "a,b,c,d,e"),
+            (@"keyword:john~AUTO\:4,4", "a,b,c,d,e"),
+            ("keyword:jo~AUTO", ""),
+            ("keyword:jon~AUTO", "a,b,c"),
+            ("keyword:johnn~AUTO", "a,d,e"),
+            ("keyword:johnny~AUTO", "a,d,e,f"),
+            ("text:john~AUTO", "a,b,e,g"),
+            (@"text:john~AUTO\:5,8", "a,e,g"),
+            ("children.keyword:john~AUTO", "a,b,c,e"),
+            ("children.text:john~AUTO", "a,b,e,g"),
+            ("john~AUTO", "a,b,e,g"),
+            (@"john~AUTO\:5,8", "a,e,g")
+        ];
+
+        foreach (var (query, expected) in cases)
+            foreach (bool scoring in new[] { false, true })
+                yield return new(query, expected, scoring);
+    }
+
+    [Theory]
+    [MemberData(nameof(AutoFuzzinessCases))]
+    public async Task BuildQueryAsync_WithAutoFuzziness_ReturnsExpectedDocuments(string text, string expected, bool scoring)
+    {
+        // Arrange
+        using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
+        var parser = CreateParser(resolver);
+
+        // Act
+        var query = await parser.BuildQueryAsync(text, CreateQueryContext(scoring));
+        var result = await SearchAsync(query);
+
+        // Assert
+        Assert.Equal(expected, GetDocumentIds(result));
+
+        if (!scoring)
+            Assert.All(result.Hits, hit => Assert.Equal(0, hit.Score));
+    }
+
     [Theory]
     [InlineData("AUTO", "a,b,c,e")]
     [InlineData("AUTO:3,6", "a,b,c,e")]
@@ -281,10 +331,13 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
         var fixedQuery = await parser.BuildQueryAsync("keyword:john~", CreateQueryContext(true));
         var fixedResult = await SearchAsync(fixedQuery);
         var autoResult = await SearchAsync(autoQuery);
+        var parsedAuto = await parser.BuildQueryAsync("keyword:john~" + policy.Replace(":", @"\:", StringComparison.Ordinal), CreateQueryContext(true));
+        var parsedResult = await SearchAsync(parsedAuto);
 
         // Assert
         Assert.Equal("a,b,c,d,e", GetDocumentIds(fixedResult));
         Assert.Equal(expectedAutoIds, GetDocumentIds(autoResult));
+        Assert.Equal(expectedAutoIds, GetDocumentIds(parsedResult));
     }
 
     private ElasticQueryParser CreateParser(ElasticMappingResolver resolver, string[]? fields = null) => new(configuration => configuration
