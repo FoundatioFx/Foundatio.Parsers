@@ -269,6 +269,76 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
         Assert.Empty(result.Hits);
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, true)]
+    public async Task BuildQueryAsync_WithBoostedNestedGroup_PreservesNestedScope(bool required, bool scoring, bool explicitScope)
+    {
+        // Arrange
+        string index = $"nested_boost_{Guid.NewGuid():N}";
+        await CreateIndexAsync(index, descriptor => descriptor
+            .Settings(settings => settings.NumberOfShards(1).NumberOfReplicas(0))
+            .Mappings(TermTranslationFixture.Mapping));
+        TermTranslationFixture.TermTranslationDocument[] documents =
+        [
+            new() { Id = "same-child", Children = [new("a", "c")] },
+            new() { Id = "second-alternative", Children = [new("b", "c")] },
+            new() { Id = "split-children", Children = [new("a", "x"), new("x", "c")] }
+        ];
+        var bulk = await Client.IndexManyAsync(documents, index, TestCancellationToken);
+        Assert.True(bulk.IsValidResponse && !bulk.Errors, bulk.DebugInformation);
+
+        var refresh = await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
+        Assert.True(refresh.IsValidResponse, refresh.DebugInformation);
+
+        using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
+        var parser = CreateParser(resolver);
+        string group = "(children.keyword:a OR children.keyword:b)";
+        if (explicitScope)
+            group = "children:" + group;
+        if (required)
+            group = "+" + group;
+
+        string sibling = required ? " +children.text:c" : " AND children.text:c";
+        const string correlatedIds = "same-child,second-alternative";
+        string expectedIds = explicitScope ? correlatedIds + ",split-children" : correlatedIds;
+        var alternatives = new BoolQuery { Should = [new TermQuery("children.keyword", "a"), new TermQuery("children.keyword", "b")] };
+        var siblingQuery = new MatchQuery("children.text", "c");
+        // An explicit children:(...) group has its own nested boundary; implicit groups
+        // correlate with siblings inside a single child document.
+        Query reference = explicitScope
+            ? new BoolQuery { Must = [new NestedQuery("children", alternatives), new NestedQuery("children", siblingQuery)] }
+            : new NestedQuery("children", new BoolQuery { Must = [alternatives, siblingQuery] });
+
+        // Act
+        var baselineQuery = await parser.BuildQueryAsync(group + sibling, CreateQueryContext(scoring));
+        var boostedQuery = await parser.BuildQueryAsync(group + "^8" + sibling, CreateQueryContext(scoring));
+        var baseline = await SearchAsync(baselineQuery, index);
+        var boosted = await SearchAsync(boostedQuery, index);
+        var referenceResult = await SearchAsync(reference, index);
+
+        // Assert
+        Assert.Equal(expectedIds, GetDocumentIds(referenceResult));
+        Assert.Equal(expectedIds, GetDocumentIds(baseline));
+        Assert.Equal(expectedIds, GetDocumentIds(boosted));
+
+        if (scoring)
+        {
+            var baselineScores = baseline.Hits.ToDictionary(hit => hit.Id, hit => hit.Score);
+            Assert.All(boosted.Hits, hit => Assert.True(hit.Score > baselineScores[hit.Id]));
+        }
+        else
+        {
+            Assert.All(boosted.Hits, hit => Assert.Equal(0, hit.Score));
+        }
+    }
+
     public static IEnumerable<TheoryDataRow<string, string, bool>> AutoFuzzinessCases()
     {
         (string Query, string Expected)[] cases =
@@ -349,10 +419,10 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
 
     private static ElasticQueryVisitorContext CreateQueryContext(bool scoring) => new() { UseScoring = scoring, DefaultOperator = GroupOperator.Or };
 
-    private async Task<SearchResponse<TermTranslationFixture.TermTranslationDocument>> SearchAsync(Query query)
+    private async Task<SearchResponse<TermTranslationFixture.TermTranslationDocument>> SearchAsync(Query query, string? index = null)
     {
         var response = await Client.SearchAsync<TermTranslationFixture.TermTranslationDocument>(descriptor => descriptor
-            .Indices(_fixture.Index).Query(query).Size(100).TrackTotalHits(true).AllowPartialSearchResults(false), TestCancellationToken);
+            .Indices(index ?? _fixture.Index).Query(query).Size(100).TrackTotalHits(true).AllowPartialSearchResults(false), TestCancellationToken);
 
         Assert.True(response.IsValidResponse, response.DebugInformation);
         Assert.False(response.TimedOut);

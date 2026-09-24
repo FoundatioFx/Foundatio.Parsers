@@ -111,12 +111,12 @@ public static class DefaultQueryNodeExtensions
     private static Query GetSingleFieldQuery(QueryTerm term, string field, IElasticQueryVisitorContext context)
     {
         var fieldType = ElasticMappingResolver.GetFieldType(context.GetMappingResult(field)?.Property);
-        if ((term.Regex is not null || term.Fuzziness is not null)
+        if ((term.Regex is not null || term.Fuzziness is not null || term.Slop is not null)
             && fieldType is FieldType.Byte or FieldType.Short or FieldType.Integer or FieldType.Long
                 or FieldType.Float or FieldType.HalfFloat or FieldType.Double or FieldType.ScaledFloat
                 or FieldType.TokenCount or FieldType.Date or FieldType.DateNanos or FieldType.Boolean)
         {
-            context.AddValidationError($"Regex and fuzzy queries are not supported on field '{field}' of type '{fieldType}'.");
+            context.AddValidationError($"Regex, fuzzy, and phrase-proximity queries are not supported on field '{field}' of type '{fieldType}'.");
             return new MatchNoneQuery();
         }
 

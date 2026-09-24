@@ -411,6 +411,9 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("dateNanos", "/2026/")]
     [InlineData("boolean", "/true/")]
     [InlineData("number", "12~1")]
+    [InlineData("number", "\"12\"~1")]
+    [InlineData("date", "\"2026\"~0")]
+    [InlineData("boolean", "\"true\"~")]
     [InlineData("date", "2026~AUTO")]
     [InlineData("boolean", "true~AUTO")]
     public async Task BuildQueryAsync_WithStringModifierOnScalarField_ReportsValidationError(string field, string term)

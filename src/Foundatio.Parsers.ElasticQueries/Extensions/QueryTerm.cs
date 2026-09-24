@@ -148,9 +148,19 @@ internal readonly record struct QueryTerm
         if (!TryReadBoost(node.UnescapedBoost, context, out var boost))
             return new MatchNoneQuery();
 
-        // Wrap the completed group once: changing a child boost would lose its existing
-        // boost or miss nested/required branches. A bool must wrapper preserves membership.
-        return query is null || boost is null ? query : new BoolQuery { Must = [query], Boost = boost };
+        if (query is null || boost is null)
+            return query;
+
+        // Keep the nested variant visible so parent groups can correlate sibling clauses
+        // within the same nested document. Boost its completed inner group instead.
+        if (query.Nested is { } nested)
+        {
+            nested.Query = new BoolQuery { Must = [nested.Query], Boost = boost };
+            return query;
+        }
+
+        // Wrap the completed group once, preserving existing child boosts and required branches.
+        return new BoolQuery { Must = [query], Boost = boost };
     }
 
     public QueryStringQuery ToQueryString(string[]? fields, IElasticQueryVisitorContext context)
