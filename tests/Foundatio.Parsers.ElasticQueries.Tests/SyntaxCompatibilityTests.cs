@@ -9,7 +9,6 @@ using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
-using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Xunit;
 using Xunit;
 
@@ -62,6 +61,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
             int requestIndex = index;
             requests[index] = Task.Run(() => ParseRequestAsync(requestIndex), TestCancellationToken);
         }
+
         var results = await Task.WhenAll(requests);
 
         // Assert
