@@ -864,17 +864,16 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         Assert.Empty(error.Result.UnresolvedIncludes);
     }
 
-    private ElasticQueryParser CreateParser(string[]? defaultFields = null) => new(c =>
-        {
-            c.SetLoggerFactory(Log).UseMappings(_resolver);
-            if (defaultFields is not null)
-                c.SetDefaultFields(defaultFields);
-        });
-
     public override ValueTask DisposeAsync()
     {
         _resolver.Dispose();
         return base.DisposeAsync();
     }
 
+    private ElasticQueryParser CreateParser(string[]? defaultFields = null) => new(c =>
+        {
+            c.SetLoggerFactory(Log).UseMappings(_resolver);
+            if (defaultFields is not null)
+                c.SetDefaultFields(defaultFields);
+        });
 }

@@ -169,11 +169,11 @@ internal static class RequiredQueryBuilder
     }
 
     /// <summary>Preserves required conditions across implicit operator groups without crossing explicit scopes.</summary>
-    private static async Task<bool> HasRequiredClauseAsync(IFieldQueryNode node)
+    private static async Task<bool> HasRequiredClauseAsync(IQueryNode? node)
     {
-        if (node.IsExcluded())
+        if (node is not IFieldQueryNode fieldNode || fieldNode.IsExcluded())
             return false;
-        if (node.IsRequired())
+        if (fieldNode.IsRequired())
             return true;
         if (node is not GroupNode group)
             return false;
@@ -183,11 +183,11 @@ internal static class RequiredQueryBuilder
             return false;
 
         // Keep an implicit AND subtree intact, but require it when it contains +.
-        bool leftRequired = group.Left is IFieldQueryNode left && await HasRequiredClauseAsync(left).AnyContext();
+        bool leftRequired = await HasRequiredClauseAsync(group.Left).AnyContext();
         if (leftRequired)
             return true;
 
-        return group.Right is IFieldQueryNode right && await HasRequiredClauseAsync(right).AnyContext();
+        return await HasRequiredClauseAsync(group.Right).AnyContext();
     }
 
     private sealed class ClauseSet(bool useScoring)
