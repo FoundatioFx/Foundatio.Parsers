@@ -10,6 +10,10 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 
 namespace Foundatio.Parsers.ElasticQueries.Extensions;
 
+/// <summary>
+/// Reads term modifiers once while retaining raw escape intent for mapping-specific query generation.
+/// Expressions contain only an escaped term or delimited regex, never a complete user query.
+/// </summary>
 internal readonly record struct QueryTerm
 {
     public required string Value { get; init; }
@@ -122,13 +126,18 @@ internal readonly record struct QueryTerm
         return query is null || boost is null ? query : new BoolQuery { Must = [query], Boost = boost };
     }
 
-    public QueryStringQuery ToQueryString(string[]? fields, IElasticQueryVisitorContext context) => new(Expression!)
+    public QueryStringQuery ToQueryString(string[]? fields, IElasticQueryVisitorContext context)
     {
-        Fields = fields,
-        AllowLeadingWildcard = context.GetValidationOptions().AllowLeadingWildcards,
-        AnalyzeWildcard = true,
-        Boost = Boost
-    };
+        var query = new QueryStringQuery(Expression!)
+        {
+            AllowLeadingWildcard = context.GetValidationOptions().AllowLeadingWildcards,
+            AnalyzeWildcard = true,
+            Boost = Boost
+        };
+        if (fields is { Length: > 0 })
+            query.Fields = fields;
+        return query;
+    }
 
     private static bool HasWildcard(string raw)
     {

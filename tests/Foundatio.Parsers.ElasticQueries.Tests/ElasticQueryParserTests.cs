@@ -375,7 +375,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
             .Query(q => q
                 .Bool(b => b
-                    .Filter(f => f.QueryString(m => m.Query("one\\/two*").Fields(Fields.FromExpression((MyType f1) => f1.Field1)).AllowLeadingWildcard(false).AnalyzeWildcard())))), TestCancellationToken);
+                    .Filter(f => f.QueryString(m => m.Query("one\\\\\\/two*").Fields(Fields.FromExpression((MyType f1) => f1.Field1)).AllowLeadingWildcard(true).AnalyzeWildcard())))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest(true);
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
@@ -679,7 +679,7 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         actualRequest = actualResponse.GetRequest();
         _logger.LogInformation("Actual: {Request}", actualRequest);
         expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(q => q.QueryString(m => m
-            .AllowLeadingWildcard(false)
+            .AllowLeadingWildcard(true)
             .AnalyzeWildcard(true)
             .Fields(Fields.FromExpression((MyType f1) => f1.Field3))
             .Query("hey*")

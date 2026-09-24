@@ -46,49 +46,50 @@ If those external field names are unmapped, the query may simply match no docume
 
 Existence concerns an **indexed value**, not merely whether a property occurs in `_source`. Mapping options such as `null_value`, `index`, and `ignore_above` can affect the result. See the [Elasticsearch exists query reference](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-exists-query).
 
-### Term modifiers this library parses but does not translate
+### Term modifiers and mapping boundaries
 
-The parser preserves modifier metadata, but the default Elasticsearch query builder does not apply term fuzziness, phrase slop, or term/phrase boosts. Regex metadata is also ignored. These limitations are tracked in [#278](https://github.com/FoundatioFx/Foundatio.Parsers/issues/278).
+The default Elasticsearch query builder translates the following forms on text and keyword fields. This corrects the dropped-modifier behavior tracked in [#278](https://github.com/FoundatioFx/Foundatio.Parsers/issues/278).
 
 | Input | Generated Elasticsearch query |
 |-------|-------------------------------|
-| `text:value~2` | `match` for `value`, without `fuzziness` |
-| `text:"a b"~5` | `match_phrase` for `a b`, without `slop` |
-| `text:value^2` | `match` for `value`, without `boost` |
-| `text:"a b"^2` | `match_phrase` for `a b`, without `boost` |
-| `text:/foo.bar/` | `match` for `foo.bar`, not `regexp` |
-| `keyword:/[0-9]+/` | `term` for the literal value `[0-9]+`, not `regexp` |
-| `text:/val.*/` | `query_string` for `val.*`, not a regex query |
-| `keyword:/val.*/` | `prefix` for the literal prefix `val.`, not a regex query |
+| `text:value~2` | `match` with `fuzziness: 2` |
+| `keyword:value~1` | `fuzzy` with `fuzziness: 1` |
+| `text:"a b"~5` | `match_phrase` with `slop: 5` |
+| `text:value^2` | `match` with `boost: 2` |
+| `text:"a b"^2` | `match_phrase` with `boost: 2` |
+| `keyword:/[0-9]+/` | `regexp` with the raw regex pattern |
+| `(text:a OR text:b)^8` | Boolean wrapper applying `boost: 8` to the group |
 
-A `match` query still analyzes its input; absence of fuzziness does **not** make it an exact keyword match. Regex delimiters are removed, and normal term unescaping is applied to the payload. The default builder never selects `regexp` from `IsRegexTerm`: a payload ending in `*` takes the trailing-star path described below, while other payloads take ordinary term paths.
+Unquoted fuzzy terms accept edit distances `0`, `1`, and `2`; bare `~` means **2**, which can differ from Elasticsearch `query_string`'s default `AUTO` behavior. Specify a distance in both consumers when comparing results. Quoted phrase slop accepts non-negative integers; bare phrase `~` means zero. Wildcard/regex terms cannot also use fuzzy syntax. Invalid distances, slop, or non-finite/negative boosts produce query validation errors; group proximity is unsupported. Numeric boosts are parsed using invariant culture.
 
-These are query-generation limitations, not recommendations to remove support from the AST. Use an explicitly constructed Elasticsearch query or a tested custom visitor when the application requires these features. Do not assume that successful validation means the modifiers were applied.
+Regex uses Elasticsearch/Lucene automaton syntax, not .NET regular expressions. The raw pattern preserves backslash intent. Regex and wildcard queries operate on indexed terms, so text analyzers and keyword normalizers affect matching. Mapping support still matters: successful library validation does not guarantee a server will accept a modifier on numeric, date, boolean, or other non-string fields. Geo visitors and custom visitors can supply their own queries before default translation; these extensions need separate qualification.
 
 ### Matching and scoring are separate contracts
 
-The default builder does not apply `^8` to terms, phrases, or parenthesized groups. Elasticsearch `query_string` applies the boost, so the same expression can rank matching documents differently. Group boosts need the same caution as term and phrase boosts.
-
-`UseScoring = false` intentionally builds filter-context queries with zero scores. Optional conditions can affect ranking only when scoring is enabled. Scores also depend on mappings, analyzers, indexed statistics, and query rewriting; matching document sets do not imply identical scores across consumers or indexes.
+Term, phrase, non-date range, and parenthesized-group boosts now affect scoring. Include boosts apply to the expanded group. `UseScoring = false` intentionally builds filter-context queries with zero scores. Optional conditions affect ranking only when scoring is enabled. Scores also depend on mappings, analyzers, indexed statistics, and query rewriting; matching document sets do not imply identical scores across consumers or indexes.
 
 ### Wildcards depend on the generated query path
 
-The default builder tests whether the **unescaped, unquoted term ends in `*`**. It does not implement a general wildcard translator.
+Unescaped `*` matches any number of characters and `?` matches one. Escaped and quoted wildcard characters remain literal values. This corrects [#289](https://github.com/FoundatioFx/Foundatio.Parsers/issues/289).
 
 | Input | Mapped text field | Mapped keyword field |
 |-------|-------------------|----------------------|
-| `field:jo?n` | `match` for `jo?n` | `term` for `jo?n` |
-| `field:jo*n` | `match` for `jo*n` | `term` for `jo*n` |
-| `field:*john` | `match` for `*john` | `term` for `*john` |
-| `field:john*` | `query_string` for `john*` | `prefix` for `john` |
-| `field:jo?n*` | `query_string` for `jo?n*` | `prefix` for the literal prefix `jo?n` |
-| `field:john\*` | Also takes the trailing-star path after unescaping | Also builds a `prefix` for `john` |
+| `field:jo?n`, `field:jo*n`, `field:*john` | Escaped term-only `query_string` | `wildcard` |
+| `field:john*` | Escaped term-only `query_string` | `prefix` for `john` |
+| `field:jo?n*` | Escaped term-only `query_string` | `wildcard` |
+| `field:john\*` | `match` for literal `john*`, subject to analysis | `term` for literal `john*` |
+| `field:"john*"` | `match_phrase`, subject to analysis | `term` for literal `john*` |
+| `field:*` | `exists` | `exists` |
 
-Thus `?` alone is not a single-character wildcard in generated queries. Embedded or leading wildcards without a final `*` are not wildcard queries either. Escaping a trailing star does not reliably preserve literal-star semantics through this builder. [Issue #289](https://github.com/FoundatioFx/Foundatio.Parsers/issues/289) tracks wildcard and escaped-literal translation.
+The analyzed wildcard path sets `analyze_wildcard: true` and takes `allow_leading_wildcard` from `QueryValidationOptions.AllowLeadingWildcards` (default **true**). Set that option to false to reject leading wildcard operators; escaped/quoted literals are still accepted. A regex is a separate operation and is not disabled by this option. Align wildcard options, mappings, analyzers, and default fields before comparing consumers.
 
-For the analyzed trailing-star path, Foundatio sets `analyze_wildcard: true` and `allow_leading_wildcard: false`. Elasticsearch `query_string` defaults are `false` and `true`, respectively. Analyzer tokenization can therefore change results even for a trailing-star input. Align those options, mappings, analyzers, and default fields before comparing results; matching the spelling alone is insufficient. See [query_string wildcard options](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query#query-string-wildcard).
+With no configured default fields, wildcard and regex terms use Elasticsearch `query_string` without an explicit field list; ordinary/fuzzy/phrase terms use `multi_match`. Configured mixed text/keyword fields use the appropriate translation for each mapping, and configured nested fields require `UseNested()`.
 
-The fieldless case also depends on configuration: with configured analyzed default fields, `john*` takes the analyzed `query_string` path; with no default fields configured, it falls back to `multi_match`, not that wildcard path.
+### Upgrading term translation and controlling cost
+
+**Breaking behavior change:** previously ignored modifiers now change matching or ranking, and escaped wildcards no longer broaden a literal into a prefix. Re-run saved queries and custom visitors against positive and negative fixtures before upgrading. Public API signatures and the grammar are unchanged by this translation update; the separate post-colon migration below still applies. SQL and aggregation translation do not gain these Elasticsearch query features.
+
+Leading and embedded wildcards, regex, and fuzzy expansions can be expensive. Restrict fields and accepted syntax in the application, set `AllowLeadingWildcards = false` where appropriate, and configure Elasticsearch's expensive-query policy and request timeouts for the deployment. Regex complexity and fuzzy expansion limits remain Elasticsearch defaults; this library does not expose separate per-expression limits. Disabling leading wildcards does not bound regex cost. Server rejection is distinct from a library validation error or a successful empty result.
 
 ### Date-range caret values are time zones, not boosts
 
@@ -155,7 +156,7 @@ The required-clause fix changes search results without changing public method si
 | `+@include:active` or `NOT @include:active` | The outer include operator was discarded | The expanded fragment is required or negated as requested |
 | A required clause that produces no Elasticsearch query | Could be silently omitted | Query building reports a validation error |
 
-Replay affected saved queries and compare document IDs and ranking before upgrading. Ordinary queries without these markers retain their existing behavior; the default operator remains AND. Include expansion is shared with other query consumers, including SQL, so review prefixed includes there too. Custom visitors see an extra outer group carrying the include operator; review assumptions about the exact AST shape and configured depth limits. This fix does not establish general equivalence with Lucene or implement the unsupported modifiers listed above.
+Replay affected saved queries and compare document IDs and ranking before upgrading. Ordinary queries without these markers retain their existing behavior; the default operator remains AND. Include expansion is shared with other query consumers, including SQL, so review prefixed includes there too. Custom visitors see an extra outer group carrying the include operator; review assumptions about the exact AST shape and configured depth limits. This fix does not establish general equivalence with Lucene.
 
 The required/optional distinction follows [Elasticsearch's Boolean operators](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query) and [bool query](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query): mandatory conditions control which documents match, while optional conditions can improve the score of documents that already qualify.
 
@@ -165,7 +166,7 @@ Start with explicit fields, explicit Boolean operators and parentheses, leading 
 
 Do not forward negated-disjunction, fuzzy, proximity, regex, boost, or general wildcard expressions under an assumption of equivalent query generation. Prefix searches still require aligned wildcard options and field configuration. Date-range time zones must be configured for each consumer rather than forwarded as caret suffixes.
 
-Finally, compare **both the generated query and returned documents** under the application's actual mappings. Include positive and negative fixtures, analyzed and keyword fields, and scoring assertions when ranking matters. Default fields, default operators, filter/scoring context, nested queries, aliases, and visitors can all change behavior without changing whether the input parses. For production inputs, enforce the supported subset explicitly; documenting an ignored modifier does not make it safe to accept when the application requires its semantics.
+Finally, compare **both the generated query and returned documents** under the application's actual mappings. Include positive and negative fixtures, analyzed and keyword fields, and scoring assertions when ranking matters. Default fields, default operators, filter/scoring context, nested queries, aliases, and visitors can all change behavior without changing whether the input parses. For production inputs, enforce the supported subset explicitly; successful validation alone does not establish the required mapping or scoring semantics.
 
 ## References
 

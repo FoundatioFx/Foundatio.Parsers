@@ -85,7 +85,7 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
 
         if (!text.Contains("children.", StringComparison.Ordinal))
         {
-            var reference = await SearchAsync(new QueryStringQuery(text) { DefaultOperator = Operator.Or, AnalyzeWildcard = true, AllowLeadingWildcard = true });
+            var reference = await SearchAsync(new QueryStringQuery(text.EndsWith("~", StringComparison.Ordinal) ? text + "2" : text) { DefaultOperator = Operator.Or, AnalyzeWildcard = true, AllowLeadingWildcard = true });
             Assert.Equal(expected, Ids(reference));
         }
     }
@@ -140,6 +140,8 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [InlineData("(+text:john text:alpha)", "(+text:john text:alpha)^8")]
     [InlineData("@include:john", "@include:john^8")]
     [InlineData("john", "john^8")]
+    [InlineData("children:(children.text:john OR children.text:alpha)", "children:(children.text:john OR children.text:alpha)^8")]
+    [InlineData("+(children.text:john OR children.text:alpha)", "+(children.text:john OR children.text:alpha)^8")]
     public async Task BuildQueryAsync_WithBoost_MultipliesScoresWithoutChangingMembership(string baseline, string boosted)
     {
         using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
@@ -151,6 +153,19 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
         var scores = before.Hits.ToDictionary(hit => hit.Id, hit => hit.Score!.Value);
         foreach (var hit in after.Hits)
             Assert.True(Math.Abs(hit.Score!.Value - scores[hit.Id] * 8) <= 0.00001 * Math.Max(1, scores[hit.Id] * 8));
+    }
+
+    [Theory]
+    [InlineData("john*", "a,d,e,g,p")]
+    [InlineData("/john/", "a,e,g,p")]
+    [InlineData("john~1", "a,b,c,e,g,p")]
+    [InlineData("\"alpha beta\"~1", "k,l")]
+    public async Task BuildQueryAsync_WithoutDefaultFields_UsesServerDefaultFields(string text, string expected)
+    {
+        using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
+        var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings(resolver));
+        var result = await SearchAsync(await parser.BuildQueryAsync(text, Context(true)));
+        Assert.Equal(expected, Ids(result));
     }
 
     [Theory]
@@ -181,7 +196,8 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
         Assert.Empty((await SearchAsync(await parser.BuildQueryAsync(text, context))).Hits);
     }
 
-    private static ElasticQueryParser CreateParser(ElasticMappingResolver resolver, string[]? fields = null) => new(configuration => configuration
+    private ElasticQueryParser CreateParser(ElasticMappingResolver resolver, string[]? fields = null) => new(configuration => configuration
+        .SetLoggerFactory(Log)
         .UseMappings(resolver)
         .SetDefaultFields(fields ?? ["text"])
         .UseIncludes(new Dictionary<string, string> { { "john", "text:john" } })

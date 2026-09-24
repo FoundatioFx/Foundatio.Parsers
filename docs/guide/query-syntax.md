@@ -52,24 +52,19 @@ result = parser.Parse("_missing_:description");
 
 ### Wildcard Queries
 
-The parser accepts wildcard characters in terms, but backend support is more limited than the Lucene syntax suggests:
+Unescaped `*` matches any number of characters; `?` matches one. On keyword fields, a single trailing `*` uses a prefix query and other patterns use a wildcard query. On analyzed fields, the default Elasticsearch builder uses an escaped term-only `query_string` with `analyze_wildcard: true`.
 
-| Pattern | Default Elasticsearch query builder |
-|---------|-------------------------------------|
-| `name:john*` | Prefix query on keyword fields; `query_string` on analyzed fields |
-| `name:jo?n` | Ordinary `match` or `term`, not a single-character wildcard |
-| `name:jo*n`, `name:*john` | Ordinary `match` or `term`, not wildcard queries |
-
-```csharp
-// Parse a trailing-star prefix expression
-var result = parser.Parse("name:john*");
+```text
+name:john*
+name:jo?n
+name:jo*n
+name:john\*
+name:"john*"
 ```
 
-::: warning Wildcard translation limitations
-Only an unquoted term ending in `*` takes the default builder's special trailing-star path. On analyzed fields that path sets `analyze_wildcard: true` and `allow_leading_wildcard: false`, unlike Elasticsearch's defaults. On keyword fields, embedded wildcard characters are literal parts of the prefix. Escaping a trailing `*` also loses its literal distinction after unescaping. Fieldless queries depend on configured default fields. See [Wildcard Compatibility](./syntax-compatibility#wildcards-depend-on-the-generated-query-path).
-:::
+The last two forms preserve a literal star; text analysis can still remove punctuation. `name:*` checks for an indexed value. Fieldless expressions use configured default fields or Elasticsearch's default fields when none are configured.
 
-[Validation options](./validation) can reject leading wildcard input; enabling such input does not add missing wildcard translation support.
+`QueryValidationOptions.AllowLeadingWildcards` defaults to true; set it to false to reject leading wildcard operators. Quoted and escaped literals remain allowed. See [Wildcard Compatibility](./syntax-compatibility#wildcards-depend-on-the-generated-query-path) and [cost controls](./syntax-compatibility#upgrading-term-translation-and-controlling-cost).
 
 ### Regex Queries
 
@@ -84,9 +79,7 @@ field:/regex/
 var result = parser.Parse("email:/.*@example\\.com/");
 ```
 
-::: warning Regex query generation is not implemented
-The AST stores `IsRegexTerm`, but the default `ElasticQueryParser` query builder does not emit a `regexp` query. A pattern such as `/foo.bar/` becomes an analyzed `match` on a text field or a literal `term` on a keyword field. A pattern ending in `*` instead takes the trailing-star path: `query_string` on analyzed fields or `prefix` on keyword fields. For example, `/val.*/` becomes the literal prefix `val.` on a keyword field. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
-:::
+The default Elasticsearch query builder emits `regexp` queries for mapped fields and preserves raw regex escapes. With no configured default fields it uses a term-only `query_string` regex. Patterns use Elasticsearch/Lucene automaton syntax and match indexed terms, not .NET regex semantics or arbitrary source text. Analyzer and mapping choices matter; see [term modifier boundaries](./syntax-compatibility#term-modifiers-and-mapping-boundaries).
 
 ## Range Queries
 
@@ -463,7 +456,7 @@ query = await parser.BuildQueryAsync("_missing_:comments");
 ```
 
 ::: info Elasticsearch Limitation
-Standard Elasticsearch `query_string` does not support nested documents. With the mappings and nested visitor configured, Foundatio.Parsers can detect nested fields and wrap queries appropriately. This does not add support for the missing term modifiers or wildcard forms described above.
+Standard Elasticsearch `query_string` does not support nested documents. With the mappings and nested visitor configured, Foundatio.Parsers can detect nested fields and wrap queries appropriately. Term translation also applies to these nested field queries.
 :::
 
 For a full explanation of how the AST is structured and traversed for nested queries, see [Nested Queries and Visitor Traversal](./nested-queries).
@@ -480,9 +473,7 @@ var result = parser.Parse("title:important^2");
 result = parser.Parse("title:\"very important\"^3");
 ```
 
-::: warning Term, phrase, and group boosts are not applied
-The boost is available on the AST, but the default `ElasticQueryParser` query builder does not apply it to term, phrase, or group queries. Live score/ranking controls verify this difference; identical document membership alone cannot detect it. Mapped date ranges are a different case: their caret suffix supplies a time zone, not a boost. See [Matching and Scoring](./syntax-compatibility#matching-and-scoring-are-separate-contracts) and [Date-range Time Zones](#date-range-time-zones).
-:::
+The default Elasticsearch query builder applies finite non-negative boosts to terms, phrases, non-date ranges, and groups. Enable scoring with `new ElasticQueryVisitorContext { UseScoring = true }`; filter context intentionally yields zero scores. Mapped date ranges retain their caret-as-time-zone extension. See [Matching and Scoring](./syntax-compatibility#matching-and-scoring-are-separate-contracts) and [Date-range Time Zones](#date-range-time-zones).
 
 ## Fuzzy Queries
 
@@ -496,9 +487,7 @@ var result = parser.Parse("name:john~");
 result = parser.Parse("name:john~2");
 ```
 
-::: warning Fuzziness and phrase proximity are not applied
-The edit distance is available on the AST (`TermNode.Proximity`), but the default `ElasticQueryParser` query builder does not set `fuzziness`. On an analyzed text field it emits an ordinary `match`, not an exact keyword match. Similarly, `"a b"~5` becomes `match_phrase` without `slop`. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
-:::
+The default Elasticsearch query builder accepts fuzzy distances `0`, `1`, or `2`; bare `~` means **2**. Analyzed text uses `match` with fuzziness; keyword fields use `fuzzy`. Quoted phrases use `match_phrase` with a non-negative integer slop, for example `title:"a b"~5`; bare phrase `~` means zero. Fuzziness cannot be combined with wildcard or regex syntax, and group proximity is unsupported. Invalid modifiers produce query validation errors. See [mapping and default-distance boundaries](./syntax-compatibility#term-modifiers-and-mapping-boundaries).
 
 ## Escaping Special Characters
 

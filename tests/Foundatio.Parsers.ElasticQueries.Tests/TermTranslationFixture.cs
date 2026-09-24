@@ -42,9 +42,9 @@ public sealed class TermTranslationFixture : ElasticsearchFixture
         {
             Id = ((char)('a' + index)).ToString(CultureInfo.InvariantCulture),
             Keyword = value,
-            Text = value,
+            Text = index == 11 ? "alpha gamma beta" : value,
             OtherText = index == 15 ? "john" : null,
-            Children = value is null ? [] : [new Child(value, value)]
+            Children = value is null ? [] : [new Child(value, index == 11 ? "alpha gamma beta" : value)]
         }).ToArray();
 
         await CreateIndexAsync(Index, descriptor => descriptor

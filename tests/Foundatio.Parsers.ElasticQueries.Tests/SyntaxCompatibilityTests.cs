@@ -15,8 +15,7 @@ using Xunit;
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
 // Characterizes the default query pipeline for docs/guide/syntax-compatibility.md.
-// The unsupported modifier cases describe the current limitations tracked in #278,
-// not desired behavior. Update these assertions and the documentation when fixing them.
+// Term translation contracts are covered separately in TermTranslationTests.
 // Scoring contexts expose the generated query directly, without a filter wrapper.
 public class SyntaxCompatibilityTests : TestWithLoggingBase
 {

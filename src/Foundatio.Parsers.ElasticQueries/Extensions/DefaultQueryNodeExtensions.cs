@@ -151,7 +151,7 @@ public static class DefaultQueryNodeExtensions
     private static Query GetMultiFieldQuery(QueryTerm term, string[]? fields, IElasticQueryVisitorContext context)
     {
         if (fields is null or { Length: 0 })
-            return GetAnalyzedFieldsQuery(term, fields, context);
+            return GetAnalyzedFieldsQuery(term, null, context);
 
         var analyzedFields = new List<string>();
         var nonAnalyzedFields = new List<string>();
@@ -192,14 +192,16 @@ public static class DefaultQueryNodeExtensions
         if (fields is { Length: 1 })
             return GetSingleFieldQuery(term, fields[0], context);
 
-        return new MultiMatchQuery(term.Value)
+        var query = new MultiMatchQuery(term.Value)
         {
-            Fields = fields,
             Type = term.Quoted ? TextQueryType.Phrase : null,
             Slop = term.Slop,
             Fuzziness = term.Fuzziness,
             Boost = term.Boost
         };
+        if (fields is { Length: > 0 })
+            query.Fields = fields;
+        return query;
     }
 
     private static Query GetNonAnalyzedFieldsQuery(QueryTerm term, List<string> fields, IElasticQueryVisitorContext context)

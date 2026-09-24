@@ -976,7 +976,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 .Path(p => p.Nested)
                 .Query(q2 => q2.QueryString(qs => qs
                     .Fields(Fields.FromStrings(["nested.field1"]))
-                    .AllowLeadingWildcard(false)
+                    .AllowLeadingWildcard(true)
                     .AnalyzeWildcard(true)
                     .Query("test*"))))), TestCancellationToken);
 

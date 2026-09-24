@@ -9,14 +9,18 @@ using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Xunit;
 using Xunit;
 
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
 // These assertions specify the default query pipeline, not just accepted AST syntax.
 // Keep the executable contract and both syntax guides synchronized.
-public class TermTranslationTests
+public class TermTranslationTests : TestWithLoggingBase
 {
+    public TermTranslationTests(ITestOutputHelper output) : base(output) { }
+
     [Theory]
     [InlineData("text:1..5", "match", "text", "query", "1..5")]
     [InlineData("keyword:1..5", "term", "keyword", "value", "1..5")]
@@ -126,7 +130,7 @@ public class TermTranslationTests
         var actual = Assert.Single(json.RootElement.EnumerateObject());
         Assert.Equal("bool", actual.Name);
         Assert.Equal(8, actual.Value.GetProperty("boost").GetSingle());
-        Assert.Equal(1, actual.Value.GetProperty("must").GetArrayLength());
+        Assert.Equal(2, actual.Value.GetProperty("must").GetProperty("bool").GetProperty("should").GetArrayLength());
     }
 
     [Theory]
@@ -178,7 +182,7 @@ public class TermTranslationTests
     public async Task BuildQueryAsync_WithInvalidModifier_ReportsPublicValidationError(string query)
     {
         using var resolver = CreateResolver();
-        var parser = new ElasticQueryParser(configuration => configuration.UseMappings(resolver));
+        var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings(resolver));
         Assert.False((await parser.ValidateQueryAsync(query)).IsValid);
         await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync(query));
     }
@@ -199,6 +203,36 @@ public class TermTranslationTests
         }
     }
 
+    [Theory]
+    [InlineData("alias:john\\*", "term", "john*")]
+    [InlineData("alias:jo?n", "wildcard", "jo?n")]
+    [InlineData("alias:/jo.n/", "regexp", "jo.n")]
+    public async Task BuildQueryAsync_WithIncludedAlias_PreservesTranslationAndFieldRestrictions(string fragment, string kind, string value)
+    {
+        using var resolver = CreateResolver();
+        var parser = new ElasticQueryParser(configuration => configuration
+            .SetLoggerFactory(Log)
+            .UseMappings(resolver)
+            .UseFieldMap(new System.Collections.Generic.Dictionary<string, string> { ["alias"] = "keyword" })
+            .UseIncludes(new System.Collections.Generic.Dictionary<string, string> { ["saved"] = fragment }));
+        var options = new QueryValidationOptions { AllowedFields = { "alias" } };
+        var context = new ElasticQueryVisitorContext { UseScoring = true };
+        context.SetValidationOptions(options);
+
+        var query = await parser.BuildQueryAsync("@include:saved", context);
+
+        Assert.Contains("alias", context.GetValidationResult().ReferencedFields);
+        Assert.Contains("saved", context.GetValidationResult().ReferencedIncludes);
+        if (kind == "term")
+            Assert.Equal(value, query.Term!.Value.ToString());
+        else if (kind == "wildcard")
+            Assert.Equal(value, query.Wildcard!.Value);
+        else
+            Assert.Equal(value, query.Regexp!.Value);
+        Assert.False((await parser.ValidateQueryAsync("@include:saved", new QueryValidationOptions { RestrictedFields = { "alias" } })).IsValid);
+        Assert.False((await parser.ValidateQueryAsync("@include:missing")).IsValid);
+    }
+
     private static ElasticMappingResolver CreateResolver() => new(() => new TypeMapping
     {
         Properties = new Properties
@@ -212,12 +246,12 @@ public class TermTranslationTests
         }
     });
 
-    private static async Task<JsonDocument> BuildQueryJsonAsync(string query, string[]? defaultFields = null)
+    private async Task<JsonDocument> BuildQueryJsonAsync(string query, string[]? defaultFields = null)
     {
         using var resolver = CreateResolver();
         var parser = new ElasticQueryParser(configuration =>
         {
-            configuration.UseMappings(resolver);
+            configuration.SetLoggerFactory(Log).UseMappings(resolver);
             if (defaultFields is not null)
                 configuration.SetDefaultFields(defaultFields);
         });
