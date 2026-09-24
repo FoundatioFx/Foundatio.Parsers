@@ -84,14 +84,5 @@ export default withMermaid(defineConfig({
     }
   },
   markdown: {
-    lineNumbers: false,
-    codeTransformers: [
-      {
-        name: 'snippet-transformer',
-        preprocess(code, options) {
-          return code
-        }
-      }
-    ]
   }
 }))
