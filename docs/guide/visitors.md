@@ -416,6 +416,7 @@ The fix in [#277](https://github.com/FoundatioFx/Foundatio.Parsers/pull/277) cha
 #### Ordering contexts interpret these operators differently
 
 Outside of query contexts these operators are interpreted as ordering, not negation, and only `+` (ascending) and `-` (descending) are accepted:
+
 - **Sort**: `DefaultSortNodeExtensions` calls `IsNodeOrGroupNegated()`. For standalone fields, `-field` sorts descending and `field` / `+field` sort ascending. Unprefixed terms can inherit group direction; `-(price name +rank)` sorts `price` and `name` descending, with `rank` ascending because of its own `+`.
 - **Aggregations**: `CombineAggregationsVisitor` reads `Prefix` directly and honors `-` (descending) and `+` (ascending) on a sub-aggregation.
 - **Boolean negation is rejected**: the built-in string-based sort and aggregation APIs reject `!` and `NOT`, including `NOT +field`, before returning generated output. Previously, `!field` and `NOT field` sorted descending, `NOT +field` sorted ascending, and aggregation negation could be silently ignored. The lower-level AST build overloads do not rerun validation; see [Ordering Operators](./validation#ordering-operators).

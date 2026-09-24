@@ -156,7 +156,7 @@ public static class QueryNodeExtensions
     /// </remarks>
     public static bool IsNodeOrGroupNegated(this IFieldQueryNode node)
     {
-        if (node == null || node.IsRequired())
+        if (node is null || node.IsRequired())
             return false;
 
         return node.IsExcluded() || node.Parent?.GetGroupNode()?.IsExcluded() is true;
