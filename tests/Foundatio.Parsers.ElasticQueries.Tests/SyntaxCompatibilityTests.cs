@@ -15,7 +15,8 @@ using Xunit;
 namespace Foundatio.Parsers.ElasticQueries.Tests;
 
 // Characterizes the default query pipeline for docs/guide/syntax-compatibility.md.
-// Term translation contracts are covered separately in TermTranslationTests.
+// TermTranslationTests covers wildcard/regex, fuzzy/slop, boost and default-field output.
+// Keep AST metadata, date/time-zone and cross-feature compatibility contracts here.
 // Scoring contexts expose the generated query directly, without a filter wrapper.
 public class SyntaxCompatibilityTests : TestWithLoggingBase
 {

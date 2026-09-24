@@ -265,6 +265,28 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
         Assert.Empty(result.Hits);
     }
 
+    [Theory]
+    [InlineData("AUTO", "a,b,c,e")]
+    [InlineData("AUTO:3,6", "a,b,c,e")]
+    [InlineData("AUTO:2,4", "a,b,c,d,e")]
+    [InlineData("AUTO:5,8", "a")]
+    public async Task BuildQueryAsync_WithBareFuzziness_UsesFixedDistanceInsteadOfAuto(string policy, string expectedAutoIds)
+    {
+        // Arrange
+        using var resolver = new ElasticMappingResolver(() => TermTranslationFixture.Mapping);
+        var parser = CreateParser(resolver);
+        var autoQuery = new FuzzyQuery("keyword", "john") { Fuzziness = new Fuzziness(policy) };
+
+        // Act
+        var fixedQuery = await parser.BuildQueryAsync("keyword:john~", CreateQueryContext(true));
+        var fixedResult = await SearchAsync(fixedQuery);
+        var autoResult = await SearchAsync(autoQuery);
+
+        // Assert
+        Assert.Equal("a,b,c,d,e", GetDocumentIds(fixedResult));
+        Assert.Equal(expectedAutoIds, GetDocumentIds(autoResult));
+    }
+
     private ElasticQueryParser CreateParser(ElasticMappingResolver resolver, string[]? fields = null) => new(configuration => configuration
         .SetLoggerFactory(Log)
         .UseMappings(resolver)

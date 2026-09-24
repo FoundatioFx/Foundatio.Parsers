@@ -358,8 +358,9 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
     }
 
     [Fact]
-    public async Task CanHandleEscapedQueryWithWildcards()
+    public async Task BuildQueryAsync_WithEscapedBackslashAndWildcard_PreservesLiteralDelimiters()
     {
+        // Arrange
         string index = await CreateRandomIndexAsync<MyType>();
         await Client.IndexManyAsync([
             new MyType { Field1 = "one/two/three" }
@@ -367,18 +368,23 @@ public class ElasticQueryParserTests : ElasticsearchTestBase
         await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings(Client, index));
+
+        // Act
         var result = await processor.BuildQueryAsync(@"field1:one\\/two*");
         var actualResponse = await Client.SearchAsync<MyType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest(true);
         _logger.LogInformation("Actual: {Request}", actualRequest);
 
+        // Preserve the literal backslash and slash when re-escaping for query_string;
+        // the trailing star remains an operator. The wildcard policy defaults to true.
         var expectedResponse = await Client.SearchAsync<MyType>(d => d.Indices(index)
             .Query(q => q
                 .Bool(b => b
-                    .Filter(f => f.QueryString(m => m.Query("one\\\\\\/two*").Fields(Fields.FromExpression((MyType f1) => f1.Field1)).AllowLeadingWildcard(true).AnalyzeWildcard())))), TestCancellationToken);
+                    .Filter(f => f.QueryString(m => m.Query(@"one\\\/two*").Fields(Fields.FromExpression((MyType f1) => f1.Field1)).AllowLeadingWildcard(true).AnalyzeWildcard())))), TestCancellationToken);
         string expectedRequest = expectedResponse.GetRequest(true);
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
+        // Assert
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
         Assert.Equal(1, actualResponse.Total);

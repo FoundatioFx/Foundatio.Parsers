@@ -487,9 +487,11 @@ var result = parser.Parse("name:john~");
 result = parser.Parse("name:john~2");
 ```
 
-The default Elasticsearch query builder accepts fuzzy distances `0`, `1`, or `2`. These are [Elasticsearch's supported edit distances](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/common-options#fuzziness): `0` allows no character edits, `1` allows one, and `2` allows two. Edits include insertions, deletions, substitutions, and, by default, adjacent-character transpositions. Analyzed text uses `match` with fuzziness; keyword fields use `fuzzy`.
+The default Elasticsearch query builder accepts the numeric fuzzy distances `0`, `1`, or `2`. These are [Elasticsearch's supported numeric edit distances](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/common-options#fuzziness): `0` allows no character edits, `1` allows one, and `2` allows two. Edits include insertions, deletions, substitutions, and, by default, adjacent-character transpositions. Analyzed text uses `match` with fuzziness; keyword fields use `fuzzy`.
 
 Bare `~` means **2**, following [Lucene's classic query parser default](https://lucene.apache.org/core/9_12_2/queryparser/org/apache/lucene/queryparser/classic/QueryParserBase.html#setFuzzyMinSim(float)). It is a fixed distance, not Elasticsearch's length-dependent `AUTO` policy. Specify an explicit distance when comparing query consumers.
+
+Elasticsearch also supports and generally recommends `AUTO` for its JSON `fuzziness` parameter. Its default thresholds (`AUTO:3,6`) allow zero edits for terms of length 0–2, one for 3–5, and two for 6 or more; custom thresholds are also supported by Elasticsearch. **This parser's fuzzy suffix does not support `AUTO` or `AUTO:low,high`, and it has no default-fuzziness setting.** Use an explicitly constructed Elasticsearch query or a custom query visitor when the application needs that policy. `term~AUTO` is rejected rather than silently interpreted as distance 2.
 
 Quoted phrases use `match_phrase` with a non-negative integer slop, for example `title:"a b"~5`. Slop measures token-position movement rather than character edits; zero requires an exact phrase, and transposing adjacent terms costs two positions. Bare phrase `~` means zero. See [Elasticsearch's phrase-slop definition](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query#query-string-top-level-params).
 

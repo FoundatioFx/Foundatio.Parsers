@@ -43,8 +43,8 @@ internal readonly record struct QueryTerm
             if (raw[0] is '*' or '?' && !context.GetValidationOptions().AllowLeadingWildcards)
             {
                 // The visitor normally reports this first; direct query helpers must also reject it.
-                string message = "Terms must not start with a wildcard: " + raw;
-                if (!context.GetValidationErrors().Any(error => error.Index == -1 && error.Message == message))
+                string message = $"Terms must not start with a wildcard: {raw}";
+                if (!context.GetValidationErrors().Any(error => error.Index is -1 && String.Equals(error.Message, message, StringComparison.Ordinal)))
                     context.AddValidationError(message);
 
                 return false;
@@ -57,34 +57,34 @@ internal readonly record struct QueryTerm
         {
             if (node.IsRegexTerm || wildcard is not null)
             {
-                context.AddValidationError("Fuzziness cannot be combined with regex or wildcard syntax: " + node);
+                context.AddValidationError($"Fuzziness cannot be combined with regex or wildcard syntax: {node}");
                 return false;
             }
 
             string proximity = node.UnescapedProximity!;
             if (node.IsQuotedTerm)
             {
-                if (proximity.Length == 0)
+                if (proximity.Length is 0)
                     slop = 0;
-                else if (Int32.TryParse(proximity, NumberStyles.None, CultureInfo.InvariantCulture, out int value))
+                else if (Int32.TryParse(proximity, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int value) && value is >= 0)
                     slop = value;
                 else
                 {
-                    context.AddValidationError("Phrase slop must be a non-negative integer: " + proximity);
+                    context.AddValidationError($"Phrase slop must be a non-negative integer: {proximity}");
                     return false;
                 }
             }
-            else if (proximity.Length == 0)
+            else if (proximity.Length is 0)
             {
                 fuzziness = new Fuzziness(2);
             }
-            else if (Int32.TryParse(proximity, NumberStyles.None, CultureInfo.InvariantCulture, out int distance) && distance <= 2)
+            else if (Int32.TryParse(proximity, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int distance) && distance is >= 0 and <= 2)
             {
                 fuzziness = new Fuzziness(distance);
             }
             else
             {
-                context.AddValidationError("Fuzzy edit distance must be 0, 1, or 2: " + proximity);
+                context.AddValidationError($"Fuzzy edit distance must be 0, 1, or 2: {proximity}");
                 return false;
             }
         }
@@ -95,7 +95,7 @@ internal readonly record struct QueryTerm
             Quoted = node.IsQuotedTerm,
             Regex = node.IsRegexTerm ? raw : null,
             Wildcard = wildcard,
-            Expression = node.IsRegexTerm ? "/" + raw + "/" : expression,
+            Expression = node.IsRegexTerm ? $"/{raw}/" : expression,
             IsPrefix = prefix,
             Boost = boost,
             Slop = slop,
@@ -116,7 +116,7 @@ internal readonly record struct QueryTerm
             return true;
         }
 
-        context.AddValidationError("A query boost must be a finite, non-negative number: " + value);
+        context.AddValidationError($"A query boost must be a finite, non-negative number: {value}");
         return false;
     }
 
@@ -124,9 +124,11 @@ internal readonly record struct QueryTerm
     {
         if (node.Proximity is not null)
         {
-            context.AddValidationError("Group proximity is not supported: " + node);
+            context.AddValidationError($"Group proximity is not supported: {node}");
             return new MatchNoneQuery();
         }
+
+        // Boost metadata retains grammar escapes: ^\+2 must parse as +2, just like term/range boosts.
         if (!TryReadBoost(node.UnescapedBoost, context, out var boost))
             return new MatchNoneQuery();
 
@@ -152,7 +154,7 @@ internal readonly record struct QueryTerm
     {
         for (int i = 0; i < raw.Length; i++)
         {
-            if (raw[i] == '\\')
+            if (raw[i] is '\\')
                 i++;
             else if (raw[i] is '*' or '?')
                 return true;
@@ -169,7 +171,7 @@ internal readonly record struct QueryTerm
         for (int i = 0; i < raw.Length; i++)
         {
             char value = raw[i];
-            bool literal = value == '\\';
+            bool literal = value is '\\';
             if (literal && i + 1 < raw.Length)
                 value = raw[++i];
 
@@ -193,6 +195,6 @@ internal readonly record struct QueryTerm
         }
         wildcard = pattern.ToString();
         expression = escaped.ToString();
-        prefix = operators == 1 && lastOperator == raw.Length - 1 && raw[^1] == '*';
+        prefix = operators is 1 && lastOperator == raw.Length - 1 && raw[^1] is '*';
     }
 }

@@ -62,6 +62,8 @@ The default Elasticsearch query builder translates the following forms on text a
 
 Unquoted fuzzy terms accept edit distances `0`, `1`, and `2`; bare `~` means **2**, which can differ from Elasticsearch `query_string`'s default `AUTO` behavior. Specify a distance in both consumers when comparing results. Quoted phrase slop accepts non-negative integers; bare phrase `~` means zero. Wildcard/regex terms cannot also use fuzzy syntax. Invalid distances, slop, or non-finite/negative boosts produce query validation errors; group proximity is unsupported. Numeric boosts are parsed using invariant culture.
 
+The Elasticsearch JSON API also accepts `AUTO` and custom `AUTO:low,high` thresholds. This library's fuzzy suffix and parser configuration do not expose those policies; `term~AUTO` is a validation error. Bare `~` stays at distance 2 regardless of term length. Use an explicit Elasticsearch query or custom visitor for `AUTO`, and see the [fuzziness policy boundary](./query-syntax#fuzzy-queries) before adopting Elasticsearch's length-dependent defaults.
+
 Regex uses Elasticsearch/Lucene automaton syntax, not .NET regular expressions. The raw pattern preserves backslash intent. Regex and wildcard queries operate on indexed terms, so text analyzers and keyword normalizers affect matching. Mapping support still matters: successful library validation does not guarantee a server will accept a modifier on numeric, date, boolean, or other non-string fields. Geo visitors and custom visitors can supply their own queries before default translation; these extensions need separate qualification.
 
 ### Matching and scoring are separate contracts

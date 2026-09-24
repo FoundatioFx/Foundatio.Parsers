@@ -111,7 +111,7 @@ var results = await db.Products
 - **Term queries**: `field:value`, `field:"quoted phrase"`
 - **Range queries**: `field:[1 TO 10]`, `field:>100`, `field:>=2024-01-01`
 - **Boolean operators**: `AND`, `OR`, `NOT`, `+`, `-`
-- **Wildcard expressions**: `field:val*`, `field:va?ue` (escape or quote literal wildcard characters)
+- **Wildcard expressions**: `field:val*` (`*` matches zero or more characters), `field:va?ue` (`?` matches one). Escape or quote literal wildcards. See [Elasticsearch's wildcard syntax](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query#query-string-wildcard).
 - **Existence**: `_exists_:field`, `_missing_:field`
 - **Date math**: `created:[now-7d TO now]`
 - **Geo queries**: `location:"New York, NY"~75mi` (with a configured location resolver)

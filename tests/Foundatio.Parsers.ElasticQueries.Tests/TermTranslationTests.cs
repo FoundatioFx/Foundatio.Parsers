@@ -133,8 +133,18 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("text:value~2", "match", "text", 2)]
     [InlineData("text:value~", "match", "text", 2)]
     [InlineData("text:value~0", "match", "text", 0)]
+    [InlineData("text:value~1", "match", "text", 1)]
+    [InlineData("keyword:value~0", "fuzzy", "keyword", 0)]
     [InlineData("keyword:value~1", "fuzzy", "keyword", 1)]
     [InlineData("keyword:value~2", "fuzzy", "keyword", 2)]
+    [InlineData("keyword:value~", "fuzzy", "keyword", 2)]
+    [InlineData("text:ab~", "match", "text", 2)]
+    [InlineData("text:abcdef~", "match", "text", 2)]
+    [InlineData("keyword:ab~", "fuzzy", "keyword", 2)]
+    [InlineData("keyword:abcdef~", "fuzzy", "keyword", 2)]
+    [InlineData("text:value~+1", "match", "text", 1)]
+    [InlineData(@"text:value~\+1", "match", "text", 1)]
+    [InlineData("keyword:value~+2", "fuzzy", "keyword", 2)]
     public async Task BuildQueryAsync_WithFuzzyTerm_EmitsEditDistance(string query, string kind, string field, int distance)
     {
         // Arrange
@@ -155,6 +165,8 @@ public class TermTranslationTests : TestWithLoggingBase
     [InlineData("text:\"a b\"~5", "text", 5)]
     [InlineData("text:\"a b\"~", "text", 0)]
     [InlineData("keyword:\"a b\"~3", "keyword", 3)]
+    [InlineData("text:\"a b\"~+1", "text", 1)]
+    [InlineData("text:\"a b\"~\\+1", "text", 1)]
     public async Task BuildQueryAsync_WithPhraseSlop_EmitsSlop(string query, string field, int slop)
     {
         // Arrange
@@ -324,9 +336,14 @@ public class TermTranslationTests : TestWithLoggingBase
 
     [Theory]
     [InlineData("text:value~-1")]
+    [InlineData("keyword:value~-1")]
     [InlineData("text:value~3")]
     [InlineData("text:value~NaN")]
     [InlineData("text:value~0.8")]
+    [InlineData("text:value~AUTO")]
+    [InlineData("keyword:value~AUTO")]
+    [InlineData(@"text:value~AUTO\:3,6")]
+    [InlineData(@"keyword:value~AUTO\:3,6")]
     [InlineData("text:value^NaN")]
     [InlineData("text:value^-1")]
     [InlineData("text:value^1e100")]
