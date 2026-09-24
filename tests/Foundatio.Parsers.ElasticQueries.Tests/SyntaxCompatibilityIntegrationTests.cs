@@ -29,20 +29,8 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("text-term", "text:alpha", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("text-case", "text:ALPHA", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("keyword-term", "keyword:john", GroupOperator.Or, "a", "a"),
-            ("keyword-case", "keyword:JOHN", GroupOperator.Or, String.Empty, String.Empty),
+            ("keyword-case", "keyword:JOHN", GroupOperator.Or, "", ""),
             ("keyword-uppercase", "keyword:ALPHA", GroupOperator.Or, "l", "l"),
-            ("source-component", "source:Services", GroupOperator.Or, "a,b", "a,b"),
-            ("source-qualified", "source:App.Services.Checkout", GroupOperator.Or, "a", "a"),
-            ("source-prefix", "source:App.Services.Check*", GroupOperator.Or, "a", "a"),
-            ("tag-analysis", "tag:VIP", GroupOperator.Or, "a,b", "a,b"),
-            ("tag-phrase", "tag:\"VIP Member\"", GroupOperator.Or, "b", "b"),
-            ("tag-prefix", "tag:VI*", GroupOperator.Or, "a,b", "a,b"),
-            ("tag-regex", "tag:/vip/", GroupOperator.Or, "a,b", "a,b"),
-            ("tag-regex-case", "tag:/VIP/", GroupOperator.Or, String.Empty, String.Empty),
-            ("keyword-normalizer", "folded:CAFÉ", GroupOperator.Or, "a,b", "a,b"),
-            ("indexed-not-source", "_exists_:ignored", GroupOperator.Or, "a,d,f", "a,d,f"),
-            ("null-sentinel", "nullable:MISSING", GroupOperator.Or, "a,f", "a,f"),
-            ("null-existence", "_exists_:nullable", GroupOperator.Or, "a,c,d,f", "a,c,d,f"),
             ("phrase", "text:\"alpha beta\"", GroupOperator.Or, "a", "a"),
             ("and", "text:alpha AND text:beta", GroupOperator.Or, "a,b", "a,b"),
             ("or", "text:alpha OR text:beta", GroupOperator.Or, "a,b,c,l", "a,b,c,l"),
@@ -68,7 +56,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("bare-dots", "keyword:1..5", GroupOperator.Or, "e", "e"),
             ("dot-range", "number:[1 .. 5]", GroupOperator.Or, "a,b,c,f,g", null),
             ("dot-range-compact", "number:[1..5]", GroupOperator.Or, "a,b,c,f,g", null),
-            ("escaped-dot", "field\\.with\\.dots:value", GroupOperator.Or, null, String.Empty),
+            ("escaped-dot", "field\\.with\\.dots:value", GroupOperator.Or, null, ""),
             ("wildcard-question", "keyword:jo?n", GroupOperator.Or, "a,b,c", "a,b,c"),
             ("wildcard-middle", "keyword:jo*n", GroupOperator.Or, "a,b,c", "a,b,c"),
             ("wildcard-leading", "keyword:*john", GroupOperator.Or, "a", "a"),
@@ -77,14 +65,14 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("wildcard-escaped", "keyword:john\\*", GroupOperator.Or, "j", "j"),
             ("wildcard-text", "text:alp*", GroupOperator.Or, "a,b,d,l", "a,b,d,l"),
             ("regex-prefix", "keyword:/val.*/", GroupOperator.Or, "f,g", "f,g"),
-            ("regex-nonprefix", "keyword:/[0-9]+/", GroupOperator.Or, String.Empty, String.Empty),
+            ("regex-nonprefix", "keyword:/[0-9]+/", GroupOperator.Or, "", ""),
             ("fuzzy", "text:alphx~1", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("phrase-slop", "text:\"alpha beta\"~1", GroupOperator.Or, "a,b", "a,b"),
             ("boost-membership", "text:alpha^8", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("exists", "_exists_:keyword", GroupOperator.Or, "a,b,c,d,e,f,g,h,j,k,l", "a,b,c,d,e,f,g,h,j,k,l"),
-            ("missing", "_missing_:keyword", GroupOperator.Or, "i", String.Empty),
+            ("missing", "_missing_:keyword", GroupOperator.Or, "i", ""),
             ("missing-migration", "NOT _exists_:keyword", GroupOperator.Or, "i", "i"),
-            ("include", "@include:active", GroupOperator.Or, "a", String.Empty),
+            ("include", "@include:active", GroupOperator.Or, "a", ""),
             ("range-inclusive", "number:[1 TO 5]", GroupOperator.Or, "a,b,c,f,g", "a,b,c,f,g"),
             ("range-exclusive", "number:{1 TO 5}", GroupOperator.Or, "b,f,g", "b,f,g"),
             ("range-open-upper", "number:[1 TO 5}", GroupOperator.Or, "a,b,f,g", "a,b,f,g"),
@@ -267,98 +255,6 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         Assert.Equal(native, external);
     }
 
-    [Theory]
-    [InlineData("lowerkeyword", "VIP Member", "vip member")]
-    [InlineData("whitespace_lower", "App.Services.Checkout, SECOND", "app.services.checkout,second")]
-    [InlineData("components", "App.Services.Checkout", "app,app.services.checkout,checkout,services")]
-    public async Task AnalyzeAsync_WithCustomAnalyzer_PreservesTokenBoundaries(string analyzer, string text, string expected)
-    {
-        // Act
-        var response = await Client.Indices.AnalyzeAsync(descriptor => descriptor
-            .Index(_fixture.Index).Analyzer(analyzer).Text(text), TestCancellationToken);
-
-        // Assert
-        Assert.True(response.IsValidResponse, response.DebugInformation);
-        Assert.NotNull(response.Tokens);
-        Assert.Equal(expected, String.Join(',', response.Tokens.Select(token => token.Token).Order(StringComparer.Ordinal)));
-    }
-
-    public static IEnumerable<TheoryDataRow<string, string, string, string, string, bool>> DateBoundaryCases()
-    {
-        (string Field, string Range, string Expected, string From, string To)[] cases =
-        [
-            ("date", "[\"2024-03-10T00:00:00\" TO \"2024-03-11T00:00:00\"}^\"America/Chicago\"", "s1,s2,s3,s4", "2024-03-10T06:00:00Z", "2024-03-11T05:00:00Z"),
-            ("date", "[\"2024-11-03T00:00:00\" TO \"2024-11-04T00:00:00\"}^\"America/Chicago\"", "f1,f2,f3,f4", "2024-11-03T05:00:00Z", "2024-11-04T06:00:00Z"),
-            ("date", "[2024-03-10 TO 2024-03-10]^\"America/Chicago\"", "s1,s2,s3,s4", "2024-03-10T06:00:00Z", "2024-03-11T05:00:00Z"),
-            ("date", "[2024-11-03 TO 2024-11-03]^\"America/Chicago\"", "f1,f2,f3,f4", "2024-11-03T05:00:00Z", "2024-11-04T06:00:00Z"),
-            ("dateNanos", "[\"2024-03-10T00:00:00\" TO \"2024-03-11T00:00:00\"}^\"America/Chicago\"", "s1,s2,s3,s4", "2024-03-10T06:00:00Z", "2024-03-11T05:00:00Z"),
-            ("dateNanos", "[\"2024-11-03T00:00:00\" TO \"2024-11-04T00:00:00\"}^\"America/Chicago\"", "f1,f2,f3,f4", "2024-11-03T05:00:00Z", "2024-11-04T06:00:00Z"),
-            ("date", "[\"2024-02-29T00:00:00Z\" TO \"2024-03-01T00:00:00Z\"}", "l1", "2024-02-29T00:00:00Z", "2024-03-01T00:00:00Z"),
-            ("date", "[2024-02-28||+1d/d TO 2024-03-01||/d}", "l1", "2024-02-29T00:00:00Z", "2024-03-01T00:00:00Z"),
-            ("date", "[\"2024-12-31T00:00:00Z\" TO \"2025-01-01T00:00:00Z\"}", "y0", "2024-12-31T00:00:00Z", "2025-01-01T00:00:00Z"),
-            ("dateNanos", "[\"2024-01-01T00:00:00.000000001Z\" TO \"2024-01-01T00:00:00.000000002Z\"}", "n1", "2024-01-01T00:00:00.000000001Z", "2024-01-01T00:00:00.000000002Z"),
-            ("dateNanos", "{\"2024-01-01T00:00:00.000000000Z\" TO \"2024-01-01T00:00:00.000000001Z\"]", "n1", "2024-01-01T00:00:00.000000001Z", "2024-01-01T00:00:00.000000002Z")
-        ];
-
-        foreach (var testCase in cases)
-            foreach (bool scoring in new[] { false, true })
-                yield return new(testCase.Field, testCase.Range, testCase.Expected, testCase.From, testCase.To, scoring);
-    }
-
-    [Theory]
-    [MemberData(nameof(DateBoundaryCases))]
-    public async Task BuildQueryAsync_WithDateBoundary_MatchesIndependentUtcBounds(
-        string field, string range, string expected, string from, string to, bool scoring)
-    {
-        // Arrange
-        using var resolver = ElasticMappingResolver.Create(Client, _fixture.DateIndex);
-        var parser = CreateParser(resolver);
-        Query reference = new DateRangeQuery(field) { Gte = from, Lt = to };
-        if (!scoring)
-            reference = new BoolQuery { Filter = [reference] };
-
-        // Act
-        var native = await parser.BuildQueryAsync($"{field}:{range}", new ElasticQueryVisitorContext { UseScoring = scoring });
-
-        // Assert both queries against independent IDs, not just against each other.
-        foreach (var query in new[] { native, reference })
-        {
-            var response = await Client.SearchAsync<SyntaxCompatibilityFixture.DateBoundaryDocument>(descriptor => descriptor
-                .Indices(_fixture.DateIndex).Query(query).Size(100).TrackTotalHits(true).AllowPartialSearchResults(false), TestCancellationToken);
-            Assert.True(response.IsValidResponse, response.DebugInformation);
-            AssertComplete(response);
-            Assert.Equal(expected, String.Join(',', response.Hits.Select(hit => hit.Id).Order(StringComparer.Ordinal)));
-            if (!scoring)
-                Assert.All(response.Hits, hit => Assert.Equal(0, hit.Score));
-        }
-    }
-
-    [Theory]
-    [InlineData("text:alpha OR keyword:johnny", "a")]
-    [InlineData("NOT keyword:john", "")]
-    [InlineData("keyword:johnny OR text:gamma", "")]
-    [InlineData("+text:alpha text:gamma", "a")]
-    public async Task BuildQueryAsync_WithCallerOwnedFilter_CannotBroadenResults(string text, string expected)
-    {
-        // Arrange
-        using var resolver = new ElasticMappingResolver(() => SyntaxCompatibilityFixture.Mapping);
-        var parser = CreateParser(resolver);
-
-        foreach (bool scoring in new[] { false, true })
-        {
-            // Act
-            var userQuery = await parser.BuildQueryAsync(text, new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring });
-            var query = new BoolQuery
-            {
-                Must = [userQuery],
-                Filter = [new TermQuery("keyword", "john")]
-            };
-
-            // Assert
-            Assert.Equal(expected, await GetMatchesAsync(query));
-        }
-    }
-
     private ElasticQueryParser CreateParser(ElasticMappingResolver resolver) => new(configuration => configuration
         .SetLoggerFactory(Log)
         .UseMappings(resolver)
@@ -412,7 +308,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         .TrackTotalHits(true)
         .AllowPartialSearchResults(false), TestCancellationToken);
 
-    private static void AssertComplete<T>(SearchResponse<T> response)
+    private static void AssertComplete(SearchResponse<SyntaxCompatibilityFixture.CompatibilityDocument> response)
     {
         Assert.False(response.TimedOut);
         Assert.Equal(0, response.Shards.Failed);

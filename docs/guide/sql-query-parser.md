@@ -109,7 +109,7 @@ public class EntityFieldInfo
     public bool IsDate { get; set; }           // DateTime type
     public bool IsDateOnly { get; set; }       // DateOnly type
     public bool IsBoolean { get; set; }        // Boolean type
-    public bool IsString { get; set; }         // String type
+    public bool? IsString { get; set; }        // String type when known
     public bool IsCollection { get; set; }     // Collection navigation
     public bool IsNavigation { get; set; }     // Navigation property
     public EntityFieldInfo? Parent { get; set; } // Parent for nested fields
@@ -356,9 +356,15 @@ var parser = new SqlQueryParser(c => c
 ## Complete Example
 
 ```csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.SqlQueries;
 using System.Linq.Dynamic.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 public class ProductSearchService
 {
@@ -409,7 +415,7 @@ public class ProductSearchService
 
     public async Task<PagedResult<Product>> SearchPagedAsync(
         string query,
-        string sort = null,
+        string? sort = null,
         int page = 1,
         int pageSize = 20)
     {

@@ -167,7 +167,7 @@ public static class SqlNodeExtensions
 
         var builder = new StringBuilder();
         bool isExcluded = node.IsExcluded();
-        var wildcard = SqlWildcardPattern.Analyze(node);
+        var wildcardKind = SqlWildcardPattern.GetKind(node);
 
         if (String.IsNullOrEmpty(node.Field))
         {
@@ -177,18 +177,21 @@ public static class SqlNodeExtensions
                 return String.Empty;
             }
 
-            if (wildcard.Kind == SqlWildcardKind.Advanced)
+            if (wildcardKind is SqlWildcardKind.Advanced)
             {
                 if (isExcluded)
                     builder.Append("!(");
                 builder.Append("(");
-                for (int i = 0; i < context.DefaultFields.Length; i++)
+                bool isFirstField = true;
+                string likePattern = SqlWildcardPattern.GetLikePattern(node);
+                foreach (string defaultFieldName in context.DefaultFields)
                 {
-                    if (i > 0)
+                    if (!isFirstField)
                         builder.Append(" OR ");
 
-                    var defaultField = GetFieldInfo(context.Fields, context.DefaultFields[i]);
-                    AppendLike(builder, defaultField, wildcard.LikePattern);
+                    var defaultField = GetFieldInfo(context.Fields, defaultFieldName);
+                    AppendLike(builder, defaultField, likePattern);
+                    isFirstField = false;
                 }
                 builder.Append(")");
                 if (isExcluded)
@@ -318,7 +321,7 @@ public static class SqlNodeExtensions
         var field = GetFieldInfo(context.Fields, node.Field);
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
         var (scopePrefix, argumentPrefix) = SplitFieldPrefix(field, fieldPrefix);
-        var searchOperator = wildcard.Kind switch
+        var searchOperator = wildcardKind switch
         {
             SqlWildcardKind.Prefix => SqlSearchOperator.StartsWith,
             SqlWildcardKind.Contains => SqlSearchOperator.Contains,
@@ -328,20 +331,20 @@ public static class SqlNodeExtensions
         if (isExcluded)
             builder.Append("!(");
 
-        if (wildcard.Kind == SqlWildcardKind.Advanced)
+        if (wildcardKind is SqlWildcardKind.Advanced)
         {
-            AppendLike(builder, field, wildcard.LikePattern);
+            AppendLike(builder, field, SqlWildcardPattern.GetLikePattern(node));
         }
-        else if (searchOperator == SqlSearchOperator.Equals)
+        else if (searchOperator is SqlSearchOperator.Equals)
         {
             builder.Append(scopePrefix);
             builder.Append(argumentPrefix);
             builder.Append(field.Name);
             builder.Append(" = ");
-            AppendField(builder, field, wildcard.Literal, context);
+            AppendField(builder, field, SqlWildcardPattern.GetLiteral(node, wildcardKind), context);
             builder.Append(fieldSuffix);
         }
-        else if (searchOperator == SqlSearchOperator.Contains)
+        else if (searchOperator is SqlSearchOperator.Contains)
         {
             builder.Append(scopePrefix);
 
@@ -359,7 +362,7 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(".Contains(");
-                AppendField(builder, field, wildcard.Literal, context);
+                AppendField(builder, field, SqlWildcardPattern.GetLiteral(node, wildcardKind), context);
                 builder.Append(")");
             }
 
@@ -375,7 +378,7 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(", ");
-                AppendField(builder, field, "\"" + wildcard.Literal + "*\"", context);
+                AppendField(builder, field, "\"" + SqlWildcardPattern.GetLiteral(node, wildcardKind) + "*\"", context);
                 builder.Append(")");
             }
             else
@@ -383,7 +386,7 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(".StartsWith(");
-                AppendField(builder, field, wildcard.Literal, context);
+                AppendField(builder, field, SqlWildcardPattern.GetLiteral(node, wildcardKind), context);
                 builder.Append(")");
             }
 

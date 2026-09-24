@@ -16,14 +16,17 @@ public class SqlQuerySyntaxTests
     [InlineData("FullName:jo*n", "jo%n")]
     [InlineData("FullName:*ohn", "%ohn")]
     [InlineData("FullName:jo?n*", "jo_n%")]
-    public async Task AdvancedWildcards_TranslateToSqlLike(string query, string expectedPattern)
+    public async Task ToDynamicLinqAsync_WithAdvancedWildcard_TranslatesToSqlLike(string query, string expectedPattern)
     {
+        // Arrange
         using var db = CreateContext();
         var parser = new SqlQueryParser();
 
+        // Act
         string predicate = await parser.ToDynamicLinqAsync(query, parser.GetContext(db.Employees.EntityType));
         string sql = db.Employees.Where(parser.ParsingConfig, predicate).ToQueryString();
 
+        // Assert
         Assert.Contains(" LIKE ", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(expectedPattern, sql, StringComparison.Ordinal);
         Assert.Contains(" ESCAPE ", sql, StringComparison.OrdinalIgnoreCase);
@@ -33,42 +36,51 @@ public class SqlQuerySyntaxTests
     [InlineData(@"FullName:jo\*n", "jo*n")]
     [InlineData(@"FullName:jo\?n", "jo?n")]
     [InlineData("FullName:\"jo*n\"", "jo*n")]
-    public async Task EscapedAndQuotedWildcards_RemainLiteral(string query, string expectedValue)
+    public async Task ToDynamicLinqAsync_WithEscapedOrQuotedWildcard_KeepsLiteralValue(string query, string expectedValue)
     {
+        // Arrange
         using var db = CreateContext();
         var parser = new SqlQueryParser();
 
+        // Act
         string predicate = await parser.ToDynamicLinqAsync(query, parser.GetContext(db.Employees.EntityType));
         string sql = db.Employees.Where(parser.ParsingConfig, predicate).ToQueryString();
 
+        // Assert
         Assert.DoesNotContain(" LIKE ", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(expectedValue, sql, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task AdvancedWildcard_EscapesSqlPatternCharacters()
+    public async Task ToDynamicLinqAsync_WithSqlLikeCharacters_EscapesLiteralCharacters()
     {
+        // Arrange
         using var db = CreateContext();
         var parser = new SqlQueryParser();
 
+        // Act
         string predicate = await parser.ToDynamicLinqAsync("FullName:jo%_?", parser.GetContext(db.Employees.EntityType));
         string sql = db.Employees.Where(parser.ParsingConfig, predicate).ToQueryString();
 
+        // Assert
         Assert.Contains("LIKE", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(@"jo\%\__", sql, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task AdvancedWildcard_OnDefaultAndNavigationFields_Translates()
+    public async Task ToDynamicLinqAsync_WithDefaultAndNavigationFields_TranslatesAdvancedWildcard()
     {
+        // Arrange
         using var db = CreateContext();
         var parser = new SqlQueryParser(c => c.SetDefaultFields(["FullName", "Title"]));
 
+        // Act
         string defaultPredicate = await parser.ToDynamicLinqAsync("jo?n", parser.GetContext(db.Employees.EntityType));
         string defaultSql = db.Employees.Where(parser.ParsingConfig, defaultPredicate).ToQueryString();
         string navigationPredicate = await parser.ToDynamicLinqAsync("CurrentCompany.Name:jo?n", parser.GetContext(db.Employees.EntityType));
         string navigationSql = db.Employees.Where(parser.ParsingConfig, navigationPredicate).ToQueryString();
 
+        // Assert
         Assert.Equal(2, defaultSql.Split(" LIKE ").Length - 1);
         Assert.Contains("jo_n", defaultSql, StringComparison.Ordinal);
         Assert.Contains(" LIKE ", navigationSql, StringComparison.OrdinalIgnoreCase);
@@ -84,35 +96,42 @@ public class SqlQuerySyntaxTests
     [InlineData("Salary:[1 TO 5]^2", "boost")]
     [InlineData("Salary:1?0", "wildcard")]
     [InlineData("Salary:1*", "wildcard")]
-    public async Task UnsupportedSqlSyntax_IsRejectedBeforeGeneratingPredicate(string query, string kind)
+    public async Task ValidateAsync_WithUnsupportedSqlSyntax_ReturnsErrorBeforeGeneration(string query, string kind)
     {
+        // Arrange
         using var db = CreateContext();
         var parser = new SqlQueryParser();
 
+        // Act
         var result = await parser.ValidateAsync(query, parser.GetContext(db.Employees.EntityType));
         var error = await Assert.ThrowsAsync<ValidationException>(() =>
             parser.ToDynamicLinqAsync(query, parser.GetContext(db.Employees.EntityType)));
 
+        // Assert
         Assert.False(result.IsValid);
         Assert.Contains(kind, result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(kind, error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task AdvancedWildcard_OnFullTextField_IsRejected()
+    public async Task ValidateAsync_WithAdvancedWildcardOnFullTextField_ReturnsError()
     {
+        // Arrange
         using var db = CreateContext();
         var parser = new SqlQueryParser(c => c.SetFullTextFields(["FullName"]));
 
+        // Act
         var result = await parser.ValidateAsync("FullName:jo?n", parser.GetContext(db.Employees.EntityType));
 
+        // Assert
         Assert.False(result.IsValid);
         Assert.Contains("wildcard", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task AdvancedWildcard_ThroughAliasAndInclude_Translates()
+    public async Task ToDynamicLinqAsync_WithAliasedInclude_TranslatesAdvancedWildcard()
     {
+        // Arrange
         using var db = CreateContext();
         var parser = new SqlQueryParser(c => c
             .UseFieldMap(new Dictionary<string, string> { ["name"] = "FullName" })
@@ -120,11 +139,49 @@ public class SqlQuerySyntaxTests
 
         var context = parser.GetContext(db.Employees.EntityType);
         context.ValidationOptions!.AllowedFields.Add("name");
+
+        // Act
         string predicate = await parser.ToDynamicLinqAsync("@include:find", context);
         string sql = db.Employees.Where(parser.ParsingConfig, predicate).ToQueryString();
 
+        // Assert
         Assert.Contains(" LIKE ", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("jo_n", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithManualFieldMetadata_PreservesPrefixSearch()
+    {
+        // Arrange
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields = [new EntityFieldInfo { Name = "FullName", FullName = "name" }]
+        };
+
+        // Act
+        string predicate = await parser.ToDynamicLinqAsync("name:Jo*", context);
+
+        // Assert
+        Assert.Equal("FullName.StartsWith(\"Jo\")", predicate);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WithAdvancedWildcardWithoutMappedType_ReturnsError()
+    {
+        // Arrange
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields = [new EntityFieldInfo { Name = "FullName", FullName = "name" }]
+        };
+
+        // Act
+        var validation = await parser.ValidateAsync("name:Jo?n", context);
+
+        // Assert
+        Assert.False(validation.IsValid);
+        Assert.Contains("mapped string field", validation.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static SampleContext CreateContext() => new(new DbContextOptionsBuilder<SampleContext>()

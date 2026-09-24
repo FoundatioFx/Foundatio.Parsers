@@ -464,9 +464,9 @@ var parser = new ElasticQueryParser(c => c
 var query = await parser.BuildQueryAsync("searchterm");
 ```
 
-Multi-level nested paths are supported when their mappings identify each nested level and `UseNested()` is enabled. Queries on `parent.child.field1` generate the required nested wrappers for both levels.
+### Known Limitations
 
-For a detailed explanation of how visitors traverse nested query structures, field scoping rules, and the full AST breakdown, see [Nested Queries and Visitor Traversal](./nested-queries).
+Nested groups do not compose relative child field names from the enclosing group. Use the full path, such as `parent.child.field1`. With mappings for each nested level and `UseNested()`, a single field query uses the deepest nested path, while a query combining parent and child fields creates correlated wrappers. See [Nested Queries and Visitor Traversal](./nested-queries) for details.
 
 ## Runtime Fields
 

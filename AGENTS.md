@@ -76,6 +76,7 @@ docs                                  # Query and aggregation syntax documentati
 
 - Write complete, runnable code—no placeholders, TODOs, or `// existing code...` comments
 - Use modern C# features: pattern matching, nullable references, `is` expressions, target-typed `new()`
+- Prefer `is` for constant and enum checks; use names that explain each value's role
 - Follow SOLID, DRY principles; remove unused code and parameters
 - Clear, descriptive naming; prefer explicit over clever
 - Use `AnyContext()` (e.g., `ConfigureAwait(false)`) in library code (not in tests)
@@ -185,6 +186,12 @@ Before marking work complete, verify:
 - **No deprecated APIs**: Avoid obsolete cryptography, serialization, or framework features
 
 ## Testing
+
+### Documentation Examples
+
+- Treat changed C# samples as executable API examples. Compile representative snippets against the current projects, adding only the surrounding declarations needed to run them; fix the documentation if a sample uses a missing method, wrong signature, or stale type.
+- Verify the sample's behavior and visitor ordering against source and relevant tests. Preserve its scope and meaning when editing it, and explain any necessary semantic change.
+- Keep fenced code valid, check local links, and build the docs after changing guides. Do not remove a documented limitation until current implementation and tests demonstrate its replacement.
 
 ### Philosophy: Battle-Tested Code
 
