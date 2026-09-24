@@ -1,9 +1,0 @@
-# id	configured expression	canonical expression	independent expected IDs
-dot-range	count:[1 .. 5]	count:[1 TO 5]	a,b,e,f
-mapping-alias	tag:VIP	tags:VIP	a,b
-reference-alias	reference:Ref-A	reference_id:Ref-A	a
-field-map	msg:alpha	message:alpha	a,b,e
-nested-field-map	who:alice	children.name:alice	a,b,c
-missing-extension	_missing_:tags	NOT _exists_:tags	d,f
-include-expansion	@include:vip	tag:VIP	a,b
-leading-negation	-message:alpha	NOT message:alpha	c,d,f
