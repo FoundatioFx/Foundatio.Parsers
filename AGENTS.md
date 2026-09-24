@@ -189,8 +189,8 @@ Before marking work complete, verify:
 
 ### Documentation Examples
 
-- Treat changed C# samples as executable API examples. Compile representative snippets against the current projects, adding only the surrounding declarations needed to run them; fix the documentation if a sample uses a missing method, wrong signature, or stale type.
-- Verify the sample's behavior and visitor ordering against source and relevant tests. Preserve its scope and meaning when editing it, and explain any necessary semantic change.
+- Treat changed C# samples as executable API examples. Compile every changed runnable snippet against the current projects, adding only the surrounding declarations needed to run them; fix the documentation if a sample uses a missing method, wrong signature, or stale type.
+- Verify the sample's behavior and visitor ordering against source and relevant tests. Preserve its scope and meaning when editing it, and explain any necessary semantic change. For date ranges, verify inclusivity and rounding against the pinned dependency and boundary tests.
 - Keep fenced code valid, check local links, and build the docs after changing guides. Do not remove a documented limitation until current implementation and tests demonstrate its replacement.
 
 ### Philosophy: Battle-Tested Code

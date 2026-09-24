@@ -199,6 +199,7 @@ public static class SqlNodeExtensions
                 return builder.ToString();
             }
 
+            string literalTerm = SqlWildcardPattern.GetLiteral(node, SqlWildcardKind.None);
             var fieldTerms = new Dictionary<EntityFieldInfo, SearchTerm>();
             foreach (string df in context.DefaultFields)
             {
@@ -208,7 +209,7 @@ public static class SqlNodeExtensions
                     searchTerm = new SearchTerm
                     {
                         FieldInfo = fieldInfo,
-                        Term = node.Term,
+                        Term = literalTerm,
                         Operator = context.DefaultSearchOperator
                     };
                     fieldTerms[fieldInfo] = searchTerm;
@@ -263,7 +264,7 @@ public static class SqlNodeExtensions
                             builder.Append(argumentPrefix);
                             builder.Append(kvp.Key.Name);
                             builder.Append(", ");
-                            AppendField(builder, kvp.Key, "\"*" + token + "*\"", context);
+                            AppendField(builder, kvp.Key, $"\"*{token}*\"", context);
                             builder.Append(")");
                         }
                         else
@@ -293,7 +294,7 @@ public static class SqlNodeExtensions
                             builder.Append(argumentPrefix);
                             builder.Append(kvp.Key.Name);
                             builder.Append(", ");
-                            AppendField(builder, kvp.Key, "\"" + token + "*\"", context);
+                            AppendField(builder, kvp.Key, $"\"{token}*\"", context);
                             builder.Append(")");
                         }
                         else
@@ -319,6 +320,16 @@ public static class SqlNodeExtensions
         }
 
         var field = GetFieldInfo(context.Fields, node.Field);
+        if (wildcardKind is SqlWildcardKind.Advanced)
+        {
+            if (isExcluded)
+                builder.Append("!(");
+            AppendLike(builder, field, SqlWildcardPattern.GetLikePattern(node));
+            if (isExcluded)
+                builder.Append(")");
+            return builder.ToString();
+        }
+
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
         var (scopePrefix, argumentPrefix) = SplitFieldPrefix(field, fieldPrefix);
         var searchOperator = wildcardKind switch
@@ -331,11 +342,7 @@ public static class SqlNodeExtensions
         if (isExcluded)
             builder.Append("!(");
 
-        if (wildcardKind is SqlWildcardKind.Advanced)
-        {
-            AppendLike(builder, field, SqlWildcardPattern.GetLikePattern(node));
-        }
-        else if (searchOperator is SqlSearchOperator.Equals)
+        if (searchOperator is SqlSearchOperator.Equals)
         {
             builder.Append(scopePrefix);
             builder.Append(argumentPrefix);
@@ -378,7 +385,7 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(", ");
-                AppendField(builder, field, "\"" + SqlWildcardPattern.GetLiteral(node, wildcardKind) + "*\"", context);
+                AppendField(builder, field, $"\"{SqlWildcardPattern.GetLiteral(node, wildcardKind)}*\"", context);
                 builder.Append(")");
             }
             else
@@ -652,11 +659,11 @@ public static class SqlNodeExtensions
     private static void AppendStringLiteral(StringBuilder builder, string value)
     {
         builder.Append('"');
-        foreach (char c in value)
+        foreach (char character in value)
         {
-            if (c is '\\' or '"')
+            if (character is '\\' or '"')
                 builder.Append('\\');
-            builder.Append(c);
+            builder.Append(character);
         }
         builder.Append('"');
     }

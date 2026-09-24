@@ -294,11 +294,10 @@ public class DateRangeExpansionVisitor : ChainableMutatingQueryVisitor
                 Field = node.Field,
                 Prefix = node.Prefix,
                 IsNegated = node.IsNegated,
-                Boost = node.Boost,
                 Min = start,
                 Max = end,
                 MinInclusive = true,
-                MaxInclusive = false
+                MaxInclusive = true
             };
             
             return Task.FromResult<IQueryNode?>(node.ReplaceSelf(rangeNode));
@@ -323,11 +322,11 @@ public class DateRangeExpansionVisitor : ChainableMutatingQueryVisitor
     {
         return term switch
         {
-            "today" => ("now/d", "now+1d/d"),
-            "yesterday" => ("now-1d/d", "now/d"),
-            "this_week" => ("now/w", "now+1w/w"),
-            "last_week" => ("now-1w/w", "now/w"),
-            _ => throw new ArgumentOutOfRangeException(nameof(term))
+            "today" => ("now/d", "now"),
+            "yesterday" => ("now-1d/d", "now-1d/d"),
+            "this_week" => ("now/w", "now"),
+            "last_week" => ("now-1w/w", "now-1w/w"),
+            _ => (term, term)
         };
     }
 }
@@ -385,7 +384,7 @@ var parser = new ElasticQueryParser(c => c
     .AddVisitor(new CustomFilterVisitor(), priority: 15));
 ```
 
-Expand includes before resolving fields so aliases inside included queries are resolved too. Priority 15 runs the custom visitor after field resolution (10) and before mapping validation (20) and query validation (30). `AddVisitor` registers it in the query, aggregation, and sort chains, as in the original example; use `AddQueryVisitor` only when it should process queries alone.
+Expand includes before resolving fields so aliases inside included queries are resolved too. Priority 15 runs the custom visitor after field resolution (10) and before mapping validation (20) and query validation (30). `AddVisitor` registers it in the query, aggregation, and sort chains; use `AddQueryVisitor` only when it should process queries alone.
 
 ## Best Practices
 

@@ -37,12 +37,12 @@ internal sealed class SqlSyntaxValidationVisitor : ChainableQueryVisitor
 
         if (!String.IsNullOrEmpty(node.Field))
         {
-            ValidateField(node.Field, wildcardKind, sqlContext, context);
+            ValidateField(node.Field, wildcardKind, sqlContext);
             return;
         }
 
         foreach (string fieldName in context.DefaultFields ?? [])
-            ValidateField(fieldName, wildcardKind, sqlContext, context);
+            ValidateField(fieldName, wildcardKind, sqlContext);
     }
 
     public override void Visit(TermRangeNode node, IQueryVisitorContext context)
@@ -53,13 +53,13 @@ internal sealed class SqlSyntaxValidationVisitor : ChainableQueryVisitor
             context.AddValidationError("Proximity is not supported by SQL queries.");
     }
 
-    private static void ValidateField(string fieldName, SqlWildcardKind wildcardKind, ISqlQueryVisitorContext sqlContext, IQueryVisitorContext context)
+    private static void ValidateField(string fieldName, SqlWildcardKind wildcardKind, ISqlQueryVisitorContext context)
     {
-        var field = SqlNodeExtensions.GetFieldInfo(sqlContext.Fields, fieldName);
+        var field = SqlNodeExtensions.GetFieldInfo(context.Fields, fieldName);
         if (field.IsString is false || (wildcardKind is SqlWildcardKind.Advanced && field.IsString is not true))
             context.AddValidationError($"Wildcard patterns require a mapped string field: {fieldName}.");
         else if (wildcardKind is SqlWildcardKind.Advanced
-            && sqlContext.FullTextFields?.Contains(field.FullName, StringComparer.OrdinalIgnoreCase) is true)
+            && context.FullTextFields?.Contains(field.FullName, StringComparer.OrdinalIgnoreCase) is true)
             context.AddValidationError($"Advanced wildcard patterns are not supported on full-text fields: {fieldName}.");
     }
 }

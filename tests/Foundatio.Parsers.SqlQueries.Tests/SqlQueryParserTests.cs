@@ -486,7 +486,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         db.Companies.Add(new Company { Name = "Second", Location = "jo%_hn" });
         await db.SaveChangesAsync(TestCancellationToken);
 
-        var parser = new SqlQueryParser(c => c
+        var parser = new SqlQueryParser(c => c.SetLoggerFactory(Log)
             .UseFieldMap(new Dictionary<string, string> { ["location"] = "Location" })
             .UseIncludes(new Dictionary<string, string> { ["matching"] = "location:jo%_?n" }));
         var context = parser.GetContext(db.Companies.EntityType);
@@ -504,23 +504,6 @@ public class SqlQueryParserTests : TestWithLoggingBase
         Assert.Equal("Second", companies[0].Name);
     }
 
-    [Fact]
-    public async Task ToDynamicLinqAsync_WithQuestionMarkAndTrailingStar_ReturnsMatchingEmployee()
-    {
-        // Arrange
-        var serviceProvider = GetServiceProvider();
-        await using var db = await GetSampleContextWithDataAsync(serviceProvider);
-        var parser = new SqlQueryParser();
-
-        // Act
-        string predicate = await parser.ToDynamicLinqAsync("FullName:Jo?n*", parser.GetContext(db.Employees.EntityType));
-        var employees = await db.Employees.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
-
-        // Assert
-        Assert.Single(employees);
-        Assert.Equal("John Doe", employees[0].FullName);
-    }
-
     [Theory]
     [InlineData(@"Location:jo\*n", "jo*n")]
     [InlineData(@"Location:jo\?n", "jo?n")]
@@ -532,7 +515,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
         db.Companies.Add(new Company { Name = "Literal", Location = location });
         db.Companies.Add(new Company { Name = "Other", Location = "john" });
         await db.SaveChangesAsync(TestCancellationToken);
-        var parser = new SqlQueryParser();
+        var parser = new SqlQueryParser(configuration => configuration.SetLoggerFactory(Log));
 
         // Act
         string predicate = await parser.ToDynamicLinqAsync(query, parser.GetContext(db.Companies.EntityType));
@@ -542,6 +525,23 @@ public class SqlQueryParserTests : TestWithLoggingBase
         // Assert
         Assert.DoesNotContain(" LIKE ", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("Literal", Assert.Single(companies).Name);
+    }
+
+    [Fact]
+    public async Task ToDynamicLinqAsync_WithQuestionMarkAndTrailingStar_ReturnsMatchingEmployee()
+    {
+        // Arrange
+        var serviceProvider = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(serviceProvider);
+        var parser = new SqlQueryParser(configuration => configuration.SetLoggerFactory(Log));
+
+        // Act
+        string predicate = await parser.ToDynamicLinqAsync("FullName:Jo?n*", parser.GetContext(db.Employees.EntityType));
+        var employees = await db.Employees.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
+
+        // Assert
+        Assert.Single(employees);
+        Assert.Equal("John Doe", employees[0].FullName);
     }
 
     [Fact]
