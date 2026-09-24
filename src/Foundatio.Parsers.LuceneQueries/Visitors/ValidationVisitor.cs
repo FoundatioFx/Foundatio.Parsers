@@ -35,7 +35,10 @@ public class ValidationVisitor : ChainableQueryVisitor
         ValidateOrderingOperators(node, context);
 
         var validationOptions = context.GetValidationOptions();
-        if (validationOptions is { AllowLeadingWildcards: false } && node.Term != null && (node.Term.StartsWith("*") || node.Term.StartsWith("?")))
+        // Quoted terms treat wildcards as literals; regex metacharacters belong to a separate
+        // syntax. Only unquoted, non-regex terms are subject to the leading-wildcard policy.
+        if (validationOptions is { AllowLeadingWildcards: false } && !node.IsQuotedTerm && !node.IsRegexTerm
+            && node.Term != null && (node.Term.StartsWith("*") || node.Term.StartsWith("?")))
             context.AddValidationError("Terms must not start with a wildcard: " + node.Term);
     }
 

@@ -57,17 +57,17 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("dot-range", "number:[1 .. 5]", GroupOperator.Or, "a,b,c,f,g", null),
             ("dot-range-compact", "number:[1..5]", GroupOperator.Or, "a,b,c,f,g", null),
             ("escaped-dot", "field\\.with\\.dots:value", GroupOperator.Or, null, ""),
-            ("wildcard-question", "keyword:jo?n", GroupOperator.Or, "c", "a,b,c"),
-            ("wildcard-middle", "keyword:jo*n", GroupOperator.Or, "", "a,b,c"),
-            ("wildcard-leading", "keyword:*john", GroupOperator.Or, "", "a"),
+            ("wildcard-question", "keyword:jo?n", GroupOperator.Or, "a,b,c", "a,b,c"),
+            ("wildcard-middle", "keyword:jo*n", GroupOperator.Or, "a,b,c", "a,b,c"),
+            ("wildcard-leading", "keyword:*john", GroupOperator.Or, "a", "a"),
             ("wildcard-prefix", "keyword:john*", GroupOperator.Or, "a,d,j", "a,d,j"),
-            ("wildcard-mixed", "keyword:jo?n*", GroupOperator.Or, "c,k", "a,b,c,d,j,k"),
-            ("wildcard-escaped", "keyword:john\\*", GroupOperator.Or, "a,d,j", "j"),
+            ("wildcard-mixed", "keyword:jo?n*", GroupOperator.Or, "a,b,c,d,j,k", "a,b,c,d,j,k"),
+            ("wildcard-escaped", "keyword:john\\*", GroupOperator.Or, "j", "j"),
             ("wildcard-text", "text:alp*", GroupOperator.Or, "a,b,d,l", "a,b,d,l"),
-            ("regex-prefix", "keyword:/val.*/", GroupOperator.Or, "f", "f,g"),
-            ("regex-nonprefix", "keyword:/[0-9]+/", GroupOperator.Or, "h", ""),
-            ("fuzzy", "text:alphx~1", GroupOperator.Or, "", "a,b,l"),
-            ("phrase-slop", "text:\"alpha beta\"~1", GroupOperator.Or, "a", "a,b"),
+            ("regex-prefix", "keyword:/val.*/", GroupOperator.Or, "f,g", "f,g"),
+            ("regex-nonprefix", "keyword:/[0-9]+/", GroupOperator.Or, "", ""),
+            ("fuzzy", "text:alphx~1", GroupOperator.Or, "a,b,l", "a,b,l"),
+            ("phrase-slop", "text:\"alpha beta\"~1", GroupOperator.Or, "a,b", "a,b"),
             ("boost-membership", "text:alpha^8", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("exists", "_exists_:keyword", GroupOperator.Or, "a,b,c,d,e,f,g,h,j,k,l", "a,b,c,d,e,f,g,h,j,k,l"),
             ("missing", "_missing_:keyword", GroupOperator.Or, "i", ""),
@@ -169,7 +169,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
     [InlineData("text:alpha", "text:alpha^8")]
     [InlineData("text:\"alpha beta\"", "text:\"alpha beta\"^8")]
     [InlineData("(text:alpha OR text:gamma)", "(text:alpha OR text:gamma)^8")]
-    public async Task BuildQueryAsync_WithBoost_CharacterizesMissingBoostAndReferenceMultiplier(string baseline, string boosted)
+    public async Task BuildQueryAsync_WithBoost_PreservesReferenceMultiplier(string baseline, string boosted)
     {
         // Arrange
         using var resolver = new ElasticMappingResolver(() => SyntaxCompatibilityFixture.Mapping);
@@ -188,14 +188,15 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         Assert.Equal(external.Keys.Order(StringComparer.Ordinal), externalBoosted.Keys.Order(StringComparer.Ordinal));
 
         foreach (string id in native.Keys)
-            AssertClose(native[id], nativeBoosted[id]);
-
-        foreach (string id in external.Keys)
+        {
+            AssertClose(native[id] * 8, nativeBoosted[id]);
             AssertClose(external[id] * 8, externalBoosted[id]);
+            AssertClose(externalBoosted[id], nativeBoosted[id]);
+        }
     }
 
     [Fact]
-    public async Task BuildQueryAsync_WithBoostedDisjunction_ChangesReferenceRankingButNotNativeRanking()
+    public async Task BuildQueryAsync_WithBoostedDisjunction_PreservesReferenceRanking()
     {
         // Arrange
         using var resolver = new ElasticMappingResolver(() => SyntaxCompatibilityFixture.Mapping);
@@ -207,8 +208,12 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         var external = await GetScoresAsync(ReferenceQuery(query));
 
         // Assert
-        Assert.True(native["c"] > native["a"], "Unboosted gamma should outrank alpha in equal-length documents.");
+        Assert.True(native["a"] > native["c"], "The alpha boost must reverse the unboosted ranking.");
         Assert.True(external["a"] > external["c"], "The reference boost must reverse that document ranking.");
+        Assert.Equal(external.Keys.Order(StringComparer.Ordinal), native.Keys.Order(StringComparer.Ordinal));
+
+        foreach (string id in native.Keys)
+            AssertClose(external[id], native[id]);
     }
 
     [Fact]

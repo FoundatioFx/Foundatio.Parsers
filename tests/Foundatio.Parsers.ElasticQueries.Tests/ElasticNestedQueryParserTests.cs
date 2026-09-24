@@ -6,8 +6,10 @@ using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
-using Foundatio.Parsers.LuceneQueries.Visitors;
+using Foundatio.Parsers.LuceneQueries;
+using Foundatio.Parsers.LuceneQueries.Extensions;
 using Foundatio.Parsers.LuceneQueries.Nodes;
+using Foundatio.Parsers.LuceneQueries.Visitors;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
@@ -947,9 +949,12 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         Assert.True(actualResponse.IsValidResponse);
     }
 
-    [Fact]
-    public async Task NestedQuery_WithWildcardOnAnalyzedField_WrapsQueryStringInNestedQuery()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NestedQuery_WithWildcardOnAnalyzedField_WrapsQueryStringInNestedQuery(bool allowLeadingWildcards)
     {
+        // Arrange
         string index = await CreateRandomIndexAsync<MyNestedType>(d => d.Properties(p => p
             .Text(e => e.Field1)
             .Nested(e => e.Nested, o => o.Properties(p1 => p1
@@ -965,7 +970,11 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
 
         var processor = new ElasticQueryParser(c => c.SetLoggerFactory(Log).UseMappings<MyNestedType>(Client).UseNested());
 
-        var result = await processor.BuildQueryAsync("nested.field1:test*", new ElasticQueryVisitorContext().UseScoring());
+        var context = new ElasticQueryVisitorContext().UseScoring();
+        context.SetValidationOptions(new QueryValidationOptions { AllowLeadingWildcards = allowLeadingWildcards });
+
+        // Act
+        var result = await processor.BuildQueryAsync("nested.field1:test*", context);
 
         var actualResponse = await Client.SearchAsync<MyNestedType>(d => d.Indices(index).Query(result), TestCancellationToken);
         string actualRequest = actualResponse.GetRequest();
@@ -976,13 +985,14 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
                 .Path(p => p.Nested)
                 .Query(q2 => q2.QueryString(qs => qs
                     .Fields(Fields.FromStrings(["nested.field1"]))
-                    .AllowLeadingWildcard(false)
+                    .AllowLeadingWildcard(allowLeadingWildcards)
                     .AnalyzeWildcard(true)
                     .Query("test*"))))), TestCancellationToken);
 
         string expectedRequest = expectedResponse.GetRequest();
         _logger.LogInformation("Expected: {Request}", expectedRequest);
 
+        // Assert
         Assert.Equal(expectedRequest, actualRequest);
         Assert.Equal(expectedResponse.Total, actualResponse.Total);
         Assert.Equal(1, actualResponse.Total);
@@ -1930,8 +1940,10 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
             {
                 if (resolvedField == "items.status")
                     return Task.FromResult<Query?>((Query)new TermQuery("items.type", "status_filter"));
+
                 if (resolvedField == "items.priority")
                     return Task.FromResult<Query?>((Query)new TermQuery("items.type", "priority_filter"));
+
                 return Task.FromResult<Query?>(null);
             }));
 

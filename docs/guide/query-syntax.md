@@ -52,24 +52,19 @@ result = parser.Parse("_missing_:description");
 
 ### Wildcard Queries
 
-The parser accepts wildcard characters in terms, but backend support is more limited than the Lucene syntax suggests:
+Unescaped `*` matches any number of characters; `?` matches one. On keyword fields, a single trailing `*` uses a prefix query and other patterns use a wildcard query. On analyzed fields, the default Elasticsearch builder uses an escaped term-only `query_string` with `analyze_wildcard: true`.
 
-| Pattern | Default Elasticsearch query builder |
-|---------|-------------------------------------|
-| `name:john*` | Prefix query on keyword fields; `query_string` on analyzed fields |
-| `name:jo?n` | Ordinary `match` or `term`, not a single-character wildcard |
-| `name:jo*n`, `name:*john` | Ordinary `match` or `term`, not wildcard queries |
-
-```csharp
-// Parse a trailing-star prefix expression
-var result = parser.Parse("name:john*");
+```text
+name:john*
+name:jo?n
+name:jo*n
+name:john\*
+name:"john*"
 ```
 
-::: warning Wildcard translation limitations
-Only an unquoted term ending in `*` takes the default builder's special trailing-star path. On analyzed fields that path sets `analyze_wildcard: true` and `allow_leading_wildcard: false`, unlike Elasticsearch's defaults. On keyword fields, embedded wildcard characters are literal parts of the prefix. Escaping a trailing `*` also loses its literal distinction after unescaping. Fieldless queries depend on configured default fields. See [Wildcard Compatibility](./syntax-compatibility#wildcards-depend-on-the-generated-query-path).
-:::
+The last two forms preserve a literal star; text analysis can still remove punctuation. `name:*` checks for an indexed value. Fieldless expressions use configured default fields or Elasticsearch's default fields when none are configured.
 
-[Validation options](./validation) can reject leading wildcard input; enabling such input does not add missing wildcard translation support.
+`QueryValidationOptions.AllowLeadingWildcards` defaults to true; set it to false to reject leading wildcard operators. Quoted and escaped literals remain allowed. See [Wildcard Compatibility](./syntax-compatibility#wildcards-depend-on-the-generated-query-path) and [cost controls](./syntax-compatibility#upgrading-term-translation-and-controlling-cost).
 
 ### Regex Queries
 
@@ -84,9 +79,7 @@ field:/regex/
 var result = parser.Parse("email:/.*@example\\.com/");
 ```
 
-::: warning Regex query generation is not implemented
-The AST stores `IsRegexTerm`, but the default `ElasticQueryParser` query builder does not emit a `regexp` query. A pattern such as `/foo.bar/` becomes an analyzed `match` on a text field or a literal `term` on a keyword field. A pattern ending in `*` instead takes the trailing-star path: `query_string` on analyzed fields or `prefix` on keyword fields. For example, `/val.*/` becomes the literal prefix `val.` on a keyword field. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
-:::
+The default Elasticsearch query builder emits `regexp` queries for compatible mapped fields and preserves raw regex escapes. It rejects regex on known numeric, date, and boolean mappings before search. With no configured default fields it uses a term-only `query_string` regex. Patterns use Elasticsearch/Lucene automaton syntax and match indexed terms, not .NET regex semantics or arbitrary source text. Analyzer and mapping choices matter; see [term modifier boundaries](./syntax-compatibility#term-modifiers-and-mapping-boundaries).
 
 ## Range Queries
 
@@ -463,7 +456,7 @@ query = await parser.BuildQueryAsync("_missing_:comments");
 ```
 
 ::: info Elasticsearch Limitation
-Standard Elasticsearch `query_string` does not support nested documents. With the mappings and nested visitor configured, Foundatio.Parsers can detect nested fields and wrap queries appropriately. This does not add support for the missing term modifiers or wildcard forms described above.
+Standard Elasticsearch `query_string` does not support nested documents. With the mappings and nested visitor configured, Foundatio.Parsers can detect nested fields and wrap queries appropriately. Term translation also applies to these nested field queries.
 :::
 
 For a full explanation of how the AST is structured and traversed for nested queries, see [Nested Queries and Visitor Traversal](./nested-queries).
@@ -480,9 +473,7 @@ var result = parser.Parse("title:important^2");
 result = parser.Parse("title:\"very important\"^3");
 ```
 
-::: warning Term, phrase, and group boosts are not applied
-The boost is available on the AST, but the default `ElasticQueryParser` query builder does not apply it to term, phrase, or group queries. Live score/ranking controls verify this difference; identical document membership alone cannot detect it. Mapped date ranges are a different case: their caret suffix supplies a time zone, not a boost. See [Matching and Scoring](./syntax-compatibility#matching-and-scoring-are-separate-contracts) and [Date-range Time Zones](#date-range-time-zones).
-:::
+The default Elasticsearch query builder applies finite non-negative boosts to terms, phrases, non-date ranges, and groups. Enable scoring with `new ElasticQueryVisitorContext { UseScoring = true }`; filter context intentionally yields zero scores. Mapped date ranges retain their caret-as-time-zone extension. See [Matching and Scoring](./syntax-compatibility#matching-and-scoring-are-separate-contracts) and [Date-range Time Zones](#date-range-time-zones).
 
 ## Fuzzy Queries
 
@@ -496,9 +487,25 @@ var result = parser.Parse("name:john~");
 result = parser.Parse("name:john~2");
 ```
 
-::: warning Fuzziness and phrase proximity are not applied
-The edit distance is available on the AST (`TermNode.Proximity`), but the default `ElasticQueryParser` query builder does not set `fuzziness`. On an analyzed text field it emits an ordinary `match`, not an exact keyword match. Similarly, `"a b"~5` becomes `match_phrase` without `slop`. See [Syntax Compatibility](./syntax-compatibility#term-modifiers-this-library-parses-but-does-not-translate).
-:::
+The default Elasticsearch query builder accepts the numeric fuzzy distances `0`, `1`, or `2`. These are [Elasticsearch's supported numeric edit distances](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/common-options#fuzziness): `0` allows no character edits, `1` allows one, and `2` allows two. Edits include insertions, deletions, substitutions, and, by default, adjacent-character transpositions. Analyzed text uses `match` with fuzziness; keyword fields use `fuzzy`.
+
+Bare `~` means **2**, following [Lucene's classic query parser default](https://lucene.apache.org/core/9_12_2/queryparser/org/apache/lucene/queryparser/classic/QueryParserBase.html#setFuzzyMinSim(float)). It is a fixed distance, not Elasticsearch's length-dependent `AUTO` policy. Specify an explicit distance when comparing query consumers.
+
+For length-dependent matching, the Elasticsearch query builder also accepts `~AUTO` and custom thresholds. [Elasticsearch generally recommends `AUTO`](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/common-options#fuzziness). The default thresholds (`AUTO:3,6`) allow zero edits for terms of length 0–2, one for 3–5, and two for 6 or more.
+
+```csharp
+// Let Elasticsearch select the edit distance from the analyzed term length
+var query = await elasticParser.BuildQueryAsync("name:john~AUTO");
+
+// Escape the colon in query syntax; C# verbatim strings preserve the backslash
+query = await elasticParser.BuildQueryAsync(@"name:john~AUTO\:2,4");
+```
+
+`AUTO` is case-insensitive. Custom thresholds are non-negative 32-bit integers with `low <= high`: term lengths below `low` allow zero edits, lengths below `high` allow one, and all longer terms allow two. Equal thresholds are allowed and skip the one-edit band. The colon must be escaped (`\:`) because an unescaped colon separates a field from its value in this grammar. These policies are an Elasticsearch translation extension; do not forward the suffix to Lucene's classic query parser or assume the SQL translator applies it. There is no global default-fuzziness setting; bare `~` remains distance 2.
+
+Quoted phrases use `match_phrase` with a non-negative integer slop, for example `title:"a b"~5`. Slop measures token-position movement rather than character edits; zero requires an exact phrase, and transposing adjacent terms costs two positions. Bare phrase `~` means zero. See [Elasticsearch's phrase-slop definition](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query#query-string-top-level-params).
+
+Fuzziness cannot be combined with wildcard or regex syntax, and group proximity is unsupported. Invalid modifiers produce query validation errors. See [mapping and default-distance boundaries](./syntax-compatibility#term-modifiers-and-mapping-boundaries).
 
 ## Escaping Special Characters
 
@@ -521,7 +528,7 @@ Quoted values and regex bodies follow different rules. They accept these backsla
 | `field:"a\.b"` | Quoted term; raw value `a\.b`, unescaped value `a.b` |
 | `field:/a\.b/` | Regex term; raw value `a\.b`, unescaped value `a.b` |
 
-These rules come from the [Foundatio grammar](https://github.com/FoundatioFx/Foundatio.Parsers/blob/main/src/Foundatio.Parsers.LuceneQueries/LuceneQueryParser.peg); they differ from [Elasticsearch's reserved-character rules](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query). Successful parsing still does not guarantee literal wildcard matching or regex execution in the generated query. See [Wildcard Queries](#wildcard-queries) and [Regex Queries](#regex-queries).
+These rules come from the [Foundatio grammar](https://github.com/FoundatioFx/Foundatio.Parsers/blob/main/src/Foundatio.Parsers.LuceneQueries/LuceneQueryParser.peg); they differ from [Elasticsearch's reserved-character rules](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query). AST parsing preserves the syntax; backend translation determines execution. The default Elasticsearch query builder now preserves literal wildcards and translates regex, while other backends have separate contracts. See [Wildcard Queries](#wildcard-queries) and [Regex Queries](#regex-queries).
 
 ```csharp
 // Escape colon in value (the C# string needs a second backslash)

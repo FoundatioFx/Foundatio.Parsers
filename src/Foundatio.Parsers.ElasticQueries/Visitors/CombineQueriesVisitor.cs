@@ -33,17 +33,20 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
 
         // + requires this group in its parent; it must not turn +(a OR b) into +(a AND b).
         var op = node.GetOperator(elasticContext);
+
+        // Apply a group's boost only after required clauses and nested filters are assembled.
+        // Boosting individual children would change their relative scores or skip branches.
         if (requiredClauses is not null)
         {
             var requiredQuery = await RequiredQueryBuilder.BuildAsync(requiredClauses, nested is null ? container : null, elasticContext).AnyContext();
             if (nested is not null)
             {
                 nested.Query = ApplyNestedFilter(requiredQuery, node.GetNestedFilter());
-                node.SetQuery(nested);
+                node.SetQuery(QueryTerm.ApplyGroupBoost(nested, node, context));
             }
             else
             {
-                node.SetQuery(requiredQuery);
+                node.SetQuery(QueryTerm.ApplyGroupBoost(requiredQuery, node, context));
             }
 
             return;
@@ -258,11 +261,11 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
                 nested.Query = container;
             }
 
-            node.SetQuery(nested);
+            node.SetQuery(QueryTerm.ApplyGroupBoost(nested, node, context));
         }
         else
         {
-            node.SetQuery(container);
+            node.SetQuery(QueryTerm.ApplyGroupBoost(container, node, context));
         }
     }
 
@@ -270,6 +273,7 @@ public class CombineQueriesVisitor : ChainableQueryVisitor
     {
         if (left is null)
             return right;
+
         if (right is null)
             return left;
 
