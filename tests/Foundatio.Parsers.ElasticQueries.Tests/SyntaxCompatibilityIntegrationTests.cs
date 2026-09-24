@@ -29,7 +29,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("text-term", "text:alpha", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("text-case", "text:ALPHA", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("keyword-term", "keyword:john", GroupOperator.Or, "a", "a"),
-            ("keyword-case", "keyword:JOHN", GroupOperator.Or, "", ""),
+            ("keyword-case", "keyword:JOHN", GroupOperator.Or, String.Empty, String.Empty),
             ("keyword-uppercase", "keyword:ALPHA", GroupOperator.Or, "l", "l"),
             ("source-component", "source:Services", GroupOperator.Or, "a,b", "a,b"),
             ("source-qualified", "source:App.Services.Checkout", GroupOperator.Or, "a", "a"),
@@ -38,7 +38,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("tag-phrase", "tag:\"VIP Member\"", GroupOperator.Or, "b", "b"),
             ("tag-prefix", "tag:VI*", GroupOperator.Or, "a,b", "a,b"),
             ("tag-regex", "tag:/vip/", GroupOperator.Or, "a,b", "a,b"),
-            ("tag-regex-case", "tag:/VIP/", GroupOperator.Or, "", ""),
+            ("tag-regex-case", "tag:/VIP/", GroupOperator.Or, String.Empty, String.Empty),
             ("keyword-normalizer", "folded:CAFÉ", GroupOperator.Or, "a,b", "a,b"),
             ("indexed-not-source", "_exists_:ignored", GroupOperator.Or, "a,d,f", "a,d,f"),
             ("null-sentinel", "nullable:MISSING", GroupOperator.Or, "a,f", "a,f"),
@@ -68,7 +68,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("bare-dots", "keyword:1..5", GroupOperator.Or, "e", "e"),
             ("dot-range", "number:[1 .. 5]", GroupOperator.Or, "a,b,c,f,g", null),
             ("dot-range-compact", "number:[1..5]", GroupOperator.Or, "a,b,c,f,g", null),
-            ("escaped-dot", "field\\.with\\.dots:value", GroupOperator.Or, null, ""),
+            ("escaped-dot", "field\\.with\\.dots:value", GroupOperator.Or, null, String.Empty),
             ("wildcard-question", "keyword:jo?n", GroupOperator.Or, "a,b,c", "a,b,c"),
             ("wildcard-middle", "keyword:jo*n", GroupOperator.Or, "a,b,c", "a,b,c"),
             ("wildcard-leading", "keyword:*john", GroupOperator.Or, "a", "a"),
@@ -77,14 +77,14 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
             ("wildcard-escaped", "keyword:john\\*", GroupOperator.Or, "j", "j"),
             ("wildcard-text", "text:alp*", GroupOperator.Or, "a,b,d,l", "a,b,d,l"),
             ("regex-prefix", "keyword:/val.*/", GroupOperator.Or, "f,g", "f,g"),
-            ("regex-nonprefix", "keyword:/[0-9]+/", GroupOperator.Or, "", ""),
+            ("regex-nonprefix", "keyword:/[0-9]+/", GroupOperator.Or, String.Empty, String.Empty),
             ("fuzzy", "text:alphx~1", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("phrase-slop", "text:\"alpha beta\"~1", GroupOperator.Or, "a,b", "a,b"),
             ("boost-membership", "text:alpha^8", GroupOperator.Or, "a,b,l", "a,b,l"),
             ("exists", "_exists_:keyword", GroupOperator.Or, "a,b,c,d,e,f,g,h,j,k,l", "a,b,c,d,e,f,g,h,j,k,l"),
-            ("missing", "_missing_:keyword", GroupOperator.Or, "i", ""),
+            ("missing", "_missing_:keyword", GroupOperator.Or, "i", String.Empty),
             ("missing-migration", "NOT _exists_:keyword", GroupOperator.Or, "i", "i"),
-            ("include", "@include:active", GroupOperator.Or, "a", ""),
+            ("include", "@include:active", GroupOperator.Or, "a", String.Empty),
             ("range-inclusive", "number:[1 TO 5]", GroupOperator.Or, "a,b,c,f,g", "a,b,c,f,g"),
             ("range-exclusive", "number:{1 TO 5}", GroupOperator.Or, "b,f,g", "b,f,g"),
             ("range-open-upper", "number:[1 TO 5}", GroupOperator.Or, "a,b,f,g", "a,b,f,g"),
@@ -401,7 +401,7 @@ public sealed class SyntaxCompatibilityIntegrationTests : ElasticsearchTestBase<
         var scores = response.Hits.ToDictionary(hit => hit.Source!.Id, hit => hit.Score ?? Double.NaN, StringComparer.Ordinal);
         Assert.All(scores.Values, score => Assert.True(Double.IsFinite(score) && score >= 0));
 
-        _logger.LogInformation("Scores: {Scores}", String.Join(", ", scores.OrderByDescending(pair => pair.Value).Select(pair => FormattableString.Invariant($"{pair.Key}={pair.Value:R}"))));
+        _logger.LogInformation("Scores: {Scores}", String.Join(", ", scores.OrderByDescending(pair => pair.Value).Select(pair => $"{pair.Key}={pair.Value:R}")));
         return scores;
     }
 

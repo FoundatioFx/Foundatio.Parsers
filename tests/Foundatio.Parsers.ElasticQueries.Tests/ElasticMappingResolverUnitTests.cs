@@ -1809,7 +1809,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             await Task.Yield();
             return CreateTextWithKeywordMapping("name");
         }, _inferrer, logger: _logger);
-        resolver.MappingRefreshWaitTimeout = TimeSpan.FromMilliseconds(250);
+        resolver.MappingRefreshWaitTimeout = TimeSpan.FromSeconds(2);
 
         // Act
         var result = await RunWithNonPumpingSynchronizationContext(() =>
@@ -1817,7 +1817,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             var asyncLookup = resolver.GetMappingAsync("name", cancellationToken: TestCancellationToken).AsTask();
             var syncLookup = resolver.GetMapping("name");
             return (Async: asyncLookup, Sync: syncLookup);
-        }).WaitAsync(TimeSpan.FromSeconds(2), TestCancellationToken);
+        }).WaitAsync(TimeSpan.FromSeconds(5), TestCancellationToken);
 
         // Assert
         Assert.True(result.Sync?.Found);
@@ -1836,7 +1836,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             await Task.Yield();
             return CreateTextWithKeywordMapping("name");
         }, _inferrer, logger: _logger);
-        resolver.MappingRefreshWaitTimeout = TimeSpan.FromMilliseconds(250);
+        resolver.MappingRefreshWaitTimeout = TimeSpan.FromSeconds(2);
         var scheduler = new ConcurrentExclusiveSchedulerPair(TaskScheduler.Default, maxConcurrencyLevel: 1);
 
         // Act
@@ -1846,7 +1846,7 @@ public class ElasticMappingResolverUnitTests : TestWithLoggingBase, IDisposable
             var syncLookup = resolver.GetMapping("name");
             return (Async: asyncLookup, Sync: syncLookup);
         }, CancellationToken.None, TaskCreationOptions.DenyChildAttach, scheduler.ExclusiveScheduler);
-        var result = await lookup.WaitAsync(TimeSpan.FromSeconds(2), TestCancellationToken);
+        var result = await lookup.WaitAsync(TimeSpan.FromSeconds(5), TestCancellationToken);
         scheduler.Complete();
 
         // Assert

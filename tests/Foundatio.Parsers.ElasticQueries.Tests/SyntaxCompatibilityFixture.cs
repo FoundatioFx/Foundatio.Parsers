@@ -40,12 +40,12 @@ public sealed class SyntaxCompatibilityFixture : ElasticsearchFixture
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         CompatibilityDocument[] documents =
         [
-            new() { Id = "a", Text = "alpha beta", OtherText = "gamma", Keyword = "john", Number = 1, Date = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero), Source = "App.Services.Checkout", Tags = ["VIP", "alpha"], Folded = "Café", Ignored = [""], Nullable = [null] },
+            new() { Id = "a", Text = "alpha beta", OtherText = "gamma", Keyword = "john", Number = 1, Date = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero), Source = "App.Services.Checkout", Tags = ["VIP", "alpha"], Folded = "Café", Ignored = [String.Empty], Nullable = [null] },
             new() { Id = "b", Text = "alpha gamma beta", OtherText = "beta", Keyword = "joan", Number = 3, Date = new DateTimeOffset(2024, 1, 1, 5, 59, 59, TimeSpan.Zero), Source = "App.Services.Payments", Tags = ["vip", "VIP Member"], Folded = "CAFE" },
             new() { Id = "c", Text = "beta gamma", OtherText = "alpha", Keyword = "jo?n", Number = 5, Date = new DateTimeOffset(2024, 1, 1, 6, 0, 0, TimeSpan.Zero), Source = "Other.Worker", Tags = ["beta"], Folded = "Tea", Ignored = ["123456"], Nullable = ["present"] },
-            new() { Id = "d", Text = "alphabet soup", OtherText = "beta", Keyword = "johnny", Number = 9, Date = new DateTimeOffset(2024, 1, 2, 6, 0, 0, TimeSpan.Zero), Ignored = ["ok"], Nullable = [""] },
+            new() { Id = "d", Text = "alphabet soup", OtherText = "beta", Keyword = "johnny", Number = 9, Date = new DateTimeOffset(2024, 1, 2, 6, 0, 0, TimeSpan.Zero), Ignored = ["ok"], Nullable = [String.Empty] },
             new() { Id = "e", Text = "foo bar", OtherText = "delta", Keyword = "1..5", Number = 7, Date = null, Nullable = [] },
-            new() { Id = "f", Text = "foobar", OtherText = "delta", Keyword = "val.test", Number = 2, Date = new DateTimeOffset(2023, 12, 31, 0, 0, 0, TimeSpan.Zero), Ignored = ["", null], Nullable = ["x", null] },
+            new() { Id = "f", Text = "foobar", OtherText = "delta", Keyword = "val.test", Number = 2, Date = new DateTimeOffset(2023, 12, 31, 0, 0, 0, TimeSpan.Zero), Ignored = [String.Empty, null], Nullable = ["x", null] },
             new() { Id = "g", Text = "brown fox", OtherText = "delta", Keyword = "value", Number = 4, Date = new DateTimeOffset(2024, 1, 3, 0, 0, 0, TimeSpan.Zero) },
             new() { Id = "h", Text = "quick brown fox", OtherText = "alpha", Keyword = "[0-9]+", Number = 6, Date = new DateTimeOffset(2024, 1, 4, 0, 0, 0, TimeSpan.Zero) },
             new() { Id = "i", Text = null, OtherText = null, Keyword = null, Number = 8, Date = null },
