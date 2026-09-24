@@ -131,20 +131,35 @@ public static class QueryNodeExtensions
     }
 
     /// <summary>
-    /// Determines whether the node is negated, either directly or by the nearest enclosing parenthesized group.
-    /// Returns <c>false</c> when the node is marked as required by the <c>+</c> prefix operator.
+    /// Determines whether the node is excluded locally or by its nearest enclosing parenthesized group,
+    /// falling back to the root group when no enclosing parenthesized group exists.
+    /// Returns <c>false</c> for a null node or when the node is marked as required by the <c>+</c> prefix.
     /// </summary>
     /// <remarks>
-    /// Only the nearest parenthesized group is inspected, not the full ancestor chain. When called on a
-    /// <see cref="GroupNode"/> that already has parens, that same node is the nearest group, so an excluded
-    /// parent group does not affect the result.
+    /// The ancestor search starts at the node's parent and skips non-parenthesized intermediate groups.
+    /// Only the first parenthesized group or root group is inspected, not the ancestors beyond it.
+    /// Thus <c>NOT (a:(b:(c)))</c> reports <c>true</c> for the <c>a:(...)</c> group but <c>false</c> for
+    /// the nested <c>b:(...)</c> group, whose nearest enclosing group is <c>a:(...)</c> and is not excluded.
+    /// A node without a parent is checked only for its own exclusion, subject to the <c>+</c> override.
+    /// <para>
+    /// Node and group exclusions are combined with logical OR, not negation parity: an excluded node
+    /// inside an excluded group still reports <c>true</c>. Only the node's own <c>+</c> prefix overrides
+    /// exclusion; a <c>+</c> on an ancestor does not override the node's result.
+    /// </para>
+    /// <para>
+    /// This reports a node's syntactic negation context, not its effective negation. In
+    /// <c>NOT (status:active AND region:us)</c> the <c>status:active</c> term reports <c>true</c>, yet the
+    /// query only excludes records matching both terms, so an active record outside the US still matches.
+    /// Use this for node-local and immediate-group negation, such as choosing a sort direction, rather
+    /// than as a general-purpose negation check.
+    /// </para>
     /// </remarks>
     public static bool IsNodeOrGroupNegated(this IFieldQueryNode node)
     {
-        if (node.IsRequired())
+        if (node is null || node.IsRequired())
             return false;
 
-        return node.IsExcluded() || node.GetGroupNode()?.IsExcluded() is true;
+        return node.IsExcluded() || node.Parent?.GetGroupNode()?.IsExcluded() is true;
     }
 
     public static GroupNode? GetRootNode(this IQueryNode node)
