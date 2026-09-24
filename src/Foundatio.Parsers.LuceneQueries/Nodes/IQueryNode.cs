@@ -101,9 +101,10 @@ public interface IFieldQueryWithProximityAndBoostNode : IFieldQueryNode
     /// </summary>
     /// <remarks>
     /// Non-null when the tilde (~) operator is present.
-    /// For unquoted terms (e.g., <c>roam~0.8</c>), this indicates a fuzzy search with edit distance.
+    /// For unquoted terms (e.g., <c>roam~2</c>), this carries the fuzzy search modifier.
     /// For quoted terms (e.g., <c>"jakarta apache"~10</c>), this indicates a phrase proximity search with word slop.
     /// An empty string means the bare tilde was used with no explicit value (e.g., <c>term~</c>).
+    /// The AST preserves modifier text; supported values and omitted-value defaults are determined by the backend visitor.
     /// </remarks>
     string? Proximity { get; set; }
 
