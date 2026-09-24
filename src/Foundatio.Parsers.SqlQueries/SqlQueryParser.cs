@@ -88,11 +88,7 @@ public class SqlQueryParser : LuceneQueryParser
         if (!result.IsValid || node is null)
             throw new ValidationException("Invalid query: " + result.Message);
 
-        string predicate = await GenerateSqlVisitor.RunAsync(node, context).AnyContext();
-        if (!result.IsValid)
-            throw new ValidationException("Invalid query: " + result.Message);
-
-        return predicate;
+        return await GenerateSqlVisitor.RunAsync(node, context).AnyContext();
     }
 
     public SqlQueryVisitorContext GetContext(IEntityType entityType)
