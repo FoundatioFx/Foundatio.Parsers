@@ -37,8 +37,12 @@ public static class DefaultQueryNodeExtensions
     {
         if (context is not IElasticQueryVisitorContext elasticContext)
             throw new ArgumentException("Context must be of type IElasticQueryVisitorContext", nameof(context));
+
+        // Keep absent terms nullable at this public boundary. Every successfully read
+        // QueryTerm produces a query, so mapping-specific helpers do not need null fallbacks.
         if (node.Term is null)
             return null;
+
         if (!QueryTerm.TryCreate(node, elasticContext, out var term))
             return new MatchNoneQuery();
 
@@ -61,7 +65,7 @@ public static class DefaultQueryNodeExtensions
         if (defaultFields is { Length: 1 })
         {
             var singleQuery = GetSingleFieldQuery(term, defaultFields[0], elasticContext);
-            string? nestedPath = GetNestedPath(defaultFields[0], elasticContext);
+            string? nestedPath = NestedPathResolver.GetDeepestNestedPath(defaultFields[0], elasticContext);
             if (nestedPath is not null)
             {
                 Query innerQuery = singleQuery;
@@ -81,6 +85,7 @@ public static class DefaultQueryNodeExtensions
 
         if (defaultFields is { Length: > 1 })
         {
+            // Keep root fields together and give each nested path its own query boundary.
             var fieldsByNestedPath = GroupFieldsByNestedPath(defaultFields, elasticContext);
             if (fieldsByNestedPath.Count == 1 && fieldsByNestedPath.ContainsKey(String.Empty))
                 return GetMultiFieldQuery(term, defaultFields, elasticContext);
@@ -113,10 +118,15 @@ public static class DefaultQueryNodeExtensions
         {
             if (term.Wildcard == "*")
                 return new ExistsQuery(field) { Boost = term.Boost };
+
+            // Match queries analyze '*' as text; query_string retains wildcard operators
+            // while applying the field analyzer to the safely escaped term expression.
             if (analyzed)
                 return term.ToQueryString([field], context);
+
             if (term.IsPrefix)
                 return new PrefixQuery(field, term.Value[..^1]) { Boost = term.Boost };
+
             return new WildcardQuery(field) { Value = term.Wildcard, Boost = term.Boost };
         }
 
@@ -129,6 +139,7 @@ public static class DefaultQueryNodeExtensions
         if (term.Fuzziness is not null)
             return new FuzzyQuery(field, term.Value) { Fuzziness = term.Fuzziness, Boost = term.Boost };
 
+        // Non-analyzed numeric and boolean fields need typed values, not JSON strings.
         FieldValue termValue = GetTypedFieldValue(term.Value, field, context);
         return new TermQuery(field, termValue) { Boost = term.Boost };
     }
@@ -170,6 +181,8 @@ public static class DefaultQueryNodeExtensions
         if (analyzedFields.Count == 0)
             return GetNonAnalyzedFieldsQuery(term, nonAnalyzedFields, context);
 
+        // multi_match cannot preserve each keyword/numeric field's exact-value semantics.
+        // Combine analyzed fields with separately typed non-analyzed queries instead.
         var queries = new List<Query> { GetAnalyzedFieldsQuery(term, analyzedFields.ToArray(), context) };
         foreach (string field in nonAnalyzedFields)
             queries.Add(GetSingleFieldQuery(term, field, context));
@@ -186,6 +199,7 @@ public static class DefaultQueryNodeExtensions
         {
             if (fields is null or { Length: 0 })
                 return term.ToQueryString(fields, context);
+
             return new BoolQuery { Should = fields.Select(field => (Query)new RegexpQuery(field, term.Regex) { Boost = term.Boost }).ToArray() };
         }
 
@@ -218,18 +232,14 @@ public static class DefaultQueryNodeExtensions
 
         foreach (string field in fields)
         {
-            string nestedPath = GetNestedPath(field, context) ?? String.Empty;
+            // The empty key groups root fields; nested fields use their deepest mapped path.
+            string nestedPath = NestedPathResolver.GetDeepestNestedPath(field, context) ?? String.Empty;
             if (!result.ContainsKey(nestedPath))
                 result[nestedPath] = new List<string>();
             result[nestedPath].Add(field);
         }
 
         return result;
-    }
-
-    private static string? GetNestedPath(string fullName, IElasticQueryVisitorContext context)
-    {
-        return NestedPathResolver.GetDeepestNestedPath(fullName, context);
     }
 
     private static bool IsPropertyAnalyzed(string field, IElasticQueryVisitorContext context)
@@ -252,17 +262,14 @@ public static class DefaultQueryNodeExtensions
                     var branches = new List<Query>();
                     foreach (string field in fields)
                     {
-                        var q = GetSingleFieldQuery(term, field, context);
-                        Query branch = q;
+                        Query branch = GetSingleFieldQuery(term, field, context);
                         var filter = await filterResolver(nestedPath, field, field, context).AnyContext();
                         if (filter is not null)
                             branch = new BoolQuery { Must = [branch], Filter = [filter] };
                         branches.Add(branch);
                     }
 
-                    if (branches.Count is 0)
-                        continue;
-
+                    // Every path group contains at least one field, each producing a query.
                     Query innerQuery = branches.Count == 1 ? branches[0] : new BoolQuery { Should = branches };
                     queryList.Add(new NestedQuery(nestedPath, innerQuery));
                 }
@@ -297,7 +304,7 @@ public static class DefaultQueryNodeExtensions
 
     private static NestedFilterResolver? GetNestedFilterResolver(IElasticQueryVisitorContext context)
     {
-        if (context is IQueryVisitorContext visitorContext && visitorContext.Data.TryGetValue("@NestedFilterResolver", out object? value))
+        if (context.Data.TryGetValue("@NestedFilterResolver", out object? value))
             return value as NestedFilterResolver;
 
         return null;
@@ -343,6 +350,7 @@ public static class DefaultQueryNodeExtensions
         {
             if (!QueryTerm.TryReadBoost(node.UnescapedBoost, context, out var boost))
                 return new MatchNoneQuery();
+
             var range = new TermRangeQuery(field) { Boost = boost };
             if (!String.IsNullOrWhiteSpace(node.UnescapedMin) && node.UnescapedMin != "*")
             {

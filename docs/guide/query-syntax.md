@@ -487,7 +487,13 @@ var result = parser.Parse("name:john~");
 result = parser.Parse("name:john~2");
 ```
 
-The default Elasticsearch query builder accepts fuzzy distances `0`, `1`, or `2`; bare `~` means **2**. Analyzed text uses `match` with fuzziness; keyword fields use `fuzzy`. Quoted phrases use `match_phrase` with a non-negative integer slop, for example `title:"a b"~5`; bare phrase `~` means zero. Fuzziness cannot be combined with wildcard or regex syntax, and group proximity is unsupported. Invalid modifiers produce query validation errors. See [mapping and default-distance boundaries](./syntax-compatibility#term-modifiers-and-mapping-boundaries).
+The default Elasticsearch query builder accepts fuzzy distances `0`, `1`, or `2`. These are [Elasticsearch's supported edit distances](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/common-options#fuzziness): `0` allows no character edits, `1` allows one, and `2` allows two. Edits include insertions, deletions, substitutions, and, by default, adjacent-character transpositions. Analyzed text uses `match` with fuzziness; keyword fields use `fuzzy`.
+
+Bare `~` means **2**, following [Lucene's classic query parser default](https://lucene.apache.org/core/9_12_2/queryparser/org/apache/lucene/queryparser/classic/QueryParserBase.html#setFuzzyMinSim(float)). It is a fixed distance, not Elasticsearch's length-dependent `AUTO` policy. Specify an explicit distance when comparing query consumers.
+
+Quoted phrases use `match_phrase` with a non-negative integer slop, for example `title:"a b"~5`. Slop measures token-position movement rather than character edits; zero requires an exact phrase, and transposing adjacent terms costs two positions. Bare phrase `~` means zero. See [Elasticsearch's phrase-slop definition](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query#query-string-top-level-params).
+
+Fuzziness cannot be combined with wildcard or regex syntax, and group proximity is unsupported. Invalid modifiers produce query validation errors. See [mapping and default-distance boundaries](./syntax-compatibility#term-modifiers-and-mapping-boundaries).
 
 ## Escaping Special Characters
 

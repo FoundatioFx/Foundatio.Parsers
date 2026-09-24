@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.QueryDsl;
@@ -41,7 +42,11 @@ internal readonly record struct QueryTerm
             BuildWildcard(raw, out wildcard, out expression, out prefix);
             if (raw[0] is '*' or '?' && !context.GetValidationOptions().AllowLeadingWildcards)
             {
-                context.AddValidationError("Terms must not start with a wildcard: " + raw);
+                // The visitor normally reports this first; direct query helpers must also reject it.
+                string message = "Terms must not start with a wildcard: " + raw;
+                if (!context.GetValidationErrors().Any(error => error.Index == -1 && error.Message == message))
+                    context.AddValidationError(message);
+
                 return false;
             }
         }
@@ -104,6 +109,7 @@ internal readonly record struct QueryTerm
         boost = null;
         if (value is null)
             return true;
+
         if (Single.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed) && Single.IsFinite(parsed) && parsed >= 0)
         {
             boost = parsed;
@@ -121,8 +127,11 @@ internal readonly record struct QueryTerm
             context.AddValidationError("Group proximity is not supported: " + node);
             return new MatchNoneQuery();
         }
-        if (!TryReadBoost(node.Boost, context, out var boost))
+        if (!TryReadBoost(node.UnescapedBoost, context, out var boost))
             return new MatchNoneQuery();
+
+        // Wrap the completed group once: changing a child boost would lose its existing
+        // boost or miss nested/required branches. A bool must wrapper preserves membership.
         return query is null || boost is null ? query : new BoolQuery { Must = [query], Boost = boost };
     }
 

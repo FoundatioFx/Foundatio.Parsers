@@ -8,9 +8,11 @@ using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
+using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Parsers.ElasticQueries.Visitors;
 using Foundatio.Parsers.LuceneQueries;
 using Foundatio.Parsers.LuceneQueries.Extensions;
+using Foundatio.Parsers.LuceneQueries.Nodes;
 using Foundatio.Xunit;
 using Xunit;
 
@@ -210,6 +212,90 @@ public class TermTranslationTests : TestWithLoggingBase
         Assert.Equal("bool", actual.Name);
         Assert.Equal(8, actual.Value.GetProperty("boost").GetSingle());
         Assert.Equal(2, actual.Value.GetProperty("must").GetProperty("bool").GetProperty("should").GetArrayLength());
+    }
+
+    [Theory]
+    [InlineData("(text:a OR text:b)")]
+    [InlineData("+(text:a OR text:b)")]
+    [InlineData("@include:saved")]
+    [InlineData("+@include:saved")]
+    public async Task BuildQueryAsync_WithEscapedGroupBoost_MatchesUnescapedBoost(string expression)
+    {
+        // Arrange
+        var parser = new ElasticQueryParser(configuration => configuration
+            .SetLoggerFactory(Log)
+            .UseMappings(_resolver)
+            .UseIncludes(new Dictionary<string, string> { ["saved"] = "text:a OR text:b" }));
+
+        // Act
+        var expected = await parser.BuildQueryAsync(expression + "^2", new ElasticQueryVisitorContext { UseScoring = true });
+        var actual = await parser.BuildQueryAsync(expression + @"^\+2", new ElasticQueryVisitorContext { UseScoring = true });
+
+        // Assert
+        using var expectedJson = await SerializeQueryAsync(expected);
+        using var actualJson = await SerializeQueryAsync(actual);
+
+        Assert.Equal(expectedJson.RootElement.GetRawText(), actualJson.RootElement.GetRawText());
+    }
+
+    [Theory]
+    [InlineData("keyword:*john", "*john")]
+    [InlineData("text:?ohn", "?ohn")]
+    [InlineData("*john", "*john")]
+    public async Task BuildQueryAsync_WithDisallowedLeadingWildcard_ReportsOneDiagnostic(string query, string term)
+    {
+        // Arrange
+        var parser = CreateParser();
+        var options = new QueryValidationOptions { AllowLeadingWildcards = false };
+        var context = new ElasticQueryVisitorContext();
+        context.SetValidationOptions(options);
+        string expectedMessage = "Terms must not start with a wildcard: " + term;
+
+        // Act
+        var validation = await parser.ValidateQueryAsync(query, options);
+        var exception = await Assert.ThrowsAsync<QueryValidationException>(() => parser.BuildQueryAsync(query, context));
+
+        // Assert
+        Assert.Equal(expectedMessage, Assert.Single(validation.ValidationErrors).Message);
+        Assert.Equal(expectedMessage, validation.Message);
+        Assert.NotNull(exception.Result);
+        Assert.Equal(expectedMessage, Assert.Single(exception.Result.ValidationErrors).Message);
+        Assert.Equal("Invalid query: " + expectedMessage, exception.Message);
+    }
+
+    [Theory]
+    [InlineData("*john")]
+    [InlineData("?ohn")]
+    public async Task GetDefaultQueryAsync_WithDisallowedLeadingWildcard_ReportsOneDiagnostic(string term)
+    {
+        // Arrange
+        var node = new TermNode { Field = "keyword", Term = term };
+        var context = new ElasticQueryVisitorContext();
+        context.SetValidationOptions(new QueryValidationOptions { AllowLeadingWildcards = false });
+
+        // Act
+        var query = await node.GetDefaultQueryAsync(context);
+
+        // Assert
+        Assert.NotNull(query?.MatchNone);
+        Assert.Equal("Terms must not start with a wildcard: " + term, Assert.Single(context.GetValidationErrors()).Message);
+    }
+
+    [Theory]
+    [InlineData("text")]
+    [InlineData(null)]
+    public async Task GetDefaultQueryAsync_WithMissingTerm_ReturnsNoQuery(string? field)
+    {
+        // Arrange
+        var node = new TermNode { Field = field };
+        var context = new ElasticQueryVisitorContext { DefaultFields = ["text", "keyword"] };
+
+        // Act
+        var query = await node.GetDefaultQueryAsync(context);
+
+        // Assert
+        Assert.Null(query);
+        Assert.Empty(context.GetValidationErrors());
     }
 
     [Theory]

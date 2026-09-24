@@ -177,6 +177,9 @@ public sealed class TermTranslationIntegrationTests : ElasticsearchTestBase<Term
     [InlineData("john", "john^8")]
     [InlineData("children:(children.text:john OR children.text:alpha)", "children:(children.text:john OR children.text:alpha)^8")]
     [InlineData("+(children.text:john OR children.text:alpha)", "+(children.text:john OR children.text:alpha)^8")]
+    [InlineData("(text:john OR text:alpha)", @"(text:john OR text:alpha)^\+8")]
+    [InlineData("@include:john", @"@include:john^\+8")]
+    [InlineData("+(children.text:john OR children.text:alpha)", @"+(children.text:john OR children.text:alpha)^\+8")]
     public async Task BuildQueryAsync_WithBoost_MultipliesScoresWithoutChangingMembership(string baseline, string boosted)
     {
         // Arrange
