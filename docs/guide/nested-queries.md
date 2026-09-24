@@ -383,7 +383,10 @@ When default fields include both nested and non-nested fields, `DefaultQueryNode
 
 ```csharp
 // Configuration
-parser.SetDefaultFields(["field1", "nested.field1", "nested.field2"]);
+var parser = new ElasticQueryParser(c => c
+    .SetDefaultFields(["field1", "nested.field1", "nested.field2"])
+    .UseMappings(client, "my-index")
+    .UseNested());
 
 // Query: "searchterm"
 // Produces: match(field1, "searchterm") OR nested(match(nested.field1, "searchterm") OR match(nested.field2, "searchterm"))

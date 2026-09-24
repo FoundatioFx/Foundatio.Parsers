@@ -88,7 +88,11 @@ public class SqlQueryParser : LuceneQueryParser
         if (!result.IsValid || node is null)
             throw new ValidationException("Invalid query: " + result.Message);
 
-        return await GenerateSqlVisitor.RunAsync(node, context).AnyContext();
+        string predicate = await GenerateSqlVisitor.RunAsync(node, context).AnyContext();
+        if (!result.IsValid)
+            throw new ValidationException("Invalid query: " + result.Message);
+
+        return predicate;
     }
 
     public SqlQueryVisitorContext GetContext(IEntityType entityType)
@@ -143,6 +147,7 @@ public class SqlQueryParser : LuceneQueryParser
                 IsDate = property.ClrType.UnwrapNullable()?.IsDateTime() ?? false,
                 IsDateOnly = property.ClrType.UnwrapNullable()?.IsDateOnly() ?? false,
                 IsBoolean = property.ClrType.UnwrapNullable()?.IsBoolean() ?? false,
+                IsString = property.ClrType.UnwrapNullable() == typeof(string),
                 Parent = parent
             });
         }
@@ -246,4 +251,4 @@ public static class FTS
     }
 }
 
-public class DynamicLinqTypeProvider() : DefaultDynamicLinqCustomTypeProvider(ParsingConfig.Default, [typeof(EF), typeof(FTS)]);
+public class DynamicLinqTypeProvider() : DefaultDynamicLinqCustomTypeProvider(ParsingConfig.Default, [typeof(EF), typeof(FTS), typeof(DbFunctionsExtensions)]);

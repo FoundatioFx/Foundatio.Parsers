@@ -478,6 +478,35 @@ public class SqlQueryParserTests : TestWithLoggingBase
     }
 
     [Fact]
+    public async Task AdvancedWildcards_ExecuteWithAliasesIncludesAndNulls()
+    {
+        var sp = GetServiceProvider();
+        await using var db = await GetSampleContextWithDataAsync(sp);
+        db.Companies.Add(new Company { Name = "Second", Location = "jo%_hn" });
+        await db.SaveChangesAsync(TestCancellationToken);
+
+        var parser = new SqlQueryParser(c => c
+            .UseFieldMap(new Dictionary<string, string> { ["location"] = "Location" })
+            .UseIncludes(new Dictionary<string, string> { ["matching"] = "location:jo%_?n" }));
+        var context = parser.GetContext(db.Companies.EntityType);
+        context.ValidationOptions!.AllowedFields.Add("location");
+
+        string predicate = await parser.ToDynamicLinqAsync("@include:matching", context);
+        string sql = db.Companies.Where(parser.ParsingConfig, predicate).ToQueryString();
+        var companies = await db.Companies.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
+
+        Assert.Contains(" LIKE ", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(" ESCAPE ", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(companies);
+        Assert.Equal("Second", companies[0].Name);
+
+        predicate = await parser.ToDynamicLinqAsync("FullName:Jo?n*", parser.GetContext(db.Employees.EntityType));
+        var employees = await db.Employees.Where(parser.ParsingConfig, predicate).ToListAsync(TestCancellationToken);
+        Assert.Single(employees);
+        Assert.Equal("John Doe", employees[0].FullName);
+    }
+
+    [Fact]
     public async Task CanSearchWithTokenizer()
     {
         var sp = GetServiceProvider();

@@ -223,8 +223,8 @@ using Foundatio.Parsers.LuceneQueries.Visitors;
 var chainedVisitor = new ChainedQueryVisitor();
 
 // Add visitors with priority (lower runs first)
+chainedVisitor.AddVisitor(new IncludeVisitor(), priority: 0);
 chainedVisitor.AddVisitor(new FieldResolverQueryVisitor(fieldResolver), priority: 10);
-chainedVisitor.AddVisitor(new IncludeVisitor(), priority: 20);
 chainedVisitor.AddVisitor(new ValidationVisitor(), priority: 30);
 
 // Run all visitors

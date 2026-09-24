@@ -61,7 +61,6 @@ For text fields with keyword sub-fields, the resolver automatically uses the key
 
 - Sorting
 - Aggregations
-- Exact match queries
 
 ```csharp
 // Mapping:

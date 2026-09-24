@@ -276,7 +276,7 @@ Expand relative date expressions:
 ```csharp
 public class DateRangeExpansionVisitor : ChainableMutatingQueryVisitor
 {
-    public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
+    public override Task<IQueryNode?> VisitAsync(TermNode node, IQueryVisitorContext context)
     {
         if (IsDateField(node.Field) && IsRelativeDate(node.Term))
         {
@@ -292,10 +292,10 @@ public class DateRangeExpansionVisitor : ChainableMutatingQueryVisitor
                 MaxInclusive = true
             };
             
-            node.ReplaceSelf(rangeNode);
+            return Task.FromResult<IQueryNode?>(node.ReplaceSelf(rangeNode));
         }
         
-        return Task.CompletedTask;
+        return Task.FromResult<IQueryNode?>(node);
     }
 
     private bool IsDateField(string field)
@@ -328,41 +328,27 @@ public class DateRangeExpansionVisitor : ChainableMutatingQueryVisitor
 
 ## Example: Query Logging Visitor
 
-Log all queries for analytics:
+Log query structure without recording raw terms:
 
 ```csharp
 public class QueryLoggingVisitor : ChainableQueryVisitor
 {
     private readonly ILogger _logger;
-    private readonly List<string> _terms = new();
-    private readonly List<string> _fields = new();
 
     public QueryLoggingVisitor(ILogger logger)
     {
         _logger = logger;
     }
 
-    public override Task VisitAsync(TermNode node, IQueryVisitorContext context)
+    public override async Task<IQueryNode?> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
     {
-        _fields.Add(node.Field ?? "_default");
-        _terms.Add(node.Term);
-        return Task.CompletedTask;
-    }
-
-    public override async Task<IQueryNode> AcceptAsync(IQueryNode node, IQueryVisitorContext context)
-    {
-        _terms.Clear();
-        _fields.Clear();
-        
         var result = await base.AcceptAsync(node, context);
-        
-        _logger.LogInformation(
-            "Query executed. Fields: {Fields}, Terms: {Terms}",
-            string.Join(", ", _fields.Distinct()),
-            string.Join(", ", _terms));
-        
+        _logger.LogInformation("Query parsed. Term count: {TermCount}", CountTerms(node));
         return result;
     }
+
+    private static int CountTerms(IQueryNode node) =>
+        (node is TermNode ? 1 : 0) + node.Children.Sum(CountTerms);
 }
 ```
 
@@ -372,18 +358,12 @@ When using chained visitors, priority determines execution order (lower runs fir
 
 ```csharp
 var parser = new ElasticQueryParser(c => c
-    // Field resolution first
-    .AddVisitor(new FieldResolverQueryVisitor(resolver), priority: 10)
-    
-    // Then include expansion
-    .AddVisitor(new IncludeVisitor(), priority: 20)
-    
-    // Then custom processing
-    .AddVisitor(new CustomFilterVisitor(), priority: 50)
-    
-    // Validation last
-    .AddVisitor(new ValidationVisitor(), priority: 100));
+    .UseIncludes(includes) // Expands includes at priority 0
+    .UseFieldResolver(resolver) // Resolves fields at priority 10
+    .AddQueryVisitorBefore<ValidationVisitor>(new CustomFilterVisitor()));
 ```
+
+The built-in validation visitor runs at priority 30. Register a query visitor relative to it so the custom visitor runs after include expansion and field resolution, before validation. Other visitor chains have separate ordering.
 
 ## Best Practices
 

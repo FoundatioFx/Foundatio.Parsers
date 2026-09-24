@@ -28,6 +28,7 @@ public class EntityFieldInfo
     public bool IsDate { get; set; }
     public bool IsDateOnly { get; set; }
     public bool IsBoolean { get; set; }
+    public bool IsString { get; set; }
     public bool IsCollection { get; set; }
     public bool IsNavigation { get; set; }
     public EntityFieldInfo? Parent { get; set; }

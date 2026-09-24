@@ -167,6 +167,7 @@ public static class SqlNodeExtensions
 
         var builder = new StringBuilder();
         bool isExcluded = node.IsExcluded();
+        var wildcard = SqlWildcardPattern.Analyze(node);
 
         if (String.IsNullOrEmpty(node.Field))
         {
@@ -174,6 +175,25 @@ public static class SqlNodeExtensions
             {
                 context.AddValidationError("Field or DefaultFields is required for term queries.");
                 return String.Empty;
+            }
+
+            if (wildcard.Kind == SqlWildcardKind.Advanced)
+            {
+                if (isExcluded)
+                    builder.Append("!(");
+                builder.Append("(");
+                for (int i = 0; i < context.DefaultFields.Length; i++)
+                {
+                    if (i > 0)
+                        builder.Append(" OR ");
+
+                    var defaultField = GetFieldInfo(context.Fields, context.DefaultFields[i]);
+                    AppendLike(builder, defaultField, wildcard.LikePattern);
+                }
+                builder.Append(")");
+                if (isExcluded)
+                    builder.Append(")");
+                return builder.ToString();
             }
 
             var fieldTerms = new Dictionary<EntityFieldInfo, SearchTerm>();
@@ -240,7 +260,7 @@ public static class SqlNodeExtensions
                             builder.Append(argumentPrefix);
                             builder.Append(kvp.Key.Name);
                             builder.Append(", ");
-                            AppendField(builder, kvp.Key, "\\\"*" + token + "*\\\"", context);
+                            AppendField(builder, kvp.Key, "\"*" + token + "*\"", context);
                             builder.Append(")");
                         }
                         else
@@ -270,7 +290,7 @@ public static class SqlNodeExtensions
                             builder.Append(argumentPrefix);
                             builder.Append(kvp.Key.Name);
                             builder.Append(", ");
-                            AppendField(builder, kvp.Key, "\\\"" + token + "*\\\"", context);
+                            AppendField(builder, kvp.Key, "\"" + token + "*\"", context);
                             builder.Append(")");
                         }
                         else
@@ -298,22 +318,27 @@ public static class SqlNodeExtensions
         var field = GetFieldInfo(context.Fields, node.Field);
         var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
         var (scopePrefix, argumentPrefix) = SplitFieldPrefix(field, fieldPrefix);
-        var searchOperator = SqlSearchOperator.Equals;
-        if (node.Term.StartsWith("*") && node.Term.EndsWith("*"))
-            searchOperator = SqlSearchOperator.Contains;
-        else if (node.Term.EndsWith("*"))
-            searchOperator = SqlSearchOperator.StartsWith;
+        var searchOperator = wildcard.Kind switch
+        {
+            SqlWildcardKind.Prefix => SqlSearchOperator.StartsWith,
+            SqlWildcardKind.Contains => SqlSearchOperator.Contains,
+            _ => SqlSearchOperator.Equals
+        };
 
         if (isExcluded)
             builder.Append("!(");
 
-        if (searchOperator == SqlSearchOperator.Equals)
+        if (wildcard.Kind == SqlWildcardKind.Advanced)
+        {
+            AppendLike(builder, field, wildcard.LikePattern);
+        }
+        else if (searchOperator == SqlSearchOperator.Equals)
         {
             builder.Append(scopePrefix);
             builder.Append(argumentPrefix);
             builder.Append(field.Name);
             builder.Append(" = ");
-            AppendField(builder, field, node.Term, context);
+            AppendField(builder, field, wildcard.Literal, context);
             builder.Append(fieldSuffix);
         }
         else if (searchOperator == SqlSearchOperator.Contains)
@@ -334,7 +359,7 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(".Contains(");
-                AppendField(builder, field, node.Term.Trim('*'), context);
+                AppendField(builder, field, wildcard.Literal, context);
                 builder.Append(")");
             }
 
@@ -350,7 +375,7 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(", ");
-                AppendField(builder, field, "\\\"" + node.Term.TrimEnd('*') + "*\\\"", context);
+                AppendField(builder, field, "\"" + wildcard.Literal + "*\"", context);
                 builder.Append(")");
             }
             else
@@ -358,7 +383,7 @@ public static class SqlNodeExtensions
                 builder.Append(argumentPrefix);
                 builder.Append(field.Name);
                 builder.Append(".StartsWith(");
-                AppendField(builder, field, node.Term.TrimEnd('*'), context);
+                AppendField(builder, field, wildcard.Literal, context);
                 builder.Append(")");
             }
 
@@ -607,7 +632,30 @@ public static class SqlNodeExtensions
             }
         }
         else
-            builder.Append("\"" + term + "\"");
+            AppendStringLiteral(builder, term);
+    }
+
+    private static void AppendLike(StringBuilder builder, EntityFieldInfo field, string pattern)
+    {
+        var (fieldPrefix, fieldSuffix) = field.GetFieldPrefixAndSuffix();
+        var (scopePrefix, argumentPrefix) = SplitFieldPrefix(field, fieldPrefix);
+        builder.Append(scopePrefix).Append("DbFunctionsExtensions.Like(EF.Functions, ").Append(argumentPrefix).Append(field.Name).Append(", ");
+        AppendStringLiteral(builder, pattern);
+        builder.Append(", ");
+        AppendStringLiteral(builder, "\\");
+        builder.Append(")").Append(fieldSuffix);
+    }
+
+    private static void AppendStringLiteral(StringBuilder builder, string value)
+    {
+        builder.Append('"');
+        foreach (char c in value)
+        {
+            if (c is '\\' or '"')
+                builder.Append('\\');
+            builder.Append(c);
+        }
+        builder.Append('"');
     }
 
     private const string QueryKey = "Query";
