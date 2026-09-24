@@ -42,6 +42,8 @@ With the Elasticsearch query builder, check whether a field has an indexed value
 
 This is not simply a check for a non-null property in `_source`: mappings can affect which values are indexed. `_missing_` is a Foundatio extension, while `_exists_` is supported by Elasticsearch but is not existence syntax in bare Lucene classic.
 
+Empty strings count as indexed values. Values excluded by `ignore_above` do not. Explicit nulls can count when the field mapping supplies `null_value`; missing fields and empty arrays still have no indexed value.
+
 ```csharp
 // Find documents with an indexed title
 var result = parser.Parse("_exists_:title");
@@ -171,6 +173,14 @@ var result = parser.Parse("created:[2024-01-01 TO *]^\"America/Chicago\"");
 ```
 
 The default Elasticsearch range builder assigns that value to `time_zone`, not `boost`. Do not use `^2` to boost a date range: it is interpreted as a time-zone value instead. The caret time-zone form is a Foundatio extension; for an external `query_string` request, configure its `time_zone` option separately. See [Date-range Compatibility](./syntax-compatibility#date-range-caret-values-are-time-zones-not-boosts).
+
+Quote timestamp bounds containing colons. To select a local calendar day, use the next local midnight as an exclusive upper bound:
+
+```text
+created:["2024-03-10T00:00:00" TO "2024-03-11T00:00:00"}^"America/Chicago"
+```
+
+That day spans 23 hours because daylight saving time begins; the fall transition day spans 25. Do not substitute a fixed 24-hour interval. For `date_nanos`, keep timestamp strings at their original precision rather than converting them through a lower-precision application type.
 
 ## Boolean Operators
 
