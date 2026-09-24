@@ -78,13 +78,13 @@ public sealed class ProductionQueryContractTests : ElasticsearchTestBase<Product
 
     [Theory]
     [MemberData(nameof(MigrationCases))]
-    public async Task BuildQueryAsync_WithMigration_PreservesIndependentExpectedSet(string id, string legacy, string canonical, string expected, string operatorName, bool scoring)
+    public async Task BuildQueryAsync_WithMigration_PreservesIndependentExpectedSet(string id, string configured, string canonical, string expected, string operatorName, bool scoring)
     {
         using var resolver = ElasticMappingResolver.Create(Client, _fixture.Index);
         var parser = CreateParser(resolver);
-        var before = await SearchAsync(await parser.BuildQueryAsync(legacy, Context(operatorName, scoring)), scoring);
+        var before = await SearchAsync(await parser.BuildQueryAsync(configured, Context(operatorName, scoring)), scoring);
         var after = await SearchAsync(await parser.BuildQueryAsync(canonical, Context(operatorName, scoring)), scoring);
-        _output.WriteLine($"{id}: {legacy} -> {canonical}");
+        _output.WriteLine($"{id}: {configured} -> {canonical}");
         Assert.Equal(expected, Ids(before));
         Assert.Equal(expected, Ids(after));
     }
@@ -113,6 +113,7 @@ public sealed class ProductionQueryContractTests : ElasticsearchTestBase<Product
     {
         var response = await Client.Indices.AnalyzeAsync(descriptor => descriptor.Index(_fixture.Index).Analyzer(analyzer).Text(text), TestCancellationToken);
         Assert.True(response.IsValidResponse, response.DebugInformation);
+        Assert.NotNull(response.Tokens);
         Assert.Equal(expected, String.Join(',', response.Tokens.Select(token => token.Token).Order(StringComparer.Ordinal)));
     }
 
@@ -222,6 +223,9 @@ public sealed class ProductionQueryContractTests : ElasticsearchTestBase<Product
     [InlineData("who:*lice")]
     [InlineData("field\\.with\\.dots:value")]
     [InlineData("count:-[1 TO 5]")]
+    [InlineData("message:-alpha")]
+    [InlineData("message:+alpha")]
+    [InlineData("message:NOT alpha")]
     [InlineData("message:alpha~3")]
     [InlineData("message:\"alpha beta\"~1.5")]
     [InlineData("message:alpha^-1")]
@@ -245,6 +249,7 @@ public sealed class ProductionQueryContractTests : ElasticsearchTestBase<Product
     }
 
     private ElasticQueryParser CreateParser(ElasticMappingResolver resolver, string[]? fields = null) => new(configuration => configuration
+        .SetLoggerFactory(Log)
         .UseMappings(resolver)
         .SetDefaultFields(fields ?? _fixture.Definition.DefaultFields)
         .UseFieldMap(_fixture.Definition.FieldMap)
@@ -265,7 +270,7 @@ public sealed class ProductionQueryContractTests : ElasticsearchTestBase<Product
     private async Task<SearchResponse<ProductionQueryContractFixture.Document>> SearchAsync(Query query, bool scoring, string? index = null)
     {
         using var stream = new MemoryStream();
-        await Client.RequestResponseSerializer.SerializeAsync(query, stream, TestCancellationToken);
+        await Client.RequestResponseSerializer.SerializeAsync(query, stream, cancellationToken: TestCancellationToken);
         _output.WriteLine(Encoding.UTF8.GetString(stream.ToArray()));
         var response = await Client.SearchAsync<ProductionQueryContractFixture.Document>(descriptor => descriptor
             .Indices(index ?? _fixture.Index).Query(query).Size(100).TrackTotalHits(true).AllowPartialSearchResults(false), TestCancellationToken);

@@ -20,7 +20,7 @@ CONTROLS = {
     "BuildQueryAsync_WithOptionalClause_ChangesScoresNotMembership": 1,
     "BuildQueryAsync_WithApplicationFilter_CannotBroadenOuterScope": 4,
     "BuildQueryAsync_WithDefaultFields_RestrictsSelection": 5,
-    "BuildQueryAsync_WithDisallowedInput_RejectsBeforeSearch": 8,
+    "BuildQueryAsync_WithDisallowedInput_RejectsBeforeSearch": 11,
     "BuildQueryAsync_WithLiteralWildcard_DoesNotRejectAsPattern": 3,
 }
 

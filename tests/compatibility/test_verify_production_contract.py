@@ -69,7 +69,7 @@ class EvidenceReportTests(unittest.TestCase):
         ET.SubElement(self.collection, "test", type=CLASS, method=method, result="Pass", name=f"{CLASS}.{method}({arguments})")
 
     def test_complete_report(self):
-        self.assertEqual(50, verify_report(self.root, self.folder))
+        self.assertEqual(53, verify_report(self.root, self.folder))
 
     def test_assembly_error(self):
         self.assembly.set("errors", "1")
