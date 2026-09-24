@@ -70,7 +70,7 @@ public class SqlQueryParserTests : TestWithLoggingBase
     public async Task ToDynamicLinqAsync_WithPrefixedInclude_PreservesMatchingEmployees(string query, int expectedId)
     {
         // Arrange
-        var parser = new SqlQueryParser(configuration => configuration.UseIncludes(new Dictionary<string, string>
+        var parser = new SqlQueryParser(configuration => configuration.SetLoggerFactory(Log).UseIncludes(new Dictionary<string, string>
         {
             { "one", "Id:1" },
             { "not-one", "NOT Id:1" }

@@ -85,7 +85,7 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
                 };
             }
 
-            // Expansion replaces this node without retaining its operators.
+            // Ordering expansion replaces this node without retaining its operators.
             ValidationVisitor.ValidateOrderingOperators(node, context);
             return node.ReplaceSelf(result);
         }

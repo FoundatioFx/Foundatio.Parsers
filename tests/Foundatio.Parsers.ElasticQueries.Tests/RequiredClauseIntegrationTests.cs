@@ -161,7 +161,7 @@ public sealed class RequiredClauseIntegrationTests : ElasticsearchTestBase<Requi
     {
         // Arrange
         using var resolver = new ElasticMappingResolver(() => RequiredClauseFixture.Mapping);
-        var parser = new ElasticQueryParser(configuration => configuration.UseMappings(resolver));
+        var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings(resolver));
 
         var referenceClause = new QueryStringQuery(text) { DefaultOperator = op is GroupOperator.And ? Operator.And : Operator.Or };
         Query referenceQuery = scoring ? referenceClause : new BoolQuery { Filter = [referenceClause] };
@@ -184,7 +184,8 @@ public sealed class RequiredClauseIntegrationTests : ElasticsearchTestBase<Requi
         }
     }
 
-    private static ElasticQueryParser CreateParser(ElasticMappingResolver resolver) => new(configuration => configuration
+    private ElasticQueryParser CreateParser(ElasticMappingResolver resolver) => new(configuration => configuration
+        .SetLoggerFactory(Log)
         .UseMappings(resolver)
         .SetDefaultFields(["tags"])
         .UseFieldResolver((field, _) => Task.FromResult<string?>(field is "alias" ? "tags" : null))

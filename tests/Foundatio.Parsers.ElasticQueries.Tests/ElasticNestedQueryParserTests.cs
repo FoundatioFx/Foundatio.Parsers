@@ -2112,7 +2112,7 @@ public class ElasticNestedQueryParserTests : ElasticsearchTestBase
         var indexed = await Client.IndexManyAsync(documents, index, TestCancellationToken);
         Assert.False(indexed.Errors, indexed.DebugInformation);
         await Client.Indices.RefreshAsync(index, cancellationToken: TestCancellationToken);
-        var parser = new ElasticQueryParser(configuration => configuration.UseMappings<SiblingNestedDoc>(Client).UseNested());
+        var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings<SiblingNestedDoc>(Client).UseNested());
 
         // Act
         var query = await parser.BuildQueryAsync(text,

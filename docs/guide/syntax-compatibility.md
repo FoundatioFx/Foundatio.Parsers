@@ -140,7 +140,7 @@ Escaping is not interchangeable either: Foundatio's ordinary escape rule accepts
 
 ### Sort and aggregation ordering
 
-Ordering has a separate contract from search queries: `price`, `+price`, and `-price` are valid sort expressions; `+max:price` and `-max:price` select aggregation order. Boolean `!` and `NOT` are rejected in ordering expressions, including `NOT +price`, rather than interpreted as descending or silently ignored. Their meaning in search queries is unchanged. This follows the [ordering decision in #273](https://github.com/FoundatioFx/Foundatio.Parsers/issues/273#issuecomment-5687993474).
+Ordering has a separate contract from search queries: `price`, `+price`, and `-price` are valid sort expressions; `+max:price` and `-max:price` select aggregation order. Boolean `!` and `NOT` are rejected in ordering expressions, including `NOT +price`, rather than interpreted as descending or silently ignored. They remain Boolean operators in search queries. This follows the [ordering decision in #273](https://github.com/FoundatioFx/Foundatio.Parsers/issues/273#issuecomment-5687993474).
 
 This is a behavioral breaking change for previously accepted ordering input. Choose an explicit direction when migrating; do not automatically turn ignored aggregation negation into descending order. See [Ordering Operators](./validation#ordering-operators) for validation errors, migration examples, and the limits of raw AST build overloads.
 

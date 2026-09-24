@@ -44,6 +44,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
         int arrived = 0;
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var parser = new ElasticQueryParser(configuration => configuration
+            .SetLoggerFactory(Log)
             .UseMappings(_resolver)
             .UseIncludes(async name =>
             {
@@ -156,6 +157,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     {
         // Arrange
         var parser = new ElasticQueryParser(configuration => configuration
+            .SetLoggerFactory(Log)
             .UseMappings(_resolver)
             .AddQueryVisitor(new CustomFilterVisitor()));
         var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring };
@@ -178,7 +180,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     public async Task BuildQueryAsync_WithRequiredAndOptionalClauses_PreservesBooleanScope(bool scoring)
     {
         // Arrange
-        var parser = new ElasticQueryParser(configuration => configuration.UseMappings(_resolver));
+        var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings(_resolver));
         var context = new ElasticQueryVisitorContext { DefaultOperator = GroupOperator.Or, UseScoring = scoring };
 
         // Act
@@ -201,7 +203,7 @@ public class SyntaxCompatibilityTests : TestWithLoggingBase
     public Task BuildQueryAsync_WithUntranslatableRequiredClause_ThrowsValidationException(GroupOperator op)
     {
         // Arrange
-        var parser = new ElasticQueryParser(configuration => configuration.UseMappings(_resolver));
+        var parser = new ElasticQueryParser(configuration => configuration.SetLoggerFactory(Log).UseMappings(_resolver));
         var context = new ElasticQueryVisitorContext { DefaultOperator = op };
 
         // Act & Assert

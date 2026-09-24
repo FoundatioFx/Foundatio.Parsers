@@ -397,7 +397,7 @@ Aggregation negation previously could be silently ignored. Remove it from primar
 sub-aggregation when ordering is intended (`terms:(category -max:price)`, for example). Do not blindly
 replace an ignored operator with descending order, since that changes the result ordering.
 
-`NOT`, `!`, and required/prohibited clauses in **search queries**, including SQL queries, are unchanged.
+This ordering restriction does not apply to `NOT`, `!`, or required/prohibited clauses in **search queries**, including SQL queries. For changes to required clauses and prefixed includes, see the [query upgrade guidance](./syntax-compatibility#upgrading-queries-that-use-required-clauses-or-includes).
 :::
 
 For custom visitor pipelines, preserve operator state until it can be validated. The built-in
