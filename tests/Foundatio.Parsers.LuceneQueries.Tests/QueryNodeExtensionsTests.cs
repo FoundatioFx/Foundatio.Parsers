@@ -4,8 +4,125 @@ using Xunit;
 
 namespace Foundatio.Parsers.LuceneQueries.Tests;
 
+[Trait("TestType", "Unit")]
 public class QueryNodeExtensionsTests
 {
+    [Fact]
+    public void IsNodeOrGroupNegated_WithNullNode_ReturnsFalse()
+    {
+        // Arrange
+        // IsExcluded() and IsRequired() both tolerate a null receiver, so this helper must too.
+        // Suppressed because the scenario under test is a caller without nullable reference types enabled.
+        IFieldQueryNode node = null!;
+
+        // Act
+        bool result = node.IsNodeOrGroupNegated();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsNodeOrGroupNegated_WithRootNode_ReturnsFalse()
+    {
+        // Arrange
+        // The root group has no parent, so the parent walk must not throw.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse("field1:value1");
+
+        // Assert
+        Assert.False(result.IsNodeOrGroupNegated());
+    }
+
+    [Fact]
+    public void IsNodeOrGroupNegated_WithTermInsideNestedFieldGroup_StopsAtNearestParenthesizedGroup()
+    {
+        // Arrange
+        // Pins the documented depth limit: the walk stops at the nearest parenthesized group, so a term
+        // can disagree with the groups enclosing it. See https://github.com/FoundatioFx/Foundatio.Parsers/issues/279.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var nested = parser.Parse("-(field:(value))");
+        var flat = parser.Parse("-(field:value)");
+
+        // Assert
+        var nestedOuter = Assert.IsType<GroupNode>(nested.Left);
+        var nestedInner = Assert.IsType<GroupNode>(nestedOuter.Left);
+        var nestedTerm = Assert.IsType<TermNode>(nestedInner.Left);
+
+        Assert.True(nestedOuter.IsNodeOrGroupNegated());
+        Assert.True(nestedInner.IsNodeOrGroupNegated());
+
+        // The term's nearest group is the parenthesized "field:(...)" group, which is not itself
+        // excluded, so the excluded outer group is never reached.
+        Assert.False(nestedTerm.IsNodeOrGroupNegated());
+
+        // Without the intermediate parenthesized field group, the same term does see the negation.
+        var flatOuter = Assert.IsType<GroupNode>(flat.Left);
+        var flatTerm = Assert.IsType<TermNode>(flatOuter.Left);
+        Assert.True(flatTerm.IsNodeOrGroupNegated());
+    }
+
+    [Fact]
+    public void IsNodeOrGroupNegated_WithDoublyNestedGroups_MatchesDocumentedExample()
+    {
+        // Arrange
+        // Pins the exact example in the IsNodeOrGroupNegated XML docs, so the documented result cannot
+        // drift from the implementation. See https://github.com/FoundatioFx/Foundatio.Parsers/issues/279.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse("NOT (a:(b:(c)))");
+
+        // Assert
+        var notGroup = Assert.IsType<GroupNode>(result.Left);
+        var groupA = Assert.IsType<GroupNode>(notGroup.Left);
+        var groupB = Assert.IsType<GroupNode>(groupA.Left);
+        var termC = Assert.IsType<TermNode>(groupB.Left);
+
+        Assert.True(notGroup.IsExcluded());
+
+        // "a" sees the excluded NOT group, because that group is its nearest enclosing parenthesized group.
+        Assert.True(groupA.IsNodeOrGroupNegated());
+
+        // "b" does not: its nearest enclosing group is "a:(...)", which is parenthesized but not excluded,
+        // so the walk stops there and never reaches the NOT group.
+        Assert.False(groupB.IsNodeOrGroupNegated());
+        Assert.False(termC.IsNodeOrGroupNegated());
+    }
+
+    [Fact]
+    public void IsNodeOrGroupNegated_WithMultipleTermsInExcludedGroup_ReportsSyntacticContextOnly()
+    {
+        // Arrange
+        // Pins the multi-term example in the IsNodeOrGroupNegated docs: a "true" here describes the term's
+        // syntactic context, not what the query excludes. See https://github.com/FoundatioFx/Foundatio.Parsers/issues/279.
+        var parser = new LuceneQueryParser();
+
+        // Act
+        var result = parser.Parse("NOT (status:active AND region:us)");
+
+        // Assert
+        var notGroup = Assert.IsType<GroupNode>(result.Left);
+        var statusTerm = Assert.IsType<TermNode>(notGroup.Left);
+        var regionTerm = Assert.IsType<TermNode>(notGroup.Right);
+
+        Assert.True(notGroup.HasParens);
+        Assert.True(notGroup.IsExcluded());
+        Assert.Equal(GroupOperator.And, notGroup.Operator);
+
+        // Both terms report negated because their nearest enclosing parenthesized group is excluded, even
+        // though the query only excludes records matching both terms - an active record outside the US
+        // still matches. Neither term is individually negated.
+        Assert.False(statusTerm.IsExcluded());
+        Assert.False(regionTerm.IsExcluded());
+        Assert.True(statusTerm.IsNodeOrGroupNegated());
+        Assert.True(regionTerm.IsNodeOrGroupNegated());
+    }
+
     [Theory]
     [InlineData(null, null, null, null, false)]
     [InlineData(false, null, false, null, false)]

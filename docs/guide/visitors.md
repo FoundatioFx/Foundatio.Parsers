@@ -381,15 +381,12 @@ In query contexts, use the extension methods instead of inspecting the propertie
 - `IsNodeOrGroupNegated()` - `IsExcluded()` plus negation on the nearest enclosing parenthesized group, falling back to the root group. Its limits are described below.
 
 ```csharp
-// Wrong: misses the ! prefix and any negation on the enclosing group
-bool isNegated = node.IsNegated.GetValueOrDefault() || node.Prefix == "-";
+// Check only the node's own NOT, - or ! operator.
+bool isLocallyExcluded = node.IsExcluded();
 
-// Right
-bool isNegated = node.IsExcluded();
-
-// Right, when negation on the enclosing group should also apply
-// e.g. the value term in -field:(value)
-bool isNegated = node.IsNodeOrGroupNegated();
+// Also inspect the nearest enclosing group (or root), unless the node has +.
+// For example, the value term in -field:(value).
+bool isNodeOrGroupExcluded = node.IsNodeOrGroupNegated();
 ```
 
 #### What `IsNodeOrGroupNegated()` checks
