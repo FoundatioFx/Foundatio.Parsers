@@ -779,6 +779,38 @@ public class SqlQueryParserTests : TestWithLoggingBase
         string sql = await parser.ToDynamicLinqAsync("created:>now-90d", context);
         sqlActual = db.Employees.Where(sql).ToQueryString();
         Assert.Equal(sqlExpected, sqlActual);
+
+        sqlExpected = db.Employees.Where(e => e.Created > DateTime.UtcNow.AddDays(-14)).ToQueryString();
+        sql = await parser.ToDynamicLinqAsync("created:>now-2w", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+
+        sqlExpected = db.Employees.Where(e => e.Birthday < DateOnly.FromDateTime(DateTime.UtcNow).AddDays(21)).ToQueryString();
+        sql = await parser.ToDynamicLinqAsync("birthday:<now+3w", context);
+        sqlActual = db.Employees.Where(sql).ToQueryString();
+        Assert.Equal(sqlExpected, sqlActual);
+    }
+
+    [Theory]
+    [InlineData("created:>now-2w", "Created > DateTime.UtcNow.AddDays(-14)")]
+    [InlineData("created:<=now+1w", "Created <= DateTime.UtcNow.AddDays(7)")]
+    [InlineData("birthday:<now+3w", "Birthday < DateOnly.FromDateTime(DateTime.UtcNow).AddDays(21)")]
+    [InlineData("birthday:now-1w", "Birthday = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-7)")]
+    public async Task ToDynamicLinqAsync_WithWeekDateMath_ConvertsWeeksToDays(string query, string expected)
+    {
+        var parser = new SqlQueryParser();
+        var context = new SqlQueryVisitorContext
+        {
+            Fields =
+            [
+                new EntityFieldInfo { Name = "Created", FullName = "created", IsDate = true },
+                new EntityFieldInfo { Name = "Birthday", FullName = "birthday", IsDateOnly = true }
+            ]
+        };
+
+        string result = await parser.ToDynamicLinqAsync(query, context);
+
+        Assert.Equal(expected, result);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using Foundatio.Parsers.LuceneQueries.Extensions;
@@ -578,6 +579,7 @@ public static class SqlNodeExtensions
                 {
                     "y" => "AddYears",
                     "M" => "AddMonths",
+                    "w" => "AddDays",
                     "d" => "AddDays",
                     "h" => "AddHours",
                     "H" => "AddHours",
@@ -588,7 +590,7 @@ public static class SqlNodeExtensions
 
                 bool subtract = term.Substring(3, 1) == "-";
 
-                builder.Append(method).Append("(").Append(subtract ? "-" : "").Append(term.Substring(4, term.Length - 5)).Append(")");
+                builder.Append(method).Append("(").Append(subtract ? "-" : "").Append(GetDateMathAmount(term)).Append(")");
             }
             else
             {
@@ -622,13 +624,14 @@ public static class SqlNodeExtensions
                 {
                     "y" => "AddYears",
                     "M" => "AddMonths",
+                    "w" => "AddDays",
                     "d" => "AddDays",
                     _ => throw new NotSupportedException("Invalid date operation.")
                 };
 
                 bool subtract = term.Substring(3, 1) == "-";
 
-                builder.Append(method).Append("(").Append(subtract ? "-" : "").Append(term.Substring(4, term.Length - 5)).Append(")");
+                builder.Append(method).Append("(").Append(subtract ? "-" : "").Append(GetDateMathAmount(term)).Append(")");
             }
             else
             {
@@ -645,6 +648,16 @@ public static class SqlNodeExtensions
         }
         else
             AppendStringLiteral(builder, term);
+    }
+
+    private static string GetDateMathAmount(string term)
+    {
+        string amount = term.Substring(4, term.Length - 5);
+        if (term[^1] != 'w')
+            return amount;
+
+        long days = checked(Int64.Parse(amount, NumberStyles.None, CultureInfo.InvariantCulture) * 7);
+        return days.ToString(CultureInfo.InvariantCulture);
     }
 
     private static void AppendLike(StringBuilder builder, EntityFieldInfo field, string pattern)
