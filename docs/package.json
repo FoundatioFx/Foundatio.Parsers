@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "mermaid": "^11.16.1",
+    "mermaid": "^12.2.0",
     "vitepress": "^2.0.0-alpha.19",
     "vitepress-plugin-llms": "^1.13.4",
     "vitepress-plugin-mermaid": "^2.0.17"
