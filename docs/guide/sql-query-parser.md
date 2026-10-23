@@ -277,12 +277,18 @@ var parser = new SqlQueryParser(c => c
 ```csharp
 // Relative dates
 "created:>now-7d"
-// Generates: Created > DateTime.Parse("2024-01-08") // 7 days ago
+// Generates: Created > DateTime.UtcNow.AddDays(-7)
+
+// Weeks are converted to days
+"created:>now-2w"
+// Generates: Created > DateTime.UtcNow.AddDays(-14)
 
 // Date ranges
 "created:[now-30d TO now]"
 // Generates: (Created >= ... AND Created <= ...)
 ```
+
+Relative dates support `now` with a single `+N` or `-N` offset. `DateTime` fields accept the `y`, `M`, `w`, `d`, `h`/`H`, `m`, and `s` units; `DateOnly` fields accept `y`, `M`, `w`, and `d`. Rounding (`/d`) and chained operations are not supported.
 
 ### Custom Date Parsing
 
