@@ -29,6 +29,11 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
         if (node.Field != "@" + _includeName || (_shouldSkipInclude != null && _shouldSkipInclude(node, context)))
             return node;
 
+        // Inside an aggregation group such as terms:(field @include:/re/) "@include" is the aggregation's own modifier,
+        // not a named query include. A top-level "@include:name" in an aggregation or sort still expands the include.
+        if (_includeName == "include" && context.QueryType is QueryTypes.Aggregation && IsInsideNamedGroup(node))
+            return node;
+
         var includeResolver = context.GetIncludeResolver();
         if (includeResolver == null)
             return node;
@@ -96,6 +101,17 @@ public class IncludeVisitor : ChainableMutatingQueryVisitor
 
             return node;
         }
+    }
+
+    private static bool IsInsideNamedGroup(TermNode node)
+    {
+        for (var parent = node.Parent; parent is not null; parent = parent.Parent)
+        {
+            if (parent is GroupNode { Field.Length: > 0 })
+                return true;
+        }
+
+        return false;
     }
 
     public static Task<IQueryNode?> RunAsync(IQueryNode node, IncludeResolver includeResolver, IQueryVisitorContextWithIncludeResolver? context = null, ShouldSkipIncludeFunc? shouldSkipInclude = null)
